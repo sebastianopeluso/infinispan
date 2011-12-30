@@ -22,6 +22,8 @@
  */
 package org.infinispan.container;
 
+import eu.cloudtm.rmi.statistics.ThreadStatistics;
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.CacheException;
 import org.infinispan.config.Configuration;
 import org.infinispan.container.entries.CacheEntry;
@@ -55,6 +57,8 @@ public class EntryFactoryImpl implements EntryFactory {
 
    private static final Log log = LogFactory.getLog(EntryFactoryImpl.class);
    private static final boolean trace = log.isTraceEnabled();
+   //DIE
+   private boolean statisticsEnabled = false;
 
    @Inject
    public void injectDependencies(DataContainer dataContainer, LockManager lockManager, Configuration configuration, CacheNotifier notifier) {
@@ -62,12 +66,15 @@ public class EntryFactoryImpl implements EntryFactory {
       this.configuration = configuration;
       this.lockManager = lockManager;
       this.notifier = notifier;
+
    }
 
    @Start
    public void init() {
       useRepeatableRead = configuration.getIsolationLevel() == IsolationLevel.REPEATABLE_READ;
       writeSkewCheck = configuration.isWriteSkewCheck();
+      //DIE
+      this.setStatisticsEnabled(configuration.isExposeJmxStatistics());
    }
 
    private MVCCEntry createWrappedEntry(Object key, Object value, boolean isForInsert, boolean forRemoval, long lifespan) {
@@ -230,6 +237,11 @@ public class EntryFactoryImpl implements EntryFactory {
 
       if (!ctx.hasLockedKey(key) && !shouldSkipLocking) {
          if (lockManager.lockAndRecord(key, ctx)) {
+            //DIE
+            if(this.statisticsEnabled && ctx.isInTxScope()){
+                ThreadStatistics is = ThreadLocalStatistics.getInfinispanThreadStats();
+                is.startHoldTime(key,ctx.isOriginLocal());
+            }
             return true;
          } else {
             Object owner = lockManager.getOwner(key);
@@ -260,5 +272,10 @@ public class EntryFactoryImpl implements EntryFactory {
 
    public final void releaseLock(Object key) {
       lockManager.unlock(key);
+   }
+
+   //DIE
+   private void setStatisticsEnabled(boolean b){
+       this.statisticsEnabled = b;
    }
 }

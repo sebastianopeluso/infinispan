@@ -88,4 +88,7 @@ public interface Ids {
    int XID_GLOBAL_TRANSACTION = 68;
 
    int IN_DOUBT_TX_INFO = 70;
+
+   //DIE
+   int STATISTICS_EXTENDED_RESPONSE = 71;
 }

@@ -22,6 +22,8 @@
  */
 package org.infinispan.interceptors;
 
+import eu.cloudtm.rmi.statistics.ThreadStatistics;
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.CacheException;
 import org.infinispan.commands.control.LockControlCommand;
 import org.infinispan.commands.read.GetKeyValueCommand;
@@ -75,6 +77,8 @@ public class LockingInterceptor extends CommandInterceptor {
    EntryFactory entryFactory;
    boolean useReadCommitted;
    Transport transport;
+
+   private boolean statisticsEnabled = true; //DIE per ora è fisso
 
    @Inject
    public void setDependencies(LockManager lockManager, DataContainer dataContainer, EntryFactory entryFactory, Transport transport) {
@@ -353,6 +357,11 @@ public class LockingInterceptor extends CommandInterceptor {
    }
 
    private void cleanupLocks(InvocationContext ctx, boolean commit) {
+      //DIE
+      final boolean computeStats = this.statisticsEnabled && ctx.isInTxScope();
+      ThreadStatistics is = null;
+      if(computeStats)
+          is = ThreadLocalStatistics.getInfinispanThreadStats();
       if (commit) {
          Object owner = ctx.getLockOwner();
          ReversibleOrderedSet<Map.Entry<Object, CacheEntry>> entries = ctx.getLookedUpEntries().entrySet();
@@ -374,10 +383,17 @@ public class LockingInterceptor extends CommandInterceptor {
             if (needToUnlock && !ctx.hasFlag(Flag.SKIP_LOCKING)) {
                if (trace) log.tracef("Releasing lock on [%s] for owner %s", key, owner);
                lockManager.unlock(key);
+               if(computeStats){
+                  is.computeHoldTime(key,ctx.isOriginLocal(),commit);
+               }
+
             }
          }
       } else {
          lockManager.releaseLocks(ctx);
+         if(computeStats){
+             is.flushHoldTimesOnAbort(ctx.isOriginLocal());
+         }
       }
    }
 

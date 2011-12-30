@@ -37,12 +37,16 @@ import org.infinispan.util.Util;
  * @author Jason T. Greene
  */
 public class ExtendedResponse extends ValidResponse {
-   private final boolean replayIgnoredRequests;
-   private final Response response;
+   protected final boolean replayIgnoredRequests;
+   protected final Response response;
+
+
 
    public ExtendedResponse(Response response, boolean replayIgnoredRequests) {
       this.response = response;
       this.replayIgnoredRequests = replayIgnoredRequests;
+
+
    }
 
    public boolean isReplayIgnoredRequests() {
@@ -56,6 +60,9 @@ public class ExtendedResponse extends ValidResponse {
    public boolean isSuccessful() {
       return response.isSuccessful();
    }
+
+
+
 
    public static class Externalizer extends AbstractExternalizer<ExtendedResponse> {
       @Override

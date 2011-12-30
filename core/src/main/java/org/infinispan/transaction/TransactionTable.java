@@ -207,6 +207,10 @@ public class TransactionTable {
          }
          ((SyncLocalTransaction) localTransaction).setEnlisted(true);
       }
+      //DIE
+       else{
+          System.out.println("Transazione già enlisted!! E io la inizializzo di nuovo nel threadLocal!!");
+      }
    }
 
    public void failureCompletingTransaction(Transaction tx) {

@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @MBean(objectName = "Statistics", description = "General statistics such as timings, hit/miss ratio, etc.")
 public class CacheMgmtInterceptor_original extends JmxStatsCommandInterceptor {
+
    private AtomicLong hitTimes = new AtomicLong(0);
    private AtomicLong missTimes = new AtomicLong(0);
    private AtomicLong storeTimes = new AtomicLong(0);
@@ -219,6 +220,9 @@ public class CacheMgmtInterceptor_original extends JmxStatsCommandInterceptor {
    public long getTimeSinceReset() {
       return TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - reset.get());
    }
+
+
+
 
    @ManagedOperation(description = "Resets statistics gathered by this component")
    @Operation(displayName = "Reset Statistics (Statistics)")

@@ -22,11 +22,14 @@
  */
 package org.infinispan.remoting.rpc;
 
+import eu.cloudtm.rmi.statistics.ThreadStatistics;
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.CacheException;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.control.StateTransferControlCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
+import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.config.Configuration;
 import org.infinispan.factories.KnownComponentNames;
 import org.infinispan.factories.annotations.ComponentName;
@@ -39,6 +42,7 @@ import org.infinispan.jmx.annotations.ManagedOperation;
 import org.infinispan.remoting.RpcException;
 import org.infinispan.remoting.ReplicationQueue;
 import org.infinispan.remoting.responses.Response;
+import org.infinispan.remoting.responses.StatisticsExtendedResponse;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.remoting.transport.Transport;
 import org.infinispan.statetransfer.StateTransferException;
@@ -54,10 +58,7 @@ import org.rhq.helpers.pluginAnnotations.agent.Parameter;
 import org.rhq.helpers.pluginAnnotations.agent.Units;
 
 import java.text.NumberFormat;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -121,31 +122,49 @@ public class RpcManagerImpl implements RpcManager {
 
    public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout, boolean usePriorityQueue, ResponseFilter responseFilter) {
       List<Address> members = t.getMembers();
+      //DIE
+      boolean exceptionThrown = false;
+      Map<Address, Response> result = null;
+
       if (members.size() < 2) {
          if (log.isDebugEnabled())
             log.debug("We're the only member in the cluster; Don't invoke remotely.");
          return Collections.emptyMap();
       } else {
          long startTime = 0;
-         if (statisticsEnabled) startTime = System.currentTimeMillis();
+         if (statisticsEnabled) startTime = System.nanoTime();
          try {
-            Map<Address, Response> result = t.invokeRemotely(recipients, rpcCommand, mode, timeout, usePriorityQueue, responseFilter, stateTransferEnabled);
+            result = t.invokeRemotely(recipients, rpcCommand, mode, timeout, usePriorityQueue, responseFilter, stateTransferEnabled);
+
             if (isStatisticsEnabled()) replicationCount.incrementAndGet();
             return result;
          } catch (CacheException e) {
             if (log.isTraceEnabled()) {
                log.trace("replication exception: ", e);
             }
+            //DIE
+            exceptionThrown=true;
 
             if (isStatisticsEnabled()) replicationFailures.incrementAndGet();
             throw e;
          } catch (Throwable th) {
             log.unexpectedErrorReplicating(th);
             if (isStatisticsEnabled()) replicationFailures.incrementAndGet();
+            //DIE
+            exceptionThrown = true;
+
             throw new CacheException(th);
          } finally {
-            if (statisticsEnabled) {
-               long timeTaken = System.currentTimeMillis() - startTime;
+            if (statisticsEnabled && !exceptionThrown && rpcCommand instanceof PrepareCommand) {
+               long timeTaken = System.nanoTime() - startTime;
+               long maxReplayTime = this.getMaxReplayTime(result);
+               long avgReplayTime = this.getAvgReplayTime(result);
+               long rtt = timeTaken - maxReplayTime;
+               ThreadStatistics is = ThreadLocalStatistics.getInfinispanThreadStats();
+               is.addMaxReplayTime(maxReplayTime);
+               is.addAvgReplayTime(avgReplayTime);
+               is.addRtt(rtt);
+
                totalReplicationTime.getAndAdd(timeTaken);
             }
          }
@@ -426,4 +445,33 @@ public class RpcManagerImpl implements RpcManager {
    public Address getAddress() {
       return t != null ? t.getAddress() : null;
    }
+
+
+
+    //DIE
+    private long getMaxReplayTime(Map<Address,Response> list){
+        long max=0;
+        long ttemp = 0;
+        StatisticsExtendedResponse temp;
+        Iterator<Address> it = list.keySet().iterator();
+        while(it.hasNext()){
+            temp = (StatisticsExtendedResponse) list.get(it.next());
+            ttemp = temp.getReplayTime();
+            if(ttemp>max)
+                max=ttemp;
+        }
+        return max;
+    }
+
+    private long getAvgReplayTime(Map<Address,Response> list){
+        double avg = 0;
+        StatisticsExtendedResponse temp;
+        Iterator<Address> it = list.keySet().iterator();
+        while(it.hasNext()){
+            temp = (StatisticsExtendedResponse) list.get(it.next());
+            avg+=temp.getReplayTime();
+        }
+        return (long)( avg / (double)list.size());
+
+    }
 }

@@ -22,9 +22,12 @@
  */
 package org.infinispan.remoting.transport.jgroups;
 
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.CacheException;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
+import org.infinispan.commands.tx.CommitCommand;
+import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.RpcException;
 import org.infinispan.remoting.responses.ExceptionResponse;
@@ -212,6 +215,15 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          Buffer buf;
          try {
             buf = req_marshaller.objectToBuffer(command);
+             //DIE
+            if(command instanceof PrepareCommand) {
+               //ThreadLocalStatistics.getInfinispanThreadStats().incrementPrepares();
+               ThreadLocalStatistics.getInfinispanThreadStats().addPrepareCommandSize(buf.getLength());
+            }
+            else if(command instanceof CommitCommand){
+               //ThreadLocalStatistics.getInfinispanThreadStats().incrementCommits();
+               ThreadLocalStatistics.getInfinispanThreadStats().addCommitCommandSize(buf.getLength());
+            }
          } catch (Exception e) {
             throw new RuntimeException("Failure to marshal argument(s)", e);
          }

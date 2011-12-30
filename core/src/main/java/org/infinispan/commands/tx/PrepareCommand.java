@@ -22,6 +22,7 @@
  */
 package org.infinispan.commands.tx;
 
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.Visitor;
 import org.infinispan.commands.write.WriteCommand;
@@ -90,6 +91,12 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       }
 
       // 1. first create a remote transaction
+      //DIE
+      ThreadLocalStatistics.getInfinispanThreadStats().startTransaction(false);
+      //NB: va gestita bene la storia delle tx remote create già con delle modifiche... i.e. è già non-read-only
+      //
+
+
       RemoteTransaction remoteTransaction = txTable.getRemoteTransaction(globalTx);
       boolean remoteTxInitiated = remoteTransaction != null;
       if (!remoteTxInitiated) {

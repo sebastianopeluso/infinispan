@@ -9,18 +9,21 @@ package eu.cloudtm.rmi.statistics;
  * @author Davide
  */
 public class ThreadLocalStatistics {
-    private static InfinispanStatistics stats = null;
-    private static final ThreadLocal<InfinispanStatistics> thread = new ThreadLocal<InfinispanStatistics>() {
+
+    //private static ThreadStatistics stats = null;
+
+
+    private static final ThreadLocal<ThreadStatistics> thread = new ThreadLocal<ThreadStatistics>() {
     	
             @Override
-            protected InfinispanStatistics initialValue() {
-                stats = new InfinispanStatistics(Thread.currentThread());
+            protected ThreadStatistics initialValue() {
+                ThreadStatistics stats = new ThreadStatistics(Thread.currentThread());
                 StatisticsListManager.addInfinispanStatistics(stats);
                 return stats;
             }
     };
 
-    public static InfinispanStatistics getInfinispanThreadStats() {
+    public static ThreadStatistics getInfinispanThreadStats() {
         return thread.get();
     }
     

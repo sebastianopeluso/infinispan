@@ -22,6 +22,8 @@
  */
 package org.infinispan.util.concurrent.locks;
 
+import eu.cloudtm.rmi.statistics.ThreadStatistics;
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.config.Configuration;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.context.Flag;
@@ -32,6 +34,7 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.jmx.annotations.ManagedAttribute;
+import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.ReversibleOrderedSet;
 import org.infinispan.util.concurrent.locks.containers.*;
 import org.infinispan.util.logging.Log;
@@ -62,6 +65,10 @@ public class LockManagerImpl implements LockManager {
    protected static final boolean trace = log.isTraceEnabled();
    private static final String ANOTHER_THREAD = "(another thread)";
 
+   //DIE
+   private boolean statisticsEnabled = false;
+   private boolean lastLockConflict = false;
+
    @Inject
    public void injectDependencies(Configuration configuration, TransactionManager transactionManager, InvocationContextContainer invocationContextContainer) {
       this.configuration = configuration;
@@ -74,14 +81,29 @@ public class LockManagerImpl implements LockManager {
       lockContainer = configuration.isUseLockStriping() ?
       transactionManager == null ? new ReentrantStripedLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantStripedLockContainer(configuration.getConcurrencyLevel(), invocationContextContainer) :
       transactionManager == null ? new ReentrantPerEntryLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantPerEntryLockContainer(configuration.getConcurrencyLevel(), invocationContextContainer);
+      //DIE
+      this.setStatisticsEnabled(configuration.isExposeJmxStatistics());
    }
 
    public boolean lockAndRecord(Object key, InvocationContext ctx) throws InterruptedException {
       long lockTimeout = getLockAcquisitionTimeout(ctx);
+      long preAcquisitionTime = 0;
       if (trace) log.tracef("Attempting to lock %s with acquisition timeout of %s millis", key, lockTimeout);
+      //DIE
+      if(this.statisticsEnabled && ctx.isInTxScope()){
+          this.updateContentionStats(key,ctx);
+          preAcquisitionTime = System.nanoTime();
+          this.incrementRequestedLocks();
+      }
+
       if (lockContainer.acquireLock(key, lockTimeout, MILLISECONDS) != null) {
+
          // successfully locked!
          if (ctx instanceof TxInvocationContext) {
+            if(statisticsEnabled){
+                this.updateLockWaitingTimeStats(System.nanoTime() - preAcquisitionTime,ctx.isOriginLocal());
+            }
+
             TxInvocationContext tctx = (TxInvocationContext) ctx;
             if (!tctx.isTransactionValid()) {
                Transaction tx = tctx.getTransaction();
@@ -216,4 +238,45 @@ public class LockManagerImpl implements LockManager {
    public int getLockId(Object key) {
       return lockContainer.getLockId(key);
    }
+
+
+
+   //DIE
+   private void setStatisticsEnabled(boolean b){
+       this.statisticsEnabled = b;
+   }
+    private void updateContentionStats(Object key, InvocationContext ctx){
+      GlobalTransaction holder=(GlobalTransaction)this.getOwner(key);
+      if(holder!=null){
+         GlobalTransaction me=(GlobalTransaction) ctx.getLockOwner();
+         if(holder!=me){
+            this.lastLockConflict = true;
+            boolean isItLocal=!(holder.isRemote());
+             ThreadStatistics is = ThreadLocalStatistics.getInfinispanThreadStats();
+            if(isItLocal)
+               is.incrementToLocalConflicts();
+            else
+                is.incrementToRemoteConflicts();
+         }
+      }
+
+   }
+   private void updateLockWaitingTimeStats(Long l, boolean isLocal){
+      ThreadStatistics is = ThreadLocalStatistics.getInfinispanThreadStats();
+      //DIE
+      //NB: here I have no knowledge of whether my last lock acquisition has experienced contention
+      //if it has not, then the time I'm going to add is not paid to resolve the contention, but just to
+      //acquire the lock. Considering this latter negligible wrt the former, I can sum it here
+      if(this.lastLockConflict)
+        is.addLockWaitingTime(l);
+      else
+        is.addLockAcquisitionTime(l);
+       this.lastLockConflict = false;
+
+   }
+
+    private void incrementRequestedLocks(){
+        ThreadStatistics is = ThreadLocalStatistics.getInfinispanThreadStats();
+        is.incrementRequestedLocks();
+    }
 }

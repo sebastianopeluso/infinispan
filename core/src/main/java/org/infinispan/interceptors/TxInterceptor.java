@@ -30,6 +30,7 @@ import javax.transaction.Status;
 import javax.transaction.SystemException;
 import javax.transaction.Transaction;
 
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.commands.VisitableCommand;
 import org.infinispan.commands.control.LockControlCommand;
 import org.infinispan.commands.read.GetKeyValueCommand;
@@ -167,11 +168,7 @@ public class TxInterceptor extends CommandInterceptor {
 
    @Override
    public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
-	   /////
-	   CustomMis mc = new CustomMis();
-	   //mc.setNome("prova");
-	   mc.setValore((new Random()).nextInt());
-	   tempoRisposta.add(mc);
+
       return enlistWriteAndInvokeNext(ctx, command);
    }
 
@@ -224,6 +221,7 @@ public class TxInterceptor extends CommandInterceptor {
          localTxContext.setLocalTransaction(localTransaction);
       }
       Object rv;
+
       rv = invokeNextInterceptor(ctx, command);
       if (!ctx.isInTxScope())
          transactionLog.logNoTxWrite(command);
@@ -239,6 +237,10 @@ public class TxInterceptor extends CommandInterceptor {
             " is not in a valid state to be invoking cache operations on.");
       LocalTransaction localTransaction = txTable.getOrCreateLocalTransaction(transaction, ctx);
       txTable.enlist(transaction, localTransaction);
+      //DIE
+      if(statisticsEnabled){
+          ThreadLocalStatistics.getInfinispanThreadStats().startTransaction(true);
+      }
       return localTransaction;
    }
 
@@ -300,11 +302,6 @@ public class TxInterceptor extends CommandInterceptor {
       return rollbacks.get();
    }
    
-   @ManagedAttribute(description = "Tempo di rispostaa")
-   @Metric(displayName = "TempoRisposta", measurementType = MeasurementType.TRENDSUP, displayType = DisplayType.DETAIL)
-   public ArrayList<CustomMis> getTempoRisposta() {
-      return tempoRisposta;
-   }
 
    /**
     * Designed to be overridden.  Returns a VisitableCommand fit for replaying locally, based on the modification passed

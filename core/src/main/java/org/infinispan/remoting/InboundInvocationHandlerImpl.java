@@ -42,11 +42,7 @@ import org.infinispan.manager.CacheContainer;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.infinispan.manager.NamedCacheNotFoundException;
 import org.infinispan.marshall.StreamingMarshaller;
-import org.infinispan.remoting.responses.ExceptionResponse;
-import org.infinispan.remoting.responses.ExtendedResponse;
-import org.infinispan.remoting.responses.RequestIgnoredResponse;
-import org.infinispan.remoting.responses.Response;
-import org.infinispan.remoting.responses.ResponseGenerator;
+import org.infinispan.remoting.responses.*;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.remoting.transport.DistributedSync;
 import org.infinispan.remoting.transport.Transport;
@@ -94,6 +90,9 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
 
    private final Map<String, RetryQueue> retryThreadMap = Collections.synchronizedMap(new HashMap<String, RetryQueue>());
    private volatile boolean stopping;
+
+   //DIE
+   private boolean statisticsEnabled = true;
 
    /**
     * How to handle an invocation based on the join status of a given cache *
@@ -200,12 +199,19 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       // If this thread blocked during a NBST flush, then inform the sender
       // it needs to replay ignored messages
       boolean replayIgnored = sr == DistributedSync.SyncResponse.STATE_ACHIEVED;
-
+      long init = 0;
+      long replayTime = 0L;
+      if(statisticsEnabled) init = System.nanoTime();
       Response resp = handleInternal(cmd);
+      if(statisticsEnabled) replayTime= System.nanoTime() - init;
 
       // A null response is valid and OK ...
       if (resp == null || resp.isValid()) {
-         if (replayIgnored) resp = new ExtendedResponse(resp, true);
+         if (replayIgnored){
+             if(this.statisticsEnabled)
+                 resp = new StatisticsExtendedResponse(resp,true,replayTime);
+             resp = new ExtendedResponse(resp, true);
+         }
       } else {
          // invalid response
          if (trace) log.trace("Unable to execute command, got invalid response");
