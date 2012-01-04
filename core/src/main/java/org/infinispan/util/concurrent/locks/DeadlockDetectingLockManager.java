@@ -94,7 +94,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
                if (trace) log.tracef("successfully acquired lock on %s, returning ...", key);
                //PEDRO
                if(exposeJmxStats && topKEnabled) {
-                        analyticsBean.addLockInformation(key, contention, false, false);
+                        analyticsBean.addLockInformation(key, contention, false);
                }
                return true;
             } else {
@@ -114,7 +114,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
                   //PEDRO
                   if(exposeJmxStats && topKEnabled) {
                             //deadlock
-                            analyticsBean.addLockInformation(key, contention, true, false);
+                            analyticsBean.addLockInformation(key, contention, true);
                   }
                   throw new DeadlockDetectedException(message);
                }
@@ -123,7 +123,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
          //PEDRO
          if(exposeJmxStats && topKEnabled) {
                 //timeout!!
-                analyticsBean.addLockInformation(key, contention, false, true);
+                analyticsBean.addLockInformation(key, contention,true);
             }
 
       } else {

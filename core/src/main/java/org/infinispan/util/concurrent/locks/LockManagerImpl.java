@@ -107,7 +107,7 @@ public class LockManagerImpl implements LockManager {
          if (ctx instanceof TxInvocationContext) {
             if(statisticsEnabled){
                 //PEDRO
-                if(this.topKEnabled) this.analyticsBean.addLockInformation(key, contention, false, false);
+                if(this.topKEnabled) this.analyticsBean.addLockInformation(key, contention, false);
                 this.updateLockWaitingTimeStats(System.nanoTime() - preAcquisitionTime,ctx.isOriginLocal(),contention);
             }
 
@@ -126,7 +126,7 @@ public class LockManagerImpl implements LockManager {
       //PEDRO
       if(statisticsEnabled && ctx.isInTxScope() && topKEnabled) {
             //deadlock detection is not enable. so the timeout is the only option
-            this.analyticsBean.addLockInformation(key, contention, false, true);
+            this.analyticsBean.addLockInformation(key, contention, true);
         }
 
       // couldn't acquire lock!

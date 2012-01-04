@@ -49,6 +49,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
     @Operation(displayName = "Reset Statistics (Statistics)")
     @Override
     public void resetStatistics() {
+        this.analyticsBean.resetAll();
 
     }
 
@@ -61,96 +62,113 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
     @ManagedAttribute(description = "Show the top " + AnalyticsBean.MAX_CAPACITY + " keys most read remotely by this instance")
     @Operation(displayName = "Top Remote Read Keys")
     public Map<Object, Long> getRemoteTopGets() {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.REMOTE_GET);
+        Map<Object, Long> res =  analyticsBean.getTopKFrom(AnalyticsBean.Stat.REMOTE_GET);
+        analyticsBean.resetStat(AnalyticsBean.Stat.REMOTE_GET);
+        return res;
     }
 
     @ManagedOperation(description = "Show the top n keys most read remotely by this instance")
     @Operation(displayName = "Top Remote Read Keys")
     public Map<Object, Long> getRemoteTopGets(int n) {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.REMOTE_GET, n);
+        Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.REMOTE_GET, n);
+        analyticsBean.resetStat(AnalyticsBean.Stat.REMOTE_GET);
+        return res;
     }
 
     @ManagedAttribute(description = "Show the top " + AnalyticsBean.MAX_CAPACITY + " keys most read locally by this instance")
     @Operation(displayName = "Top Local Read Keys")
     public Map<Object, Long> getLocalTopGets() {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.LOCAL_GET);
+        Map<Object, Long> res =  analyticsBean.getTopKFrom(AnalyticsBean.Stat.LOCAL_GET);
+        analyticsBean.resetStat(AnalyticsBean.Stat.LOCAL_GET);
+        return res;
     }
 
     @ManagedOperation(description = "Show the top n keys most read locally by this instance")
     @Operation(displayName = "Top Local Read Keys")
     public Map<Object, Long> getLocalTopGets(int n) {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.LOCAL_GET, n);
+        Map<Object, Long> res =  analyticsBean.getTopKFrom(AnalyticsBean.Stat.LOCAL_GET, n);
+        analyticsBean.resetStat(AnalyticsBean.Stat.LOCAL_GET);
+        return res;
     }
 
     @ManagedAttribute(description = "Show the top " + AnalyticsBean.MAX_CAPACITY + " keys most write remotely by this instance")
     @Operation(displayName = "Top Remote Write Keys")
     public Map<Object, Long> getRemoteTopPuts() {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.REMOTE_PUT);
+        Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.REMOTE_PUT);
+        analyticsBean.resetStat(AnalyticsBean.Stat.REMOTE_PUT);
+        return res;
     }
 
     @ManagedOperation(description = "Show the top n keys most write remotely by this instance")
     @Operation(displayName = "Top Remote Write Keys")
     public Map<Object, Long> getRemoteTopPuts(int n) {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.REMOTE_PUT, n);
+        Map<Object, Long> res =  analyticsBean.getTopKFrom(AnalyticsBean.Stat.REMOTE_PUT, n);
+        analyticsBean.resetStat(AnalyticsBean.Stat.REMOTE_PUT);
+        return res;
     }
 
     @ManagedAttribute(description = "Show the top " + AnalyticsBean.MAX_CAPACITY + " keys most write locally by this instance")
     @Operation(displayName = "Top Local Write Keys")
     public Map<Object, Long> getLocalTopPuts() {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.LOCAL_PUT);
+        Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.LOCAL_PUT);
+        analyticsBean.resetStat(AnalyticsBean.Stat.LOCAL_PUT);
+        return res;
     }
 
     @ManagedOperation(description = "Show the top n keys most write locally by this instance")
     @Operation(displayName = "Top Local Write Keys")
     public Map<Object, Long> getLocalTopPuts(int n) {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.LOCAL_PUT, n);
+        Map<Object, Long> res  = analyticsBean.getTopKFrom(AnalyticsBean.Stat.LOCAL_PUT, n);
+        analyticsBean.resetStat(AnalyticsBean.Stat.LOCAL_PUT);
+        return res;
     }
 
     @ManagedAttribute(description = "Show the top " + AnalyticsBean.MAX_CAPACITY + " keys most locked")
     @Operation(displayName = "Top Locked Keys")
     public Map<Object, Long> getTopLockedKeys() {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_LOCKED_KEYS);
+        Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_LOCKED_KEYS);
+        analyticsBean.resetStat(AnalyticsBean.Stat.MOST_LOCKED_KEYS);
+        return res;
     }
 
     @ManagedOperation(description = "Show the top n keys most locked")
     @Operation(displayName = "Top Locked Keys")
     public Map<Object, Long> getTopLockedKeys(int n) {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_LOCKED_KEYS, n);
+        Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_LOCKED_KEYS, n);
+        analyticsBean.resetStat(AnalyticsBean.Stat.MOST_LOCKED_KEYS);
+        return res;
     }
 
     @ManagedAttribute(description = "Show the top " + AnalyticsBean.MAX_CAPACITY + " keys most contended")
     @Operation(displayName = "Top Contended Keys")
     public Map<Object, Long> getTopContendedKeys() {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_CONTENDED_KEYS);
+        Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_CONTENDED_KEYS);
+        analyticsBean.resetStat(AnalyticsBean.Stat.MOST_CONTENDED_KEYS);
+        return res;
     }
 
     @ManagedOperation(description = "Show the top n keys most contended")
     @Operation(displayName = "Top Contended Keys")
     public Map<Object, Long> getTopContendedKeys(int n) {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_CONTENDED_KEYS, n);
+        Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_CONTENDED_KEYS, n);
+        analyticsBean.resetStat(AnalyticsBean.Stat.MOST_CONTENDED_KEYS);
+        return res;
     }
 
-    @ManagedAttribute(description = "Show the top " + AnalyticsBean.MAX_CAPACITY + " keys where the lock acquisition failed by timeout")
-    @Operation(displayName = "Top Keys where Lock Acquisition Failed by Timeout")
+    @ManagedAttribute(description = "Show the top " + AnalyticsBean.MAX_CAPACITY + " keys whose lock acquisition failed by timeout")
+    @Operation(displayName = "Top Keys whose Lock Acquisition Failed by Timeout")
     public Map<Object, Long> getTopLockFailedByTimeoutKeys() {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_FAILED_KEYS_BY_TIMEOUT);
+        Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_FAILED_KEYS);
+        analyticsBean.resetStat(AnalyticsBean.Stat.MOST_FAILED_KEYS);
+        return res;
     }
 
-    @ManagedOperation(description = "Show the top n keys where the lock acquisition failed by timeout")
-    @Operation(displayName = "Top Keys where Lock Acquisition Failed by Timeout")
+    @ManagedOperation(description = "Show the top n keys whose lock acquisition failed ")
+    @Operation(displayName = "Top Keys whose Lock Acquisition Failed by Timeout")
     public Map<Object, Long> getTopLockFailedByTimeoutKeys(int n) {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_FAILED_KEYS_BY_TIMEOUT, n);
+        Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_FAILED_KEYS, n);
+        analyticsBean.resetStat(AnalyticsBean.Stat.MOST_FAILED_KEYS);
+        return res;
     }
 
-    @ManagedAttribute(description = "Show the top " + AnalyticsBean.MAX_CAPACITY + " keys where the lock acquisition failed by deadlock")
-    @Operation(displayName = "Top Keys where Lock Acquisition Failed by Deadlock")
-    public Map<Object, Long> getTopLockFailedByDeadlockKeys() {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_FAILED_KEYS_BY_DEADLOCK);
-    }
-
-    @ManagedOperation(description = "Show the top n keys where the lock acquisition failed by deadlock")
-    @Operation(displayName = "Top Keys where Lock Acquisition Failed by Deadlock")
-    public Map<Object, Long> getTopLockFailedByDeadlockKeys(int n) {
-        return analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_FAILED_KEYS_BY_DEADLOCK, n);
-    }
 }

@@ -19,15 +19,14 @@ public class AnalyticsBean {
 
 
     //counters
-    private final StreamSummary<Object> remoteGet;
-    private final StreamSummary<Object> localGet;
-    private final StreamSummary<Object> remotePut;
-    private final StreamSummary<Object> localPut;
+    private StreamSummary<Object> remoteGet;
+    private StreamSummary<Object> localGet;
+    private StreamSummary<Object> remotePut;
+    private StreamSummary<Object> localPut;
 
-    private final StreamSummary<Object> mostLockedKey;
-    private final StreamSummary<Object> mostContendedKey; //keys with more contention detected
-    private final StreamSummary<Object> mostFailedKeyByDeadlock; //keys that the lock acquisition fails because of deadlock
-    private final StreamSummary<Object> mostFailedKeyByTimeout;  //keys that the lock acquisition fails because of timeout
+    private StreamSummary<Object> mostLockedKey;
+    private StreamSummary<Object> mostContendedKey; //keys with more contention detected
+    private StreamSummary<Object> mostFailedKey;
 
     private int capacity = 100;
     private boolean active = false;
@@ -41,8 +40,7 @@ public class AnalyticsBean {
 
         MOST_LOCKED_KEYS,
         MOST_CONTENDED_KEYS,
-        MOST_FAILED_KEYS_BY_DEADLOCK,
-        MOST_FAILED_KEYS_BY_TIMEOUT
+        MOST_FAILED_KEYS
     }
 
 
@@ -55,8 +53,7 @@ public class AnalyticsBean {
         localPut = new StreamSummary<Object>(MAX_CAPACITY);
         mostLockedKey = new StreamSummary<Object>(MAX_CAPACITY);
         mostContendedKey = new StreamSummary<Object>(MAX_CAPACITY);
-        mostFailedKeyByDeadlock = new StreamSummary<Object>(MAX_CAPACITY);
-        mostFailedKeyByTimeout = new StreamSummary<Object>(MAX_CAPACITY);
+        mostFailedKey = new StreamSummary<Object>(MAX_CAPACITY);
     }
 
     public static AnalyticsBean getInstance() {
@@ -113,7 +110,7 @@ public class AnalyticsBean {
         }
     }
 
-    public void addLockInformation(Object key, boolean contention, boolean deadlock, boolean timeout) {
+    public void addLockInformation(Object key, boolean contention, boolean abort) {
         if(!isActive()) {
             return;
         }
@@ -125,14 +122,9 @@ public class AnalyticsBean {
                 mostContendedKey.offer(key);
             }
         }
-        if(deadlock) {
-            synchronized (mostFailedKeyByDeadlock) {
-                mostFailedKeyByDeadlock.offer(key);
-            }
-        }
-        if(timeout) {
-            synchronized (mostFailedKeyByTimeout) {
-                mostFailedKeyByTimeout.offer(key);
+        if(abort) {
+            synchronized (mostFailedKey) {
+                mostFailedKey.offer(key);
             }
         }
     }
@@ -148,8 +140,7 @@ public class AnalyticsBean {
             case REMOTE_PUT: return getStatsFrom(remotePut, topk);
             case LOCAL_PUT: return getStatsFrom(localPut, topk);
             case MOST_LOCKED_KEYS: return getStatsFrom(mostLockedKey, topk);
-            case MOST_FAILED_KEYS_BY_TIMEOUT: return getStatsFrom(mostFailedKeyByTimeout, topk);
-            case MOST_FAILED_KEYS_BY_DEADLOCK: return getStatsFrom(mostFailedKeyByDeadlock, topk);
+            case MOST_FAILED_KEYS: return getStatsFrom(mostFailedKey, topk);
             case MOST_CONTENDED_KEYS: return getStatsFrom(mostContendedKey, topk);
         }
         return Collections.emptyMap();
@@ -166,4 +157,40 @@ public class AnalyticsBean {
         return results;
     }
 
+    public void resetAll(){
+        synchronized (remoteGet){
+            remoteGet = new StreamSummary<Object>(MAX_CAPACITY);
+        }
+        synchronized (remotePut){
+            remotePut = new StreamSummary<Object>(MAX_CAPACITY);
+        }
+        synchronized (localPut){
+            localPut = new StreamSummary<Object>(MAX_CAPACITY);
+        }
+        synchronized (localGet){
+            localGet = new StreamSummary<Object>(MAX_CAPACITY);
+        }
+        synchronized (mostContendedKey){
+            mostContendedKey = new StreamSummary<Object>(MAX_CAPACITY);
+        }
+        synchronized (mostFailedKey){
+            mostFailedKey = new StreamSummary<Object>(MAX_CAPACITY);
+        }
+        synchronized (mostLockedKey){
+            mostLockedKey = new StreamSummary<Object>(MAX_CAPACITY);
+        }
+
+    }
+
+    public void resetStat(Stat stat){
+        switch (stat){
+            case REMOTE_GET: remoteGet = new StreamSummary<Object>(MAX_CAPACITY);
+            case LOCAL_GET: localGet = new StreamSummary<Object>(MAX_CAPACITY);
+            case REMOTE_PUT: remotePut = new StreamSummary<Object>(MAX_CAPACITY);
+            case LOCAL_PUT: localPut = new StreamSummary<Object>(MAX_CAPACITY);
+            case MOST_LOCKED_KEYS: mostLockedKey = new StreamSummary<Object>(MAX_CAPACITY);
+            case MOST_FAILED_KEYS: mostFailedKey = new StreamSummary<Object>(MAX_CAPACITY);
+            case MOST_CONTENDED_KEYS: mostContendedKey = new StreamSummary<Object>(MAX_CAPACITY);
+        }
+    }
 }
