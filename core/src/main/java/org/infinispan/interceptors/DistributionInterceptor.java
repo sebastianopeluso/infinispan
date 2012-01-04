@@ -22,6 +22,8 @@
  */
 package org.infinispan.interceptors;
 
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
+import eu.cloudtm.rmi.statistics.ThreadStatistics;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.control.LockControlCommand;
 import org.infinispan.commands.read.GetKeyValueCommand;
@@ -80,6 +82,8 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    EntryFactory entryFactory;
    L1Manager l1Manager;
 
+   boolean statisticsEnabled;
+
    static final RecipientGenerator CLEAR_COMMAND_GENERATOR = new RecipientGenerator() {
       public List<Address> generateRecipients() {
          return null;
@@ -104,6 +108,9 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    public void start() {
       isL1CacheEnabled = configuration.isL1CacheEnabled();
       needReliableReturnValues = !configuration.isUnsafeUnreliableReturnValues();
+
+      //DIE
+      statisticsEnabled = configuration.isExposeJmxStatistics();
 
    }
 
@@ -361,7 +368,14 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
       boolean sync = isSynchronous(ctx);
 
       if (shouldInvokeRemoteTxCommand(ctx)) {
+
+
          Collection<Address> recipients = dm.getAffectedNodes(ctx.getAffectedKeys());
+         //DIE
+         if(statisticsEnabled){
+             ThreadStatistics th= ThreadLocalStatistics.getInfinispanThreadStats();
+             th.setNumNodesInvolvedInPrepare(recipients.size());
+         }
          NotifyingNotifiableFuture<Object> f = null;
          if (isL1CacheEnabled && command.isOnePhaseCommit())
             f = l1Manager.flushCache(ctx.getLockedKeys(), null, null);

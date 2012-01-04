@@ -237,10 +237,8 @@ public class TxInterceptor extends CommandInterceptor {
             " is not in a valid state to be invoking cache operations on.");
       LocalTransaction localTransaction = txTable.getOrCreateLocalTransaction(transaction, ctx);
       txTable.enlist(transaction, localTransaction);
-      //DIE
-      if(statisticsEnabled){
-          ThreadLocalStatistics.getInfinispanThreadStats().startTransaction(true);
-      }
+
+
       return localTransaction;
    }
 

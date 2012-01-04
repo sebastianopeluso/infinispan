@@ -148,4 +148,15 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
          log.warnf("Indexing can only be enabled if infinispan-query.jar is available on your classpath, and this jar has not been detected. Intended behavior may not be exhibited.");
       }
    }
+
+    @Override
+    //PEDRO
+    public void visitJmxStatistics(Configuration.JmxStatistics config) {
+        if(config.getTopK() <= 0) {
+            throw new ConfigurationException("Top-K value must be higher than zero");
+        }
+    }
+
+
+
 }

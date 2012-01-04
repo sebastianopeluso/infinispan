@@ -41,6 +41,7 @@ import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
 import org.infinispan.remoting.RpcException;
 import org.infinispan.remoting.ReplicationQueue;
+import org.infinispan.remoting.responses.ExtendedResponse;
 import org.infinispan.remoting.responses.Response;
 import org.infinispan.remoting.responses.StatisticsExtendedResponse;
 import org.infinispan.remoting.transport.Address;
@@ -155,7 +156,7 @@ public class RpcManagerImpl implements RpcManager {
 
             throw new CacheException(th);
          } finally {
-            if (statisticsEnabled && !exceptionThrown && rpcCommand instanceof PrepareCommand) {
+            if (statisticsEnabled && !exceptionThrown && (rpcCommand instanceof PrepareCommand)) {
                long timeTaken = System.nanoTime() - startTime;
                long maxReplayTime = this.getMaxReplayTime(result);
                long avgReplayTime = this.getAvgReplayTime(result);
@@ -449,13 +450,16 @@ public class RpcManagerImpl implements RpcManager {
 
 
     //DIE
+
     private long getMaxReplayTime(Map<Address,Response> list){
+        System.out.println("Chiamata la getMaxReplayTime");
         long max=0;
         long ttemp = 0;
-        StatisticsExtendedResponse temp;
-        Iterator<Address> it = list.keySet().iterator();
+        Iterator<Response> it = list.values().iterator();
+        ExtendedResponse temp;
         while(it.hasNext()){
-            temp = (StatisticsExtendedResponse) list.get(it.next());
+            System.out.println("Sono nel while");
+            temp = (ExtendedResponse) it.next();
             ttemp = temp.getReplayTime();
             if(ttemp>max)
                 max=ttemp;
@@ -463,12 +467,17 @@ public class RpcManagerImpl implements RpcManager {
         return max;
     }
 
+
+
     private long getAvgReplayTime(Map<Address,Response> list){
         double avg = 0;
-        StatisticsExtendedResponse temp;
+        ExtendedResponse temp;
         Iterator<Address> it = list.keySet().iterator();
+
+
         while(it.hasNext()){
             temp = (StatisticsExtendedResponse) list.get(it.next());
+            System.out.println("replay " + temp.getReplayTime());
             avg+=temp.getReplayTime();
         }
         return (long)( avg / (double)list.size());

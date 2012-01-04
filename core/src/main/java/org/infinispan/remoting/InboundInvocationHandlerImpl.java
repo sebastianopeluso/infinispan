@@ -28,6 +28,7 @@ import org.infinispan.commands.read.DistributedExecuteCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
+import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.config.Configuration;
 import org.infinispan.config.GlobalConfiguration;
 import org.infinispan.distribution.DistributionManager;
@@ -137,6 +138,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
 
    @Override
    public Response handle(final CacheRpcCommand cmd, Address origin) throws Throwable {
+
    	cmd.setOrigin(origin);
       String cacheName = cmd.getCacheName();
 
@@ -172,6 +174,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
             LockSupport.parkNanos(MILLISECONDS.toNanos(100));
       }
 
+
       return handleWithRetry(cmd);
    }
 
@@ -199,24 +202,44 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       // If this thread blocked during a NBST flush, then inform the sender
       // it needs to replay ignored messages
       boolean replayIgnored = sr == DistributedSync.SyncResponse.STATE_ACHIEVED;
+      boolean traceReplay = statisticsEnabled && (cmd instanceof PrepareCommand);
       long init = 0;
       long replayTime = 0L;
-      if(statisticsEnabled) init = System.nanoTime();
+      if(traceReplay)
+          init = System.nanoTime();
       Response resp = handleInternal(cmd);
-      if(statisticsEnabled) replayTime= System.nanoTime() - init;
+      if(traceReplay)
+          replayTime= System.nanoTime() - init;
+      if(traceReplay)
+          System.out.println("ReplayTime = "+replayTime);
 
       // A null response is valid and OK ...
       if (resp == null || resp.isValid()) {
+          System.out.println("VALID REPONSE ;)");
          if (replayIgnored){
-             if(this.statisticsEnabled)
-                 resp = new StatisticsExtendedResponse(resp,true,replayTime);
+             System.out.println("ReplayIgnored");
              resp = new ExtendedResponse(resp, true);
+             if(traceReplay)
+                 ((ExtendedResponse)resp).setReplayTime(replayTime);
          }
+         //DIE : if replayignored=false I create a StatisticsExtendedResponse with false
+         else{
+             System.out.println("Not ReplayIgnored");
+             if(traceReplay){
+                 resp = new ExtendedResponse(resp,false);
+                 ((ExtendedResponse)resp).setReplayTime(replayTime);
+             }
+         }
+
       } else {
          // invalid response
          if (trace) log.trace("Unable to execute command, got invalid response");
+          System.out.println("INVALID RESPONSE!!");
       }
-
+      if(resp==null && traceReplay)
+          System.out.println("Sto ritornando una risposta nulla");
+       else if(resp!=null && traceReplay)
+          System.out.println("ritorno "+resp.getClass().getName()+" con replay time "+((ExtendedResponse)resp).getReplayTime());
       return resp;
    }
 

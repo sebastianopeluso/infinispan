@@ -22,8 +22,11 @@
 package org.infinispan.interceptors;
 
 import com.sun.xml.internal.bind.v2.runtime.unmarshaller.XsiNilLoader;
+import eu.cloudtm.rmi.statistics.Statistics;
 import eu.cloudtm.rmi.statistics.StatisticsListManager;
 import eu.cloudtm.rmi.statistics.ThreadStatistics;
+import eu.cloudtm.rmi.statistics.stream_lib.AnalyticsBean;
+import org.infinispan.commands.read.GetKeyValueCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
@@ -38,6 +41,8 @@ import org.infinispan.jmx.annotations.MBean;
 import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
+import org.infinispan.util.concurrent.TimeoutException;
+import org.infinispan.util.concurrent.locks.DeadlockDetectedException;
 import org.rhq.helpers.pluginAnnotations.agent.DisplayType;
 import org.rhq.helpers.pluginAnnotations.agent.MeasurementType;
 import org.rhq.helpers.pluginAnnotations.agent.Metric;
@@ -51,25 +56,72 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
 
    private Configuration configuration;
    private boolean statisticsEnabled = false;
+   //private boolean topKEnabled = false;
 
    private static boolean COMMIT = true;
    private static boolean ABORT = false;
 
 
+
+
    @Inject
    public void setDependencies(Configuration configuration) {
        this.configuration = configuration;
-       this.statisticsEnabled = configuration.isExposeJmxStatistics();
+       this.statisticsEnabled = this.configuration.isExposeJmxStatistics();
    }
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-       if(ctx.isOriginLocal()){
+       boolean stats = ctx.isOriginLocal() && statisticsEnabled;
+       if(stats){
           ThreadStatistics is = ThreadLocalStatistics.getInfinispanThreadStats();
           is.terminateLocalExecution();
        }
-       Object result = invokeNextInterceptor(ctx, command);
+
+       Object result;
+       try{
+        result = invokeNextInterceptor(ctx, command);
+       }
+       catch(TimeoutException e){
+           if(stats){
+              ThreadLocalStatistics.getInfinispanThreadStats().incrementTimeoutExceptionOnPrepare();
+           }
+           throw e;
+        }
+       catch(DeadlockDetectedException e){
+           if(stats)
+               ThreadLocalStatistics.getInfinispanThreadStats().incrementDeadlockExceptionOnPrepare();
+           throw e;
+       }
        return result;
+   }
+
+   public Object visitGetKeyValueCommand(InvocationContext ctx, GetKeyValueCommand cmd) throws Throwable{
+       if(ctx.isInTxScope() &&  statisticsEnabled){
+           Object result;
+           if(!ctx.isOriginLocal()){
+              //SEBA STATS ON REMOTE GET
+              long time = System.nanoTime();
+              result = invokeNextInterceptor(ctx,cmd);
+              time = System.nanoTime() - time;
+              ThreadLocalStatistics.getInfinispanThreadStats().addRemoteGetCost(time);
+              return result;
+           }
+           /*
+           else if(this.topKEnabled){
+               //PEDRO's
+
+                Object key = cmd.getKey();
+                ThreadLocalStatistics.getInfinispanThreadStats().addRead(key, isRemote(key));
+                return invokeNextInterceptor(ctx,cmd);
+
+           }
+           */
+           else
+               return invokeNextInterceptor(ctx,cmd);
+       }
+       else
+           return invokeNextInterceptor(ctx,cmd);
    }
 
    @Override
@@ -80,12 +132,15 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
        long t2 = System.nanoTime();
        //DIE
        long commitCost = t2-t1;
-       if(ctx.isOriginLocal()){
+       if(statisticsEnabled){
            ThreadStatistics is = ThreadLocalStatistics.getInfinispanThreadStats();
-           is.addCommitCost(commitCost);
-           is.flush(COMMIT);
+           if(ctx.isOriginLocal()){
+                is.addCommitCost(commitCost);
+            }
+           is.flush(COMMIT,ctx.isOriginLocal());
        }
-       return result;
+
+        return result;
    }
 
    @Override
@@ -94,10 +149,14 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
       Object result = invokeNextInterceptor(ctx, command);
       long t2 = System.nanoTime();
       //DIE
-      if(ctx.isOriginLocal()){
-          ThreadStatistics is = ThreadLocalStatistics.getInfinispanThreadStats();
-          is.addRollbackCost(t2-t1);
-          is.flush(ABORT);
+      if(statisticsEnabled){
+
+         ThreadStatistics is = ThreadLocalStatistics.getInfinispanThreadStats();
+          if(ctx.isOriginLocal()){
+            is.addRollbackCost(t2-t1);
+          }
+          is.flush(ABORT,ctx.isOriginLocal());
+
       }
 
       return result;
@@ -107,28 +166,27 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
    public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
        long t1 = System.nanoTime();
       //DIE
-     if(ctx==null){
-         throw new RuntimeException("Il contesto è null!!!");
-     }
-
-     //DIE
-     /*
-     La putKeyValueCommand impone al TXInterceptor che venga creata (enlisted) la transazione
-     L'enlist fa in modo che io crei la transazione nella threadLocal. Quindi se accedo alla tx del threadLocal
-     da qui, creo la nullPointerException. Questo va sul tx Interceptor, dopo la enlist
-      */
-
-     /*
-      if(ctx.isInTxScope()){
-         StatisticsListManager.insertInterArrivalSample((long)(t1/1000.0D), command.getKey());
+      if(ctx.isInTxScope() && statisticsEnabled){
+          Object key = command.getKey();
+         StatisticsListManager.insertInterArrivalSample((long)(t1/1000.0D), key);
           if(ctx.isOriginLocal()){
-            System.out.println("Put di una tx locale");
-            ThreadLocalStatistics.getInfinispanThreadStats().incrementPuts();
+             ThreadStatistics th = ThreadLocalStatistics.getInfinispanThreadStats();
+             th.incrementPuts();
+             //PEDRO's
+             /*
+             if(this.topKEnabled){
+                 th.addWrite(key, isRemote(key));
+             }
+             */
           }
       }
-      */
+
       return invokeNextInterceptor(ctx, command);
    }
+
+    protected boolean isRemote(Object key){
+        return false;
+    }
 
 
    /*
@@ -137,7 +195,7 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
 
    @ManagedAttribute(description = "Average Rtt duration")
    @Metric(displayName = "Rtt")
-   public long getRollbacks() {
+   public long getRtt() {
       return StatisticsListManager.getRtt();
    }
 
@@ -261,10 +319,41 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
        return StatisticsListManager.getHoldTime();
    }
 
+   @ManagedAttribute(description = "Size of a clusteredGetCommand ")
+   @Metric(displayName = "ClusteredGetCommand size")
+   public long getClusteredGetCommandSize(){
+       return StatisticsListManager.getClusteredGetCommandSize();
+   }
+
+   @ManagedAttribute(description = "Number of nodes involved in a PrepareCommand ")
+   @Metric(displayName = "Nodes involved in PrepareCommand")
+   public double getNumNodesInvolvedInPrepare(){
+       return StatisticsListManager.getNumNodesInvolvedInPrepare();
+   }
+
+   @ManagedAttribute(description = "Number of prepare phases failed due to a TimeoutException since last reset")
+   @Metric(displayName = "TimeoutExceptions during prepare")
+   public long getTimeoutExceptionOnPrepare(){
+       return StatisticsListManager.getTimeoutExceptionsOnPrepare();
+   }
+
+   @ManagedAttribute(description = "Number of prepare phases failed due to a DeadlockException since last reset")
+   @Metric(displayName = "DeadlockExceptions during prepare")
+   public long getDeadlockExceptionOnPrepare(){
+       return StatisticsListManager.getDeadlockExceptionsOnPrepare();
+   }
+
+   @ManagedAttribute(description = "Cost of a remote get operation ")
+   @Metric(displayName = "Remote get operation cost")
+   public long getRemoteGetCost(){
+       return StatisticsListManager.getRemoteGetCost();
+   }
+
    @ManagedOperation(description = "Resets statistics gathered by this component")
    @Operation(displayName = "Reset Statistics")
    public void resetStatistics() {
       StatisticsListManager.clearList();
+      StatisticsListManager.reset();
    }
 
    @ManagedAttribute(description = "Inter-arrival lock request time histogram")
@@ -279,6 +368,54 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
    public long getTest(){
        return 12L;
    }
+
+
+
+    @ManagedAttribute(description = "Total execution time of an update transaction (99-th percentile)")
+    @Metric(displayName = "Update Tx execution time 99-th percentile")
+    public static long getWriteTXDuration99Percentile(){
+        return StatisticsListManager.getWriteTXDuration99Percentile();
+    }
+    @ManagedAttribute(description = "Total execution time of an update transaction (95-th percentile)")
+    @Metric(displayName = "Update Tx execution time 95-th percentile")
+    public static long getWriteTXDuration95Percentile(){
+        return StatisticsListManager.getWriteTXDuration95Percentile();
+    }
+    @ManagedAttribute(description = "Total execution time of an update transaction (90-th percentile)")
+    @Metric(displayName = "Update Tx execution time 90-th percentile")
+    public static long getWriteTXDuration90Percentile(){
+        return StatisticsListManager.getWriteTXDuration90Percentile();
+    }
+    @ManagedAttribute(description = "Total execution time of an update transaction (k-th percentile)")
+    public static long getWriteTXDurationKPercentile(int k){
+        return StatisticsListManager.getWriteTXDurationKPercentile(k);
+    }
+
+    @ManagedAttribute(description = "Total execution time of a read-only transaction (99-th percentile)")
+    @Metric(displayName = "Update Tx execution time k-th percentile")
+    public static long getReadOnlyTXDuration99Percentile(){
+        return StatisticsListManager.getReadOnlyTXDuration99Percentile();
+    }
+    @ManagedAttribute(description = "Total execution time of a read-only transaction (95-th percentile)")
+    @Metric(displayName = "Read-only Tx execution time 95-th percentile")
+    public static long getReadOnlyTXDuration95Percentile(){
+        return StatisticsListManager.getReadOnlyTXDuration95Percentile();
+    }
+    @ManagedAttribute(description = "Total execution time of a read-only transaction (90-th percentile)")
+    @Metric(displayName = "Read-only Tx execution time 90-th percentile")
+    public static long getReadOnlyTXDuration90Percentile(){
+        return StatisticsListManager.getReadOnlyTXDuration90Percentile();
+    }
+    @ManagedAttribute(description = "Total execution time of a read-only transaction (k-th percentile)")
+    @Metric(displayName = "Read-only Tx execution time k-th percentile")
+    public static long getReadOnlyTXDurationKPercentile(int k){
+        return StatisticsListManager.getReadOnlyTXDurationKPercentile(k);
+    }
+
+
+
+
+
 
 
 }

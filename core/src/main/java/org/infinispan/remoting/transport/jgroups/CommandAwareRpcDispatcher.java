@@ -26,6 +26,7 @@ import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.CacheException;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
+import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.remoting.InboundInvocationHandler;
@@ -107,6 +108,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
                                        boolean anycasting, boolean oob, RspFilter filter, boolean supportReplay, boolean asyncMarshalling,
                                        boolean broadcast) {
 
+
       ReplicationTask task = new ReplicationTask(command, oob, dests, mode, timeout, anycasting, filter, supportReplay, broadcast);
 
       if (asyncMarshalling) {
@@ -120,8 +122,12 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             throw rewrapAsCacheException(e);
          }
          if (mode == GroupRequest.GET_NONE) return null; // "Traditional" async.
-         if (response.isEmpty() || containsOnlyNulls(response))
+         if (response.isEmpty() || containsOnlyNulls(response)){
+            //DIE
+            if(containsOnlyNulls(response))
+                System.out.println("CommandAwareRpcDispatcher : le risposte sono tutte null!");
             return null;
+        }
          else
             return response;
       }
@@ -143,8 +149,12 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          ReplicableCommand cmd = null;
          try {
             cmd = (ReplicableCommand) req_marshaller.objectFromByteBuffer(req.getBuffer(), req.getOffset(), req.getLength());
-            if (cmd instanceof CacheRpcCommand)
-               return executeCommand((CacheRpcCommand) cmd, req);
+            if (cmd instanceof CacheRpcCommand){
+                Object ret = executeCommand((CacheRpcCommand) cmd, req);
+                if(cmd instanceof PrepareCommand)
+                    System.out.println(((ExtendedResponse)ret).getReplayTime());
+               return  ret;
+            }
             else
                return cmd.perform(null);
          } catch (InterruptedException e) {
@@ -224,6 +234,9 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
                //ThreadLocalStatistics.getInfinispanThreadStats().incrementCommits();
                ThreadLocalStatistics.getInfinispanThreadStats().addCommitCommandSize(buf.getLength());
             }
+            else if(command instanceof ClusteredGetCommand) {
+                    ThreadLocalStatistics.getInfinispanThreadStats().addClusteredGetCommandSize(buf.getLength());
+                }
          } catch (Exception e) {
             throw new RuntimeException("Failure to marshal argument(s)", e);
          }
@@ -248,7 +261,12 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             opts.setAnycasting(false);
             buf = marshallCall();
             retval = castMessage(dests, constructMessage(buf, null), opts);
+            System.out.println("after castMessage "+retval);
          } else {
+            //DIE
+            System.out.println("no broadcast");
+
+
             Set<Address> targets = new HashSet<Address>(dests); // should sufficiently randomize order.
             RequestOptions opts = new RequestOptions();
             opts.setMode(mode);
@@ -297,6 +315,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          if (mode != GroupRequest.GET_NONE) {
 
             if (trace) log.tracef("Responses: %s", retval);
+            System.out.println("Tutte le risposte "+retval);
 
             // a null response is 99% likely to be due to a marshalling problem - we throw a NSE, this needs to be changed when
             // JGroups supports http://jira.jboss.com/jira/browse/JGRP-193
@@ -304,6 +323,21 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             if (retval == null)
                throw new NotSerializableException("RpcDispatcher returned a null.  This is most often caused by args for "
                                                         + command.getClass().getSimpleName() + " not being serializable.");
+
+            //DIE
+            //I could take the replayTime here, without considering the ignoring
+            //Then I can directly add the statistics and compute the rtt in the flush, rather than computing it
+            //directly in the rpcmanagerimpl
+            //if one day we want the cost to replicate also other kind of operation, we can put
+            //in the extendedRespone the class of the replayed operation
+
+            //replay: qualcuno può rifiutarsi di fare il comando x' sta facendo altro e lo comunica
+            //in questo caso il comando viene RIMANDATO se supportReplay è vero.
+            //Noi possiamo fregarcene di quella risposta
+
+            //la entry.setValue(ex.get)) fa casino e me la modifica
+
+            //qui: calcola il max e mettilo nel threadLocal e via
 
             if (supportReplay) {
                boolean replay = false;
@@ -313,12 +347,16 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
                   if (value instanceof RequestIgnoredResponse) {
                      ignorers.add(entry.getKey());
                   } else if (value instanceof ExtendedResponse) {
+                     System.out.println("Trovata una extendedResponse");
                      ExtendedResponse extended = (ExtendedResponse) value;
                      replay |= extended.isReplayIgnoredRequests();
                      entry.getValue().setValue(extended.getResponse());
+                      //DIE qui potrei settargli a mano anche il tempo di risposta (che mi salvo in una variabile)
+                      //oppure invece di  extended.getResponse potrei mettere come parametro solo   extended, ma poi nn so se faccio casino da altre parti
                   }
-               }
 
+               }
+               System.out.println("Dopo supportReplay "+retval);
                if (replay && !ignorers.isEmpty()) {
                   Message msg = constructMessage(buf, null);
                   //Since we are making a sync call make sure we don't bundle
@@ -335,10 +373,12 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
                   RspList responses = castMessage(ignorers, msg, opts);
                   if (responses != null)
                      retval.putAll(responses);
+                  //DIE qui potrei scandirmi preventivamente la lista resposes, mettere a posto il replayTIme(se necessario) e fare poi la putAll
+                  System.out.println("Prima del pre-return "+retval);
                }
             }
          }
-
+         System.out.println("Pre return "+retval);
          return retval;
       }
    }

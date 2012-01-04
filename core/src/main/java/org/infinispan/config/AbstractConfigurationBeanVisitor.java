@@ -242,6 +242,13 @@ public abstract class AbstractConfigurationBeanVisitor implements ConfigurationB
       defaultVisit(config);
    }
 
+
+   //PEDRO
+   @Override
+    public void visitJmxStatistics(Configuration.JmxStatistics config) {
+        defaultVisit(config);
+    }
+
    public void defaultVisit(AbstractConfigurationBean c) {
    }
 }

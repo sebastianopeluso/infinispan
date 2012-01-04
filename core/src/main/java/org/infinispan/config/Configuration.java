@@ -1103,6 +1103,11 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       return jmxStatistics.enabled;
    }
 
+   //DIE
+   public boolean isTopKeyEnabled(){
+       return jmxStatistics.enabled && jmxStatistics.getTopK()!=0;
+   }
+
    /**
     * @return true if invocation batching is enabled.
     * @since 4.0
@@ -3742,6 +3747,8 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
        */
       private static final long serialVersionUID = 8716456707015486673L;
 
+      private Integer topKValue = 0;
+
       public JmxStatistics() {
          super("jmxStatistics");
       }
@@ -3763,6 +3770,33 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          super.disable();
          return this;
       }
+
+
+      @Override
+        public JmxStatisticsConfig setTopKValue(Integer topKValue) {
+            testImmutability("topKValue");
+            this.topKValue = topKValue;
+            return this;
+        }
+
+        public Integer getTopK() {
+            return this.topKValue;
+        }
+
+       public JmxStatistics clone() {
+            try{
+                JmxStatistics dolly = (JmxStatistics) super.clone();
+                dolly.topKValue = topKValue;
+                return dolly;
+            } catch (CloneNotSupportedException e) {
+                throw new IllegalArgumentException("Should never get here");
+            }
+        }
+
+       @Override
+        public void accept(ConfigurationBeanVisitor v) {
+            v.visitJmxStatistics(this);
+        }
    }
 
    /**

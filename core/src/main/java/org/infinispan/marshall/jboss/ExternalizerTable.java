@@ -58,12 +58,7 @@ import org.infinispan.marshall.exts.MapExternalizer;
 import org.infinispan.marshall.exts.ReplicableCommandExternalizer;
 import org.infinispan.marshall.exts.SetExternalizer;
 import org.infinispan.marshall.exts.SingletonListExternalizer;
-import org.infinispan.remoting.responses.ExceptionResponse;
-import org.infinispan.remoting.responses.ExtendedResponse;
-import org.infinispan.remoting.responses.RequestIgnoredResponse;
-import org.infinispan.remoting.responses.SuccessfulResponse;
-import org.infinispan.remoting.responses.UnsuccessfulResponse;
-import org.infinispan.remoting.responses.UnsureResponse;
+import org.infinispan.remoting.responses.*;
 import org.infinispan.remoting.transport.jgroups.JGroupsAddress;
 import org.infinispan.remoting.transport.jgroups.JGroupsTopologyAwareAddress;
 import org.infinispan.transaction.TransactionLog;
@@ -172,6 +167,9 @@ class ExternalizerTable implements ObjectTable {
       internalExternalizers.add(new RemoteTransactionLogDetails.Externalizer());
       internalExternalizers.add(new SerializableXid.XidExternalizer());
       internalExternalizers.add(new InDoubtTxInfoImpl.Externalizer());
+
+      //DIE
+      internalExternalizers.add(new StatisticsExtendedResponse.Externalizer());
    }
 
    void addInternalExternalizer(AdvancedExternalizer ext) {

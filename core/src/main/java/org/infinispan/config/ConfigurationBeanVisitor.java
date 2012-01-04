@@ -133,4 +133,7 @@ public interface ConfigurationBeanVisitor {
    void visitRecoveryType(Configuration.RecoveryType config);
 
    void visitStoreAsBinaryType(Configuration.StoreAsBinary config);
+
+    //PEDRO
+   void visitJmxStatistics(Configuration.JmxStatistics config);
 }

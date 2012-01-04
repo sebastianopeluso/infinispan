@@ -91,10 +91,7 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       }
 
       // 1. first create a remote transaction
-      //DIE
-      ThreadLocalStatistics.getInfinispanThreadStats().startTransaction(false);
-      //NB: va gestita bene la storia delle tx remote create già con delle modifiche... i.e. è già non-read-only
-      //
+
 
 
       RemoteTransaction remoteTransaction = txTable.getRemoteTransaction(globalTx);

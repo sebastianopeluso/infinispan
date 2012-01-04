@@ -305,4 +305,11 @@ public class DelegatingConfigurationVisitor implements ConfigurationBeanVisitor 
          delegate.visitStoreAsBinaryType(bean);
       }
    }
+
+   @Override
+    public void visitJmxStatistics(Configuration.JmxStatistics config) {
+        for (ConfigurationBeanVisitor delegate : delegates) {
+            delegate.visitJmxStatistics(config);
+        }
+    }
 }

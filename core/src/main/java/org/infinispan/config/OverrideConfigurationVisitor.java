@@ -61,6 +61,8 @@ public class OverrideConfigurationVisitor extends AbstractConfigurationBeanVisit
    private RecoveryType recoveryType = null;
    private StoreAsBinary storeAsBinary = null;
    private DataContainerType dataContainerType;
+   //PEDRO
+   private JmxStatistics jmxStatistics;
 
    public void override(OverrideConfigurationVisitor override) {
       
@@ -213,5 +215,11 @@ public class OverrideConfigurationVisitor extends AbstractConfigurationBeanVisit
    public void visitDataContainerType(DataContainerType bean) {
       this.dataContainerType = bean;
    }
+
+   //PEDRO
+   @Override
+    public void visitJmxStatistics(JmxStatistics config) {
+        this.jmxStatistics = config;
+    }
 
 }

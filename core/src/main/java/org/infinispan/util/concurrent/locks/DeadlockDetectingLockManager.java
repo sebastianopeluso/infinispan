@@ -22,6 +22,7 @@
  */
 package org.infinispan.util.concurrent.locks;
 
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.jmx.annotations.MBean;
@@ -80,6 +81,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
 
 
       if (ctx.isInTxScope()) {
+         boolean contention = updateContentionStats(key, ctx);
          if (trace) log.trace("Using early dead lock detection");
          final long start = System.currentTimeMillis();
          DldGlobalTransaction thisTx = (DldGlobalTransaction) ctx.getLockOwner();
@@ -90,6 +92,10 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
             if (lockContainer.acquireLock(key, spinDuration, MILLISECONDS) != null) {
                thisTx.setLockIntention(null); //clear lock intention
                if (trace) log.tracef("successfully acquired lock on %s, returning ...", key);
+               //PEDRO
+               if(exposeJmxStats && topKEnabled) {
+                        analyticsBean.addLockInformation(key, contention, false, false);
+               }
                return true;
             } else {
                Object owner = getOwner(key);
@@ -105,10 +111,21 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
                         "Deadlock found and we %s shall not continue. Other tx is %s",
                         thisTx, lockOwnerTx);
                   if (trace) log.trace(message);
+                  //PEDRO
+                  if(exposeJmxStats && topKEnabled) {
+                            //deadlock
+                            analyticsBean.addLockInformation(key, contention, true, false);
+                  }
                   throw new DeadlockDetectedException(message);
                }
             }
          }
+         //PEDRO
+         if(exposeJmxStats && topKEnabled) {
+                //timeout!!
+                analyticsBean.addLockInformation(key, contention, false, true);
+            }
+
       } else {
          if (lockContainer.acquireLock(key, lockTimeout, MILLISECONDS) != null) {
             return true;

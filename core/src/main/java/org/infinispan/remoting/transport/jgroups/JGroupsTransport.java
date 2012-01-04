@@ -444,7 +444,9 @@ public class JGroupsTransport extends AbstractTransport implements ExtendedMembe
          if (mode.isAsynchronous()) return Collections.emptyMap();// async case
 
          // short-circuit no-return-value calls.
-         if (rsps == null) return Collections.emptyMap();
+         if (rsps == null){
+             return Collections.emptyMap();
+         }
          Map<Address, Response> retval = new HashMap<Address, Response>(rsps.size());
 
          boolean noValidResponses = true;

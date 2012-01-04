@@ -23,6 +23,7 @@
 
 package org.infinispan.transaction;
 
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.CacheException;
 import org.infinispan.commands.control.LockControlCommand;
 import org.infinispan.commands.tx.RollbackCommand;
@@ -187,6 +188,8 @@ public class TransactionTable {
 
    public void enlist(Transaction transaction, LocalTransaction localTransaction) {
       if (!localTransaction.isEnlisted()) {
+
+
          SynchronizationAdapter sync = new SynchronizationAdapter(localTransaction, txCoordinator);
          if(transactionSynchronizationRegistry != null) {
             try {
@@ -206,10 +209,6 @@ public class TransactionTable {
             }
          }
          ((SyncLocalTransaction) localTransaction).setEnlisted(true);
-      }
-      //DIE
-       else{
-          System.out.println("Transazione già enlisted!! E io la inizializzo di nuovo nel threadLocal!!");
       }
    }
 
@@ -394,6 +393,13 @@ public class TransactionTable {
    public RemoteTransaction createRemoteTransaction(GlobalTransaction globalTx, WriteCommand[] modifications) {
       RemoteTransaction remoteTransaction = txFactory.newRemoteTransaction(modifications, globalTx);
       registerRemoteTransaction(globalTx, remoteTransaction);
+       //DIE
+      if(configuration.isExposeJmxStatistics()){
+          System.out.println(Thread.currentThread().getId()+" - Starto una tx REMOTA, "+globalTx.getId());
+        ThreadLocalStatistics.getInfinispanThreadStats().startTransaction();
+      }
+      //NB: va gestita bene la storia delle tx remote create già con delle modifiche... i.e. è già non-read-only
+
       return remoteTransaction;
    }
 
@@ -433,6 +439,11 @@ public class TransactionTable {
          current = txFactory.newLocalTransaction(transaction, tx);
          localTransactions.put(transaction, current);
          notifier.notifyTransactionRegistered(tx, ctx);
+         //DIE
+         if(configuration.isExposeJmxStatistics()){
+            System.out.println(Thread.currentThread().getId()+" - Starto una tx LOCALE, "+tx.getId());
+            ThreadLocalStatistics.getInfinispanThreadStats().startTransaction();
+          }
       }
       return current;
    }

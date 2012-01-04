@@ -287,6 +287,8 @@ public class FluentConfiguration extends AbstractFluentConfigurationBean {
    public static interface CustomInterceptorsConfig extends FluentTypes, CustomInterceptorCumulator {
    }
 
+
+
    /**
     * Enables addition of several customer interceptors
     */
@@ -766,7 +768,9 @@ public class FluentConfiguration extends AbstractFluentConfigurationBean {
       Configuration build();
    }
 
-   public static interface JmxStatisticsConfig extends FluentTypes {}
+   public static interface JmxStatisticsConfig extends FluentTypes {
+       JmxStatisticsConfig setTopKValue(Integer topKValue);
+   }
 
    public static interface InvocationBatchingConfig extends FluentTypes {}
 }

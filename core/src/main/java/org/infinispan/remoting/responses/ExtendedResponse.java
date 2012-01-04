@@ -40,6 +40,8 @@ public class ExtendedResponse extends ValidResponse {
    protected final boolean replayIgnoredRequests;
    protected final Response response;
 
+   protected long replayTime;
+
 
 
    public ExtendedResponse(Response response, boolean replayIgnoredRequests) {
@@ -48,6 +50,10 @@ public class ExtendedResponse extends ValidResponse {
 
 
    }
+
+
+
+
 
    public boolean isReplayIgnoredRequests() {
       return replayIgnoredRequests;
@@ -61,7 +67,14 @@ public class ExtendedResponse extends ValidResponse {
       return response.isSuccessful();
    }
 
+   //DIE
+   public void setReplayTime(long replayTime){
+       this.replayTime = replayTime;
+   }
 
+   public long getReplayTime(){
+       return this.replayTime;
+   }
 
 
    public static class Externalizer extends AbstractExternalizer<ExtendedResponse> {
@@ -69,13 +82,17 @@ public class ExtendedResponse extends ValidResponse {
       public void writeObject(ObjectOutput output, ExtendedResponse er) throws IOException {
          output.writeBoolean(er.replayIgnoredRequests);
          output.writeObject(er.response);
+
+         output.writeLong(er.replayTime);
       }
 
       @Override
       public ExtendedResponse readObject(ObjectInput input) throws IOException, ClassNotFoundException {
          boolean replayIgnoredRequests = input.readBoolean();
          Response response = (Response) input.readObject();
-         return new ExtendedResponse(response, replayIgnoredRequests);
+         ExtendedResponse er = new ExtendedResponse(response, replayIgnoredRequests);
+         er.setReplayTime(input.readLong());
+         return er;
       }
 
       @Override

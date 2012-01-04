@@ -1,12 +1,10 @@
 package eu.cloudtm.rmi.statistics;
 
 
-import org.infinispan.interceptors.InvalidationInterceptor;
+
 
 import java.lang.Thread.State;
-import java.lang.reflect.Method;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -27,10 +25,11 @@ public final class StatisticsListManager {
     private static final boolean collapseBeforeQuery = false;
 
     private static long windowInitTime;
+
     private static InterArrivalHistogram interArrivalHistogram = new InterArrivalHistogram(0,10000000L,100);
 
-
-
+    private static ReservoirSampling responseTimeWriteTXDistribution = new ReservoirSampling();
+    private static ReservoirSampling responseTimeReadOnlyTXDistribution = new ReservoirSampling();
 
     public synchronized static CopyOnWriteArrayList<ISPNStats> getInfinispanStatisticsList(){
 
@@ -62,6 +61,7 @@ public final class StatisticsListManager {
         return statsList;
     }
 
+    //We can safely remove elements from list since it is a copyOnWriteArrayList
     public synchronized static void clearList(){
             if(statsList==null)
                 throw new RuntimeException("Trying to remove an entry from an empty statsList");
@@ -76,10 +76,57 @@ public final class StatisticsListManager {
                     else
                         temp.reset();
                 }
-                //TO-DO handle the NODEStats case
+                else if(temp instanceof NodeStats)
+                    statsList.remove(temp);
 
     	    }
         }
+
+    public static void reset(){
+        windowInitTime = System.nanoTime();
+        responseTimeReadOnlyTXDistribution = new ReservoirSampling();
+        responseTimeWriteTXDistribution = new ReservoirSampling();
+    }
+
+
+    public static void insertWriteTXDurationRespTimeDistribution(int time){
+        responseTimeWriteTXDistribution.insertSample(time);
+    }
+
+    public static long getWriteTXDuration99Percentile(){
+        return responseTimeWriteTXDistribution.get99Percentile();
+    }
+
+    public static long getWriteTXDuration95Percentile(){
+        return responseTimeWriteTXDistribution.get95Percentile();
+    }
+
+    public static long getWriteTXDuration90Percentile(){
+        return responseTimeWriteTXDistribution.get90Percentile();
+    }
+
+    public static long getWriteTXDurationKPercentile(int k){
+        return responseTimeWriteTXDistribution.getKPercentile(k);
+    }
+    public static void insertReadOnlyTXDurationRespTimeDistribution(int time){
+        responseTimeWriteTXDistribution.insertSample(time);
+    }
+
+    public static long getReadOnlyTXDuration99Percentile(){
+        return responseTimeReadOnlyTXDistribution.get99Percentile();
+    }
+
+    public static long getReadOnlyTXDuration95Percentile(){
+        return responseTimeReadOnlyTXDistribution.get95Percentile();
+    }
+
+    public static long getReadOnlyTXDuration90Percentile(){
+        return responseTimeReadOnlyTXDistribution.get90Percentile();
+    }
+
+    public static long getReadOnlyTXDurationKPercentile(int k){
+        return responseTimeReadOnlyTXDistribution.getKPercentile(k);
+    }
 
     public static double getLocalConflictProbability(){
         if(collapseBeforeQuery){
@@ -326,6 +373,48 @@ public final class StatisticsListManager {
         }
     }
 
+    public static long getClusteredGetCommandSize(){
+        int[] param = {Statistics.CLUSTERED_GET_COMMAND_SIZE,Statistics.NUM_CLUSTERED_GET_COMMANDS};
+        double[] values = getParameters(param);
+        double size = values[0];
+        double num = values[1];
+        if(num!=0)
+            return (long)(size / num);
+        return 0L;
+    }
+
+    public static long getRemoteGetCost(){
+        int[] param = {Statistics.REMOTE_GET_COST, Statistics.NUM_REMOTE_GETS};
+        double[] values = getParameters(param);
+        double cost = values[0];
+        double num = values[1];
+        if (num!=0)
+            return (long)(cost / num);
+        return 0L;
+    }
+
+    public static long getTimeoutExceptionsOnPrepare(){
+        int[] param = {Statistics.NUM_TIMEOUT_EXCEPTION_ON_PREPARE};
+        double[] values = getParameters(param);
+        return (long)values[0];
+    }
+
+    public static double getNumNodesInvolvedInPrepare(){
+        int[] param = {Statistics.NUM_NODES_INVOLVED_IN_PREPARE, Statistics.NUM_PREPARES};
+        double[] value = getParameters(param);
+        double numNodes = value[0];
+        double numPrepares = value[1];
+        if(numPrepares!=0)
+            return numNodes / numPrepares;
+        return 0D;
+    }
+
+    public static long getDeadlockExceptionsOnPrepare(){
+        int[] param = {Statistics.NUM_DEADLOCK_EXCEPTION_ON_PREPARE};
+        double[] values = getParameters(param);
+        return (long)values[0];
+    }
+
     public static long getLockAcquisitionRate(){
         if(collapseBeforeQuery){
             NodeStats stats = collapseStatistics();
@@ -458,6 +547,7 @@ public final class StatisticsListManager {
         interArrivalHistogram.insertSample(time,key);
     }
 
+
     private synchronized static NodeStats collapseStatistics(){
             NodeStats stat = new NodeStats();
             Iterator<ISPNStats> it = statsList.iterator();
@@ -507,6 +597,20 @@ public final class StatisticsListManager {
         }
         return stats;
      }
+    /*
+    private static List<Object> getObjects(int index){
+        Iterator<ISPNStats> it= statsList.iterator();
+        List<Object> ret = new LinkedList<Object>();
+        ISPNStats temp;
+        int i = 0;
+        while(it.hasNext()){
+            temp = it.next();
+            ret.add(temp.getObjects(index));
+        }
+        return ret;
+
+    }
+    */
 
 
 }
