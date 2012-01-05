@@ -94,6 +94,13 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       if (configuration.isExposeJmxStatistics())
          interceptorChain.appendInterceptor(createInterceptor(CacheMgmtInterceptor.class));
 
+      //DIE    (PEDRO)
+      if(configuration.isTopKeyEnabled()){
+          interceptorChain.appendInterceptor(createInterceptor(StreamLibInterceptor.class));
+          System.out.println("**********\nInterceptorChainFactory: inserisco StreamLibInterceptor; ricordarsi di inserire i metodi per il suo inserimento/la sua rimozione a runtime\n**********");
+      }
+
+
       // load the tx interceptor
       if (configuration.getCacheMode().isDistributed())
          interceptorChain.appendInterceptor(createInterceptor(DistTxInterceptor.class));

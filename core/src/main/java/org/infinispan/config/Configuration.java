@@ -399,6 +399,9 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       jmxStatistics.setEnabled(useMbean);
    }
 
+
+
+
    /**
     * Enables invocation batching if set to <tt>true</tt>.  You still need to use {@link
     * org.infinispan.Cache#startBatch()} and {@link org.infinispan.Cache#endBatch(boolean)} to demarcate the start and
@@ -1107,6 +1110,17 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    public boolean isTopKeyEnabled(){
        return jmxStatistics.enabled && jmxStatistics.getTopK()!=0;
    }
+
+   //DIE   PEDRO
+   public void setTopKValue(Integer k){
+       jmxStatistics.setTopKValue(k);
+   }
+   //DIE PEDRO
+   public int getTopKeyValue(){
+       return jmxStatistics.topKValue;
+   }
+
+
 
    /**
     * @return true if invocation batching is enabled.
@@ -3747,6 +3761,8 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
        */
       private static final long serialVersionUID = 8716456707015486673L;
 
+       @ConfigurationDoc(desc = "Sets the capacity for the stream lib. Used to obtain the Top-K keys for reading, writing, etc...")
+       @XmlAttribute(name = "topKValue")
       private Integer topKValue = 0;
 
       public JmxStatistics() {
@@ -3774,6 +3790,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
       @Override
         public JmxStatisticsConfig setTopKValue(Integer topKValue) {
+            System.out.println("*********topKValue Changed to "+topKValue+"***********");
             testImmutability("topKValue");
             this.topKValue = topKValue;
             return this;

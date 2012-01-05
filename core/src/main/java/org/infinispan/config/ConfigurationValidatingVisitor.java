@@ -152,7 +152,7 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
     @Override
     //PEDRO
     public void visitJmxStatistics(Configuration.JmxStatistics config) {
-        if(config.getTopK() <= 0) {
+        if(config.getTopK() < 0) {
             throw new ConfigurationException("Top-K value must be higher than zero");
         }
     }

@@ -395,7 +395,7 @@ public class TransactionTable {
       registerRemoteTransaction(globalTx, remoteTransaction);
        //DIE
       if(configuration.isExposeJmxStatistics()){
-          System.out.println(Thread.currentThread().getId()+" - Starto una tx REMOTA, "+globalTx.getId());
+          //System.out.println(Thread.currentThread().getId()+" - Starto una tx REMOTA, "+globalTx.getId());
         ThreadLocalStatistics.getInfinispanThreadStats().startTransaction();
       }
       //NB: va gestita bene la storia delle tx remote create già con delle modifiche... i.e. è già non-read-only
@@ -441,7 +441,7 @@ public class TransactionTable {
          notifier.notifyTransactionRegistered(tx, ctx);
          //DIE
          if(configuration.isExposeJmxStatistics()){
-            System.out.println(Thread.currentThread().getId()+" - Starto una tx LOCALE, "+tx.getId());
+            //System.out.println(Thread.currentThread().getId()+" - Starto una tx LOCALE, "+tx.getId());
             ThreadLocalStatistics.getInfinispanThreadStats().startTransaction();
           }
       }

@@ -23,6 +23,7 @@
 package org.infinispan.factories;
 
 
+import eu.cloudtm.rmi.statistics.stream_lib.AnalyticsBean;
 import org.infinispan.batch.BatchContainer;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.context.InvocationContextContainer;
@@ -50,7 +51,7 @@ import static org.infinispan.util.Util.loadClass;
 @DefaultFactoryFor(classes = {CacheNotifier.class, EntryFactory.class, CommandsFactory.class,
         CacheLoaderManager.class, InvocationContextContainer.class, PassivationManager.class,
         BatchContainer.class, TransactionLog.class, EvictionManager.class, InvocationContextContainer.class,
-        TransactionCoordinator.class, RecoveryAdminOperations.class})
+        TransactionCoordinator.class, RecoveryAdminOperations.class, AnalyticsBean.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -67,6 +68,12 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          }
          return componentType.cast(getInstance(componentImpl));
       } else {
+         if(componentType.equals(AnalyticsBean.class)) {
+                AnalyticsBean ab = (AnalyticsBean) getInstance(componentType);
+                ab.setCapacity(configuration.getTopKeyValue());
+                ab.setActive(configuration.isTopKeyEnabled());
+                return (T) ab;
+            }
          return getInstance(componentType);
       }
    }

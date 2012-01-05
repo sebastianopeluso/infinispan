@@ -898,6 +898,8 @@ abstract class AbstractFluentConfigurationBean extends AbstractNamedCacheConfigu
       return config.jmxStatistics.enabled(true);
    }
 
+
+
    @Override
    public FluentConfiguration.StoreAsBinaryConfig storeAsBinary() {
       return config.storeAsBinary.enabled(true);
@@ -970,6 +972,12 @@ abstract class AbstractFluentConfigurationBean extends AbstractNamedCacheConfigu
 
    public FluentConfiguration.RecoveryConfig recovery() {
       return transaction().recovery();
+   }
+
+   //DIE
+   public void topKValues(Integer k){
+       System.out.println("**********************************");
+       jmxStatistics().setTopKValue(k);
    }
 
    @Override

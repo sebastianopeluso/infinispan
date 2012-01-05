@@ -97,6 +97,8 @@ public class OverrideConfigurationVisitor extends AbstractConfigurationBeanVisit
       overrideFields(customInterceptorsType, override.customInterceptorsType);
       overrideFields(storeAsBinary, override.storeAsBinary);
       overrideFields(dataContainerType, override.dataContainerType);
+      //PEDRO
+      overrideFields(jmxStatistics, override.jmxStatistics);
    }
 
    private void overrideFields(AbstractConfigurationBean bean, AbstractConfigurationBean overrides) {

@@ -306,6 +306,7 @@ public class DelegatingConfigurationVisitor implements ConfigurationBeanVisitor 
       }
    }
 
+    //PEDRO?
    @Override
     public void visitJmxStatistics(Configuration.JmxStatistics config) {
         for (ConfigurationBeanVisitor delegate : delegates) {
