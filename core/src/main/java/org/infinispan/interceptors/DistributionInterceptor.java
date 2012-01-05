@@ -82,7 +82,6 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    EntryFactory entryFactory;
    L1Manager l1Manager;
 
-   boolean statisticsEnabled;
 
    static final RecipientGenerator CLEAR_COMMAND_GENERATOR = new RecipientGenerator() {
       public List<Address> generateRecipients() {
@@ -109,8 +108,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
       isL1CacheEnabled = configuration.isL1CacheEnabled();
       needReliableReturnValues = !configuration.isUnsafeUnreliableReturnValues();
 
-      //DIE
-      statisticsEnabled = configuration.isExposeJmxStatistics();
+
 
    }
 

@@ -157,7 +157,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
 
     @ManagedAttribute(description = "Show the top " + AnalyticsBean.MAX_CAPACITY + " keys whose lock acquisition failed by timeout")
     @Operation(displayName = "Top Keys whose Lock Acquisition Failed by Timeout")
-    public Map<Object, Long> getTopLockFailedByTimeoutKeys() {
+    public Map<Object, Long> getTopLockFailedKeys() {
         Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_FAILED_KEYS);
         analyticsBean.resetStat(AnalyticsBean.Stat.MOST_FAILED_KEYS);
         return res;
@@ -165,7 +165,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
 
     @ManagedOperation(description = "Show the top n keys whose lock acquisition failed ")
     @Operation(displayName = "Top Keys whose Lock Acquisition Failed by Timeout")
-    public Map<Object, Long> getTopLockFailedByTimeoutKeys(int n) {
+    public Map<Object, Long> getTopLockFailedKeys(int n) {
         Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_FAILED_KEYS, n);
         analyticsBean.resetStat(AnalyticsBean.Stat.MOST_FAILED_KEYS);
         return res;

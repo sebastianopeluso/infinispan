@@ -352,7 +352,7 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
    @ManagedOperation(description = "Resets statistics gathered by this component")
    @Operation(displayName = "Reset Statistics")
    public void resetStatistics() {
-      StatisticsListManager.clearList();
+      //StatisticsListManager.clearList();
       StatisticsListManager.reset();
    }
 
@@ -361,14 +361,6 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
    public Map<Long,Long> getLocksInterArrivalHistogram(){
        return StatisticsListManager.getInterArrivalHistogram();
    }
-
-
-   @ManagedAttribute(description = "Test")
-   @Metric(displayName = "Test")
-   public long getTest(){
-       return 12L;
-   }
-
 
 
     @ManagedAttribute(description = "Total execution time of an update transaction (99-th percentile)")

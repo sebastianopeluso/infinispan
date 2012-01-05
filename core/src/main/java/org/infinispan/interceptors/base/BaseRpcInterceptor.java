@@ -47,10 +47,12 @@ public abstract class BaseRpcInterceptor extends CommandInterceptor {
    }
 
    protected boolean defaultSynchronous;
+   protected boolean statisticsEnabled;
 
    @Start
    public void init() {
       defaultSynchronous = configuration.getCacheMode().isSynchronous();
+      statisticsEnabled = configuration.isExposeJmxStatistics();
    }
 
    @Override

@@ -62,7 +62,7 @@ public final class StatisticsListManager {
     }
 
     //We can safely remove elements from list since it is a copyOnWriteArrayList
-    public synchronized static void clearList(){
+    private synchronized static void clearList(){
             if(statsList==null)
                 throw new RuntimeException("Trying to remove an entry from an empty statsList");
     	    Iterator<ISPNStats> iter = statsList.iterator();
@@ -83,6 +83,7 @@ public final class StatisticsListManager {
         }
 
     public static void reset(){
+        clearList();
         windowInitTime = System.nanoTime();
         responseTimeReadOnlyTXDistribution = new ReservoirSampling();
         responseTimeWriteTXDistribution = new ReservoirSampling();

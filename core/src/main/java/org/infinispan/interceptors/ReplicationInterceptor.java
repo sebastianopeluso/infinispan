@@ -22,6 +22,8 @@
  */
 package org.infinispan.interceptors;
 
+import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
+import eu.cloudtm.rmi.statistics.ThreadStatistics;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
@@ -60,6 +62,12 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       Object retVal = invokeNextInterceptor(ctx, command);
       if (shouldInvokeRemoteTxCommand(ctx)) {
+         //DIE
+         if(statisticsEnabled){
+             ThreadStatistics th= ThreadLocalStatistics.getInfinispanThreadStats();
+             th.setNumNodesInvolvedInPrepare(rpcManager.getTransport().getMembers().size());
+         }
+
          boolean async = configuration.getCacheMode() == Configuration.CacheMode.REPL_ASYNC;
          rpcManager.broadcastRpcCommand(command, !async, false);
       }
