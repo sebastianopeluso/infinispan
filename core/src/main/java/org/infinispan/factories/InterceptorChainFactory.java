@@ -96,7 +96,10 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
 
       //DIE    (PEDRO)
       if(configuration.isTopKeyEnabled()){
-          interceptorChain.appendInterceptor(createInterceptor(StreamLibInterceptor.class));
+          if (configuration.getCacheMode().isDistributed())
+              interceptorChain.appendInterceptor(createInterceptor(DistributedStreamLibInterceptor.class));
+          else
+              interceptorChain.appendInterceptor(createInterceptor(StreamLibInterceptor.class));
           System.out.println("**********\nInterceptorChainFactory: inserisco StreamLibInterceptor; ricordarsi di inserire i metodi per il suo inserimento/la sua rimozione a runtime\n**********");
       }
 

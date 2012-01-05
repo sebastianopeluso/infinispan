@@ -29,10 +29,15 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
         this.analyticsBean = analyticsBean;
     }
 
+    protected boolean isRemote(Object k){
+        return false;
+    }
+
     @Override
     public Object visitGetKeyValueCommand(InvocationContext ctx, GetKeyValueCommand command) throws Throwable {
+
         if(getStatisticsEnabled()) {
-            analyticsBean.addGet(command.getKey(), false);
+            analyticsBean.addGet(command.getKey(), isRemote(command.getKey()));
         }
         return invokeNextInterceptor(ctx, command);
     }
@@ -40,7 +45,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
     @Override
     public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
         if(getStatisticsEnabled()) {
-            analyticsBean.addPut(command.getKey(), false);
+            analyticsBean.addPut(command.getKey(), isRemote(command.getKey()));
         }
         return invokeNextInterceptor(ctx, command);
     }
