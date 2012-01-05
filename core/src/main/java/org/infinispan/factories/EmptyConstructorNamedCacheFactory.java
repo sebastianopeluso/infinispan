@@ -51,7 +51,7 @@ import static org.infinispan.util.Util.loadClass;
 @DefaultFactoryFor(classes = {CacheNotifier.class, EntryFactory.class, CommandsFactory.class,
         CacheLoaderManager.class, InvocationContextContainer.class, PassivationManager.class,
         BatchContainer.class, TransactionLog.class, EvictionManager.class, InvocationContextContainer.class,
-        TransactionCoordinator.class, RecoveryAdminOperations.class, AnalyticsBean.class})
+        TransactionCoordinator.class, RecoveryAdminOperations.class, /*PEDRO*/AnalyticsBean.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -68,6 +68,7 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          }
          return componentType.cast(getInstance(componentImpl));
       } else {
+         //PEDRO
          if(componentType.equals(AnalyticsBean.class)) {
                 AnalyticsBean ab = (AnalyticsBean) getInstance(componentType);
                 ab.setCapacity(configuration.getTopKeyValue());
