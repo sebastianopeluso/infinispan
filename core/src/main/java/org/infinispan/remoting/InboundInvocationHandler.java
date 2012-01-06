@@ -81,4 +81,6 @@ public interface InboundInvocationHandler {
    void blockTillNoLongerRetrying(String cacheName);
 
 
+   //DIE
+   Configuration getConfiguration();
 }

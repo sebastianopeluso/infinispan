@@ -112,8 +112,6 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       this.embeddedCacheManager = embeddedCacheManager;
       this.transport = transport;
       this.globalConfiguration = globalConfiguration;
-      //DIE
-      System.out.println("Sono io il problema?");
       this.configuration = this.embeddedCacheManager.getDefaultConfiguration();
    }
 

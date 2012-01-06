@@ -122,7 +122,6 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
            }
 
        }
-       System.out.println("Max is "+max);
        return max;
 
    }

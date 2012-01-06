@@ -22,7 +22,6 @@ public class StatisticsExtendedResponse extends ExtendedResponse {
 
    public StatisticsExtendedResponse(Response response, boolean replayIgnoredRequests, long replayTime){
        super(response,replayIgnoredRequests);
-       System.out.println("creata una statisticsExtendedResponse");
        this.replayTime = replayTime;
    }
 
