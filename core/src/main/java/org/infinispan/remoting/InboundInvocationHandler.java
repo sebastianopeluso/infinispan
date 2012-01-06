@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import org.infinispan.commands.remote.CacheRpcCommand;
+import org.infinispan.config.Configuration;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.remoting.responses.Response;
@@ -78,4 +79,6 @@ public interface InboundInvocationHandler {
     * @param cacheName name of the cache for which the handler would be queueing requests.
     */
    void blockTillNoLongerRetrying(String cacheName);
+
+
 }

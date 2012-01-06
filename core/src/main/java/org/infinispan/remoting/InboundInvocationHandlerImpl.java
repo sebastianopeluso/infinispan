@@ -22,6 +22,7 @@
  */
 package org.infinispan.remoting;
 
+
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.control.RehashControlCommand;
 import org.infinispan.commands.read.DistributedExecuteCommand;
@@ -94,6 +95,8 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
 
    //DIE
    private boolean statisticsEnabled = true;
+   private Configuration configuration;
+
 
    /**
     * How to handle an invocation based on the join status of a given cache *
@@ -103,12 +106,15 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
    }
 
    @Inject
-   public void inject(GlobalComponentRegistry gcr, StreamingMarshaller marshaller, EmbeddedCacheManager embeddedCacheManager, Transport transport, GlobalConfiguration globalConfiguration) {
+   public void inject(GlobalComponentRegistry gcr, StreamingMarshaller marshaller, EmbeddedCacheManager embeddedCacheManager, Transport transport, GlobalConfiguration globalConfiguration/*,Configuration config*/) {
       this.gcr = gcr;
       this.marshaller = marshaller;
       this.embeddedCacheManager = embeddedCacheManager;
       this.transport = transport;
       this.globalConfiguration = globalConfiguration;
+      //DIE
+      System.out.println("Sono io il problema?");
+      this.configuration = this.embeddedCacheManager.getDefaultConfiguration();
    }
 
    @Start
@@ -116,6 +122,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       distributedSync = transport.getDistributedSync();
       distributedSyncTimeout = globalConfiguration.getDistributedSyncTimeout();
       stopping = false;
+      this.statisticsEnabled = configuration.isExposeJmxStatistics();
    }
 
    @Stop
@@ -124,6 +131,11 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       for (Map.Entry<String, RetryQueue> retryThread : retryThreadMap.entrySet()) {
          retryThread.getValue().interrupt();
       }
+   }
+
+   //DIE
+   public Configuration getConfiguration(){
+       return this.configuration;
    }
 
    private boolean isDefined(String cacheName) {
@@ -202,7 +214,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       // If this thread blocked during a NBST flush, then inform the sender
       // it needs to replay ignored messages
       boolean replayIgnored = sr == DistributedSync.SyncResponse.STATE_ACHIEVED;
-      boolean traceReplay = statisticsEnabled && (cmd instanceof PrepareCommand);
+      final boolean traceReplay = this.statisticsEnabled && (cmd instanceof PrepareCommand);    //DIE
       long init = 0;
       long replayTime = 0L;
       if(traceReplay)
@@ -210,37 +222,25 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       Response resp = handleInternal(cmd);
       if(traceReplay)
           replayTime= System.nanoTime() - init;
-      /*if(traceReplay)
-          System.out.println("ReplayTime = "+replayTime);*/
 
       // A null response is valid and OK ...
       if (resp == null || resp.isValid()) {
-          //System.out.println("VALID REPONSE ;)");
-         if (replayIgnored){
-             //System.out.println("ReplayIgnored");
-             resp = new ExtendedResponse(resp, true);
-             if(traceReplay)
-                 ((ExtendedResponse)resp).setReplayTime(replayTime);
-         }
-         //DIE : if replayignored=false I create a StatisticsExtendedResponse with false
-         else{
-             //System.out.println("Not ReplayIgnored");
-             if(traceReplay){
-                 resp = new ExtendedResponse(resp,false);
-                 ((ExtendedResponse)resp).setReplayTime(replayTime);
+         if(!traceReplay){
+             if (replayIgnored){
+                 resp = new ExtendedResponse(resp, true);
              }
          }
+         //DIE
+          else{
+             resp = new StatisticsExtendedResponse(resp,replayIgnored,replayTime);
+           }
 
       } else {
          // invalid response
          if (trace) log.trace("Unable to execute command, got invalid response");
           //System.out.println("INVALID RESPONSE!!");
       }
-      /*if(resp==null && traceReplay)
-          System.out.println("Sto ritornando una risposta nulla");
-       else if(resp!=null && traceReplay)
-          System.out.println("ritorno "+resp.getClass().getName()+" con replay time "+((ExtendedResponse)resp).getReplayTime());*/
-      return resp;
+       return resp;
    }
 
    public JoinHandle howToHandle(CacheRpcCommand cmd) {

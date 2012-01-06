@@ -208,12 +208,13 @@ public final class StatisticsListManager {
             throw new RuntimeException("CollapseBeforeQuery not supported yet");
         }
         else{
-            int[] param = {Statistics.RTT, Statistics.NUM_RTTS};
+            int[] param = {Statistics.RTT, Statistics.NUM_RTTS, Statistics.MAX_REMOTE_EXEC};
             double[] values = getParameters(param);
             double rtt = values[0];
             double rtts = values[1];
+            double replay = values[2];
             if(rtts != 0){
-                return (long)(rtt / rtts);
+                return (long)((rtt-replay) / rtts);
             }
             return 0L;
         }

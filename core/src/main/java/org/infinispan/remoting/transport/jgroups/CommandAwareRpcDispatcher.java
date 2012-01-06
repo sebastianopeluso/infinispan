@@ -22,6 +22,7 @@
  */
 package org.infinispan.remoting.transport.jgroups;
 
+import com.sun.tools.doclets.internal.toolkit.util.Extern;
 import eu.cloudtm.rmi.statistics.ThreadLocalStatistics;
 import org.infinispan.CacheException;
 import org.infinispan.commands.ReplicableCommand;
@@ -31,10 +32,7 @@ import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.RpcException;
-import org.infinispan.remoting.responses.ExceptionResponse;
-import org.infinispan.remoting.responses.ExtendedResponse;
-import org.infinispan.remoting.responses.RequestIgnoredResponse;
-import org.infinispan.remoting.responses.Response;
+import org.infinispan.remoting.responses.*;
 import org.infinispan.util.Util;
 import org.infinispan.util.concurrent.TimeoutException;
 import org.infinispan.util.logging.Log;
@@ -104,6 +102,31 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
       return true;
    }
 
+   //DIE
+   private boolean isStatisticEnabled(){
+       return inboundInvocationHandler.getConfiguration().isExposeJmxStatistics();
+   }
+
+   private long maxReplayTime(RspList r){
+       Object resp;
+       long max = 0;
+       long temp ;
+       for (Map.Entry<Address, Rsp> entry : r.entrySet()){
+           resp  = entry.getValue().getValue();
+           if(resp instanceof StatisticsExtendedResponse){
+               temp = ((StatisticsExtendedResponse)resp).getReplayTime();
+               if( temp > max)
+                   max = temp;
+
+
+           }
+
+       }
+       System.out.println("Max is "+max);
+       return max;
+
+   }
+
    public RspList invokeRemoteCommands(Vector<Address> dests, ReplicableCommand command, int mode, long timeout,
                                        boolean anycasting, boolean oob, RspFilter filter, boolean supportReplay, boolean asyncMarshalling,
                                        boolean broadcast) {
@@ -123,10 +146,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          }
          if (mode == GroupRequest.GET_NONE) return null; // "Traditional" async.
          if (response.isEmpty() || containsOnlyNulls(response)){
-            //DIE
-            /*if(containsOnlyNulls(response))
-                System.out.println("CommandAwareRpcDispatcher : le risposte sono tutte null!");
-            */return null;
+            return null;
         }
          else
             return response;
@@ -151,8 +171,6 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             cmd = (ReplicableCommand) req_marshaller.objectFromByteBuffer(req.getBuffer(), req.getOffset(), req.getLength());
             if (cmd instanceof CacheRpcCommand){
                 Object ret = executeCommand((CacheRpcCommand) cmd, req);
-                /*if(cmd instanceof PrepareCommand)
-                    System.out.println(((ExtendedResponse)ret).getReplayTime());*/
                return  ret;
             }
             else
@@ -226,17 +244,17 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          try {
             buf = req_marshaller.objectToBuffer(command);
              //DIE
-            if(command instanceof PrepareCommand) {
-               //ThreadLocalStatistics.getInfinispanThreadStats().incrementPrepares();
-               ThreadLocalStatistics.getInfinispanThreadStats().addPrepareCommandSize(buf.getLength());
-            }
-            else if(command instanceof CommitCommand){
-               //ThreadLocalStatistics.getInfinispanThreadStats().incrementCommits();
-               ThreadLocalStatistics.getInfinispanThreadStats().addCommitCommandSize(buf.getLength());
-            }
-            else if(command instanceof ClusteredGetCommand) {
-                    ThreadLocalStatistics.getInfinispanThreadStats().addClusteredGetCommandSize(buf.getLength());
+            if(isStatisticEnabled()){
+                if(command instanceof PrepareCommand) {
+                   ThreadLocalStatistics.getInfinispanThreadStats().addPrepareCommandSize(buf.getLength());
                 }
+                else if(command instanceof CommitCommand){
+                   ThreadLocalStatistics.getInfinispanThreadStats().addCommitCommandSize(buf.getLength());
+                }
+                else if(command instanceof ClusteredGetCommand) {
+                        ThreadLocalStatistics.getInfinispanThreadStats().addClusteredGetCommandSize(buf.getLength());
+                    }
+            }
          } catch (Exception e) {
             throw new RuntimeException("Failure to marshal argument(s)", e);
          }
@@ -338,6 +356,11 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             //la entry.setValue(ex.get)) fa casino e me la modifica
 
             //qui: calcola il max e mettilo nel threadLocal e via
+
+            //DIE
+            if(isStatisticEnabled() && command instanceof PrepareCommand)
+               ThreadLocalStatistics.getInfinispanThreadStats().addMaxReplayTime(maxReplayTime(retval));
+
 
             if (supportReplay) {
                boolean replay = false;

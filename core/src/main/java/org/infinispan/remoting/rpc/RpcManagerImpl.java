@@ -158,12 +158,12 @@ public class RpcManagerImpl implements RpcManager {
          } finally {
             if (statisticsEnabled && !exceptionThrown && (rpcCommand instanceof PrepareCommand)) {
                long timeTaken = System.nanoTime() - startTime;
-               long maxReplayTime = this.getMaxReplayTime(result);
-               long avgReplayTime = this.getAvgReplayTime(result);
-               long rtt = timeTaken - maxReplayTime;
+               //long maxReplayTime = this.getMaxReplayTime(result);
+               //long avgReplayTime = this.getAvgReplayTime(result);
+               long rtt = timeTaken;// - maxReplayTime;
                ThreadStatistics is = ThreadLocalStatistics.getInfinispanThreadStats();
-               is.addMaxReplayTime(maxReplayTime);
-               is.addAvgReplayTime(avgReplayTime);
+               //is.addMaxReplayTime(maxReplayTime);
+               //is.addAvgReplayTime(avgReplayTime);
                is.addRtt(rtt);
 
                totalReplicationTime.getAndAdd(timeTaken);
@@ -456,10 +456,10 @@ public class RpcManagerImpl implements RpcManager {
         long max=0;
         long ttemp = 0;
         Iterator<Response> it = list.values().iterator();
-        ExtendedResponse temp;
+        StatisticsExtendedResponse temp;
         while(it.hasNext()){
             //System.out.println("Sono nel while");
-            temp = (ExtendedResponse) it.next();
+            temp = (StatisticsExtendedResponse) it.next();
             ttemp = temp.getReplayTime();
             if(ttemp>max)
                 max=ttemp;
@@ -471,12 +471,12 @@ public class RpcManagerImpl implements RpcManager {
 
     private long getAvgReplayTime(Map<Address,Response> list){
         double avg = 0;
-        ExtendedResponse temp;
+        StatisticsExtendedResponse temp;
         Iterator<Address> it = list.keySet().iterator();
 
 
         while(it.hasNext()){
-            temp = (ExtendedResponse) list.get(it.next());
+            temp = (StatisticsExtendedResponse) list.get(it.next());
             //System.out.println("replay " + temp.getReplayTime());
             avg+=temp.getReplayTime();
         }

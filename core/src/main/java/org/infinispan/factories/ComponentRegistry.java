@@ -147,7 +147,9 @@ public class ComponentRegistry extends AbstractComponentRegistry {
 
    @Override
    protected void registerComponentInternal(Object component, String name, boolean nonVolatile) {
+      System.out.println("Registro il componente " + name);
       if (isGlobal(component.getClass())) {
+
          globalComponents.registerComponentInternal(component, name, nonVolatile);
       } else {
          super.registerComponentInternal(component, name, nonVolatile);
