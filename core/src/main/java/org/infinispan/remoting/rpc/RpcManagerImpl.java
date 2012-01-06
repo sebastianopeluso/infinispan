@@ -452,13 +452,13 @@ public class RpcManagerImpl implements RpcManager {
     //DIE
 
     private long getMaxReplayTime(Map<Address,Response> list){
-        System.out.println("Chiamata la getMaxReplayTime");
+        //System.out.println("Chiamata la getMaxReplayTime");
         long max=0;
         long ttemp = 0;
         Iterator<Response> it = list.values().iterator();
         ExtendedResponse temp;
         while(it.hasNext()){
-            System.out.println("Sono nel while");
+            //System.out.println("Sono nel while");
             temp = (ExtendedResponse) it.next();
             ttemp = temp.getReplayTime();
             if(ttemp>max)
@@ -476,8 +476,8 @@ public class RpcManagerImpl implements RpcManager {
 
 
         while(it.hasNext()){
-            temp = (StatisticsExtendedResponse) list.get(it.next());
-            System.out.println("replay " + temp.getReplayTime());
+            temp = (ExtendedResponse) list.get(it.next());
+            //System.out.println("replay " + temp.getReplayTime());
             avg+=temp.getReplayTime();
         }
         return (long)( avg / (double)list.size());

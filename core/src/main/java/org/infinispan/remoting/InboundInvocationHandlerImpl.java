@@ -210,21 +210,21 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       Response resp = handleInternal(cmd);
       if(traceReplay)
           replayTime= System.nanoTime() - init;
-      if(traceReplay)
-          System.out.println("ReplayTime = "+replayTime);
+      /*if(traceReplay)
+          System.out.println("ReplayTime = "+replayTime);*/
 
       // A null response is valid and OK ...
       if (resp == null || resp.isValid()) {
-          System.out.println("VALID REPONSE ;)");
+          //System.out.println("VALID REPONSE ;)");
          if (replayIgnored){
-             System.out.println("ReplayIgnored");
+             //System.out.println("ReplayIgnored");
              resp = new ExtendedResponse(resp, true);
              if(traceReplay)
                  ((ExtendedResponse)resp).setReplayTime(replayTime);
          }
          //DIE : if replayignored=false I create a StatisticsExtendedResponse with false
          else{
-             System.out.println("Not ReplayIgnored");
+             //System.out.println("Not ReplayIgnored");
              if(traceReplay){
                  resp = new ExtendedResponse(resp,false);
                  ((ExtendedResponse)resp).setReplayTime(replayTime);
@@ -234,12 +234,12 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       } else {
          // invalid response
          if (trace) log.trace("Unable to execute command, got invalid response");
-          System.out.println("INVALID RESPONSE!!");
+          //System.out.println("INVALID RESPONSE!!");
       }
-      if(resp==null && traceReplay)
+      /*if(resp==null && traceReplay)
           System.out.println("Sto ritornando una risposta nulla");
        else if(resp!=null && traceReplay)
-          System.out.println("ritorno "+resp.getClass().getName()+" con replay time "+((ExtendedResponse)resp).getReplayTime());
+          System.out.println("ritorno "+resp.getClass().getName()+" con replay time "+((ExtendedResponse)resp).getReplayTime());*/
       return resp;
    }
 

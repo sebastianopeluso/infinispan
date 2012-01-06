@@ -3790,7 +3790,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
       @Override
         public JmxStatisticsConfig setTopKValue(Integer topKValue) {
-            System.out.println("*********topKValue Changed to "+topKValue+"***********");
+            //System.out.println("*********topKValue Changed to "+topKValue+"***********");
             testImmutability("topKValue");
             this.topKValue = topKValue;
             return this;

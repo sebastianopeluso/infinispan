@@ -124,9 +124,9 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          if (mode == GroupRequest.GET_NONE) return null; // "Traditional" async.
          if (response.isEmpty() || containsOnlyNulls(response)){
             //DIE
-            if(containsOnlyNulls(response))
+            /*if(containsOnlyNulls(response))
                 System.out.println("CommandAwareRpcDispatcher : le risposte sono tutte null!");
-            return null;
+            */return null;
         }
          else
             return response;
@@ -151,8 +151,8 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             cmd = (ReplicableCommand) req_marshaller.objectFromByteBuffer(req.getBuffer(), req.getOffset(), req.getLength());
             if (cmd instanceof CacheRpcCommand){
                 Object ret = executeCommand((CacheRpcCommand) cmd, req);
-                if(cmd instanceof PrepareCommand)
-                    System.out.println(((ExtendedResponse)ret).getReplayTime());
+                /*if(cmd instanceof PrepareCommand)
+                    System.out.println(((ExtendedResponse)ret).getReplayTime());*/
                return  ret;
             }
             else
@@ -261,10 +261,10 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             opts.setAnycasting(false);
             buf = marshallCall();
             retval = castMessage(dests, constructMessage(buf, null), opts);
-            System.out.println("after castMessage "+retval);
+            //System.out.println("after castMessage "+retval);
          } else {
             //DIE
-            System.out.println("no broadcast");
+            //System.out.println("no broadcast");
 
 
             Set<Address> targets = new HashSet<Address>(dests); // should sufficiently randomize order.
@@ -315,7 +315,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          if (mode != GroupRequest.GET_NONE) {
 
             if (trace) log.tracef("Responses: %s", retval);
-            System.out.println("Tutte le risposte "+retval);
+            //System.out.println("Tutte le risposte "+retval);
 
             // a null response is 99% likely to be due to a marshalling problem - we throw a NSE, this needs to be changed when
             // JGroups supports http://jira.jboss.com/jira/browse/JGRP-193
@@ -347,7 +347,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
                   if (value instanceof RequestIgnoredResponse) {
                      ignorers.add(entry.getKey());
                   } else if (value instanceof ExtendedResponse) {
-                     System.out.println("Trovata una extendedResponse");
+                     //System.out.println("Trovata una extendedResponse");
                      ExtendedResponse extended = (ExtendedResponse) value;
                      replay |= extended.isReplayIgnoredRequests();
                      entry.getValue().setValue(extended.getResponse());
@@ -356,7 +356,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
                   }
 
                }
-               System.out.println("Dopo supportReplay "+retval);
+               //System.out.println("Dopo supportReplay "+retval);
                if (replay && !ignorers.isEmpty()) {
                   Message msg = constructMessage(buf, null);
                   //Since we are making a sync call make sure we don't bundle
@@ -374,11 +374,11 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
                   if (responses != null)
                      retval.putAll(responses);
                   //DIE qui potrei scandirmi preventivamente la lista resposes, mettere a posto il replayTIme(se necessario) e fare poi la putAll
-                  System.out.println("Prima del pre-return "+retval);
+                  //System.out.println("Prima del pre-return "+retval);
                }
             }
          }
-         System.out.println("Pre return "+retval);
+         //System.out.println("Pre return "+retval);
          return retval;
       }
    }

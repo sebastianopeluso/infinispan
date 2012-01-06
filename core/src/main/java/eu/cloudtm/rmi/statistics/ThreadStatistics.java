@@ -105,7 +105,7 @@ public class ThreadStatistics implements Serializable, ISPNStats {
 
     public void startTransaction() {
         long time = System.nanoTime();
-        System.out.println(Thread.currentThread().getId() + " vado a fare la start a un tempo " + time);
+        //System.out.println(Thread.currentThread().getId() + " vado a fare la start a un tempo " + time);
         this.currentTransactionState.setInitTime(time);
     }
 
@@ -347,11 +347,11 @@ public class ThreadStatistics implements Serializable, ISPNStats {
         }
 
         public void setInitTime(long l) {
-            if (this.initTime != 0L)
+            /*if (this.initTime != 0L)
                 System.out.println(Thread.currentThread().getId() + " InitTime gia' settato a " + initTime);
             else {
-                this.initTime = l;
-            }
+            */    this.initTime = l;
+            //}
         }
 
 

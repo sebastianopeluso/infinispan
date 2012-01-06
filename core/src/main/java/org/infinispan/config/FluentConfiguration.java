@@ -976,7 +976,7 @@ abstract class AbstractFluentConfigurationBean extends AbstractNamedCacheConfigu
 
    //DIE
    public void topKValues(Integer k){
-       System.out.println("**********************************");
+       //System.out.println("**********************************");
        jmxStatistics().setTopKValue(k);
    }
 

@@ -269,7 +269,7 @@ public class TxInterceptor extends CommandInterceptor {
       commits.set(0);
       rollbacks.set(0);
       tempoRisposta.clear();
-      System.out.println("Stats cleared");
+      //System.out.println("Stats cleared");
    }
 
    @Operation(displayName = "Enable/disable statistics")
