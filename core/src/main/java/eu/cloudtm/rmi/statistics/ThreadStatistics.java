@@ -1,12 +1,9 @@
 package eu.cloudtm.rmi.statistics;
 
 
-
 import java.io.Serializable;
 import java.lang.Thread.State;
-import java.lang.reflect.Array;
-import java.util.*;
-import eu.cloudtm.rmi.statistics.stream_lib.AnalyticsBean;
+import java.util.HashMap;
 
 
 /**
@@ -130,7 +127,6 @@ public class ThreadStatistics implements Serializable, ISPNStats {
     }
 
     public void incrementPuts() {
-
         this.currentTransactionState.incrementPuts();
     }
 
@@ -200,9 +196,13 @@ public class ThreadStatistics implements Serializable, ISPNStats {
         this.currentTransactionState.setNodeInvolvedInPrepare(l);
     }
 
+    public void incrementPut(boolean remote) {
+        this.currentTransactionState.incrementPut(remote);
+    }
 
-
-
+    public void incrementGet(boolean remote) {
+        this.currentTransactionState.incrementGet(remote);
+    }
 
 
     private class CurrentTransactionState {
@@ -247,6 +247,12 @@ public class ThreadStatistics implements Serializable, ISPNStats {
 
         private long numPuts;
 
+        //Pedro
+        private long numLocalGet;
+        private long numRemoteGet;
+        private long numLocalPut;
+        private long numRemotePut;
+
 
 
         /*
@@ -280,6 +286,23 @@ public class ThreadStatistics implements Serializable, ISPNStats {
             this.mostFailedKeyByTimeout = new LinkedList<Object>();
             */
 
+        }
+
+        //Pedro
+        public void incrementGet(boolean remote) {
+            if(remote) {
+                numRemoteGet++;
+            } else {
+                numLocalGet++;
+            }
+        }
+
+        public void incrementPut(boolean remote) {
+            if(remote) {
+                numRemotePut++;
+            } else {
+                numLocalPut++;
+            }
         }
 
         public void setNodeInvolvedInPrepare(long l) {
@@ -364,6 +387,11 @@ public class ThreadStatistics implements Serializable, ISPNStats {
 
                 addParameter(Statistics.CLUSTERED_GET_COMMAND_SIZE, this.clusteredGetCommandSize);
                 addParameter(Statistics.NUM_CLUSTERED_GET_COMMANDS, this.clusteredGetCommands);
+
+                addParameter(Statistics.NUM_PUTS_ON_LOCAL_KEY, this.numLocalPut);
+                addParameter(Statistics.NUM_PUTS_ON_REMOTE_KEY, this.numRemotePut);
+                addParameter(Statistics.NUM_GETS_ON_LOCAL_KEY, this.numLocalGet);
+                addParameter(Statistics.NUM_GETS_ON_REMOTE_KEY, this.numRemoteGet);
                 /*
                 addObject(Statistics.LOCAL_GETS,this.localGet);
                 addObject(Statistics.REMOTE_GETS,this.remoteGet);
@@ -608,7 +636,7 @@ public class ThreadStatistics implements Serializable, ISPNStats {
     }
     */
 
-      //not thread-safe
+    //not thread-safe
     public void reset() {
         this.needReset = true;
     }

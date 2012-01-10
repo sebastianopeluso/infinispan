@@ -68,7 +68,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
     @Operation(displayName = "Top Remote Read Keys")
     public Map<Object, Long> getRemoteTopGets() {
         Map<Object, Long> res =  analyticsBean.getTopKFrom(AnalyticsBean.Stat.REMOTE_GET);
-        analyticsBean.resetStat(AnalyticsBean.Stat.REMOTE_GET);
+        //analyticsBean.resetStat(AnalyticsBean.Stat.REMOTE_GET);
         return res;
     }
 
@@ -84,7 +84,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
     @Operation(displayName = "Top Local Read Keys")
     public Map<Object, Long> getLocalTopGets() {
         Map<Object, Long> res =  analyticsBean.getTopKFrom(AnalyticsBean.Stat.LOCAL_GET);
-        analyticsBean.resetStat(AnalyticsBean.Stat.LOCAL_GET);
+        //analyticsBean.resetStat(AnalyticsBean.Stat.LOCAL_GET);
         return res;
     }
 
@@ -100,7 +100,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
     @Operation(displayName = "Top Remote Write Keys")
     public Map<Object, Long> getRemoteTopPuts() {
         Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.REMOTE_PUT);
-        analyticsBean.resetStat(AnalyticsBean.Stat.REMOTE_PUT);
+        //analyticsBean.resetStat(AnalyticsBean.Stat.REMOTE_PUT);
         return res;
     }
 
@@ -116,7 +116,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
     @Operation(displayName = "Top Local Write Keys")
     public Map<Object, Long> getLocalTopPuts() {
         Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.LOCAL_PUT);
-        analyticsBean.resetStat(AnalyticsBean.Stat.LOCAL_PUT);
+        //analyticsBean.resetStat(AnalyticsBean.Stat.LOCAL_PUT);
         return res;
     }
 
@@ -132,7 +132,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
     @Operation(displayName = "Top Locked Keys")
     public Map<Object, Long> getTopLockedKeys() {
         Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_LOCKED_KEYS);
-        analyticsBean.resetStat(AnalyticsBean.Stat.MOST_LOCKED_KEYS);
+        //analyticsBean.resetStat(AnalyticsBean.Stat.MOST_LOCKED_KEYS);
         return res;
     }
 
@@ -148,7 +148,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
     @Operation(displayName = "Top Contended Keys")
     public Map<Object, Long> getTopContendedKeys() {
         Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_CONTENDED_KEYS);
-        analyticsBean.resetStat(AnalyticsBean.Stat.MOST_CONTENDED_KEYS);
+        //analyticsBean.resetStat(AnalyticsBean.Stat.MOST_CONTENDED_KEYS);
         return res;
     }
 
@@ -164,7 +164,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
     @Operation(displayName = "Top Keys whose Lock Acquisition Failed by Timeout")
     public Map<Object, Long> getTopLockFailedKeys() {
         Map<Object, Long> res = analyticsBean.getTopKFrom(AnalyticsBean.Stat.MOST_FAILED_KEYS);
-        analyticsBean.resetStat(AnalyticsBean.Stat.MOST_FAILED_KEYS);
+        //analyticsBean.resetStat(AnalyticsBean.Stat.MOST_FAILED_KEYS);
         return res;
     }
 

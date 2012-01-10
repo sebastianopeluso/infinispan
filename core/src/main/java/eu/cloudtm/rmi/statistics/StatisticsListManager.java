@@ -33,23 +33,23 @@ public final class StatisticsListManager {
 
     public synchronized static CopyOnWriteArrayList<ISPNStats> getInfinispanStatisticsList(){
 
-            if(statsList==null){
-                statsList=new CopyOnWriteArrayList<ISPNStats>();
-                windowInitTime = System.nanoTime();
-            }
-            return statsList;
+        if(statsList==null){
+            statsList=new CopyOnWriteArrayList<ISPNStats>();
+            windowInitTime = System.nanoTime();
+        }
+        return statsList;
 
 
     }
 
     public synchronized static void addInfinispanStatistics(ThreadStatistics thread) {
 
-            if(statsList==null){
-                statsList=new CopyOnWriteArrayList<ISPNStats>();
-                windowInitTime = System.nanoTime();
-            }
-            statsList.add(thread);
+        if(statsList==null){
+            statsList=new CopyOnWriteArrayList<ISPNStats>();
+            windowInitTime = System.nanoTime();
         }
+        statsList.add(thread);
+    }
 
     public synchronized static void removeInfinispanStatistics(ISPNStats thread) {
         if(statsList==null)
@@ -63,24 +63,24 @@ public final class StatisticsListManager {
 
     //We can safely remove elements from list since it is a copyOnWriteArrayList
     private synchronized static void clearList(){
-            if(statsList==null)
-                throw new RuntimeException("Trying to remove an entry from an empty statsList");
-    	    Iterator<ISPNStats> iter = statsList.iterator();
-            ISPNStats temp;
-    	    while(iter.hasNext()){
-                temp = iter.next();
-                if(temp instanceof ThreadStatistics){
-                    ThreadStatistics ts = (ThreadStatistics) temp;
-    		        if(ts.getThread_state().equals(State.TERMINATED))
-    			        statsList.remove(temp);
-                    else
-                        temp.reset();
-                }
-                else if(temp instanceof NodeStats)
+        if(statsList==null)
+            throw new RuntimeException("Trying to remove an entry from an empty statsList");
+        Iterator<ISPNStats> iter = statsList.iterator();
+        ISPNStats temp;
+        while(iter.hasNext()){
+            temp = iter.next();
+            if(temp instanceof ThreadStatistics){
+                ThreadStatistics ts = (ThreadStatistics) temp;
+                if(ts.getThread_state().equals(State.TERMINATED))
                     statsList.remove(temp);
+                else
+                    temp.reset();
+            }
+            else if(temp instanceof NodeStats)
+                statsList.remove(temp);
 
-    	    }
         }
+    }
 
     public static void reset(){
         clearList();
@@ -165,19 +165,19 @@ public final class StatisticsListManager {
 
     public static long getCommitCommandSize(){
         if(collapseBeforeQuery){
-           NodeStats stats = collapseStatistics();
-           //return stats.getCommitCommandSize();
+            NodeStats stats = collapseStatistics();
+            //return stats.getCommitCommandSize();
             throw new RuntimeException("CollapseBeforeQuery not supported yet");
         }
         else{
-           int[] param = {Statistics.COMMIT_COMMAND_SIZE, Statistics.NUM_COMMITTED_TX_WR};  //Only for write tx
-           double[] values = getParameters(param);
-           double commitSize = values[0];
-           double numCommits = values[1];
-           if(numCommits!=0){
-               return (long)(commitSize / numCommits);
-           }
-           return 0L;
+            int[] param = {Statistics.COMMIT_COMMAND_SIZE, Statistics.NUM_COMMITTED_TX_WR};  //Only for write tx
+            double[] values = getParameters(param);
+            double commitSize = values[0];
+            double numCommits = values[1];
+            if(numCommits!=0){
+                return (long)(commitSize / numCommits);
+            }
+            return 0L;
         }
 
 
@@ -549,30 +549,51 @@ public final class StatisticsListManager {
         interArrivalHistogram.insertSample(time,key);
     }
 
+    public static long getLocalRollbacks(){
+        int[] param = {Statistics.NUM_ROLLBACKS};
+        double[] values = getParameters(param);
+        return (long) values[0];
+    }
+
+    public static long getLocalPuts() {
+        return (long) getParameters(new int[] {Statistics.NUM_PUTS_ON_LOCAL_KEY})[0];
+    }
+
+    public static long getRemotePuts() {
+        return (long) getParameters(new int[] {Statistics.NUM_PUTS_ON_REMOTE_KEY})[0];
+    }
+
+    public static long getLocalGets() {
+        return (long) getParameters(new int[] {Statistics.NUM_GETS_ON_LOCAL_KEY})[0];
+    }
+
+    public static long getRemoteGets() {
+        return (long) getParameters(new int[] {Statistics.NUM_GETS_ON_REMOTE_KEY})[0];
+    }
 
     private synchronized static NodeStats collapseStatistics(){
-            NodeStats stat = new NodeStats();
-            Iterator<ISPNStats> it = statsList.iterator();
-            ISPNStats temp;
-            while(it.hasNext()){
-                temp = it.next();
-                //Not thread-safe
-                mergeAndFlush(stat, temp);
-                //if it's a threadStats AND its thread is dead, then I can remove it (without sync)
-                if(it instanceof ThreadStatistics){
-                    ThreadStatistics ts = (ThreadStatistics) temp;
-                    if(ts.getThread_state()==State.TERMINATED)
-                        statsList.remove(ts);
+        NodeStats stat = new NodeStats();
+        Iterator<ISPNStats> it = statsList.iterator();
+        ISPNStats temp;
+        while(it.hasNext()){
+            temp = it.next();
+            //Not thread-safe
+            mergeAndFlush(stat, temp);
+            //if it's a threadStats AND its thread is dead, then I can remove it (without sync)
+            if(it instanceof ThreadStatistics){
+                ThreadStatistics ts = (ThreadStatistics) temp;
+                if(ts.getThread_state()==State.TERMINATED)
+                    statsList.remove(ts);
 
-                }
-                //if it's a previously aggregated node, I can remove it after having copied its content
-                else{
-                    statsList.remove(temp);
-                }
             }
-            //In the end, the just created node becomes the first in the list
-            statsList.add(0,stat);
-            return stat;
+            //if it's a previously aggregated node, I can remove it after having copied its content
+            else{
+                statsList.remove(temp);
+            }
+        }
+        //In the end, the just created node becomes the first in the list
+        statsList.add(0,stat);
+        return stat;
     }
 
     private static void mergeAndFlush(ISPNStats dest, ISPNStats src){
@@ -598,7 +619,7 @@ public final class StatisticsListManager {
             i=0;
         }
         return stats;
-     }
+    }
     /*
     private static List<Object> getObjects(int index){
         Iterator<ISPNStats> it= statsList.iterator();
