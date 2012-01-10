@@ -126,9 +126,6 @@ public class ThreadStatistics implements Serializable, ISPNStats {
         this.currentTransactionState.incrementToRemoteConflicts();
     }
 
-    public void incrementPuts() {
-        this.currentTransactionState.incrementPuts();
-    }
 
     public void computeHoldTime(Object o, boolean isLocal, boolean commit) {
         this.currentTransactionState.computeHoldTime(o, commit, isLocal);
@@ -300,8 +297,10 @@ public class ThreadStatistics implements Serializable, ISPNStats {
         public void incrementPut(boolean remote) {
             if(remote) {
                 numRemotePut++;
+                this.isReadOnly = false;
             } else {
                 numLocalPut++;
+                this.isReadOnly = false;
             }
         }
 
@@ -334,10 +333,7 @@ public class ThreadStatistics implements Serializable, ISPNStats {
             this.toRemoteConflicts++;
         }
 
-        public void incrementPuts() {
-            this.numPuts++;
-            this.isReadOnly = false;
-        }
+
 
         public void addLockWaitingTime(long l) {
             this.lockWaitingTime += l;
@@ -388,8 +384,7 @@ public class ThreadStatistics implements Serializable, ISPNStats {
                 addParameter(Statistics.CLUSTERED_GET_COMMAND_SIZE, this.clusteredGetCommandSize);
                 addParameter(Statistics.NUM_CLUSTERED_GET_COMMANDS, this.clusteredGetCommands);
 
-                addParameter(Statistics.NUM_PUTS_ON_LOCAL_KEY, this.numLocalPut);
-                addParameter(Statistics.NUM_PUTS_ON_REMOTE_KEY, this.numRemotePut);
+
                 addParameter(Statistics.NUM_GETS_ON_LOCAL_KEY, this.numLocalGet);
                 addParameter(Statistics.NUM_GETS_ON_REMOTE_KEY, this.numRemoteGet);
                 /*
@@ -426,7 +421,8 @@ public class ThreadStatistics implements Serializable, ISPNStats {
                     addParameter(Statistics.NUM_LOCAL_LOCAL_CONFLICTS, this.toLocalConflicts);
                     addParameter(Statistics.NUM_LOCAL_REMOTE_CONFLICTS, this.toRemoteConflicts);
 
-                    addParameter(Statistics.NUM_PUTS, this.numPuts);
+                    addParameter(Statistics.NUM_PUTS_ON_LOCAL_KEY, this.numLocalPut);
+                    addParameter(Statistics.NUM_PUTS_ON_REMOTE_KEY, this.numRemotePut);
 
                     addParameter(this.exceptionOnPrepare, 1);
                     /*

@@ -152,7 +152,6 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
             StatisticsListManager.insertInterArrivalSample((long)(t1/1000.0D), key);
             if(ctx.isOriginLocal()){
                 ThreadStatistics th = ThreadLocalStatistics.getInfinispanThreadStats();
-                th.incrementPuts();
                 th.incrementPut(isRemote(key));
                 //PEDRO's
                 /*

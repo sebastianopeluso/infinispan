@@ -14,7 +14,7 @@ public class Statistics {
 
     public static final int NUM_STATS = 100;
 
-    public static final int NUM_PUTS = 1;
+
     public static final int NUM_PREPARES = 2;
     public static final int LOCAL_EXEC = 3;
     public static final int WAITING_TIME_ON_LOCKS = 4;

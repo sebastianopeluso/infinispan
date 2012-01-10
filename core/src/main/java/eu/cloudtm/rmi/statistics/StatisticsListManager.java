@@ -136,10 +136,10 @@ public final class StatisticsListManager {
             throw new RuntimeException("CollapseBeforeQuery not supported yet");
         }
         else{
-            int[] param = {Statistics.NUM_PUTS, Statistics.NUM_LOCAL_LOCAL_CONFLICTS, Statistics.NUM_LOCAL_REMOTE_CONFLICTS};
+            int[] param = {Statistics.NUM_PUTS_ON_LOCAL_KEY,Statistics.NUM_PUTS_ON_REMOTE_KEY, Statistics.NUM_LOCAL_LOCAL_CONFLICTS, Statistics.NUM_LOCAL_REMOTE_CONFLICTS};
             double[] values = getParameters(param);
-            double numPuts = values[0];
-            double numCont = values[1] + values[2];
+            double numPuts = values[0]+values[1];
+            double numCont = values[2] + values[3];
             if(numPuts!=0)
                 return numCont / numPuts;
             return 0D;
@@ -472,12 +472,12 @@ public final class StatisticsListManager {
             throw new RuntimeException("CollapseBeforeQuery not supported yet");
         }
         else{
-            int[] param = {Statistics.NUM_TAKEN_LOCKS, Statistics.NUM_PUTS, Statistics.NUM_LOCAL_LOCAL_CONFLICTS, Statistics.NUM_LOCAL_REMOTE_CONFLICTS,Statistics.HOLD_TIME};
+            int[] param = {Statistics.NUM_TAKEN_LOCKS, Statistics.NUM_PUTS_ON_LOCAL_KEY, Statistics.NUM_PUTS_ON_REMOTE_KEY, Statistics.NUM_LOCAL_LOCAL_CONFLICTS, Statistics.NUM_LOCAL_REMOTE_CONFLICTS,Statistics.HOLD_TIME};
             double[] values = getParameters(param);
             double takenLocks = values[0];
-            double puts = values[1];
-            double confl = values[2] + values[3];
-            double hold = values[4];
+            double puts = values[1]+values[2];
+            double confl = values[3] + values[4];
+            double hold = values[5];
             double pCont = confl / puts;
             double nanos = ((double)(System.nanoTime() - windowInitTime));
             double lockArrival = takenLocks / nanos;
