@@ -59,262 +59,262 @@ import static org.infinispan.transaction.WriteSkewHelper.performWriteSkewCheckAn
 @Scope(Scopes.NAMED_CACHE)
 public interface ClusteringDependentLogic {
 
-    static final Log log = LogFactory.getLog(ClusteringDependentLogic.class);
+   static final Log log = LogFactory.getLog(ClusteringDependentLogic.class);
 
-    boolean localNodeIsOwner(Object key);
+   boolean localNodeIsOwner(Object key);
 
-    boolean localNodeIsPrimaryOwner(Object key);
+   boolean localNodeIsPrimaryOwner(Object key);
 
-    void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck);
+   void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck);
 
-    Collection<Address> getOwners(Collection<Object> keys);
+   Collection<Address> getOwners(Collection<Object> keys);
 
-    EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand);
+   EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand);
 
-    Address getAddress();
-
-
-    /**
-     * This logic is used when a changing a key affects all the nodes in the cluster, e.g. int the replicated,
-     * invalidated and local cache modes.
-     */
-    public static final class AllNodesLogic implements ClusteringDependentLogic {
-
-        private DataContainer dataContainer;
-
-        private RpcManager rpcManager;
-        private static final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
-            @Override
-            public boolean performCheckOnKey(Object key) {
-                return true;
-            }
-        };
+   Address getAddress();
 
 
-        @Inject
-        public void init(DataContainer dc, RpcManager rpcManager) {
-            this.dataContainer = dc;
-            this.rpcManager = rpcManager;
-        }
+   /**
+    * This logic is used when a changing a key affects all the nodes in the cluster, e.g. int the replicated,
+    * invalidated and local cache modes.
+    */
+   public static final class AllNodesLogic implements ClusteringDependentLogic {
 
-        @Override
-        public boolean localNodeIsOwner(Object key) {
+      private DataContainer dataContainer;
+
+      private RpcManager rpcManager;
+      private static final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
+         @Override
+         public boolean performCheckOnKey(Object key) {
             return true;
-        }
+         }
+      };
 
-        @Override
-        public boolean localNodeIsPrimaryOwner(Object key) {
-            return rpcManager == null || rpcManager.getTransport().isCoordinator();
-        }
 
-        @Override
-        public void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck) {
-            entry.commit(dataContainer, newVersion);
-        }
+      @Inject
+      public void init(DataContainer dc, RpcManager rpcManager) {
+         this.dataContainer = dc;
+         this.rpcManager = rpcManager;
+      }
 
-        @Override
-        public Collection<Address> getOwners(Collection<Object> keys) {
-            return null;
-        }
+      @Override
+      public boolean localNodeIsOwner(Object key) {
+         return true;
+      }
 
-        @Override
-        public Address getAddress() {
-            return rpcManager.getAddress();
-        }
+      @Override
+      public boolean localNodeIsPrimaryOwner(Object key) {
+         return rpcManager == null || rpcManager.getTransport().isCoordinator();
+      }
 
-        @Override
-        public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand) {
-            // In REPL mode, this happens if we are the coordinator.
-            if (rpcManager.getTransport().isCoordinator()) {
-                // Perform a write skew check on each entry.
-                EntryVersionsMap uv = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
-                        versionGenerator, context,
-                        keySpecificLogic);
-                context.getCacheTransaction().setUpdatedEntryVersions(uv);
-                return uv;
-            }
-            return null;
-        }
-    }
+      @Override
+      public void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck) {
+         entry.commit(dataContainer, newVersion);
+      }
 
-    public static final class DistributionLogic implements ClusteringDependentLogic {
+      @Override
+      public Collection<Address> getOwners(Collection<Object> keys) {
+         return null;
+      }
 
-        private DistributionManager dm;
-        private DataContainer dataContainer;
-        private Configuration configuration;
-        private RpcManager rpcManager;
-        private final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
-            @Override
-            public boolean performCheckOnKey(Object key) {
-                return localNodeIsOwner(key);
-            }
-        };
+      @Override
+      public Address getAddress() {
+         return rpcManager.getAddress();
+      }
 
-        @Inject
-        public void init(DistributionManager dm, DataContainer dataContainer, Configuration configuration, RpcManager rpcManager) {
-            this.dm = dm;
-            this.dataContainer = dataContainer;
-            this.configuration = configuration;
-            this.rpcManager = rpcManager;
-        }
-
-        @Override
-        public boolean localNodeIsOwner(Object key) {
-            return dm.getLocality(key).isLocal();
-        }
-
-        @Override
-        public Address getAddress() {
-            return rpcManager.getAddress();
-        }
-
-        @Override
-        public boolean localNodeIsPrimaryOwner(Object key) {
-            final Address address = rpcManager.getAddress();
-            final boolean result = dm.getPrimaryLocation(key).equals(address);
-            log.tracef("My address is %s. Am I main owner? - %b", address, result);
-            return result;
-        }
-
-        @Override
-        public void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck) {
-            boolean doCommit = true;
-            // ignore locality for removals, even if skipOwnershipCheck is not true
-            if (!skipOwnershipCheck && !entry.isRemoved() && !localNodeIsOwner(entry.getKey())) {
-                if (configuration.isL1CacheEnabled()) {
-                    dm.transformForL1(entry);
-                } else {
-                    doCommit = false;
-                }
-            }
-            if (doCommit)
-                entry.commit(dataContainer, newVersion);
-            else
-                entry.rollback();
-        }
-
-        @Override
-        public Collection<Address> getOwners(Collection<Object> keys) {
-            return dm.getAffectedNodes(keys);
-        }
-
-        @Override
-        public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand) {
-            // Perform a write skew check on mapped entries.
+      @Override
+      public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand) {
+         // In REPL mode, this happens if we are the coordinator.
+         if (rpcManager.getTransport().isCoordinator()) {
+            // Perform a write skew check on each entry.
             EntryVersionsMap uv = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
-                    versionGenerator, context,
-                    keySpecificLogic);
+                  versionGenerator, context,
+                  keySpecificLogic);
+            context.getCacheTransaction().setUpdatedEntryVersions(uv);
+            return uv;
+         }
+         return null;
+      }
+   }
 
-            CacheTransaction cacheTransaction = context.getCacheTransaction();
-            EntryVersionsMap uvOld = cacheTransaction.getUpdatedEntryVersions();
-            if (uvOld != null && !uvOld.isEmpty()) {
-                uvOld.putAll(uv);
-                uv = uvOld;
-            }
-            cacheTransaction.setUpdatedEntryVersions(uv);
-            return (uv.isEmpty()) ? null : uv;
-        }
-    }
+   public static final class DistributionLogic implements ClusteringDependentLogic {
 
-    //Pedro -- Logic for total order protocol in replicated mode
-    public static final class TotalOrderAllNodesLogic implements ClusteringDependentLogic {
+      private DistributionManager dm;
+      private DataContainer dataContainer;
+      private Configuration configuration;
+      private RpcManager rpcManager;
+      private final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
+         @Override
+         public boolean performCheckOnKey(Object key) {
+            return localNodeIsOwner(key);
+         }
+      };
 
-        private DataContainer dataContainer;
-        private RpcManager rpcManager;
+      @Inject
+      public void init(DistributionManager dm, DataContainer dataContainer, Configuration configuration, RpcManager rpcManager) {
+         this.dm = dm;
+         this.dataContainer = dataContainer;
+         this.configuration = configuration;
+         this.rpcManager = rpcManager;
+      }
 
-        @Inject
-        public void init(DataContainer dc, RpcManager rpcManager) {
-            this.dataContainer = dc;
-            this.rpcManager = rpcManager;
-        }
+      @Override
+      public boolean localNodeIsOwner(Object key) {
+         return dm.getLocality(key).isLocal();
+      }
 
+      @Override
+      public Address getAddress() {
+         return rpcManager.getAddress();
+      }
 
-        @Override
-        public boolean localNodeIsOwner(Object key) {
-            return true;
-        }
+      @Override
+      public boolean localNodeIsPrimaryOwner(Object key) {
+         final Address address = rpcManager.getAddress();
+         final boolean result = dm.getPrimaryLocation(key).equals(address);
+         log.tracef("My address is %s. Am I main owner? - %b", address, result);
+         return result;
+      }
 
-        @Override
-        public boolean localNodeIsPrimaryOwner(Object key) {
-            //no lock acquisition in total order
-            return false;
-        }
-
-        @Override
-        public void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck) {
-            entry.commit(dataContainer, newVersion);
-        }
-
-        @Override
-        public Collection<Address> getOwners(Collection<Object> keys) {
-            return null;
-        }
-
-        @Override
-        public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator,
-                                                                       TxInvocationContext context,
-                                                                       VersionedPrepareCommand prepareCommand) {
-            if (context.isOriginLocal()) {
-                throw new IllegalStateException("This must not be reached");
-            }
-
-            EntryVersionsMap updatedVersionMap = new EntryVersionsMap();
-            EntryVersionsMap versionsSeenMap = prepareCommand.getVersionsSeen();
-
-            for (Object key : prepareCommand.getAffectedKeys()) {
-                ClusteredRepeatableReadEntry entry = (ClusteredRepeatableReadEntry) context.lookupEntry(key);
-
-                //save the original version and updates to the version that transaction reads
-                IncrementableEntryVersion originalLocalVersion = (IncrementableEntryVersion) entry.getVersion();
-                entry.setVersion(versionsSeenMap.get(key));
-
-                if (context.hasFlag(Flag.SKIP_WRITE_SKEW_CHECK) ||
-                        !entry.isMarkedForWriteSkew() ||
-                        entry.performWriteSkewCheck(dataContainer)) {
-                    IncrementableEntryVersion newVersion = createNewVersion(originalLocalVersion,
-                            (IncrementableEntryVersion) entry.getVersion(),
-                            versionGenerator);
-
-                    updatedVersionMap.put(key, newVersion);
-                } else {
-                    // Write skew check detected!
-                    throw new CacheException("Write skew detected on key " + key + " for transaction " +
-                            Util.prettyPrintGlobalTransaction(prepareCommand.getGlobalTransaction()));
-                }
-            }
-
-            context.getCacheTransaction().setUpdatedEntryVersions(updatedVersionMap);
-            return updatedVersionMap;
-        }
-
-        @Override
-        public Address getAddress() {
-            return rpcManager.getAddress();
-        }
-
-        private IncrementableEntryVersion createNewVersion(IncrementableEntryVersion originalLocalVersion,
-                                                           IncrementableEntryVersion versionSeen, VersionGenerator versionGenerator) {
-            if (originalLocalVersion == null) {
-                if (versionSeen == null) {
-                    //both are null (new entry)
-                    return versionGenerator.generateNew();
-                } else {
-                    //version seen is not null... increment that one
-                    return versionGenerator.increment(versionSeen);
-                }
+      @Override
+      public void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck) {
+         boolean doCommit = true;
+         // ignore locality for removals, even if skipOwnershipCheck is not true
+         if (!skipOwnershipCheck && !entry.isRemoved() && !localNodeIsOwner(entry.getKey())) {
+            if (configuration.isL1CacheEnabled()) {
+               dm.transformForL1(entry);
             } else {
-                if (versionSeen == null) {
-                    //original version is not null
-                    return versionGenerator.increment(originalLocalVersion);
-                } else {
-                    //both are not null. choose the greatest
-                    if (originalLocalVersion.compareTo(versionSeen) == InequalVersionComparisonResult.AFTER) {
-                        return versionGenerator.increment(originalLocalVersion);
-                    } else {
-                        return versionGenerator.increment(versionSeen);
-                    }
-                }
+               doCommit = false;
             }
-        }
-    }
+         }
+         if (doCommit)
+            entry.commit(dataContainer, newVersion);
+         else
+            entry.rollback();
+      }
+
+      @Override
+      public Collection<Address> getOwners(Collection<Object> keys) {
+         return dm.getAffectedNodes(keys);
+      }
+
+      @Override
+      public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand) {
+         // Perform a write skew check on mapped entries.
+         EntryVersionsMap uv = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
+               versionGenerator, context,
+               keySpecificLogic);
+
+         CacheTransaction cacheTransaction = context.getCacheTransaction();
+         EntryVersionsMap uvOld = cacheTransaction.getUpdatedEntryVersions();
+         if (uvOld != null && !uvOld.isEmpty()) {
+            uvOld.putAll(uv);
+            uv = uvOld;
+         }
+         cacheTransaction.setUpdatedEntryVersions(uv);
+         return (uv.isEmpty()) ? null : uv;
+      }
+   }
+
+   //Pedro -- Logic for total order protocol in replicated mode
+   public static final class TotalOrderAllNodesLogic implements ClusteringDependentLogic {
+
+      private DataContainer dataContainer;
+      private RpcManager rpcManager;
+
+      @Inject
+      public void init(DataContainer dc, RpcManager rpcManager) {
+         this.dataContainer = dc;
+         this.rpcManager = rpcManager;
+      }
+
+
+      @Override
+      public boolean localNodeIsOwner(Object key) {
+         return true;
+      }
+
+      @Override
+      public boolean localNodeIsPrimaryOwner(Object key) {
+         //no lock acquisition in total order
+         return false;
+      }
+
+      @Override
+      public void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck) {
+         entry.commit(dataContainer, newVersion);
+      }
+
+      @Override
+      public Collection<Address> getOwners(Collection<Object> keys) {
+         return null;
+      }
+
+      @Override
+      public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator,
+                                                                     TxInvocationContext context,
+                                                                     VersionedPrepareCommand prepareCommand) {
+         if (context.isOriginLocal()) {
+            throw new IllegalStateException("This must not be reached");
+         }
+
+         EntryVersionsMap updatedVersionMap = new EntryVersionsMap();
+         EntryVersionsMap versionsSeenMap = prepareCommand.getVersionsSeen();
+
+         for (Object key : prepareCommand.getAffectedKeys()) {
+            ClusteredRepeatableReadEntry entry = (ClusteredRepeatableReadEntry) context.lookupEntry(key);
+
+            //save the original version and updates to the version that transaction reads
+            IncrementableEntryVersion originalLocalVersion = (IncrementableEntryVersion) entry.getVersion();
+            entry.setVersion(versionsSeenMap.get(key));
+
+            if (context.hasFlag(Flag.SKIP_WRITE_SKEW_CHECK) ||
+                  !entry.isMarkedForWriteSkew() ||
+                  entry.performWriteSkewCheck(dataContainer)) {
+               IncrementableEntryVersion newVersion = createNewVersion(originalLocalVersion,
+                     (IncrementableEntryVersion) entry.getVersion(),
+                     versionGenerator);
+
+               updatedVersionMap.put(key, newVersion);
+            } else {
+               // Write skew check detected!
+               throw new CacheException("Write skew detected on key " + key + " for transaction " +
+                     Util.prettyPrintGlobalTransaction(prepareCommand.getGlobalTransaction()));
+            }
+         }
+
+         context.getCacheTransaction().setUpdatedEntryVersions(updatedVersionMap);
+         return updatedVersionMap;
+      }
+
+      @Override
+      public Address getAddress() {
+         return rpcManager.getAddress();
+      }
+
+      private IncrementableEntryVersion createNewVersion(IncrementableEntryVersion originalLocalVersion,
+                                                         IncrementableEntryVersion versionSeen, VersionGenerator versionGenerator) {
+         if (originalLocalVersion == null) {
+            if (versionSeen == null) {
+               //both are null (new entry)
+               return versionGenerator.generateNew();
+            } else {
+               //version seen is not null... increment that one
+               return versionGenerator.increment(versionSeen);
+            }
+         } else {
+            if (versionSeen == null) {
+               //original version is not null
+               return versionGenerator.increment(originalLocalVersion);
+            } else {
+               //both are not null. choose the greatest
+               if (originalLocalVersion.compareTo(versionSeen) == InequalVersionComparisonResult.AFTER) {
+                  return versionGenerator.increment(originalLocalVersion);
+               } else {
+                  return versionGenerator.increment(versionSeen);
+               }
+            }
+         }
+      }
+   }
 }

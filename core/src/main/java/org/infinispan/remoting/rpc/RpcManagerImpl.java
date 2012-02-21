@@ -44,7 +44,13 @@ import org.infinispan.remoting.transport.Transport;
 import org.infinispan.util.concurrent.NotifyingNotifiableFuture;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
-import org.rhq.helpers.pluginAnnotations.agent.*;
+import org.rhq.helpers.pluginAnnotations.agent.DataType;
+import org.rhq.helpers.pluginAnnotations.agent.DisplayType;
+import org.rhq.helpers.pluginAnnotations.agent.MeasurementType;
+import org.rhq.helpers.pluginAnnotations.agent.Metric;
+import org.rhq.helpers.pluginAnnotations.agent.Operation;
+import org.rhq.helpers.pluginAnnotations.agent.Parameter;
+import org.rhq.helpers.pluginAnnotations.agent.Units;
 
 import java.text.NumberFormat;
 import java.util.Collection;
@@ -72,299 +78,299 @@ import static org.infinispan.factories.KnownComponentNames.ASYNC_TRANSPORT_EXECU
 @MBean(objectName = "RpcManager", description = "Manages all remote calls to remote cache instances in the cluster.")
 public class RpcManagerImpl implements RpcManager {
 
-    private static final Log log = LogFactory.getLog(RpcManagerImpl.class);
-    private static final boolean trace = log.isTraceEnabled();
+   private static final Log log = LogFactory.getLog(RpcManagerImpl.class);
+   private static final boolean trace = log.isTraceEnabled();
 
-    private Transport t;
-    private final AtomicLong replicationCount = new AtomicLong(0);
-    private final AtomicLong replicationFailures = new AtomicLong(0);
-    private final AtomicLong totalReplicationTime = new AtomicLong(0);
+   private Transport t;
+   private final AtomicLong replicationCount = new AtomicLong(0);
+   private final AtomicLong replicationFailures = new AtomicLong(0);
+   private final AtomicLong totalReplicationTime = new AtomicLong(0);
 
-    @ManagedAttribute(description = "Enables or disables the gathering of statistics by this component", writable = true)
-    boolean statisticsEnabled = false; // by default, don't gather statistics.
-    private boolean stateTransferEnabled;
-    private Configuration configuration;
-    private ReplicationQueue replicationQueue;
-    private ExecutorService asyncExecutor;
-    private CommandsFactory cf;
-    private CacheViewsManager cvm;
+   @ManagedAttribute(description = "Enables or disables the gathering of statistics by this component", writable = true)
+   boolean statisticsEnabled = false; // by default, don't gather statistics.
+   private boolean stateTransferEnabled;
+   private Configuration configuration;
+   private ReplicationQueue replicationQueue;
+   private ExecutorService asyncExecutor;
+   private CommandsFactory cf;
+   private CacheViewsManager cvm;
 
 
-    @Inject
-    public void injectDependencies(Transport t, Configuration configuration, ReplicationQueue replicationQueue, CommandsFactory cf,
-                                   @ComponentName(ASYNC_TRANSPORT_EXECUTOR) ExecutorService e,
-                                   CacheViewsManager cvm) {
-        this.t = t;
-        this.configuration = configuration;
-        this.replicationQueue = replicationQueue;
-        this.asyncExecutor = e;
-        this.cf = cf;
-        this.cvm = cvm;
-    }
+   @Inject
+   public void injectDependencies(Transport t, Configuration configuration, ReplicationQueue replicationQueue, CommandsFactory cf,
+                                  @ComponentName(ASYNC_TRANSPORT_EXECUTOR) ExecutorService e,
+                                  CacheViewsManager cvm) {
+      this.t = t;
+      this.configuration = configuration;
+      this.replicationQueue = replicationQueue;
+      this.asyncExecutor = e;
+      this.cf = cf;
+      this.cvm = cvm;
+   }
 
-    @Start(priority = 9)
-    private void start() {
-        stateTransferEnabled = configuration.isStateTransferEnabled();
-        statisticsEnabled = configuration.isExposeJmxStatistics();
-    }
+   @Start(priority = 9)
+   private void start() {
+      stateTransferEnabled = configuration.isStateTransferEnabled();
+      statisticsEnabled = configuration.isExposeJmxStatistics();
+   }
 
-    private boolean useReplicationQueue(boolean sync) {
-        return !sync && replicationQueue != null && replicationQueue.isEnabled();
-    }
+   private boolean useReplicationQueue(boolean sync) {
+      return !sync && replicationQueue != null && replicationQueue.isEnabled();
+   }
 
-    public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout, boolean usePriorityQueue, ResponseFilter responseFilter) {
-        if (!configuration.getCacheMode().isClustered())
-            throw new IllegalStateException("Trying to invoke a remote command but the cache is not clustered");
+   public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout, boolean usePriorityQueue, ResponseFilter responseFilter) {
+      if (!configuration.getCacheMode().isClustered())
+         throw new IllegalStateException("Trying to invoke a remote command but the cache is not clustered");
 
-        //Pedro -- in total order protocol, we should invoke remotely even if we are the only members in the cache
-        //the sequencer will order the local transactions.
-        boolean forceInvokeRemotely = false;
-        if (rpcCommand instanceof PrepareCommand) {
-            forceInvokeRemotely = ((PrepareCommand) rpcCommand).isTotalOrdered();
-        }
+      //Pedro -- in total order protocol, we should invoke remotely even if we are the only members in the cache
+      //the sequencer will order the local transactions.
+      boolean forceInvokeRemotely = false;
+      if (rpcCommand instanceof PrepareCommand) {
+         forceInvokeRemotely = ((PrepareCommand) rpcCommand).isTotalOrdered();
+      }
 
-        List<Address> clusterMembers = t.getMembers();
-        if (!forceInvokeRemotely && clusterMembers.size() < 2) {
-            log.tracef("We're the only member in the cluster; Don't invoke remotely.");
-            return Collections.emptyMap();
-        } else {
-            long startTimeNanos = 0;
-            if (statisticsEnabled) startTimeNanos = System.nanoTime();
+      List<Address> clusterMembers = t.getMembers();
+      if (!forceInvokeRemotely && clusterMembers.size() < 2) {
+         log.tracef("We're the only member in the cluster; Don't invoke remotely.");
+         return Collections.emptyMap();
+      } else {
+         long startTimeNanos = 0;
+         if (statisticsEnabled) startTimeNanos = System.nanoTime();
+         try {
+            // add a response filter that will ensure we don't wait for replies from non-members
+            // but only if the target is the whole cluster and the call is synchronous
+            // if strict peer-to-peer is enabled we have to wait for replies from everyone, not just cache members
+            if (recipients == null && mode.isSynchronous() && !configuration.getGlobalConfiguration().isStrictPeerToPeer()) {
+               List<Address> cacheMembers =  cvm.getCommittedView(configuration.getName()).getMembers();
+               // the filter won't work if there is no other member in the cache, so we have to
+               if (!forceInvokeRemotely && cacheMembers.size() < 2) {
+                  log.tracef("We're the only member of cache %s; Don't invoke remotely.", configuration.getName());
+                  return Collections.emptyMap();
+               }
+               // if there is already a response filter attached it means it must have its own way of dealing with non-members
+               // so skip installing the filter
+               if (responseFilter == null) {
+                  responseFilter = new IgnoreExtraResponsesValidityFilter(cacheMembers, getAddress());
+               }
+            }
+            Map<Address, Response> result = t.invokeRemotely(recipients, rpcCommand, mode, timeout, usePriorityQueue, responseFilter, stateTransferEnabled);
+            if (statisticsEnabled) replicationCount.incrementAndGet();
+            return result;
+         } catch (CacheException e) {
+            log.trace("replication exception: ", e);
+            if (statisticsEnabled) replicationFailures.incrementAndGet();
+            throw e;
+         } catch (Throwable th) {
+            log.unexpectedErrorReplicating(th);
+            if (statisticsEnabled) replicationFailures.incrementAndGet();
+            throw new CacheException(th);
+         } finally {
+            if (statisticsEnabled) {
+               long timeTaken = TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTimeNanos, TimeUnit.NANOSECONDS);
+               totalReplicationTime.getAndAdd(timeTaken);
+            }
+         }
+      }
+   }
+
+   public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout, boolean usePriorityQueue) {
+      return invokeRemotely(recipients, rpcCommand, mode, timeout, usePriorityQueue, null);
+   }
+
+   public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout) {
+      return invokeRemotely(recipients, rpcCommand, mode, timeout, false, null);
+   }
+
+   public final void broadcastRpcCommand(ReplicableCommand rpc, boolean sync) throws RpcException {
+      broadcastRpcCommand(rpc, sync, false);
+   }
+
+   public final void broadcastRpcCommand(ReplicableCommand rpc, boolean sync, boolean usePriorityQueue) throws RpcException {
+      if (useReplicationQueue(sync)) {
+         replicationQueue.add(rpc);
+      } else {
+         invokeRemotely(null, rpc, sync, usePriorityQueue);
+      }
+   }
+
+   public final void broadcastRpcCommandInFuture(ReplicableCommand rpc, NotifyingNotifiableFuture<Object> l) {
+      broadcastRpcCommandInFuture(rpc, false, l);
+   }
+
+   public final void broadcastRpcCommandInFuture(ReplicableCommand rpc, boolean usePriorityQueue, NotifyingNotifiableFuture<Object> l) {
+      invokeRemotelyInFuture(null, rpc, usePriorityQueue, l);
+   }
+
+   public final void invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync) throws RpcException {
+      invokeRemotely(recipients, rpc, sync, false);
+   }
+
+   public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync, boolean usePriorityQueue) throws RpcException {
+      return invokeRemotely(recipients, rpc, sync, usePriorityQueue, configuration.getSyncReplTimeout());
+   }
+
+   public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync, boolean usePriorityQueue, long timeout) throws RpcException {
+      ResponseMode responseMode = getResponseMode(sync);
+      return invokeRemotely(recipients, rpc, sync, usePriorityQueue, timeout, responseMode);
+   }
+
+   private Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync, boolean usePriorityQueue, long timeout, ResponseMode responseMode) {
+      if (trace) log.tracef("%s broadcasting call %s to recipient list %s", t.getAddress(), rpc, recipients);
+
+      if (useReplicationQueue(sync)) {
+         replicationQueue.add(rpc);
+         return null;
+      } else {
+         if (!(rpc instanceof CacheRpcCommand)) {
+            rpc = cf.buildSingleRpcCommand(rpc);
+         }
+         Map<Address, Response> rsps = invokeRemotely(recipients, rpc, responseMode, timeout, usePriorityQueue);
+         if (trace) log.tracef("Response(s) to %s is %s", rpc, rsps);
+         if (sync) checkResponses(rsps);
+         return rsps;
+      }
+   }
+
+   public final void invokeRemotelyInFuture(Collection<Address> recipients, ReplicableCommand rpc, NotifyingNotifiableFuture<Object> l) {
+      invokeRemotelyInFuture(recipients, rpc, false, l);
+   }
+
+   public final void invokeRemotelyInFuture(final Collection<Address> recipients, final ReplicableCommand rpc, final boolean usePriorityQueue, final NotifyingNotifiableFuture<Object> l) {
+      invokeRemotelyInFuture(recipients, rpc, usePriorityQueue, l, configuration.getSyncReplTimeout());
+   }
+
+   public final void invokeRemotelyInFuture(final Collection<Address> recipients, final ReplicableCommand rpc, final boolean usePriorityQueue, final NotifyingNotifiableFuture<Object> l, final long timeout) {
+      invokeRemotelyInFuture(recipients, rpc, usePriorityQueue, l, timeout, false);
+   }
+
+   @Override
+   public void invokeRemotelyInFuture(final Collection<Address> recipients, final ReplicableCommand rpc,
+                                      final boolean usePriorityQueue, final NotifyingNotifiableFuture<Object> l,
+                                      final long timeout, final boolean ignoreLeavers) {
+      if (trace) log.tracef("%s invoking in future call %s to recipient list %s", t.getAddress(), rpc, recipients);
+      final ResponseMode responseMode = ignoreLeavers ? ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS : ResponseMode.SYNCHRONOUS;
+      final CountDownLatch futureSet = new CountDownLatch(1);
+      Callable<Object> c = new Callable<Object>() {
+         public Object call() throws Exception {
+            Object result = null;
             try {
-                // add a response filter that will ensure we don't wait for replies from non-members
-                // but only if the target is the whole cluster and the call is synchronous
-                // if strict peer-to-peer is enabled we have to wait for replies from everyone, not just cache members
-                if (recipients == null && mode.isSynchronous() && !configuration.getGlobalConfiguration().isStrictPeerToPeer()) {
-                    List<Address> cacheMembers =  cvm.getCommittedView(configuration.getName()).getMembers();
-                    // the filter won't work if there is no other member in the cache, so we have to
-                    if (!forceInvokeRemotely && cacheMembers.size() < 2) {
-                        log.tracef("We're the only member of cache %s; Don't invoke remotely.", configuration.getName());
-                        return Collections.emptyMap();
-                    }
-                    // if there is already a response filter attached it means it must have its own way of dealing with non-members
-                    // so skip installing the filter
-                    if (responseFilter == null) {
-                        responseFilter = new IgnoreExtraResponsesValidityFilter(cacheMembers, getAddress());
-                    }
-                }
-                Map<Address, Response> result = t.invokeRemotely(recipients, rpcCommand, mode, timeout, usePriorityQueue, responseFilter, stateTransferEnabled);
-                if (statisticsEnabled) replicationCount.incrementAndGet();
-                return result;
-            } catch (CacheException e) {
-                log.trace("replication exception: ", e);
-                if (statisticsEnabled) replicationFailures.incrementAndGet();
-                throw e;
-            } catch (Throwable th) {
-                log.unexpectedErrorReplicating(th);
-                if (statisticsEnabled) replicationFailures.incrementAndGet();
-                throw new CacheException(th);
+               result = invokeRemotely(recipients, rpc, true, usePriorityQueue, timeout, responseMode);
             } finally {
-                if (statisticsEnabled) {
-                    long timeTaken = TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTimeNanos, TimeUnit.NANOSECONDS);
-                    totalReplicationTime.getAndAdd(timeTaken);
-                }
+               try {
+                  futureSet.await();
+               } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+               } finally {
+                  l.notifyDone();
+               }
             }
-        }
-    }
+            return result;
+         }
+      };
+      l.setNetworkFuture(asyncExecutor.submit(c));
+      futureSet.countDown();
+   }
 
-    public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout, boolean usePriorityQueue) {
-        return invokeRemotely(recipients, rpcCommand, mode, timeout, usePriorityQueue, null);
-    }
+   public Transport getTransport() {
+      return t;
+   }
 
-    public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout) {
-        return invokeRemotely(recipients, rpcCommand, mode, timeout, false, null);
-    }
+   private ResponseMode getResponseMode(boolean sync) {
+      return sync ? ResponseMode.SYNCHRONOUS : ResponseMode.getAsyncResponseMode(configuration);
+   }
 
-    public final void broadcastRpcCommand(ReplicableCommand rpc, boolean sync) throws RpcException {
-        broadcastRpcCommand(rpc, sync, false);
-    }
-
-    public final void broadcastRpcCommand(ReplicableCommand rpc, boolean sync, boolean usePriorityQueue) throws RpcException {
-        if (useReplicationQueue(sync)) {
-            replicationQueue.add(rpc);
-        } else {
-            invokeRemotely(null, rpc, sync, usePriorityQueue);
-        }
-    }
-
-    public final void broadcastRpcCommandInFuture(ReplicableCommand rpc, NotifyingNotifiableFuture<Object> l) {
-        broadcastRpcCommandInFuture(rpc, false, l);
-    }
-
-    public final void broadcastRpcCommandInFuture(ReplicableCommand rpc, boolean usePriorityQueue, NotifyingNotifiableFuture<Object> l) {
-        invokeRemotelyInFuture(null, rpc, usePriorityQueue, l);
-    }
-
-    public final void invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync) throws RpcException {
-        invokeRemotely(recipients, rpc, sync, false);
-    }
-
-    public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync, boolean usePriorityQueue) throws RpcException {
-        return invokeRemotely(recipients, rpc, sync, usePriorityQueue, configuration.getSyncReplTimeout());
-    }
-
-    public final Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync, boolean usePriorityQueue, long timeout) throws RpcException {
-        ResponseMode responseMode = getResponseMode(sync);
-        return invokeRemotely(recipients, rpc, sync, usePriorityQueue, timeout, responseMode);
-    }
-
-    private Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync, boolean usePriorityQueue, long timeout, ResponseMode responseMode) {
-        if (trace) log.tracef("%s broadcasting call %s to recipient list %s", t.getAddress(), rpc, recipients);
-
-        if (useReplicationQueue(sync)) {
-            replicationQueue.add(rpc);
-            return null;
-        } else {
-            if (!(rpc instanceof CacheRpcCommand)) {
-                rpc = cf.buildSingleRpcCommand(rpc);
+   /**
+    * Checks whether any of the responses are exceptions. If yes, re-throws them (as exceptions or runtime exceptions).
+    */
+   private void checkResponses(Map<Address, Response> rsps) {
+      if (rsps != null) {
+         for (Map.Entry<Address, Response> rsp : rsps.entrySet()) {
+            // TODO Double-check this logic, rsp.getValue() is a Response so it's 100% not Throwable
+            if (rsp != null && rsp.getValue() instanceof Throwable) {
+               Throwable throwable = (Throwable) rsp.getValue();
+               if (trace)
+                  log.tracef("Received Throwable from remote node %s", throwable, rsp.getKey());
+               throw new RpcException(throwable);
             }
-            Map<Address, Response> rsps = invokeRemotely(recipients, rpc, responseMode, timeout, usePriorityQueue);
-            if (trace) log.tracef("Response(s) to %s is %s", rpc, rsps);
-            if (sync) checkResponses(rsps);
-            return rsps;
-        }
-    }
+         }
+      }
+   }
 
-    public final void invokeRemotelyInFuture(Collection<Address> recipients, ReplicableCommand rpc, NotifyingNotifiableFuture<Object> l) {
-        invokeRemotelyInFuture(recipients, rpc, false, l);
-    }
+   // -------------------------------------------- JMX information -----------------------------------------------
 
-    public final void invokeRemotelyInFuture(final Collection<Address> recipients, final ReplicableCommand rpc, final boolean usePriorityQueue, final NotifyingNotifiableFuture<Object> l) {
-        invokeRemotelyInFuture(recipients, rpc, usePriorityQueue, l, configuration.getSyncReplTimeout());
-    }
+   @ManagedOperation(description = "Resets statistics gathered by this component")
+   @Operation(displayName = "Reset statistics")
+   public void resetStatistics() {
+      replicationCount.set(0);
+      replicationFailures.set(0);
+      totalReplicationTime.set(0);
+   }
 
-    public final void invokeRemotelyInFuture(final Collection<Address> recipients, final ReplicableCommand rpc, final boolean usePriorityQueue, final NotifyingNotifiableFuture<Object> l, final long timeout) {
-        invokeRemotelyInFuture(recipients, rpc, usePriorityQueue, l, timeout, false);
-    }
+   @ManagedAttribute(description = "Number of successful replications")
+   @Metric(displayName = "Number of successful replications", measurementType = MeasurementType.TRENDSUP, displayType = DisplayType.SUMMARY)
+   public long getReplicationCount() {
+      if (!isStatisticsEnabled()) {
+         return -1;
+      }
+      return replicationCount.get();
+   }
 
-    @Override
-    public void invokeRemotelyInFuture(final Collection<Address> recipients, final ReplicableCommand rpc,
-                                       final boolean usePriorityQueue, final NotifyingNotifiableFuture<Object> l,
-                                       final long timeout, final boolean ignoreLeavers) {
-        if (trace) log.tracef("%s invoking in future call %s to recipient list %s", t.getAddress(), rpc, recipients);
-        final ResponseMode responseMode = ignoreLeavers ? ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS : ResponseMode.SYNCHRONOUS;
-        final CountDownLatch futureSet = new CountDownLatch(1);
-        Callable<Object> c = new Callable<Object>() {
-            public Object call() throws Exception {
-                Object result = null;
-                try {
-                    result = invokeRemotely(recipients, rpc, true, usePriorityQueue, timeout, responseMode);
-                } finally {
-                    try {
-                        futureSet.await();
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    } finally {
-                        l.notifyDone();
-                    }
-                }
-                return result;
-            }
-        };
-        l.setNetworkFuture(asyncExecutor.submit(c));
-        futureSet.countDown();
-    }
+   @ManagedAttribute(description = "Number of failed replications")
+   @Metric(displayName = "Number of failed replications", measurementType = MeasurementType.TRENDSUP, displayType = DisplayType.SUMMARY)
+   public long getReplicationFailures() {
+      if (!isStatisticsEnabled()) {
+         return -1;
+      }
+      return replicationFailures.get();
+   }
 
-    public Transport getTransport() {
-        return t;
-    }
+   @Metric(displayName = "Statistics enabled", dataType = DataType.TRAIT)
+   public boolean isStatisticsEnabled() {
+      return statisticsEnabled;
+   }
 
-    private ResponseMode getResponseMode(boolean sync) {
-        return sync ? ResponseMode.SYNCHRONOUS : ResponseMode.getAsyncResponseMode(configuration);
-    }
+   @Operation(displayName = "Enable/disable statistics")
+   public void setStatisticsEnabled(@Parameter(name = "enabled", description = "Whether statistics should be enabled or disabled (true/false)") boolean statisticsEnabled) {
+      this.statisticsEnabled = statisticsEnabled;
+   }
 
-    /**
-     * Checks whether any of the responses are exceptions. If yes, re-throws them (as exceptions or runtime exceptions).
-     */
-    private void checkResponses(Map<Address, Response> rsps) {
-        if (rsps != null) {
-            for (Map.Entry<Address, Response> rsp : rsps.entrySet()) {
-                // TODO Double-check this logic, rsp.getValue() is a Response so it's 100% not Throwable
-                if (rsp != null && rsp.getValue() instanceof Throwable) {
-                    Throwable throwable = (Throwable) rsp.getValue();
-                    if (trace)
-                        log.tracef("Received Throwable from remote node %s", throwable, rsp.getKey());
-                    throw new RpcException(throwable);
-                }
-            }
-        }
-    }
+   @ManagedAttribute(description = "Successful replications as a ratio of total replications")
+   public String getSuccessRatio() {
+      if (replicationCount.get() == 0 || !statisticsEnabled) {
+         return "N/A";
+      }
+      double ration = calculateSuccessRatio() * 100d;
+      return NumberFormat.getInstance().format(ration) + "%";
+   }
 
-    // -------------------------------------------- JMX information -----------------------------------------------
+   @ManagedAttribute(description = "Successful replications as a ratio of total replications in numeric double format")
+   @Metric(displayName = "Successful replication ratio", units = Units.PERCENTAGE, displayType = DisplayType.SUMMARY)
+   public double getSuccessRatioFloatingPoint() {
+      if (replicationCount.get() == 0 || !statisticsEnabled) return 0;
+      return calculateSuccessRatio();
+   }
 
-    @ManagedOperation(description = "Resets statistics gathered by this component")
-    @Operation(displayName = "Reset statistics")
-    public void resetStatistics() {
-        replicationCount.set(0);
-        replicationFailures.set(0);
-        totalReplicationTime.set(0);
-    }
+   private double calculateSuccessRatio() {
+      double totalCount = replicationCount.get() + replicationFailures.get();
+      return replicationCount.get() / totalCount;
+   }
 
-    @ManagedAttribute(description = "Number of successful replications")
-    @Metric(displayName = "Number of successful replications", measurementType = MeasurementType.TRENDSUP, displayType = DisplayType.SUMMARY)
-    public long getReplicationCount() {
-        if (!isStatisticsEnabled()) {
-            return -1;
-        }
-        return replicationCount.get();
-    }
+   @ManagedAttribute(description = "The average time spent in the transport layer, in milliseconds")
+   @Metric(displayName = "Average time spent in the transport layer", units = Units.MILLISECONDS, displayType = DisplayType.SUMMARY)
+   public long getAverageReplicationTime() {
+      if (replicationCount.get() == 0) {
+         return 0;
+      }
+      return totalReplicationTime.get() / replicationCount.get();
+   }
 
-    @ManagedAttribute(description = "Number of failed replications")
-    @Metric(displayName = "Number of failed replications", measurementType = MeasurementType.TRENDSUP, displayType = DisplayType.SUMMARY)
-    public long getReplicationFailures() {
-        if (!isStatisticsEnabled()) {
-            return -1;
-        }
-        return replicationFailures.get();
-    }
+   // mainly for unit testing
+   public void setTransport(Transport t) {
+      this.t = t;
+   }
 
-    @Metric(displayName = "Statistics enabled", dataType = DataType.TRAIT)
-    public boolean isStatisticsEnabled() {
-        return statisticsEnabled;
-    }
-
-    @Operation(displayName = "Enable/disable statistics")
-    public void setStatisticsEnabled(@Parameter(name = "enabled", description = "Whether statistics should be enabled or disabled (true/false)") boolean statisticsEnabled) {
-        this.statisticsEnabled = statisticsEnabled;
-    }
-
-    @ManagedAttribute(description = "Successful replications as a ratio of total replications")
-    public String getSuccessRatio() {
-        if (replicationCount.get() == 0 || !statisticsEnabled) {
-            return "N/A";
-        }
-        double ration = calculateSuccessRatio() * 100d;
-        return NumberFormat.getInstance().format(ration) + "%";
-    }
-
-    @ManagedAttribute(description = "Successful replications as a ratio of total replications in numeric double format")
-    @Metric(displayName = "Successful replication ratio", units = Units.PERCENTAGE, displayType = DisplayType.SUMMARY)
-    public double getSuccessRatioFloatingPoint() {
-        if (replicationCount.get() == 0 || !statisticsEnabled) return 0;
-        return calculateSuccessRatio();
-    }
-
-    private double calculateSuccessRatio() {
-        double totalCount = replicationCount.get() + replicationFailures.get();
-        return replicationCount.get() / totalCount;
-    }
-
-    @ManagedAttribute(description = "The average time spent in the transport layer, in milliseconds")
-    @Metric(displayName = "Average time spent in the transport layer", units = Units.MILLISECONDS, displayType = DisplayType.SUMMARY)
-    public long getAverageReplicationTime() {
-        if (replicationCount.get() == 0) {
-            return 0;
-        }
-        return totalReplicationTime.get() / replicationCount.get();
-    }
-
-    // mainly for unit testing
-    public void setTransport(Transport t) {
-        this.t = t;
-    }
-
-    @Override
-    public Address getAddress() {
-        return t != null ? t.getAddress() : null;
-    }
+   @Override
+   public Address getAddress() {
+      return t != null ? t.getAddress() : null;
+   }
 }

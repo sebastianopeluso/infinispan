@@ -28,9 +28,9 @@ import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.impl.RemoteTxInvocationContext;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.lifecycle.ComponentStatus;
-import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
+import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
@@ -45,170 +45,170 @@ import org.infinispan.util.logging.LogFactory;
  */
 public abstract class AbstractTransactionBoundaryCommand implements TransactionBoundaryCommand {
 
-    private static final Log log = LogFactory.getLog(AbstractTransactionBoundaryCommand.class);
-    private static boolean trace = log.isTraceEnabled();
+   private static final Log log = LogFactory.getLog(AbstractTransactionBoundaryCommand.class);
+   private static boolean trace = log.isTraceEnabled();
 
-    protected GlobalTransaction globalTx;
-    protected final String cacheName;
-    protected InterceptorChain invoker;
-    protected InvocationContextContainer icc;
-    protected TransactionTable txTable;
-    protected Configuration configuration;
-    private Address origin;
+   protected GlobalTransaction globalTx;
+   protected final String cacheName;
+   protected InterceptorChain invoker;
+   protected InvocationContextContainer icc;
+   protected TransactionTable txTable;
+   protected Configuration configuration;
+   private Address origin;
 
-    //Pedro -- meaning:
-    // PrepareCommand: this command must be sent in total order...
-    // Commit/RollbackCommand: this command must be sent in OOB to obtain faster commit
-    protected boolean totalOrdered = false;
+   //Pedro -- meaning:
+   // PrepareCommand: this command must be sent in total order...
+   // Commit/RollbackCommand: this command must be sent in OOB to obtain faster commit
+   protected boolean totalOrdered = false;
 
-    public AbstractTransactionBoundaryCommand(String cacheName) {
-        this.cacheName = cacheName;
-    }
+   public AbstractTransactionBoundaryCommand(String cacheName) {
+      this.cacheName = cacheName;
+   }
 
-    public void injectComponents(Configuration configuration) {
-        this.configuration = configuration;
-    }
+   public void injectComponents(Configuration configuration) {
+      this.configuration = configuration;
+   }
 
-    public Configuration getConfiguration() {
-        return configuration;
-    }
+   public Configuration getConfiguration() {
+      return configuration;
+   }
 
-    public void init(InterceptorChain chain, InvocationContextContainer icc, TransactionTable txTable) {
-        this.invoker = chain;
-        this.icc = icc;
-        this.txTable = txTable;
-    }
+   public void init(InterceptorChain chain, InvocationContextContainer icc, TransactionTable txTable) {
+      this.invoker = chain;
+      this.icc = icc;
+      this.txTable = txTable;
+   }
 
-    public String getCacheName() {
-        return cacheName;
-    }
+   public String getCacheName() {
+      return cacheName;
+   }
 
-    public GlobalTransaction getGlobalTransaction() {
-        return globalTx;
-    }
+   public GlobalTransaction getGlobalTransaction() {
+      return globalTx;
+   }
 
-    public void markTransactionAsRemote(boolean isRemote) {
-        globalTx.setRemote(isRemote);
-    }
+   public void markTransactionAsRemote(boolean isRemote) {
+      globalTx.setRemote(isRemote);
+   }
 
-    /**
-     * This is what is returned to remote callers when an invalid RemoteTransaction is encountered.  Can happen if a
-     * remote node propagates a transactional call to the current node, and the current node has no idea of the transaction
-     * in question.  Can happen during rehashing, when ownerships are reassigned during a transactions.
-     *
-     * Returning a null usually means the transactional command succeeded.
-     * @return return value to respond to a remote caller with if the transaction context is invalid.
-     */
-    protected Object invalidRemoteTxReturnValue() {
-        return null;
-    }
+   /**
+    * This is what is returned to remote callers when an invalid RemoteTransaction is encountered.  Can happen if a
+    * remote node propagates a transactional call to the current node, and the current node has no idea of the transaction
+    * in question.  Can happen during rehashing, when ownerships are reassigned during a transactions.
+    *
+    * Returning a null usually means the transactional command succeeded.
+    * @return return value to respond to a remote caller with if the transaction context is invalid.
+    */
+   protected Object invalidRemoteTxReturnValue() {
+      return null;
+   }
 
-    public Object perform(InvocationContext ctx) throws Throwable {
-        if (ctx != null) throw new IllegalStateException("Expected null context!");
-        markGtxAsRemote();
-        RemoteTransaction transaction = txTable.getRemoteTransaction(globalTx);
-        if (transaction == null) {
-            if (trace) log.tracef("Did not find a RemoteTransaction for %s", globalTx);
-            return invalidRemoteTxReturnValue();
-        }
-        visitRemoteTransaction(transaction);
-        RemoteTxInvocationContext ctxt = icc.createRemoteTxInvocationContext(
-                transaction, getOrigin());
+   public Object perform(InvocationContext ctx) throws Throwable {
+      if (ctx != null) throw new IllegalStateException("Expected null context!");
+      markGtxAsRemote();
+      RemoteTransaction transaction = txTable.getRemoteTransaction(globalTx);
+      if (transaction == null) {
+         if (trace) log.tracef("Did not find a RemoteTransaction for %s", globalTx);
+         return invalidRemoteTxReturnValue();
+      }
+      visitRemoteTransaction(transaction);
+      RemoteTxInvocationContext ctxt = icc.createRemoteTxInvocationContext(
+            transaction, getOrigin());
 
-        if (trace) log.tracef("About to execute tx command %s", this);
-        return invoker.invoke(ctxt, this);
-    }
+      if (trace) log.tracef("About to execute tx command %s", this);
+      return invoker.invoke(ctxt, this);
+   }
 
-    /**
-     * Pedro -- total order protocol. The commit or the rollback command can be received before the prepare message
-     * we let the commands be invoked in the interceptor chain. They will be block in TotalOrderInterceptor while the
-     * prepare command doesn't arrives
-     * @param ctx the same as {@link #perform(org.infinispan.context.InvocationContext)}
-     * @return the same as {@link #perform(org.infinispan.context.InvocationContext)}
-     * @throws Throwable the same as {@link #perform(org.infinispan.context.InvocationContext)}
-     */
-    protected Object performIgnoringUnexistingTransaction(InvocationContext ctx) throws Throwable {
-        if (ctx != null) throw new IllegalStateException("Expected null context!");
-        markGtxAsRemote();
-        RemoteTransaction transaction = txTable.getRemoteTransaction(globalTx);
-        if (transaction != null) {
-            visitRemoteTransaction(transaction);
-        } else {
-            log.warnf("Will execute tx command %s without the remote transaction [%s]", this,
-                    Util.prettyPrintGlobalTransaction(globalTx));
-        }
+   /**
+    * Pedro -- total order protocol. The commit or the rollback command can be received before the prepare message
+    * we let the commands be invoked in the interceptor chain. They will be block in TotalOrderInterceptor while the
+    * prepare command doesn't arrives
+    * @param ctx the same as {@link #perform(org.infinispan.context.InvocationContext)}
+    * @return the same as {@link #perform(org.infinispan.context.InvocationContext)}
+    * @throws Throwable the same as {@link #perform(org.infinispan.context.InvocationContext)}
+    */
+   protected Object performIgnoringUnexistingTransaction(InvocationContext ctx) throws Throwable {
+      if (ctx != null) throw new IllegalStateException("Expected null context!");
+      markGtxAsRemote();
+      RemoteTransaction transaction = txTable.getRemoteTransaction(globalTx);
+      if (transaction != null) {
+         visitRemoteTransaction(transaction);
+      } else {
+         log.warnf("Will execute tx command %s without the remote transaction [%s]", this,
+               Util.prettyPrintGlobalTransaction(globalTx));
+      }
 
-        RemoteTxInvocationContext ctxt = icc.createRemoteTxInvocationContext(
-                transaction, getOrigin());
+      RemoteTxInvocationContext ctxt = icc.createRemoteTxInvocationContext(
+            transaction, getOrigin());
 
-        if (trace) log.tracef("About to execute tx command %s", this);
-        return invoker.invoke(ctxt, this);
-    }
+      if (trace) log.tracef("About to execute tx command %s", this);
+      return invoker.invoke(ctxt, this);
+   }
 
-    protected void visitRemoteTransaction(RemoteTransaction tx) {
-        // to be overridden
-    }
+   protected void visitRemoteTransaction(RemoteTransaction tx) {
+      // to be overridden
+   }
 
-    public Object[] getParameters() {
-        return new Object[]{globalTx};
-    }
+   public Object[] getParameters() {
+      return new Object[]{globalTx};
+   }
 
-    public void setParameters(int commandId, Object[] args) {
-        globalTx = (GlobalTransaction) args[0];
-    }
+   public void setParameters(int commandId, Object[] args) {
+      globalTx = (GlobalTransaction) args[0];
+   }
 
-    public boolean shouldInvoke(InvocationContext ctx) {
-        return true;
-    }
+   public boolean shouldInvoke(InvocationContext ctx) {
+      return true;
+   }
 
-    @Override
-    public boolean ignoreCommandOnStatus(ComponentStatus status) {
-        return false;
-    }
+   @Override
+   public boolean ignoreCommandOnStatus(ComponentStatus status) {
+      return false;
+   }
 
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+   public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
 
-        AbstractTransactionBoundaryCommand that = (AbstractTransactionBoundaryCommand) o;
-        return this.globalTx.equals(that.globalTx);
-    }
+      AbstractTransactionBoundaryCommand that = (AbstractTransactionBoundaryCommand) o;
+      return this.globalTx.equals(that.globalTx);
+   }
 
-    public int hashCode() {
-        return globalTx.hashCode();
-    }
+   public int hashCode() {
+      return globalTx.hashCode();
+   }
 
-    @Override
-    public String toString() {
-        return "gtx=" + globalTx +
-                ", cacheName='" + cacheName + '\'' +
-                '}';
-    }
+   @Override
+   public String toString() {
+      return "gtx=" + globalTx +
+            ", cacheName='" + cacheName + '\'' +
+            '}';
+   }
 
-    private void markGtxAsRemote() {
-        globalTx.setRemote(true);
-    }
+   private void markGtxAsRemote() {
+      globalTx.setRemote(true);
+   }
 
-    public Address getOrigin() {
-        return origin;
-    }
+   public Address getOrigin() {
+      return origin;
+   }
 
-    public void setOrigin(Address origin) {
-        this.origin = origin;
-    }
+   public void setOrigin(Address origin) {
+      this.origin = origin;
+   }
 
-    @Override
-    public boolean isReturnValueExpected() {
-        return true;
-    }
+   @Override
+   public boolean isReturnValueExpected() {
+      return true;
+   }
 
-    //Pedro -- setter and getter
+   //Pedro -- setter and getter
 
-    public boolean isTotalOrdered() {
-        return totalOrdered;
-    }
+   public boolean isTotalOrdered() {
+      return totalOrdered;
+   }
 
-    public void setTotalOrdered(boolean totalOrdered) {
-        this.totalOrdered = totalOrdered;
-    }
+   public void setTotalOrdered(boolean totalOrdered) {
+      this.totalOrdered = totalOrdered;
+   }
 }

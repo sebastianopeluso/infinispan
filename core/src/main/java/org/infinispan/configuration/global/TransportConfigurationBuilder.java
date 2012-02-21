@@ -1,5 +1,24 @@
+/*
+ * Copyright 2011 Red Hat, Inc. and/or its affiliates.
+ *
+ * This is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation; either version 2.1 of
+ * the License, or (at your option) any later version.
+ *
+ * This software is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301 USA
+ */
 package org.infinispan.configuration.global;
 
+import org.infinispan.config.ConfigurationException;
 import org.infinispan.remoting.transport.Transport;
 import org.infinispan.remoting.transport.jgroups.JGroupsTransport;
 import org.infinispan.util.TypedProperties;
@@ -148,7 +167,9 @@ public class TransportConfigurationBuilder extends AbstractGlobalConfigurationBu
    
    @Override
    void validate() {
-      // No-op, no validation required
+      if(clusterName == null){
+          throw new ConfigurationException("Transport clusterName cannot be null");
+      }
    }
    
    @Override
@@ -179,4 +200,20 @@ public class TransportConfigurationBuilder extends AbstractGlobalConfigurationBu
    public Transport getTransport() {
       return transport;
    }
+
+   @Override
+   public String toString() {
+      return "TransportConfigurationBuilder{" +
+            "clusterName='" + clusterName + '\'' +
+            ", machineId='" + machineId + '\'' +
+            ", rackId='" + rackId + '\'' +
+            ", siteId='" + siteId + '\'' +
+            ", distributedSyncTimeout=" + distributedSyncTimeout +
+            ", transport=" + transport +
+            ", nodeName='" + nodeName + '\'' +
+            ", properties=" + properties +
+            ", strictPeerToPeer=" + strictPeerToPeer +
+            '}';
+   }
+
 }

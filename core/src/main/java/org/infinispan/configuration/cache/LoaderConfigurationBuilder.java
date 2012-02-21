@@ -1,3 +1,21 @@
+/*
+ * Copyright 2011 Red Hat, Inc. and/or its affiliates.
+ *
+ * This is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation; either version 2.1 of
+ * the License, or (at your option) any later version.
+ *
+ * This software is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301 USA
+ */
 package org.infinispan.configuration.cache;
 
 import java.util.Properties;
@@ -33,7 +51,7 @@ public class LoaderConfigurationBuilder extends AbstractLoaderConfigurationBuild
     * NOTE: Currently Infinispan will not use the object instance, but instead instantiate a new
     * instance of the class. Therefore, do not expect any state to survive, and provide a no-args
     * constructor to any instance. This will be resolved in Infinispan 5.2.0
-    * 
+    *
     * @param cacheLoader
     * @return
     */
@@ -138,11 +156,26 @@ public class LoaderConfigurationBuilder extends AbstractLoaderConfigurationBuild
       this.purgeOnStartup = template.purgeOnStartup();
       this.purgerThreads = template.purgerThreads();
       this.purgeSynchronously = template.purgeSynchronously();
-      
+
       this.async.read(template.async());
       this.singletonStore.read(template.singletonStore());
-      
+
       return this;
+   }
+
+   @Override
+   public String toString() {
+      return "LoaderConfigurationBuilder{" +
+            "cacheLoader=" + cacheLoader +
+            ", fetchPersistentState=" + fetchPersistentState +
+            ", ignoreModifications=" + ignoreModifications +
+            ", purgeOnStartup=" + purgeOnStartup +
+            ", purgerThreads=" + purgerThreads +
+            ", purgeSynchronously=" + purgeSynchronously +
+            ", properties=" + properties +
+            ", async=" + async +
+            ", singletonStore=" + singletonStore +
+            '}';
    }
 
 }
