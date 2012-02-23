@@ -33,6 +33,7 @@ import org.infinispan.executors.DefaultExecutorFactory;
 import org.infinispan.executors.DefaultScheduledExecutorFactory;
 import org.infinispan.executors.ExecutorFactory;
 import org.infinispan.executors.ScheduledExecutorFactory;
+import org.infinispan.executors.DefaultDynamicExecutorFactory;
 import org.infinispan.factories.GlobalComponentRegistry;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.SurvivesRestarts;
@@ -76,6 +77,7 @@ import java.util.Properties;
  * @author Vladimir Blagojevic
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
+ * @author Pedro Ruivo
  * @since 4.0
  *
  * @see <a href="../../../config.html#ce_infinispan_global">Configuration reference</a>
@@ -134,6 +136,9 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
    
    @XmlTransient
    private final ClassLoader cl;
+
+   @XmlElement
+   ExecutorFactoryType totalOrderExecutor = new TotalOrderExecutorFactoryType().setGlobalConfiguration(this);
 
    /**
     * Create a new GlobalConfiguration, using the Thread Context ClassLoader to load any
@@ -400,6 +405,15 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       replicationQueueScheduledExecutor.setFactory(replicationQueueScheduledExecutorFactoryClass);
    }
 
+   @Deprecated
+   public void setTotalOrderExecutorFactoryClass(String totalOrderExecutorFactoryClass) {
+      totalOrderExecutor.setFactory(totalOrderExecutorFactoryClass);
+   }
+
+   public String getTotalOrderExecutorFactorClass() {
+      return totalOrderExecutor.factory;
+   }
+
    public String getMarshallerClass() {
       return serialization.marshallerClass;
    }
@@ -657,6 +671,20 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       this.replicationQueueScheduledExecutor.setProperties(toTypedProperties(replicationQueueScheduledExecutorPropertiesString));
    }
 
+   public Properties getTotalOrderExecutorProperties() {
+      return totalOrderExecutor.properties;
+   }
+
+   @Deprecated
+   public void setTotalOrderExecutorProperties(Properties totalOrderExecutorProperties) {
+      totalOrderExecutor.setProperties(toTypedProperties(totalOrderExecutorProperties));
+   }
+
+   @Deprecated
+   public void setTotalOrderExecutorProperties(String totalOrderExecutorPropertiesString) {
+      totalOrderExecutor.setProperties(toTypedProperties(totalOrderExecutorPropertiesString));
+   }
+
    public short getMarshallVersion() {
       return serialization.versionShort;
    }
@@ -723,6 +751,7 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       serialization.accept(v);
       shutdown.accept(v);
       transport.accept(v);
+      totalOrderExecutor.accept(v);
       v.visitGlobalConfiguration(this);
    }
 
@@ -760,6 +789,13 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
          return false;
       if (transport.properties != null ? !transport.properties.equals(that.transport.properties) : that.transport.properties != null)
          return false;
+      if (totalOrderExecutor.factory != null ? !totalOrderExecutor.factory.equals(that.totalOrderExecutor.factory) : that.totalOrderExecutor.factory != null) {
+         return false;
+      }
+      if (totalOrderExecutor.properties != null ? !totalOrderExecutor.properties.equals(that.totalOrderExecutor.properties) : that.totalOrderExecutor.properties != null) {
+         return false;
+      }
+
       return !(transport.distributedSyncTimeout != null && !transport.distributedSyncTimeout.equals(that.transport.distributedSyncTimeout));
 
    }
@@ -781,6 +817,8 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       result = 31 * result + (shutdown.hookBehavior.hashCode());
       result = 31 * result + serialization.version.hashCode();
       result = (int) (31 * result + transport.distributedSyncTimeout);
+      result = 31 * result + (totalOrderExecutor.factory != null ? totalOrderExecutor.factory.hashCode() : 0);
+      result = 31 * result + (totalOrderExecutor.properties != null ? totalOrderExecutor.properties.hashCode() : 0);
       return result;
    }
 
@@ -819,6 +857,10 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
          if (shutdown != null) {
             dolly.shutdown = (ShutdownType) shutdown.clone();
             dolly.shutdown.setGlobalConfiguration(dolly);
+         }
+         if (totalOrderExecutor != null) {
+            dolly.totalOrderExecutor = totalOrderExecutor.clone();
+            dolly.totalOrderExecutor.setGlobalConfiguration(dolly);
          }
          dolly.fluentGlobalConfig = new FluentGlobalConfiguration(dolly);
          return dolly;
@@ -895,7 +937,11 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
               @ConfigurationDoc(name = "maxThreads",
                       desc = "Maximum number of threads for this executor. Default values can be found <a href=&quot;https://docs.jboss.org/author/display/ISPN/Default+Values+For+Property+Based+Attributes&quot;>here</a>"),
               @ConfigurationDoc(name = "threadNamePrefix",
-                      desc = "Thread name prefix for threads created by this executor. Default values can be found <a href=&quot;https://docs.jboss.org/author/display/ISPN/Default+Values+For+Property+Based+Attributes&quot;>here</a>")})
+                      desc = "Thread name prefix for threads created by this executor. Default values can be found <a href=&quot;https://docs.jboss.org/author/display/ISPN/Default+Values+For+Property+Based+Attributes&quot;>here</a>"),
+              @ConfigurationDoc(name = "minThreads",
+                      desc = "The number of threads to keep in the executor, even if they are idle"),
+              @ConfigurationDoc(name = "keepAliveTime",
+                      desc = "When the number of threads is greater than the minThread, this is the maximum time that excess idle threads will wait for new tasks before terminating")})
       protected TypedProperties properties = new TypedProperties();
 
       public void accept(ConfigurationBeanVisitor v) {
@@ -949,7 +995,9 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
            @ConfigurationDoc(name = "asyncListenerExecutor",
                    desc = "Configuration for the executor service used to emit notifications to asynchronous listeners"),
            @ConfigurationDoc(name = "asyncTransportExecutor",
-                   desc = "Configuration for the executor service used for asynchronous work on the Transport, including asynchronous marshalling and Cache 'async operations' such as Cache.putAsync().")})
+                   desc = "Configuration for the executor service used for asynchronous work on the Transport, including asynchronous marshalling and Cache 'async operations' such as Cache.putAsync()."),
+           @ConfigurationDoc(name = "totalOrderExecutor",
+                   desc = "Configuration for the executor service used to validate multiple non-conflicting concurrent transactions")})
    @Deprecated public static class ExecutorFactoryType extends FactoryClassWithPropertiesType implements ExecutorFactoryConfig<ExecutorFactory> {
 
       private static final long serialVersionUID = 6895901500645539386L;
@@ -1770,6 +1818,30 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       ShutdownType setGlobalConfiguration(GlobalConfiguration globalConfig) {
          super.setGlobalConfiguration(globalConfig);
          return this;
+      }
+   }
+
+   /**
+    * Executor factory for the Total Order protocol.
+    */
+   @Deprecated public static class TotalOrderExecutorFactoryType extends ExecutorFactoryType {
+
+      public TotalOrderExecutorFactoryType(String factory) {
+         super(factory);
+         properties.put("threadNamePrefix", "Total-Order-Validation");
+      }
+
+      public TotalOrderExecutorFactoryType() {
+         super(DefaultDynamicExecutorFactory.class.getName());
+         properties.put("threadNamePrefix", "Total-Order-Validation");
+      }
+
+      @Override
+      public void accept(ConfigurationBeanVisitor v) {
+         if (!properties.contains("threadNamePrefix")) {
+            properties.put("threadNamePrefix", "Total-Order-Validation");
+         }
+         super.accept(v);
       }
    }
 }

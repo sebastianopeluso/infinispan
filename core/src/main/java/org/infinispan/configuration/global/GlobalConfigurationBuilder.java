@@ -38,6 +38,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
    private final ScheduledExecutorFactoryConfigurationBuilder evictionScheduledExecutor;
    private final ScheduledExecutorFactoryConfigurationBuilder replicationQueueScheduledExecutor;
    private final ShutdownConfigurationBuilder shutdown;
+   private final ExecutorFactoryConfigurationBuilder totalOrderExecutor;
    
    public GlobalConfigurationBuilder() {
       this.cl = Thread.currentThread().getContextClassLoader();
@@ -49,6 +50,8 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
       this.evictionScheduledExecutor = new ScheduledExecutorFactoryConfigurationBuilder(this);
       this.replicationQueueScheduledExecutor = new ScheduledExecutorFactoryConfigurationBuilder(this);
       this.shutdown = new ShutdownConfigurationBuilder(this);
+      //set a new executor by default, that allows to set the core number of threads and the keep alive time
+      this.totalOrderExecutor = new TotalOrderExecutorFactoryConfigurationBuilder(this);
    }
    
    /**
@@ -131,6 +134,10 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
       return shutdown;
    }
 
+   public ExecutorFactoryConfigurationBuilder totalOrderExecutor() {
+      return totalOrderExecutor;
+   }
+
     @SuppressWarnings("unchecked")
     public void validate() {
         for (AbstractGlobalConfigurationBuilder<?> validatable :
@@ -152,7 +159,8 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
             transport.create(),
             serialization.create(), 
             shutdown.create(),
-            cl
+            cl,
+            totalOrderExecutor.create()
             );
    }
    
@@ -167,6 +175,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
       serialization.read(template.serialization());
       shutdown.read(template.shutdown());
       transport.read(template.transport());
+      totalOrderExecutor.read(template.totalOrderExecutor());
       
       return this;
    }
@@ -194,6 +203,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
             ", evictionScheduledExecutor=" + evictionScheduledExecutor +
             ", replicationQueueScheduledExecutor=" + replicationQueueScheduledExecutor +
             ", shutdown=" + shutdown +
+            ", totalOrderExecutor=" + totalOrderExecutor +
             '}';
    }
 
@@ -222,7 +232,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
       if (transport != null ? !transport.equals(that.transport) : that.transport != null)
          return false;
 
-      return true;
+      return !(totalOrderExecutor != null ? !totalOrderExecutor.equals(that.totalOrderExecutor) : that.totalOrderExecutor != null);
    }
 
    @Override
@@ -236,6 +246,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
       result = 31 * result + (evictionScheduledExecutor != null ? evictionScheduledExecutor.hashCode() : 0);
       result = 31 * result + (replicationQueueScheduledExecutor != null ? replicationQueueScheduledExecutor.hashCode() : 0);
       result = 31 * result + (shutdown != null ? shutdown.hashCode() : 0);
+      result = 31 * result + (totalOrderExecutor != null ? totalOrderExecutor.hashCode() : 0);
       return result;
    }
 

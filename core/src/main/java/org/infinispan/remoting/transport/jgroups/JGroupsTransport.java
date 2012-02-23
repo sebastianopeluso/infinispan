@@ -53,6 +53,7 @@ import org.jgroups.MergeView;
 import org.jgroups.View;
 import org.jgroups.blocks.RspFilter;
 import org.jgroups.jmx.JmxConfigurator;
+import org.jgroups.protocols.SEQUENCER;
 import org.jgroups.stack.AddressGenerator;
 import org.jgroups.util.Rsp;
 import org.jgroups.util.RspList;
@@ -265,7 +266,9 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
 
       // Channel.LOCAL *must* be set to false so we don't see our own messages - otherwise
       // invalidations targeted at remote instances will be received by self.
-      channel.setDiscardOwnMessages(true);
+      // WARNING: total order needs to deliver own messages. the invokeRemotely method has a total order boolean
+      //          that when it is false, it discard our own messages, maintaining the property needed
+      channel.setDiscardOwnMessages(false);
 
       // if we have a TopologyAwareConsistentHash, we need to set our own address generator in
       // JGroups
@@ -435,7 +438,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
    // ------------------------------------------------------------------------------------------------------------------
 
    @Override
-   public Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout, boolean usePriorityQueue, ResponseFilter responseFilter)
+   public Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout, boolean usePriorityQueue, ResponseFilter responseFilter, boolean totalOrder)
          throws Exception {
 
       if (recipients != null && recipients.isEmpty()) {
@@ -471,8 +474,8 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
       if (broadcast) {
          rsps = dispatcher.broadcastRemoteCommands(rpcCommand, toJGroupsMode(mode), timeout, recipients != null,
                                                    usePriorityQueue, toJGroupsFilter(responseFilter),
-               asyncMarshalling);
-      } else {         
+               asyncMarshalling, totalOrder);
+      } else {
          if (jgAddressList == null || !jgAddressList.isEmpty()) {
             boolean singleRecipient = !ignoreLeavers && jgAddressList != null && jgAddressList.size() == 1;
             boolean skipRpc = false;
@@ -491,7 +494,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
                } else {
                   rsps = dispatcher.invokeRemoteCommands(jgAddressList, rpcCommand, toJGroupsMode(mode), timeout,
                                                          recipients != null, usePriorityQueue, toJGroupsFilter(responseFilter),
-                        asyncMarshalling);
+                        asyncMarshalling, totalOrder);
                }
             }
          }
@@ -680,5 +683,10 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
 
    public Channel getChannel() {
       return channel;
+   }
+
+   @Override
+   public boolean hasCommunicationWithTotalOrderProperties() {
+      return channel.getProtocolStack().findProtocol(SEQUENCER.class) != null;
    }
 }

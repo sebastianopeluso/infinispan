@@ -86,11 +86,12 @@ public interface Transport extends Lifecycle {
     * @param usePriorityQueue if true, a priority queue is used to deliver messages.  May not be supported by all
     *                         implementations.
     * @param responseFilter   a response filter with which to filter out failed/unwanted/invalid responses.
+    * @param totalOrder       the command will be send with total order properties
     * @return a map of responses from each member contacted.
     * @throws Exception in the event of problems.
     */
    Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout,
-                                         boolean usePriorityQueue, ResponseFilter responseFilter) throws Exception;
+                                         boolean usePriorityQueue, ResponseFilter responseFilter, boolean totalOrder) throws Exception;
 
    /**
     * @return true if the current Channel is the coordinator of the cluster.
@@ -147,4 +148,12 @@ public interface Transport extends Lifecycle {
    int getViewId();
 
    Log getLog();
+
+   /**
+    * check if the transport has configured with total order deliver properties (has the sequencer in JGroups
+    * protocol stack
+    *
+    * @return true if it have total order properties, false otherwise
+    */
+   boolean hasCommunicationWithTotalOrderProperties();
 }
