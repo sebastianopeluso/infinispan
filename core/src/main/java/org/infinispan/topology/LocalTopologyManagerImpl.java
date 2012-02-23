@@ -259,7 +259,7 @@ public class LocalTopologyManagerImpl implements LocalTopologyManager {
          // this node is not the coordinator
          Address coordinator = transport.getCoordinator();
          Map<Address, Response> responseMap = transport.invokeRemotely(Collections.singleton(coordinator),
-               command, ResponseMode.SYNCHRONOUS, timeout, true, null);
+               command, ResponseMode.SYNCHRONOUS, timeout, true, null, false, false);
          response = responseMap.get(coordinator);
       }
       if (response == null || !response.isSuccessful()) {
@@ -288,7 +288,7 @@ public class LocalTopologyManagerImpl implements LocalTopologyManager {
       } else {
          Address coordinator = transport.getCoordinator();
          // ignore the responses
-         transport.invokeRemotely(Collections.singleton(coordinator), command, ResponseMode.ASYNCHRONOUS_WITH_SYNC_MARSHALLING, 0, true, null);
+         transport.invokeRemotely(Collections.singleton(coordinator), command, ResponseMode.ASYNCHRONOUS_WITH_SYNC_MARSHALLING, 0, true, null, false, false);
       }
    }
 

@@ -74,7 +74,7 @@ public class NonTxDistributionInterceptor extends BaseDistributionInterceptor {
    @Override
    public Object visitClearCommand(InvocationContext ctx, ClearCommand command) throws Throwable {
       if (ctx.isOriginLocal() && !isLocalModeForced(command)) {
-         rpcManager.broadcastRpcCommand(command, isSynchronous(command));
+         rpcManager.broadcastRpcCommand(command, isSynchronous(command), false);
       }
       return invokeNextInterceptor(ctx, command);
    }
@@ -102,7 +102,7 @@ public class NonTxDistributionInterceptor extends BaseDistributionInterceptor {
          if (recipients.contains(rpcManager.getAddress()) && (!command.isSuccessful())) {
             log.trace("Skipping remote invocation as the command hasn't executed correctly on owner");
          } else {
-            Map<Address, Response> responseMap = rpcManager.invokeRemotely(recipients, command, sync);
+            Map<Address, Response> responseMap = rpcManager.invokeRemotely(recipients, command, sync, false);
             Address mainOwner;
             boolean equals = (mainOwner = recipients.get(0)).equals(rpcManager.getAddress());
             if (sync && !recipients.isEmpty() && !equals) {

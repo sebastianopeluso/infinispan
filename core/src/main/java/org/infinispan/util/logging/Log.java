@@ -840,5 +840,10 @@ public interface Log extends BasicLogger {
    @LogMessage(level = INFO)
    @Message(value = "%d entries migrated to cache %s in %s", id = 216)
    void entriesMigrated(long count, String name, String prettyTime);
+
+   @LogMessage(level = INFO)
+   @Message(value = "Timeout while waiting for the transaction validation. The command will not be processed. " +
+         "Transaction is %s", id = 217)
+   void timeoutWaitingUntilTransactionPrepared(String globalTx);
 }
 

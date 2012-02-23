@@ -36,6 +36,7 @@ import java.util.List;
 public class VersionedPrepareCommand extends PrepareCommand {
    public static final byte COMMAND_ID = 26;
    private EntryVersionsMap versionsSeen = null;
+   private boolean skipWriteSkewCheck = false;
 
    public VersionedPrepareCommand() {
       super("");
@@ -105,5 +106,13 @@ public class VersionedPrepareCommand extends PrepareCommand {
             ", gtx=" + globalTx +
             ", cacheName='" + cacheName + '\'' +
             '}';
+   }
+
+   public boolean isSkipWriteSkewCheck() {
+      return skipWriteSkewCheck;
+   }
+
+   public void setSkipWriteSkewCheck(boolean skipWriteSkewCheck) {
+      this.skipWriteSkewCheck = skipWriteSkewCheck;
    }
 }

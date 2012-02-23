@@ -71,6 +71,7 @@ import java.util.concurrent.TimeoutException;
  * Takes care of replicating modifications to other caches in a cluster.
  *
  * @author Bela Ban
+ * @author Pedro Ruivo
  * @since 4.0
  */
 public class ReplicationInterceptor extends BaseRpcInterceptor {
@@ -113,7 +114,7 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
          throws TimeoutException, InterruptedException {
       // may need to resend, so make the commit command synchronous
       // TODO keep the list of prepared nodes or the view id when the prepare command was sent to know whether we need to resend the prepare info
-      rpcManager.invokeRemotely(null, command, cacheConfiguration.transaction().syncCommitPhase(), true);
+      rpcManager.invokeRemotely(null, command, cacheConfiguration.transaction().syncCommitPhase(), true, false);
    }
 
    @Override
@@ -134,7 +135,7 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
       if (shouldInvokeRemoteTxCommand(ctx) && !Configurations.isOnePhaseCommit(cacheConfiguration)) {
-         rpcManager.broadcastRpcCommand(command, cacheConfiguration.transaction().syncRollbackPhase(), true);
+         rpcManager.broadcastRpcCommand(command, cacheConfiguration.transaction().syncRollbackPhase(), true, false);
       }
       return invokeNextInterceptor(ctx, command);
    }
@@ -223,7 +224,7 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
       targets.retainAll(rpcManager.getTransport().getMembers());
       ResponseFilter filter = new ClusteredGetResponseValidityFilter(targets, rpcManager.getAddress());
       Map<Address, Response> responses = rpcManager.invokeRemotely(targets, get, ResponseMode.WAIT_FOR_VALID_RESPONSE,
-            cacheConfiguration.clustering().sync().replTimeout(), true, filter);
+            cacheConfiguration.clustering().sync().replTimeout(), true, filter, false);
 
       if (!responses.isEmpty()) {
          for (Response r : responses.values()) {
@@ -270,7 +271,7 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
       // FIRST pass this call up the chain.  Only if it succeeds (no exceptions) locally do we attempt to replicate.
       final Object returnValue = invokeNextInterceptor(ctx, command);
       if (!isLocalModeForced(command) && command.isSuccessful() && ctx.isOriginLocal() && !ctx.isInTxScope()) {
-         rpcManager.broadcastRpcCommand(command, isSynchronous(command));
+         rpcManager.broadcastRpcCommand(command, isSynchronous(command), false);
       }
       return returnValue;
    }

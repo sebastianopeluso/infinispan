@@ -29,6 +29,7 @@ import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.write.InvalidateCommand;
 import org.infinispan.commands.write.PutKeyValueCommand;
 import org.infinispan.configuration.cache.Configuration;
+import org.infinispan.configuration.cache.Configurations;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.context.Flag;
@@ -51,9 +52,9 @@ import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.topology.CacheTopology;
 import org.infinispan.transaction.LocalTransaction;
-import org.infinispan.transaction.LockingMode;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
+import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.util.InfinispanCollections;
 import org.infinispan.util.ReadOnlyDataContainerBackedKeySet;
@@ -95,6 +96,7 @@ public class StateConsumerImpl implements StateConsumer {
    private InterceptorChain interceptorChain;
    private InvocationContextContainer icc;
    private StateTransferLock stateTransferLock;
+   private TotalOrderManager totalOrderManager;
    private long timeout;
    private boolean useVersionedPut;
    private boolean isFetchEnabled;
@@ -195,7 +197,8 @@ public class StateConsumerImpl implements StateConsumer {
                     CacheLoaderManager cacheLoaderManager,
                     DataContainer dataContainer,
                     TransactionTable transactionTable,
-                    StateTransferLock stateTransferLock) {
+                    StateTransferLock stateTransferLock,
+                    TotalOrderManager totalOrderManager) {
       this.cacheName = cache.getName();
       this.executorService = executorService;
       this.stateTransferManager = stateTransferManager;
@@ -209,14 +212,13 @@ public class StateConsumerImpl implements StateConsumer {
       this.dataContainer = dataContainer;
       this.transactionTable = transactionTable;
       this.stateTransferLock = stateTransferLock;
+      this.totalOrderManager = totalOrderManager;
 
       isTransactional = configuration.transaction().transactionMode().isTransactional();
 
       // we need to use a special form of PutKeyValueCommand that can apply versions too
       useVersionedPut = isTransactional &&
-            configuration.versioning().enabled() &&
-            configuration.locking().writeSkewCheck() &&
-            configuration.transaction().lockingMode() == LockingMode.OPTIMISTIC &&
+            Configurations.isVersioningEnabled(configuration) &&
             configuration.clustering().cacheMode().isClustered();
 
       timeout = configuration.clustering().stateTransfer().timeout();
@@ -248,6 +250,8 @@ public class StateConsumerImpl implements StateConsumer {
       if (isRebalance) {
          rebalanceInProgress.set(true);
       }
+      totalOrderManager.notifyTransactionTransferStart();
+
       final ConsistentHash previousCh = this.cacheTopology != null ? this.cacheTopology.getWriteConsistentHash() : null;
       // Ensures writes to the data container use the right consistent hash
       // No need for a try/finally block, since it's just an assignment
@@ -342,6 +346,7 @@ public class StateConsumerImpl implements StateConsumer {
             stateTransferManager.notifyEndOfTopologyUpdate(topologyId);
          }
       }
+      totalOrderManager.notifyTransactionTransferEnd();
    }
 
    private Set<Integer> getOwnedSegments(ConsistentHash consistentHash) {
@@ -448,6 +453,10 @@ public class StateConsumerImpl implements StateConsumer {
    private void applyTransactions(Address sender, Collection<TransactionInfo> transactions) {
       log.debugf("Applying %d transactions for cache %s transferred from node %s", transactions.size(), cacheName, sender);
       if (isTransactional) {
+         if (configuration.transaction().transactionProtocol().isTotalOrder()) {
+            totalOrderManager.addTransactions(transactions);
+            return;
+         }
          for (TransactionInfo transactionInfo : transactions) {
             CacheTransaction tx = transactionTable.getLocalTransaction(transactionInfo.getGlobalTransaction());
             if (tx == null) {
@@ -499,6 +508,29 @@ public class StateConsumerImpl implements StateConsumer {
    @Override
    public CacheTopology getCacheTopology() {
       return cacheTopology;
+   }
+
+   @Override
+   public Collection<CountDownLatch> getInboundStateTransfer(Collection<Object> affectedKeys) {
+      Collection<CountDownLatch> latches = new LinkedList<CountDownLatch>();
+      if (affectedKeys == null) {
+         //clear command, wait for all the state transfer
+         synchronized (this) {
+            for (InboundTransferTask task : transfersBySegment.values()) {
+               latches.add(task.getCompletionLatch());
+            }
+         }
+      } else {
+         for (Object key : affectedKeys) {
+            synchronized (this) {
+               InboundTransferTask task = transfersBySegment.get(getSegment(key));
+               if (task != null) {
+                  latches.add(task.getCompletionLatch());
+               }
+            }
+         }
+      }
+      return latches;
    }
 
    private void addTransfers(Set<Integer> segments) {
@@ -595,7 +627,7 @@ public class StateConsumerImpl implements StateConsumer {
       // get transactions and locks
       try {
          StateRequestCommand cmd = commandsFactory.buildStateRequestCommand(StateRequestCommand.Type.GET_TRANSACTIONS, rpcManager.getAddress(), topologyId, segments);
-         Map<Address, Response> responses = rpcManager.invokeRemotely(Collections.singleton(source), cmd, ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout);
+         Map<Address, Response> responses = rpcManager.invokeRemotely(Collections.singleton(source), cmd, ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, false);
          Response response = responses.get(source);
          if (response instanceof SuccessfulResponse) {
             return (List<TransactionInfo>) ((SuccessfulResponse) response).getResponseValue();

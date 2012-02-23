@@ -153,7 +153,7 @@
       <version.jclouds>1.4.1</version.jclouds>
       <version.jetty>6.1.25</version.jetty>
       <version.jgoodies.forms>1.0.5</version.jgoodies.forms>
-      <version.jgroups>3.2.6.Final</version.jgroups>
+      <version.jgroups>3.3.0-cloudtm-SNAPSHOT</version.jgroups>
       <version.jsap>2.1</version.jsap>
       <version.json>20090211</version.json>
       <version.jstl>1.2</version.jstl>
@@ -195,7 +195,7 @@
       <dir.ispn>../</dir.ispn>
       <dir.report>../jacoco-html</dir.report>
    </properties>
-   
+
    <dependencyManagement>
       <dependencies>
          <dependency>
@@ -235,7 +235,7 @@
             <version>${project.version}</version>
             <type>test-jar</type>
          </dependency>
-         
+
          <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>infinispan-core</artifactId>
@@ -1041,7 +1041,7 @@
          <scope>provided</scope>
       </dependency>
       <!-- As of v3.0.4, the RHQ annotations have a retention policy of COMPILE,
-           which means they are no longer required at runtime. However, 
+           which means they are no longer required at runtime. However,
            because of a Sun compiler bug http://bugs.sun.com/view_bug.do?bug_id=6550655
            it still needs to be present when using the Infinispan artifacts. This
            doesn't happen when using Java 7. Please add exclusions accordingly

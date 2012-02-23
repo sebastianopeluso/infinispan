@@ -278,6 +278,6 @@ public class XSiteAdminOperations {
    }
 
    private Map<Address, Response> invokeRemotely(XSiteAdminCommand command) {
-      return rpcManager.invokeRemotely(null, command, true, true);
+      return rpcManager.invokeRemotely(null, command, true, true, false);
    }
 }

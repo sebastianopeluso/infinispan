@@ -48,6 +48,7 @@ import org.infinispan.util.logging.LogFactory;
 import java.util.Collection;
 
 import static org.infinispan.transaction.WriteSkewHelper.performWriteSkewCheckAndReturnNewVersions;
+import static org.infinispan.transaction.WriteSkewHelper.returnNewVersions;
 
 // todo [anistor] need to review this for NBST
 /**
@@ -56,6 +57,7 @@ import static org.infinispan.transaction.WriteSkewHelper.performWriteSkewCheckAn
  * the <b>Implementor</b> and various LockingInterceptors are the <b>Abstraction</b>.
  *
  * @author Mircea Markus
+ * @author Pedro Ruivo
  * @since 5.1
  */
 @Scope(Scopes.NAMED_CACHE)
@@ -112,13 +114,13 @@ public interface ClusteringDependentLogic {
     * This logic is used when a changing a key affects all the nodes in the cluster, e.g. int the replicated,
     * invalidated and local cache modes.
     */
-   public static final class AllNodesLogic extends AbstractClusteringDependentLogic {
+   public static class AllNodesLogic extends AbstractClusteringDependentLogic {
 
-      private DataContainer dataContainer;
+      protected DataContainer dataContainer;
 
       private RpcManager rpcManager;
 
-      private static final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
+      protected static final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
          @Override
          public boolean performCheckOnKey(Object key) {
             return true;
@@ -194,15 +196,15 @@ public interface ClusteringDependentLogic {
       }
    }
 
-   public static final class DistributionLogic extends AbstractClusteringDependentLogic {
+   public static class DistributionLogic extends AbstractClusteringDependentLogic {
 
       private DistributionManager dm;
-      private DataContainer dataContainer;
+      protected DataContainer dataContainer;
       private Configuration configuration;
       private RpcManager rpcManager;
       private StateTransferLock stateTransferLock;
 
-      private final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
+      protected final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
          @Override
          public boolean performCheckOnKey(Object key) {
             return localNodeIsOwner(key);
@@ -300,6 +302,60 @@ public interface ClusteringDependentLogic {
          }
          cacheTransaction.setUpdatedEntryVersions(uv);
          return (uv.isEmpty()) ? null : uv;
+      }
+   }
+
+   /**
+    * Logic for total order protocol in replicated mode
+    */
+   public static final class TotalOrderAllNodesLogic extends AllNodesLogic {
+
+      @Override
+      public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator,
+                                                                     TxInvocationContext context,
+                                                                     VersionedPrepareCommand prepareCommand) {
+         if (context.isOriginLocal()) {
+            throw new IllegalStateException("This must not be reached");
+         }
+
+         EntryVersionsMap updatedVersionMap;
+
+         if (!prepareCommand.isSkipWriteSkewCheck()) {
+            updatedVersionMap = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
+                                                                          versionGenerator, context, keySpecificLogic);
+         } else {
+            updatedVersionMap = returnNewVersions(prepareCommand, versionGenerator, context, keySpecificLogic);
+         }
+
+         context.getCacheTransaction().setUpdatedEntryVersions(updatedVersionMap);
+         return updatedVersionMap;
+      }
+   }
+
+   /**
+    * Logic for the total order protocol in distribution mode
+    */
+   public static final class TotalOrderDistributionLogic extends DistributionLogic {
+
+      @Override
+      public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator,
+                                                                     TxInvocationContext context,
+                                                                     VersionedPrepareCommand prepareCommand) {
+         if (context.isOriginLocal()) {
+            throw new IllegalStateException("This must not be reached");
+         }
+
+         EntryVersionsMap updatedVersionMap;
+
+         if (!prepareCommand.isSkipWriteSkewCheck()) {
+            updatedVersionMap = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
+                                                                          versionGenerator, context, keySpecificLogic);
+         } else {
+            updatedVersionMap = returnNewVersions(prepareCommand, versionGenerator, context, keySpecificLogic);
+         }
+
+         context.getCacheTransaction().setUpdatedEntryVersions(updatedVersionMap);
+         return updatedVersionMap;
       }
    }
 }
