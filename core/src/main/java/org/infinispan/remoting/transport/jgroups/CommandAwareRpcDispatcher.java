@@ -23,7 +23,6 @@
 package org.infinispan.remoting.transport.jgroups;
 
 import net.jcip.annotations.GuardedBy;
-
 import org.infinispan.CacheException;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
@@ -47,24 +46,16 @@ import org.jgroups.blocks.RequestOptions;
 import org.jgroups.blocks.ResponseMode;
 import org.jgroups.blocks.RpcDispatcher;
 import org.jgroups.blocks.RspFilter;
-import org.jgroups.util.Buffer;
-import org.jgroups.util.FutureListener;
-import org.jgroups.util.NotifyingFuture;
-import org.jgroups.util.Rsp;
-import org.jgroups.util.RspList;
+import org.jgroups.groups.GroupAddress;
+import org.jgroups.util.*;
 
 import java.io.NotSerializableException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.infinispan.util.Util.*;
@@ -189,6 +180,8 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
       //Pedro -- total order
       //indicates if the command must be sent with total order properties or not
       private final boolean totalOrder;
+      //Pedro: the prepare command was created in a DIST mode cache
+      private final boolean distribution;
 
       private ReplicationTask(ReplicableCommand command, boolean oob, List<Address> dests,
                               ResponseMode mode, long timeout,
@@ -203,7 +196,13 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          this.broadcast = broadcast;
 
          //Pedro -- only the prepare commands can be sent in total order
-         this.totalOrder = (command instanceof PrepareCommand) && ((PrepareCommand) command).isTotalOrdered();
+         if (command instanceof PrepareCommand) {
+            this.totalOrder = ((PrepareCommand) command).isTotalOrdered();
+            this.distribution = ((PrepareCommand) command).isDistribution();
+         } else {
+            this.totalOrder = false;
+            this.distribution = false;
+         }
 
          if (command instanceof CommitCommand || command instanceof RollbackCommand) {
             this.oob = ((AbstractTransactionBoundaryCommand)command).isTotalOrdered();
@@ -250,7 +249,24 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
 
          RspList<Object> retval = null;
          Buffer buf;
-         if (broadcast || FORCE_MCAST) {
+
+         //Pedro: check if the prepare command must be sent with Total Order Multicast primitive
+         if (distribution && totalOrder) {
+            RequestOptions opts = new RequestOptions();
+            opts.setMode(mode);
+            opts.setTimeout(timeout);
+            opts.setRspFilter(filter);
+            opts.setAnycasting(false);
+
+            buf = marshallCall();
+            Message message = constructMessage(buf, null);
+
+            GroupAddress groupAddress = new GroupAddress();
+            groupAddress.addAllAddress(dests);
+            message.setDest(groupAddress);
+
+            retval = castMessage(dests, message, opts);
+         } else  if (broadcast || FORCE_MCAST) {
             RequestOptions opts = new RequestOptions();
             opts.setMode(mode);
             opts.setTimeout(timeout);

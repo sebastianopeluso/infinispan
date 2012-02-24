@@ -256,7 +256,7 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
       }
 
       //for now, only supports full replication
-      if(!clustering().cacheMode().isReplicated()) {
+      if(!clustering().cacheMode().isReplicated() && !clustering().cacheMode().isDistributed()) {
          throw new ConfigurationException("the cache mode [" + clustering().cacheMode() + "] is not supported " +
                "with total order protocol");
       }

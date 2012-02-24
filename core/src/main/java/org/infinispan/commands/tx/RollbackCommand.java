@@ -25,8 +25,8 @@ package org.infinispan.commands.tx;
 import org.infinispan.commands.Visitor;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
-import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
+import org.infinispan.transaction.xa.GlobalTransaction;
 
 /**
  * Command corresponding to a transaction rollback.
@@ -35,61 +35,67 @@ import org.infinispan.transaction.RemoteTransaction;
  * @since 4.0
  */
 public class RollbackCommand extends AbstractTransactionBoundaryCommand {
-    public static final byte COMMAND_ID = 13;
+   public static final byte COMMAND_ID = 13;
 
-    //Pedro -- check if the rollback command should be send over the cluster
-    private transient boolean shouldInvokedRemotely = true;
+   //Pedro -- check if the rollback command should be send over the cluster
+   private transient boolean shouldInvokedRemotely = true;
 
-    private RollbackCommand() {
-        super(null); // For command id uniqueness test
-    }
+   private RollbackCommand() {
+      super(null); // For command id uniqueness test
+   }
 
-    public RollbackCommand(String cacheName, GlobalTransaction globalTransaction) {
-        super(cacheName);
-        this.globalTx = globalTransaction;
-    }
+   public RollbackCommand(String cacheName, GlobalTransaction globalTransaction) {
+      super(cacheName);
+      this.globalTx = globalTransaction;
+   }
 
-    public RollbackCommand(String cacheName) {
-        super(cacheName);
-    }
+   public RollbackCommand(String cacheName) {
+      super(cacheName);
+   }
 
-    public Object acceptVisitor(InvocationContext ctx, Visitor visitor) throws Throwable {
-        return visitor.visitRollbackCommand((TxInvocationContext) ctx, this);
-    }
+   public Object acceptVisitor(InvocationContext ctx, Visitor visitor) throws Throwable {
+      return visitor.visitRollbackCommand((TxInvocationContext) ctx, this);
+   }
 
-    @Override
-    public void visitRemoteTransaction(RemoteTransaction tx) {
-        tx.invalidate();
-    }
+   @Override
+   public void visitRemoteTransaction(RemoteTransaction tx) {
+      tx.invalidate();
+   }
 
-    public byte getCommandId() {
-        return COMMAND_ID;
-    }
+   public byte getCommandId() {
+      return COMMAND_ID;
+   }
 
-    @Override
-    public String toString() {
-        return "RollbackCommand {" + super.toString();
-    }
+   @Override
+   public String toString() {
+      return "RollbackCommand {" + super.toString();
+   }
 
-    //Pedro -- added new type of performing
+   //Pedro -- added new type of performing
 
-    @Override
-    public Object perform(InvocationContext ctx) throws Throwable {
-        if (totalOrdered) {
-            return super.performIgnoringUnexistingTransaction(ctx);
-        } else {
-            return super.perform(ctx);
-        }
-    }
+   @Override
+   public Object perform(InvocationContext ctx) throws Throwable {
+      if (isOOB()) {
+         return super.performIgnoringUnexistingTransaction(ctx);
+      } else {
+         return super.perform(ctx);
+      }
+   }
 
-    //Pedro -- setter and getter
+   //Pedro -- setter and getter
 
-    public boolean shouldInvokedRemotely() {
-        return shouldInvokedRemotely;
-    }
+   public boolean shouldInvokedRemotely() {
+      return shouldInvokedRemotely;
+   }
 
-    public void setShouldInvokedRemotely(boolean shouldInvokedRemotely) {
-        this.shouldInvokedRemotely = shouldInvokedRemotely;
-    }
+   public void setShouldInvokedRemotely(boolean shouldInvokedRemotely) {
+      this.shouldInvokedRemotely = shouldInvokedRemotely;
+   }
 
+   @Override
+   public void setTOFlags(boolean totalOrder, boolean distribution) {
+      if (totalOrder) {
+         setFlag(TO_OOB);
+      }
+   }
 }

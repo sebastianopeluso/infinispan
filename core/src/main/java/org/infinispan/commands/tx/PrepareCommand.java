@@ -38,11 +38,7 @@ import org.infinispan.transaction.xa.recovery.RecoveryManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Command corresponding to the 1st phase of 2PC.
@@ -65,6 +61,7 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
    private transient boolean replayEntryWrapping  = false;
 
    private static final WriteCommand[] EMPTY_WRITE_COMMAND_ARRAY = new WriteCommand[0];
+
 
    public void initialize(CacheNotifier notifier, RecoveryManager recoveryManager) {
       this.notifier = notifier;
@@ -159,9 +156,7 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       Object[] retval = new Object[numMods + params];
       retval[i++] = globalTx;
       retval[i++] = onePhaseCommit;
-      retval[i++] = numMods;
-      //Pedro -- send the parameter
-      retval[i] = totalOrdered;
+      retval[i] = numMods;
       if (numMods > 0) System.arraycopy(modifications, 0, retval, params, numMods);
       return retval;
    }
@@ -173,8 +168,6 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       globalTx = (GlobalTransaction) args[i++];
       onePhaseCommit = (Boolean) args[i++];
       int numMods = (Integer) args[i++];
-      //Pedro -- receive the parameter
-      totalOrdered = (Boolean) args[i++];
       if (numMods > 0) {
          modifications = new WriteCommand[numMods];
          System.arraycopy(args, i, modifications, 0, numMods);
@@ -194,7 +187,6 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       return "PrepareCommand {" +
             "modifications=" + (modifications == null ? null : Arrays.asList(modifications)) +
             ", onePhaseCommit=" + onePhaseCommit +
-            ", totalOrder=" + totalOrdered +
             ", " + super.toString();
    }
 
@@ -245,7 +237,19 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       return false;
    }
 
+   //Pedro: setter
    public void setOnePhaseCommit(boolean onePhaseCommit) {
       this.onePhaseCommit = onePhaseCommit;
+   }
+
+   //Pedro: override
+   @Override
+   public void setTOFlags(boolean totalOrder, boolean distribution) {
+      if (totalOrder) {
+         setFlag(TO_SEND);
+      }
+      if (distribution) {
+         setFlag(TO_DIST);
+      }
    }
 }

@@ -59,7 +59,18 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    //Pedro -- meaning:
    // PrepareCommand: this command must be sent in total order...
    // Commit/RollbackCommand: this command must be sent in OOB to obtain faster commit
-   protected boolean totalOrdered = false;
+   //protected boolean totalOrdered = false;
+   //Pedro: flags for total order based protocols
+
+   //Pedro
+   //for prepare command: with this flag, it will be send with Total Order properties
+   protected final byte TO_SEND = 1;
+   //for commit and rollback command: they will be sent with the flag OOB
+   protected final byte TO_OOB = 1 << 1;
+   //for prepare command: it indicates that it must use Total Order Multicast protocol
+   protected final byte TO_DIST = 1 << 2;
+   //Pedro: flags for this command
+   private byte totalOrderFlags = 0;
 
    public AbstractTransactionBoundaryCommand(String cacheName) {
       this.cacheName = cacheName;
@@ -182,6 +193,7 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    public String toString() {
       return "gtx=" + globalTx +
             ", cacheName='" + cacheName + '\'' +
+            ", flags=" + TOBFlags2String() +
             '}';
    }
 
@@ -205,10 +217,36 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    //Pedro -- setter and getter
 
    public boolean isTotalOrdered() {
-      return totalOrdered;
+      return (totalOrderFlags & TO_SEND) != 0;
    }
 
-   public void setTotalOrdered(boolean totalOrdered) {
-      this.totalOrdered = totalOrdered;
+   public boolean isOOB() {
+      return (totalOrderFlags & TO_OOB) != 0;
+   }
+
+   public boolean isDistribution() {
+      return (totalOrderFlags & TO_DIST) != 0;
+   }
+
+   public void setTOFlags(boolean totalOrder, boolean distribution) {
+      //no-op
+   }
+
+   protected void setFlag(byte flag) {
+      this.totalOrderFlags |= flag;
+   }
+
+   private String TOBFlags2String() {
+      StringBuilder sb = new StringBuilder();
+      if (isTotalOrdered()) {
+         sb.append(",TO_SEND");
+      }
+      if (isDistribution()) {
+         sb.append(",TO_DIST");
+      }
+      if (isOOB()) {
+         sb.append(",TO_OOB");
+      }
+      return sb.length() != 0 ? sb.substring(1) : "NONE";
    }
 }
