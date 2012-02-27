@@ -27,9 +27,6 @@ import org.infinispan.CacheException;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.commands.tx.AbstractTransactionBoundaryCommand;
-import org.infinispan.commands.tx.CommitCommand;
-import org.infinispan.commands.tx.PrepareCommand;
-import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.RpcException;
 import org.infinispan.remoting.responses.ExceptionResponse;
@@ -196,17 +193,13 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          this.broadcast = broadcast;
 
          //Pedro -- only the prepare commands can be sent in total order
-         if (command instanceof PrepareCommand) {
-            this.totalOrder = ((PrepareCommand) command).isTotalOrdered();
-            this.distribution = ((PrepareCommand) command).isDistribution();
+         if (command instanceof AbstractTransactionBoundaryCommand) {
+            this.totalOrder = ((AbstractTransactionBoundaryCommand) command).isTotalOrdered();
+            this.distribution = ((AbstractTransactionBoundaryCommand) command).isDistribution();
+            this.oob = ((AbstractTransactionBoundaryCommand) command).isOOB();
          } else {
             this.totalOrder = false;
             this.distribution = false;
-         }
-
-         if (command instanceof CommitCommand || command instanceof RollbackCommand) {
-            this.oob = ((AbstractTransactionBoundaryCommand)command).isTotalOrdered();
-         } else {
             this.oob = oob;
          }
       }
@@ -263,6 +256,8 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
 
             GroupAddress groupAddress = new GroupAddress();
             groupAddress.addAllAddress(dests);
+            //I need to add myself to this list, otherwise we will be blocked forever
+            groupAddress.addAddress(getChannel().getAddress());
             message.setDest(groupAddress);
 
             retval = castMessage(dests, message, opts);
