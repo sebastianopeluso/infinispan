@@ -267,7 +267,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
 
       if(needsTotalOrder && !hasTotalOrderProtocol()) {
          //Pedro --  in total order, the Sequencer must be in the protocol stack
-         throw new CacheException("Total Order protocol needs the sequencer enabled in JGroups");
+         throw new CacheException("Total Order protocol needs a protocol that ensures total order properties in JGroups");
       }
 
       // if we have a TopologyAwareConsistentHash, we need to set our own address generator in
