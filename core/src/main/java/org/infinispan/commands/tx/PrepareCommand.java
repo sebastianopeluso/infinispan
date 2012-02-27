@@ -152,7 +152,7 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
    public Object[] getParameters() {
       int numMods = modifications == null ? 0 : modifications.length;
       int i = 0;
-      final int params = 4;
+      final int params = 3;
       Object[] retval = new Object[numMods + params];
       retval[i++] = globalTx;
       retval[i++] = onePhaseCommit;

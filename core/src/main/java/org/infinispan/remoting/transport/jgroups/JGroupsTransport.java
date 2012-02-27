@@ -50,6 +50,7 @@ import org.jgroups.View;
 import org.jgroups.blocks.RspFilter;
 import org.jgroups.jmx.JmxConfigurator;
 import org.jgroups.protocols.SEQUENCER;
+import org.jgroups.protocols.pmcast.GROUP_MULTICAST;
 import org.jgroups.stack.AddressGenerator;
 import org.jgroups.util.Rsp;
 import org.jgroups.util.RspList;
@@ -637,6 +638,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
     * @return true if a total order protocol exists, false otherwise
     */
    private boolean hasTotalOrderProtocol() {
-      return channel.getProtocolStack().findProtocol(SEQUENCER.class) != null;
+      return channel.getProtocolStack().findProtocol(SEQUENCER.class) != null ||
+            channel.getProtocolStack().findProtocol(GROUP_MULTICAST.class) != null;
    }
 }
