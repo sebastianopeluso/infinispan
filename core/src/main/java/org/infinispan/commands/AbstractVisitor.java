@@ -31,6 +31,7 @@ import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.commands.tx.PrepareResponseCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.write.ApplyDeltaCommand;
 import org.infinispan.commands.write.ClearCommand;
@@ -127,6 +128,12 @@ public abstract class AbstractVisitor implements Visitor {
    
    public Object visitInvalidateL1Command(InvocationContext ctx, InvalidateL1Command invalidateL1Command) throws Throwable {
 	   return visitInvalidateCommand(ctx, invalidateL1Command);
+   }
+
+   //Pedro
+   @Override
+   public Object visitPrepareResponseCommand(TxInvocationContext ctx, PrepareResponseCommand command) throws Throwable {
+      return handleDefault(ctx, command);
    }
 
    /**

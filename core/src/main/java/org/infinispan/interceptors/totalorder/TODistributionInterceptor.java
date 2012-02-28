@@ -1,10 +1,14 @@
 package org.infinispan.interceptors.totalorder;
 
 import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.commands.tx.PrepareResponseCommand;
 import org.infinispan.commands.tx.RollbackCommand;
+import org.infinispan.commands.tx.VersionedPrepareCommand;
+import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.impl.TxInvocationContext;
-import org.infinispan.interceptors.DistributionInterceptor;
+import org.infinispan.interceptors.VersionedDistributionInterceptor;
 import org.infinispan.remoting.RpcException;
+import org.infinispan.remoting.responses.SuccessfulResponse;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.util.Util;
@@ -12,6 +16,10 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
+import java.util.Collections;
+
+import static org.infinispan.transaction.WriteSkewHelper.readVersionsFromResponse;
+import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepareCommand;
 
 /**
  * // TODO: Document this
@@ -19,7 +27,7 @@ import java.util.Collection;
  * @author pruivo
  * @since 4.0
  */
-public class TODistributionInterceptor extends DistributionInterceptor {
+public class TODistributionInterceptor extends VersionedDistributionInterceptor {
 
    private static final Log log = LogFactory.getLog(TODistributionInterceptor.class);
 
@@ -46,6 +54,7 @@ public class TODistributionInterceptor extends DistributionInterceptor {
          log.tracef("Total Order Multicast transaction %s with Total Order", globalTransactionString);
       }
 
+      setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
       rpcManager.invokeRemotely(recipients, command, false);
 
       if(sync) {
@@ -57,7 +66,12 @@ public class TODistributionInterceptor extends DistributionInterceptor {
          //this is only invoked in local context
          LocalTransaction localTransaction = (LocalTransaction) ctx.getCacheTransaction();
          try {
-            localTransaction.awaitUntilModificationsApplied(configuration.getSyncReplTimeout());
+            Object retVal = localTransaction.awaitUntilModificationsApplied();
+            if (retVal instanceof EntryVersionsMap) {
+                readVersionsFromResponse(new SuccessfulResponse(retVal), ctx.getCacheTransaction());
+            } else {
+                throw new IllegalStateException("This must not happen! we must receive the versions");
+            }
          } catch (Throwable throwable) {
             throw new RpcException(throwable);
          } finally {
@@ -78,4 +92,11 @@ public class TODistributionInterceptor extends DistributionInterceptor {
       return invokeNextInterceptor(ctx, command);
    }
 
+   @Override
+   public Object visitPrepareResponseCommand(TxInvocationContext ctx, PrepareResponseCommand command) throws Throwable {
+      Collection<Address> dest = Collections.singleton(command.getGlobalTransaction().getAddress());
+      Object retVal = invokeNextInterceptor(ctx, command);
+      rpcManager.invokeRemotely(dest, command, false);
+      return retVal;
+   }
 }

@@ -27,13 +27,7 @@ import org.infinispan.atomic.Delta;
 import org.infinispan.commands.control.LockControlCommand;
 import org.infinispan.commands.control.StateTransferControlCommand;
 import org.infinispan.commands.module.ModuleCommandInitializer;
-import org.infinispan.commands.read.DistributedExecuteCommand;
-import org.infinispan.commands.read.EntrySetCommand;
-import org.infinispan.commands.read.GetKeyValueCommand;
-import org.infinispan.commands.read.KeySetCommand;
-import org.infinispan.commands.read.MapReduceCommand;
-import org.infinispan.commands.read.SizeCommand;
-import org.infinispan.commands.read.ValuesCommand;
+import org.infinispan.commands.read.*;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
@@ -41,22 +35,8 @@ import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
-import org.infinispan.commands.tx.CommitCommand;
-import org.infinispan.commands.tx.PrepareCommand;
-import org.infinispan.commands.tx.RollbackCommand;
-import org.infinispan.commands.tx.VersionedCommitCommand;
-import org.infinispan.commands.tx.VersionedPrepareCommand;
-import org.infinispan.commands.write.ApplyDeltaCommand;
-import org.infinispan.commands.write.ClearCommand;
-import org.infinispan.commands.write.EvictCommand;
-import org.infinispan.commands.write.InvalidateCommand;
-import org.infinispan.commands.write.InvalidateL1Command;
-import org.infinispan.commands.write.PutKeyValueCommand;
-import org.infinispan.commands.write.PutMapCommand;
-import org.infinispan.commands.write.RemoveCommand;
-import org.infinispan.commands.write.ReplaceCommand;
-import org.infinispan.commands.write.VersionedPutKeyValueCommand;
-import org.infinispan.commands.write.WriteCommand;
+import org.infinispan.commands.tx.*;
+import org.infinispan.commands.write.*;
 import org.infinispan.config.Configuration;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.InternalEntryFactory;
@@ -391,6 +371,11 @@ public class CommandsFactoryImpl implements CommandsFactory {
             break;
          case ApplyDeltaCommand.COMMAND_ID:
             break;
+         //Pedro
+         case PrepareResponseCommand.COMMAND_ID:
+            PrepareResponseCommand prc = (PrepareResponseCommand) c;
+            prc.init(interceptorChain, icc, txTable);
+            break;
          default:
             ModuleCommandInitializer mci = moduleCommandInitializers.get(c.getCommandId());
             if (mci != null) {
@@ -466,5 +451,12 @@ public class CommandsFactoryImpl implements CommandsFactory {
    @Override
    public ApplyDeltaCommand buildApplyDeltaCommand(Object deltaAwareValueKey, Delta delta, Collection keys) {
       return new ApplyDeltaCommand(deltaAwareValueKey, delta, keys);
+   }
+
+
+   //Pedro
+   @Override
+   public PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction) {
+      return new PrepareResponseCommand(cacheName, globalTransaction);
    }
 }

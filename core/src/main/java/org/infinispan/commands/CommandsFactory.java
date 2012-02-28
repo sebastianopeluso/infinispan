@@ -39,11 +39,7 @@ import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
-import org.infinispan.commands.tx.CommitCommand;
-import org.infinispan.commands.tx.PrepareCommand;
-import org.infinispan.commands.tx.RollbackCommand;
-import org.infinispan.commands.tx.VersionedCommitCommand;
-import org.infinispan.commands.tx.VersionedPrepareCommand;
+import org.infinispan.commands.tx.*;
 import org.infinispan.commands.write.*;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
@@ -370,4 +366,7 @@ public interface CommandsFactory {
     * @see ApplyDeltaCommand
     */
    ApplyDeltaCommand buildApplyDeltaCommand(Object deltaAwareValueKey, Delta delta, Collection keys);
+
+   //Pedro
+   PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction);
 }

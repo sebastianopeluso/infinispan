@@ -122,7 +122,13 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
 
       //Pedro -- load total order interceptor (question: this must be placed before or after StateTransfer??)
       if(configuration.isTotalOrder()) {
-         interceptorChain.appendInterceptor(createInterceptor(new TotalOrderInterceptor(), TotalOrderInterceptor.class), false);
+         if (configuration.getCacheMode().isDistributed()) {
+            interceptorChain.appendInterceptor(createInterceptor(new DistTotalOrderInterceptor(),
+                  DistTotalOrderInterceptor.class), false);
+         } else {
+            interceptorChain.appendInterceptor(createInterceptor(new TotalOrderInterceptor(),
+                  TotalOrderInterceptor.class), false);
+         }
       }
 
       // load the tx interceptor
@@ -216,7 +222,12 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             break;
          case DIST_SYNC:
             if (needsVersionAwareComponents) {
-               interceptorChain.appendInterceptor(createInterceptor(new VersionedDistributionInterceptor(), VersionedDistributionInterceptor.class), false);
+               if (configuration.isTotalOrder()) {
+                  interceptorChain.appendInterceptor(createInterceptor(new TODistributionInterceptor(),
+                        TODistributionInterceptor.class), false);
+               } else {
+                  interceptorChain.appendInterceptor(createInterceptor(new VersionedDistributionInterceptor(), VersionedDistributionInterceptor.class), false);
+               }
                break;
             }
          case DIST_ASYNC:

@@ -39,20 +39,8 @@ import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
-import org.infinispan.commands.tx.CommitCommand;
-import org.infinispan.commands.tx.PrepareCommand;
-import org.infinispan.commands.tx.RollbackCommand;
-import org.infinispan.commands.tx.VersionedCommitCommand;
-import org.infinispan.commands.tx.VersionedPrepareCommand;
-import org.infinispan.commands.write.ApplyDeltaCommand;
-import org.infinispan.commands.write.ClearCommand;
-import org.infinispan.commands.write.InvalidateCommand;
-import org.infinispan.commands.write.InvalidateL1Command;
-import org.infinispan.commands.write.PutKeyValueCommand;
-import org.infinispan.commands.write.PutMapCommand;
-import org.infinispan.commands.write.RemoveCommand;
-import org.infinispan.commands.write.ReplaceCommand;
-import org.infinispan.commands.write.VersionedPutKeyValueCommand;
+import org.infinispan.commands.tx.*;
+import org.infinispan.commands.write.*;
 import org.infinispan.factories.GlobalComponentRegistry;
 import org.infinispan.factories.KnownComponentNames;
 import org.infinispan.factories.annotations.ComponentName;
@@ -139,7 +127,7 @@ public class RemoteCommandsFactory {
                break;
             case ApplyDeltaCommand.COMMAND_ID:
                command = new ApplyDeltaCommand();
-               break;      
+               break;
             default:
                throw new CacheException("Unknown command id " + id + "!");
          }
@@ -217,7 +205,11 @@ public class RemoteCommandsFactory {
                break;
             case CacheViewControlCommand.COMMAND_ID:
                command = new CacheViewControlCommand(cacheName);
-               break;                      
+               break;
+            //Pedro
+            case PrepareResponseCommand.COMMAND_ID:
+               command = new PrepareResponseCommand(cacheName);
+               break;
             default:
                throw new CacheException("Unknown command id " + id + "!");
          }

@@ -258,6 +258,11 @@ public interface ClusteringDependentLogic {
             throw new IllegalStateException("This must not be reached");
          }
 
+         if (context.hasFlag(Flag.SKIP_WRITE_SKEW_CHECK)) {
+            //the context, already has the new versions
+            return context.getCacheTransaction().getUpdatedEntryVersions();
+         }
+
          EntryVersionsMap updatedVersionMap = new EntryVersionsMap();
          EntryVersionsMap versionsSeenMap = prepareCommand.getVersionsSeen();
 
@@ -268,9 +273,7 @@ public interface ClusteringDependentLogic {
             IncrementableEntryVersion originalLocalVersion = (IncrementableEntryVersion) entry.getVersion();
             entry.setVersion(versionsSeenMap.get(key));
 
-            if (context.hasFlag(Flag.SKIP_WRITE_SKEW_CHECK) ||
-                  !entry.isMarkedForWriteSkew() ||
-                  entry.performWriteSkewCheck(dataContainer)) {
+            if (!entry.isMarkedForWriteSkew() || entry.performWriteSkewCheck(dataContainer)) {
                IncrementableEntryVersion newVersion = createNewVersion(originalLocalVersion,
                      (IncrementableEntryVersion) entry.getVersion(),
                      versionGenerator);
