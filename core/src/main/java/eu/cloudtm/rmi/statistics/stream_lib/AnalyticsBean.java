@@ -159,38 +159,42 @@ public class AnalyticsBean {
 
     public void resetAll(){
         synchronized (remoteGet){
-            remoteGet = new StreamSummary<Object>(MAX_CAPACITY);
+            remoteGet = createNewStreamSummary();
         }
         synchronized (remotePut){
-            remotePut = new StreamSummary<Object>(MAX_CAPACITY);
+            remotePut = createNewStreamSummary();
         }
         synchronized (localPut){
-            localPut = new StreamSummary<Object>(MAX_CAPACITY);
+            localPut = createNewStreamSummary();
         }
         synchronized (localGet){
-            localGet = new StreamSummary<Object>(MAX_CAPACITY);
+            localGet = createNewStreamSummary();
         }
         synchronized (mostContendedKey){
-            mostContendedKey = new StreamSummary<Object>(MAX_CAPACITY);
+            mostContendedKey = createNewStreamSummary();
         }
         synchronized (mostFailedKey){
-            mostFailedKey = new StreamSummary<Object>(MAX_CAPACITY);
+            mostFailedKey = createNewStreamSummary();
         }
         synchronized (mostLockedKey){
-            mostLockedKey = new StreamSummary<Object>(MAX_CAPACITY);
+            mostLockedKey = createNewStreamSummary();
         }
 
     }
 
     public void resetStat(Stat stat){
         switch (stat){
-            case REMOTE_GET: remoteGet = new StreamSummary<Object>(MAX_CAPACITY);
-            case LOCAL_GET: localGet = new StreamSummary<Object>(MAX_CAPACITY);
-            case REMOTE_PUT: remotePut = new StreamSummary<Object>(MAX_CAPACITY);
-            case LOCAL_PUT: localPut = new StreamSummary<Object>(MAX_CAPACITY);
-            case MOST_LOCKED_KEYS: mostLockedKey = new StreamSummary<Object>(MAX_CAPACITY);
-            case MOST_FAILED_KEYS: mostFailedKey = new StreamSummary<Object>(MAX_CAPACITY);
-            case MOST_CONTENDED_KEYS: mostContendedKey = new StreamSummary<Object>(MAX_CAPACITY);
+            case REMOTE_GET: remoteGet = createNewStreamSummary();
+            case LOCAL_GET: localGet = createNewStreamSummary();
+            case REMOTE_PUT: remotePut = createNewStreamSummary();
+            case LOCAL_PUT: localPut = createNewStreamSummary();
+            case MOST_LOCKED_KEYS: mostLockedKey = createNewStreamSummary();
+            case MOST_FAILED_KEYS: mostFailedKey = createNewStreamSummary();
+            case MOST_CONTENDED_KEYS: mostContendedKey = createNewStreamSummary();
         }
     }
+
+   private StreamSummary<Object> createNewStreamSummary() {
+      return new StreamSummary<Object>(Math.max(MAX_CAPACITY, capacity));
+   }
 }
