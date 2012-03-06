@@ -879,4 +879,8 @@ public interface Log extends BasicLogger {
    @Message(value = "Timeout while waiting for the transaction validation. The command will not be processed. " +
          "Transaction is %s", id = 193)
    void timeoutWaitingUntilTransactionPrepared(String globalTx);
+
+   @LogMessage(level = WARN)
+   @Message(value = "Cannot insert jgroups sequencer", id = 190)
+   void cannotInsertJGroupsSequencer(@Cause Throwable t);
 }

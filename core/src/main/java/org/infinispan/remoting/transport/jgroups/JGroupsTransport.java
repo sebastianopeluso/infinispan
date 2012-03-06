@@ -26,6 +26,7 @@ import org.infinispan.CacheConfigurationException;
 import org.infinispan.CacheException;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.config.ConfigurationException;
 import org.infinispan.config.parsing.XmlConfigHelper;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.jmx.JmxUtil;
@@ -54,7 +55,9 @@ import org.jgroups.View;
 import org.jgroups.blocks.RspFilter;
 import org.jgroups.jmx.JmxConfigurator;
 import org.jgroups.protocols.SEQUENCER;
+import org.jgroups.protocols.pbcast.GMS;
 import org.jgroups.stack.AddressGenerator;
+import org.jgroups.stack.ProtocolStack;
 import org.jgroups.util.Rsp;
 import org.jgroups.util.RspList;
 import org.jgroups.util.TopologyUUID;
@@ -686,7 +689,18 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
    }
 
    @Override
-   public boolean hasCommunicationWithTotalOrderProperties() {
-      return channel.getProtocolStack().findProtocol(SEQUENCER.class) != null;
+   public final void checkOrFixTotalOrderSupport() {
+      ProtocolStack protocolStack = channel.getProtocolStack();
+      boolean hasSequencer = protocolStack.findProtocol(SEQUENCER.class) != null;
+      if (!hasSequencer && protocolStack.findProtocol(GMS.class) != null) {
+         try {
+            protocolStack.insertProtocol(new SEQUENCER(), ProtocolStack.ABOVE, GMS.class);
+            log.trace("JGroups SEQUENCER not found, but added to the protocol stack.");
+         } catch (Exception e) {
+            log.cannotInsertJGroupsSequencer(e);
+            throw new ConfigurationException("The total order needs requires the SEQUENCER protocol to be present " +
+                                                   "in jgroups configuration");
+         }
+      }
    }
 }

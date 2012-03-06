@@ -31,7 +31,6 @@ import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.config.Configuration;
-import org.infinispan.config.ConfigurationException;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
@@ -117,9 +116,7 @@ public class RpcManagerImpl implements RpcManager {
       stateTransferEnabled = configuration.isStateTransferEnabled();
       statisticsEnabled = configuration.isExposeJmxStatistics();
 
-      if (configuration.isTotalOrder() && !t.hasCommunicationWithTotalOrderProperties()) {
-         throw new ConfigurationException("The Total Order needs a transport with total order deliver properties");
-      }
+      if (configuration.isTotalOrder()) t.checkOrFixTotalOrderSupport();
    }
 
    @ManagedAttribute(description = "Retrieves the committed view.")
