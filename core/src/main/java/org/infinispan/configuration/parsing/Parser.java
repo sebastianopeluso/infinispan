@@ -72,17 +72,17 @@ import java.util.Properties;
 import static org.infinispan.configuration.cache.CacheMode.*;
 
 public class Parser {
-
-   private static final Log log = LogFactory.getLog(Parser.class);
+   
+   private static final Log log = LogFactory.getLog(Parser.class); 
 
    private static void safeClose(final Closeable closeable) {
       if (closeable != null) try {
-         closeable.close();
+          closeable.close();
       } catch (Throwable t) {
-         log.failedToCloseResource(t);
+          log.failedToCloseResource(t);
       }
    }
-
+   
    private static String replaceSystemProperties(String value) {
       int dollar = value.indexOf('$');
       if (dollar >= 0 && value.indexOf('{', dollar) > 0 && value.indexOf('}', dollar) > 0) {
@@ -95,145 +95,145 @@ public class Parser {
          return value;
       }
    }
-
+   
    private final ClassLoader cl;
 
    public Parser(ClassLoader cl) {
       this.cl = cl;
    }
-
+   
    public ConfigurationBuilderHolder parseFile(String filename) {
       return parseFiles(Collections.singletonList(filename));
    }
-
+   
    /**
     * This will parse all the filenames in order overriding at each the global
     * and default cache settings.  Once all the default cache settings are
     * read, then the named caches for each file will be applied as a named cache
     * with the default cache settings as a base going through each file.
-    *
-    * @param filenames The file names, each might be the name of the file (too
+    * 
+    * @param filenames The file names, each might be the name of the file (too 
     *        look it up in the class path) or an url to a file.
-    * @return ConfigurationBuilderHolder with all the values applied and
+    * @return ConfigurationBuilderHolder with all the values applied and 
     *         overridden according to ordering of files
     */
    public ConfigurationBuilderHolder parseFiles(List<String> filenames) {
-      FileLookup fileLookup = FileLookupFactory.newInstance();
-      List<InputStream> streams = new ArrayList<InputStream>(filenames.size());
-      for (String filename : filenames) {
-         streams.add(fileLookup.lookupFile(filename, cl));
-      }
-      return parse(streams);
+       FileLookup fileLookup = FileLookupFactory.newInstance();
+       List<InputStream> streams = new ArrayList<InputStream>(filenames.size());
+       for (String filename : filenames) {
+           streams.add(fileLookup.lookupFile(filename, cl));
+       }
+       return parse(streams);
    }
-
+   
    public ConfigurationBuilderHolder parse(InputStream is) {
       return parse(Collections.singletonList(is));
    }
-
+   
    /**
     * This will parse all the streams in order overriding at each the global
     * and default cache settings.  Once all the default cache settings are
     * read, then the named caches for each stream will be applied as a named cache
     * in order with the default cache settings as a base going through each file.
-    *
+    * 
     * @param streams The streams each containing data pertaining to an infinispan
     *        configuration xml file
-    * @return ConfigurationBuilderHolder with all the values applied and
+    * @return ConfigurationBuilderHolder with all the values applied and 
     *         overridden according to ordering of streams
     */
    public ConfigurationBuilderHolder parse(List<? extends InputStream> streams) {
-      try {
-         List<XMLStreamReader> streamReaders = new ArrayList<XMLStreamReader>(
-               streams.size());
-         try {
-            for (InputStream is : streams) {
-               BufferedInputStream input = new BufferedInputStream(is);
-               XMLStreamReader streamReader = XMLInputFactory.newInstance().createXMLStreamReader(input);
-               streamReaders.add(streamReader);
-            }
-            ConfigurationBuilderHolder holder = doParse(streamReaders);
-            for (XMLStreamReader reader : streamReaders) {
-               reader.close();
-            }
-            return holder;
-         }
-         finally {
-            for (InputStream is : streams) {
-               safeClose(is);
-            }
-         }
-      } catch (ConfigurationException e) {
-         throw e;
-      } catch (Exception e) {
-         throw new ConfigurationException(e);
-      }
+       try {
+           List<XMLStreamReader> streamReaders = new ArrayList<XMLStreamReader>(
+                 streams.size());
+           try {
+               for (InputStream is : streams) {
+                   BufferedInputStream input = new BufferedInputStream(is);
+                   XMLStreamReader streamReader = XMLInputFactory.newInstance().createXMLStreamReader(input);
+                   streamReaders.add(streamReader);
+               }
+               ConfigurationBuilderHolder holder = doParse(streamReaders);
+               for (XMLStreamReader reader : streamReaders) {
+                   reader.close();
+               }
+               return holder;
+           }
+           finally {
+               for (InputStream is : streams) {
+                   safeClose(is);
+               }
+           }
+        } catch (ConfigurationException e) {
+           throw e;
+        } catch (Exception e) {
+           throw new ConfigurationException(e);
+        }
    }
-
+   
    private ConfigurationBuilderHolder doParse(Iterable<? extends XMLStreamReader> readers) throws XMLStreamException {
-      ConfigurationBuilderHolder holder = new ConfigurationBuilderHolder();
-
-      for (XMLStreamReader reader : readers) {
-         Element root = ParseUtils.nextElement(reader);
-
-         if (!root.getLocalName().equals(Element.ROOT.getLocalName())) {
-            throw ParseUtils.missingRequiredElement(reader, Collections.singleton(Element.ROOT));
-         }
-
-         boolean onNamedCaches = false;
-         while (!onNamedCaches && reader.hasNext() &&
-               (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
-            Element element = Element.forName(reader.getLocalName());
-            switch (element) {
-               case DEFAULT: {
-                  parseDefaultCache(reader, holder.getDefaultConfigurationBuilder());
-                  break;
+       ConfigurationBuilderHolder holder = new ConfigurationBuilderHolder();
+       
+       for (XMLStreamReader reader : readers) {
+           Element root = ParseUtils.nextElement(reader);
+           
+           if (!root.getLocalName().equals(Element.ROOT.getLocalName())) {
+              throw ParseUtils.missingRequiredElement(reader, Collections.singleton(Element.ROOT));
+           }
+           
+           boolean onNamedCaches = false;
+           while (!onNamedCaches && reader.hasNext() && 
+                   (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
+              Element element = Element.forName(reader.getLocalName());
+              switch (element) {
+                 case DEFAULT: {
+                    parseDefaultCache(reader, holder.getDefaultConfigurationBuilder());
+                    break;
+                 }
+                 case GLOBAL: {
+                    parseGlobal(reader, holder.getGlobalConfigurationBuilder());
+                    break;
+                 }
+                 case NAMED_CACHE: {
+                    onNamedCaches = true;
+                    break;
+                 }
+                 default: {
+                    throw ParseUtils.unexpectedElement(reader);
+                 }
+              }
+           }
+       }
+       
+       for (XMLStreamReader reader : readers) {
+           // If this reader was previously on a named cache now apply them
+           // all after the default was parsed
+           if (Element.forName(reader.getLocalName()) == Element.NAMED_CACHE) {
+               // Parse the previously found named cache
+               parseNamedCache(reader, holder);
+               
+               while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
+                   Element element = Element.forName(reader.getLocalName());
+                   switch (element) {
+                   // We should only have named caches now
+                   case NAMED_CACHE: {
+                       parseNamedCache(reader, holder);
+                       break;
+                    }
+                    default: {
+                       throw ParseUtils.unexpectedElement(reader);
+                    }
+                   }
                }
-               case GLOBAL: {
-                  parseGlobal(reader, holder.getGlobalConfigurationBuilder());
-                  break;
-               }
-               case NAMED_CACHE: {
-                  onNamedCaches = true;
-                  break;
-               }
-               default: {
-                  throw ParseUtils.unexpectedElement(reader);
-               }
-            }
-         }
-      }
-
-      for (XMLStreamReader reader : readers) {
-         // If this reader was previously on a named cache now apply them
-         // all after the default was parsed
-         if (Element.forName(reader.getLocalName()) == Element.NAMED_CACHE) {
-            // Parse the previously found named cache
-            parseNamedCache(reader, holder);
-
-            while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
-               Element element = Element.forName(reader.getLocalName());
-               switch (element) {
-                  // We should only have named caches now
-                  case NAMED_CACHE: {
-                     parseNamedCache(reader, holder);
-                     break;
-                  }
-                  default: {
-                     throw ParseUtils.unexpectedElement(reader);
-                  }
-               }
-            }
-         }
-      }
-      return holder;
+           }
+       }
+       return holder;
    }
 
    private void parseNamedCache(XMLStreamReader reader, ConfigurationBuilderHolder holder) throws XMLStreamException {
-
+      
       ParseUtils.requireSingleAttribute(reader, Attribute.NAME.getLocalName());
-
+      
       String name = "";
-
+      
       for (int i = 0; i < reader.getAttributeCount(); i++) {
          ParseUtils.requireNoNamespaceAttribute(reader, i);
          String value = replaceSystemProperties(reader.getAttributeValue(i));
@@ -249,10 +249,10 @@ public class Parser {
       // Reuse the builder if it was made before
       ConfigurationBuilder builder = holder.getNamedConfigurationBuilders().get(name);
       if (builder == null) {
-         builder = holder.newConfigurationBuilder(name);
+          builder = holder.newConfigurationBuilder(name);
       }
       parseCache(reader, builder);
-
+      
    }
 
    private void parseDefaultCache(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
@@ -345,22 +345,22 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case AUTO_COMMIT:
-               builder.transaction().autoCommit(Boolean.valueOf(value));
+               builder.transaction().autoCommit(Boolean.parseBoolean(value));
                break;
             case CACHE_STOP_TIMEOUT:
                builder.transaction().cacheStopTimeout(Integer.valueOf(value));
                break;
             case EAGER_LOCK_SINGLE_NODE:
-               builder.transaction().eagerLockingSingleNode(Boolean.valueOf(value));
+               builder.transaction().eagerLockingSingleNode(Boolean.parseBoolean(value));
                break;
             case LOCKING_MODE:
                builder.transaction().lockingMode(LockingMode.valueOf(value));
                break;
             case SYNC_COMMIT_PHASE:
-               builder.transaction().syncCommitPhase(Boolean.valueOf(value));
+               builder.transaction().syncCommitPhase(Boolean.parseBoolean(value));
                break;
             case SYNC_ROLLBACK_PHASE:
-               builder.transaction().syncRollbackPhase(Boolean.valueOf(value));
+               builder.transaction().syncRollbackPhase(Boolean.parseBoolean(value));
                break;
             case TRANSACTION_MANAGER_LOOKUP_CLASS:
                builder.transaction().transactionManagerLookup(Util.<TransactionManagerLookup>getInstance(value, cl));
@@ -371,17 +371,19 @@ public class Parser {
                transactionModeSpecified = true;
                break;
             case USE_EAGER_LOCKING:
-               builder.transaction().useEagerLocking(Boolean.valueOf(value));
+               builder.transaction().useEagerLocking(Boolean.parseBoolean(value));
                break;
             case USE_SYNCHRONIZAION:
-               builder.transaction().useSynchronization(Boolean.valueOf(value));
+               builder.transaction().useSynchronization(Boolean.parseBoolean(value));
                break;
             case USE_1PC_FOR_AUTOCOMMIT_TX:
-               builder.transaction().use1PcForAutoCommitTransactions(Boolean.valueOf(value));
+               builder.transaction().use1PcForAutoCommitTransactions(Boolean.parseBoolean(value));
                break;
-            //Pedro -- this parameter activates the total order protocol
             case TRANSACTION_PROTOCOL:
                builder.transaction().transactionProtocol(TransactionProtocol.valueOf(value));
+               break;
+            case USE_1PC_IN_TOTAL_ORDER:
+               builder.transaction().use1PCInTotalOrder(Boolean.valueOf(value));
                break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
@@ -389,22 +391,18 @@ public class Parser {
       }
 
       if (!transactionModeSpecified && forceSetTransactional) builder.transaction().transactionMode(TransactionMode.TRANSACTIONAL);
-
+      
       while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
          Element element = Element.forName(reader.getLocalName());
          switch (element) {
             case RECOVERY:
                parseRecovery(reader, builder);
                break;
-            //Pedro -- total order
-            case TOTAL_ORDER_THREADING:
-               parseTotalOrderThreading(reader, builder);
-               break;
             default:
                throw ParseUtils.unexpectedElement(reader);
          }
       }
-
+      
    }
 
    private void parseRecovery(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
@@ -414,7 +412,7 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.transaction().recovery().enable();
                else
                   builder.transaction().recovery().disable();
@@ -426,37 +424,7 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
-      ParseUtils.requireNoContent(reader);
-   }
-
-   private void parseTotalOrderThreading(XMLStreamReader reader, ConfigurationBuilder builder)
-         throws XMLStreamException {
-      for (int i = 0; i < reader.getAttributeCount(); i++) {
-         ParseUtils.requireNoNamespaceAttribute(reader, i);
-         String value = replaceSystemProperties(reader.getAttributeValue(i));
-         Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
-         switch (attribute) {
-            case CORE_POOL_SIZE:
-               builder.transaction().totalOrderThreading().corePoolSize(Integer.valueOf(value));
-               break;
-            case MAXIMUM_POOL_SIZE:
-               builder.transaction().totalOrderThreading().maximumPoolSize(Integer.valueOf(value));
-               break;
-            case KEEP_ALIVE_TIME:
-               builder.transaction().totalOrderThreading().keepAliveTime(Long.valueOf(value));
-               break;
-            case QUEUE_SIZE:
-               builder.transaction().totalOrderThreading().queueSize(Integer.valueOf(value));
-               break;
-            case ONE_PHASE_COMMIT:
-               builder.transaction().totalOrderThreading().onePhaseCommit(Boolean.valueOf(value));
-               break;
-            default:
-               throw ParseUtils.unexpectedAttribute(reader, i);
-         }
-      }
-
+      
       ParseUtils.requireNoContent(reader);
    }
 
@@ -467,15 +435,15 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case UNRELIABLE_RETURN_VALUES:
-               builder.unsafe().unreliableReturnValues(Boolean.valueOf(value));
+               builder.unsafe().unreliableReturnValues(Boolean.parseBoolean(value));
                break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
-
+      
    }
 
    private void parseStoreAsBinary(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
@@ -485,24 +453,24 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.storeAsBinary().enable();
                else
                   builder.storeAsBinary().disable();
                break;
             case STORE_KEYS_AS_BINARY:
-               builder.storeAsBinary().storeKeysAsBinary(Boolean.valueOf(value));
+               builder.storeAsBinary().storeKeysAsBinary(Boolean.parseBoolean(value));
                break;
             case STORE_VALUES_AS_BINARY:
-               builder.storeAsBinary().storeValuesAsBinary(Boolean.valueOf(value));
+               builder.storeAsBinary().storeValuesAsBinary(Boolean.parseBoolean(value));
                break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
-
+      
    }
 
    private void parseLocking(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
@@ -521,18 +489,18 @@ public class Parser {
                builder.locking().lockAcquisitionTimeout(Long.valueOf(value));
                break;
             case USE_LOCK_STRIPING:
-               builder.locking().useLockStriping(Boolean.valueOf(value));
+               builder.locking().useLockStriping(Boolean.parseBoolean(value));
                break;
             case WRITE_SKEW_CHECK:
-               builder.locking().writeSkewCheck(Boolean.valueOf(value));
+               builder.locking().writeSkewCheck(Boolean.parseBoolean(value));
                break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
-
+      
    }
 
    private void parseLoaders(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
@@ -542,19 +510,19 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case PASSIVATION:
-               builder.loaders().passivation(Boolean.valueOf(value));
+               builder.loaders().passivation(Boolean.parseBoolean(value));
                break;
             case PRELOAD:
-               builder.loaders().preload(Boolean.valueOf(value));
+               builder.loaders().preload(Boolean.parseBoolean(value));
                break;
             case SHARED:
-               builder.loaders().shared(Boolean.valueOf(value));
+               builder.loaders().shared(Boolean.parseBoolean(value));
                break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
          Element element = Element.forName(reader.getLocalName());
          switch (element) {
@@ -574,7 +542,7 @@ public class Parser {
       Boolean purgeOnStartup = null;
       Integer purgerThreads = null;
       Boolean purgeSynchronously = null;
-
+      
       for (int i = 0; i < reader.getAttributeCount(); i++) {
          ParseUtils.requireNoNamespaceAttribute(reader, i);
          String value = replaceSystemProperties(reader.getAttributeValue(i));
@@ -597,12 +565,12 @@ public class Parser {
                break;
             case PURGE_SYNCHRONOUSLY:
                purgeSynchronously = Boolean.valueOf(value);
-               break;
+               break; 
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       if (loader != null) {
          if (loader instanceof FileCacheStore) {
             FileCacheStoreConfigurationBuilder fcscb = builder.loaders().addFileCacheStore();
@@ -630,11 +598,11 @@ public class Parser {
                lcb.purgeSynchronously(purgeSynchronously);
             parseLoaderChildren(reader, lcb);
          }
-
+         
       }
-
+      
    }
-
+   
    private void parseLoaderChildren(XMLStreamReader reader, AbstractLoaderConfigurationBuilder<?> loaderBuilder) throws XMLStreamException {
       while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
          Element element = Element.forName(reader.getLocalName());
@@ -661,7 +629,7 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   loaderBuilder.singletonStore().enable();
                else
                   loaderBuilder.singletonStore().disable();
@@ -670,13 +638,13 @@ public class Parser {
                loaderBuilder.singletonStore().pushStateTimeout(Long.valueOf(value));
                break;
             case PUSH_STATE_WHEN_COORDINATOR:
-               loaderBuilder.singletonStore().pushStateWhenCoordinator(Boolean.valueOf(value));
+               loaderBuilder.singletonStore().pushStateWhenCoordinator(Boolean.parseBoolean(value));
                break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
    }
 
@@ -687,7 +655,7 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   loaderBuilder.async().enable();
                else
                   loaderBuilder.async().disable();
@@ -708,9 +676,9 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
-
+      
    }
 
    private void parseJmxStatistics(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
@@ -720,7 +688,7 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.jmxStatistics().enable();
                else
                   builder.jmxStatistics().disable();
@@ -729,7 +697,7 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
    }
 
@@ -740,7 +708,7 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.invocationBatching().enable();
                else
                   builder.invocationBatching().disable();
@@ -749,9 +717,9 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
-
+      
    }
 
    private void parseIndexing(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
@@ -761,13 +729,13 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.indexing().enable();
                else
                   builder.indexing().disable();
                break;
             case INDEX_LOCAL_ONLY:
-               builder.indexing().indexLocalOnly(Boolean.valueOf(value));
+                  builder.indexing().indexLocalOnly(Boolean.parseBoolean(value));
                break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
@@ -805,7 +773,7 @@ public class Parser {
                builder.expiration().maxIdle(Long.valueOf(value));
                break;
             case REAPER_ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.expiration().enableReaper();
                else
                   builder.expiration().disableReaper();
@@ -817,9 +785,9 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
-
+      
    }
 
    private void parseEviction(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
@@ -846,20 +814,20 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
-
+      
    }
 
    private void parseDeadlockDetection(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
-
+      
       for (int i = 0; i < reader.getAttributeCount(); i++) {
          ParseUtils.requireNoNamespaceAttribute(reader, i);
          String value = replaceSystemProperties(reader.getAttributeValue(i));
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.deadlockDetection().enable();
                else
                   builder.deadlockDetection().disable();
@@ -871,9 +839,9 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
-
+      
    }
 
    private void parseDataContainer(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
@@ -889,7 +857,7 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
          Element element = Element.forName(reader.getLocalName());
          switch (element) {
@@ -904,7 +872,7 @@ public class Parser {
 
    private void parseCustomInterceptors(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
       ParseUtils.requireNoAttributes(reader);
-
+      
       while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
          Element element = Element.forName(reader.getLocalName());
          switch (element) {
@@ -915,13 +883,13 @@ public class Parser {
                throw ParseUtils.unexpectedElement(reader);
          }
       }
-
+      
    }
 
    private void parseInterceptor(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
-
+      
       InterceptorConfigurationBuilder interceptorBuilder = builder.customInterceptors().addInterceptor();
-
+      
       for (int i = 0; i < reader.getAttributeCount(); i++) {
          ParseUtils.requireNoNamespaceAttribute(reader, i);
          String value = replaceSystemProperties(reader.getAttributeValue(i));
@@ -946,7 +914,7 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
    }
 
@@ -955,7 +923,7 @@ public class Parser {
       String clusteringMode = null;
       boolean synchronous = false;
       boolean asynchronous = false;
-
+      
       for (int i = 0; i < reader.getAttributeCount(); i++) {
          ParseUtils.requireNoNamespaceAttribute(reader, i);
          String value = replaceSystemProperties(reader.getAttributeValue(i));
@@ -998,22 +966,22 @@ public class Parser {
                throw ParseUtils.unexpectedElement(reader);
          }
       }
-
+      
       if (!synchronous && !asynchronous)
          setMode(builder, clusteringMode, asynchronous, asynchronous, reader);
-
-
+      
+      
    }
-
+   
    private void setMode(ConfigurationBuilder builder, String clusteringMode, boolean asynchronous, boolean synchronous, XMLStreamReader reader) {
-      if (synchronous && asynchronous)
+      if (synchronous && asynchronous) 
          throw new ConfigurationException("Cannot configure <sync> and <async> on the same cluster, " + reader.getLocation());
-
+      
       if (clusteringMode != null) {
          String mode = clusteringMode.toUpperCase();
          if (ParsedCacheMode.REPL.matches(mode)) {
             if (!asynchronous)
-               builder.clustering().cacheMode(REPL_SYNC);
+              builder.clustering().cacheMode(REPL_SYNC);
             else
                builder.clustering().cacheMode(REPL_ASYNC);
          } else if (ParsedCacheMode.INVALIDATION.matches(mode)) {
@@ -1050,14 +1018,14 @@ public class Parser {
             case REPL_TIMEOUT:
                builder.clustering().sync().replTimeout(Long.valueOf(value));
                break;
-
+           
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
-
+      
    }
 
    private void parseStateRetrieval(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException{
@@ -1072,7 +1040,7 @@ public class Parser {
                break;
             case FETCH_IN_MEMORY_STATE:
                log.stateRetrievalConfigurationDeprecaced();
-               builder.clustering().stateTransfer().fetchInMemoryState(Boolean.valueOf(value));
+               builder.clustering().stateTransfer().fetchInMemoryState(Boolean.parseBoolean(value));
                break;
             case INITIAL_RETRY_WAIT_TIME:
                log.initialRetryWaitTimeDeprecated();
@@ -1097,7 +1065,7 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
 
    }
@@ -1110,7 +1078,7 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case FETCH_IN_MEMORY_STATE:
-               builder.clustering().stateTransfer().fetchInMemoryState(Boolean.valueOf(value).booleanValue());
+               builder.clustering().stateTransfer().fetchInMemoryState(Boolean.parseBoolean(value));
                break;
             case TIMEOUT:
                builder.clustering().stateTransfer().timeout(Long.valueOf(value).longValue());
@@ -1135,7 +1103,7 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.clustering().l1().enable();
                else
                   builder.clustering().l1().disable();
@@ -1147,7 +1115,7 @@ public class Parser {
                builder.clustering().l1().lifespan(Long.valueOf(value));
                break;
             case ON_REHASH:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.clustering().l1().enableOnRehash();
                else
                   builder.clustering().l1().disableOnRehash();
@@ -1156,7 +1124,7 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
-
+      
       ParseUtils.requireNoContent(reader);
 
    }
@@ -1178,7 +1146,7 @@ public class Parser {
                builder.clustering().hash().numVirtualNodes(Integer.valueOf(value));
                break;
             case REHASH_ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.clustering().hash().rehashEnabled();
                else
                   builder.clustering().hash().rehashDisabled();
@@ -1217,7 +1185,7 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ENABLED:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.clustering().hash().groups().enabled();
                else
                   builder.clustering().hash().groups().disabled();
@@ -1248,7 +1216,7 @@ public class Parser {
          Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
          switch (attribute) {
             case ASYNC_MARSHALLING:
-               if (Boolean.valueOf(value))
+               if (Boolean.parseBoolean(value))
                   builder.clustering().async().asyncMarshalling();
                else
                   builder.clustering().async().syncMarshalling();
@@ -1263,7 +1231,7 @@ public class Parser {
                builder.clustering().async().replQueueMaxElements(Integer.valueOf(value));
                break;
             case USE_REPL_QUEUE:
-               builder.clustering().async().useReplQueue(Boolean.valueOf(value));
+               builder.clustering().async().useReplQueue(Boolean.parseBoolean(value));
                break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
@@ -1314,6 +1282,9 @@ public class Parser {
                transportParsed = true;
                break;
             }
+            case TOTAL_ORDER_EXECUTOR:
+               parseTotalOrderExecutor(reader, builder);
+               break;
             default: {
                throw ParseUtils.unexpectedElement(reader);
             }
@@ -1475,9 +1446,9 @@ public class Parser {
                      }
                   }
                }
-
+               
                ParseUtils.requireNoContent(reader);
-
+               
                if (id != null)
                   builder.serialization().addAdvancedExternalizer(id, advancedExternalizer);
                else
@@ -1540,7 +1511,7 @@ public class Parser {
                break;
             }
             case ENABLED: {
-               if (!Boolean.valueOf(value))
+               if (!Boolean.parseBoolean(value))
                   builder.globalJmxStatistics().disable();
                else
                   builder.globalJmxStatistics().enable();
@@ -1636,6 +1607,37 @@ public class Parser {
       }
    }
 
+   private void parseTotalOrderExecutor(XMLStreamReader reader, GlobalConfigurationBuilder builder)
+         throws XMLStreamException {
+      for (int i = 0; i < reader.getAttributeCount(); i++) {
+         ParseUtils.requireNoNamespaceAttribute(reader, i);
+         String value = replaceSystemProperties(reader.getAttributeValue(i));
+         Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
+         switch (attribute) {
+            case FACTORY: {
+               builder.totalOrderExecutor().factory(Util.<ExecutorFactory> getInstance(value, cl));
+               break;
+            }
+            default: {
+               throw ParseUtils.unexpectedAttribute(reader, i);
+            }
+         }
+      }
+
+      while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
+         Element element = Element.forName(reader.getLocalName());
+         switch (element) {
+            case PROPERTIES: {
+               builder.totalOrderExecutor().withProperties(parseProperties(reader));
+               break;
+            }
+            default: {
+               throw ParseUtils.unexpectedElement(reader);
+            }
+         }
+      }
+   }
+
    private void parseAsyncListenerExectuor(XMLStreamReader reader, GlobalConfigurationBuilder builder)
          throws XMLStreamException {
 
@@ -1699,9 +1701,9 @@ public class Parser {
                   }
                }
                p.put(key, propertyValue);
-
+               
                ParseUtils.requireNoContent(reader);
-
+               
                break;
             }
             default: {

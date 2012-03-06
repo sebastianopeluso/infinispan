@@ -22,7 +22,4 @@ public interface TransactionConfigurationChildBuilder extends ConfigurationChild
 
    RecoveryConfigurationBuilder recovery();
 
-   //Pedro -- total order
-   TotalOrderThreadingConfigurationBuilder totalOrderThreading();
-
 }

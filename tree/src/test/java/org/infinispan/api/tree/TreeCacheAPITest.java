@@ -26,7 +26,11 @@ import org.infinispan.Cache;
 import org.infinispan.atomic.AtomicMap;
 import org.infinispan.atomic.AtomicMapLookup;
 import org.infinispan.config.Configuration;
+import org.infinispan.config.ConfigurationException;
+import org.infinispan.configuration.cache.ConfigurationBuilder;
+import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.manager.EmbeddedCacheManager;
+import org.infinispan.test.CacheManagerCallable;
 import org.infinispan.test.SingleCacheManagerTest;
 import org.infinispan.test.TestingUtil;
 import org.infinispan.test.fwk.TestCacheManagerFactory;
@@ -34,6 +38,7 @@ import org.infinispan.tree.Fqn;
 import org.infinispan.tree.Node;
 import org.infinispan.tree.NodeKey;
 import org.infinispan.tree.TreeCache;
+import org.infinispan.tree.TreeCacheFactory;
 import org.infinispan.tree.TreeCacheImpl;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -43,6 +48,7 @@ import javax.transaction.TransactionManager;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.infinispan.test.TestingUtil.withCacheManager;
 import static org.testng.AssertJUnit.*;
 
 /**
@@ -200,4 +206,26 @@ public class TreeCacheAPITest extends SingleCacheManagerTest {
       assertEquals("CacheMode.LOCAL cache has no address", null, manager(cache.getCache()).getAddress());
       assertEquals("CacheMode.LOCAL cache has no members list", null, manager(cache.getCache()).getMembers());
    }
+
+   public void testTreeCacheFactory() throws Exception {
+      withCacheManager(new CacheManagerCallable(new DefaultCacheManager(new ConfigurationBuilder().invocationBatching().enable().build())) {
+         @Override
+         public void call() throws Exception {
+            TreeCacheFactory tcf = new TreeCacheFactory();
+            tcf.createTreeCache(cm.getCache());
+         }
+      });
+   }
+
+   @Test(expectedExceptions=ConfigurationException.class)
+   public void testFactoryNoBatching() throws Exception {
+      withCacheManager(new CacheManagerCallable(new DefaultCacheManager(new ConfigurationBuilder().build())) {
+         @Override
+         public void call() throws Exception {
+            TreeCacheFactory tcf = new TreeCacheFactory();
+            tcf.createTreeCache(cm.getCache());
+         }
+      });
+   }
+
 }

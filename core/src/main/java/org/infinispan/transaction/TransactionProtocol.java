@@ -1,23 +1,22 @@
 package org.infinispan.transaction;
 
 /**
- * The protocol to be used
- * Date: 1/13/12
- * Time: 4:05 PM
+ * Enumerate with the possible commits protocols.
  *
- * @author pruivo
+ * @author Pedro Ruivo
+ * @since 5.2
  */
 public enum TransactionProtocol {
-    /**
-     * uses the 2PC protocol
-     */
-    NORMAL,
-    /**
-     * uses the total order protocol
-     */
-    TOTAL_ORDER;
+   /**
+    * uses the 2PC protocol
+    */
+   TWO_PHASE_COMMIT,
+   /**
+    * uses the total order protocol
+    */
+   TOTAL_ORDER;
 
-    public boolean isTotalOrder() {
-        return this == TOTAL_ORDER;
-    }
+   public boolean isTotalOrder() {
+      return this == TOTAL_ORDER;
+   }
 }

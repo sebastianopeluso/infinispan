@@ -40,6 +40,7 @@ import java.util.Properties;
  *
  * @author Galder Zamarreño
  * @author Vladimir Blagojevic
+ * @author Pedro Ruivo
  * @since 5.0
  */
 @Deprecated
@@ -71,12 +72,6 @@ public class FluentGlobalConfiguration extends AbstractConfigurationBeanWithGCR 
        */
       SerializationConfig version(String marshallVersion);
 
-      /**
-       * TODO
-       *
-       * @param marshallVersion
-       * @return
-       */
       SerializationConfig version(short marshallVersion);
 
       /**
@@ -145,12 +140,6 @@ public class FluentGlobalConfiguration extends AbstractConfigurationBeanWithGCR 
        */
       TransportConfig siteId(String siteId);
 
-      /**
-       * TODO
-       *
-       * @param distributedSyncTimeout
-       * @return
-       */
       TransportConfig distributedSyncTimeout(Long distributedSyncTimeout);
 
       /**
@@ -188,13 +177,6 @@ public class FluentGlobalConfiguration extends AbstractConfigurationBeanWithGCR 
        */
       TransportConfig strictPeerToPeer(Boolean strictPeerToPeer);
 
-      /**
-       * TODO
-       *
-       * @param key
-       * @param value
-       * @return
-       */
       TransportConfig addProperty(String key, String value);
    }
 
@@ -399,5 +381,9 @@ abstract class AbstractConfigurationBeanWithGCR extends AbstractConfigurationBea
    @Override
    public GlobalConfiguration build() {
       return globalConfig;
+   }
+
+   public FluentGlobalConfiguration.ExecutorFactoryConfig<ExecutorFactory> totalOrderExecutor() {
+      return globalConfig.totalOrderExecutor;
    }
 }

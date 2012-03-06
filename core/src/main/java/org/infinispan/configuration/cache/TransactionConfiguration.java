@@ -26,9 +26,10 @@ import org.infinispan.transaction.lookup.TransactionSynchronizationRegistryLooku
 
 /**
  * Defines transactional (JTA) characteristics of the cache.
- *
+ * 
  * @author pmuir
- *
+ * @author Pedro Ruivo
+ * 
  */
 public class TransactionConfiguration {
 
@@ -45,19 +46,14 @@ public class TransactionConfiguration {
    private final boolean useSynchronization;
    private final RecoveryConfiguration recovery;
    private final boolean use1PcForAutoCommitTransactions;
-   //Pedro -- total order stuff
-   //2PC or Total order protocol
-   private final TransactionProtocol transactionProtocol;
-   //thread pool configuration for total order
-   private final TotalOrderThreadingConfiguration totalOrderThreading;
+   private final TransactionProtocol transactionProtocol; //2PC or Total order protocol
+   private final boolean use1PCInTotalOrder; //One phase to commit transaction
 
    TransactionConfiguration(boolean autoCommit, long cacheStopTimeout, boolean eagerLockingSingleNode, LockingMode lockingMode,
-                            boolean syncCommitPhase, boolean syncRollbackPhase, TransactionManagerLookup transactionManagerLookup,
-                            TransactionSynchronizationRegistryLookup transactionSynchronizationRegistryLookup, TransactionMode transactionMode,
-                            boolean useEagerLocking, boolean useSynchronization, boolean use1PcForAutoCommitTransactions,
-                            RecoveryConfiguration recovery,
-                            TransactionProtocol transactionProtocol,
-                            TotalOrderThreadingConfiguration totalOrderThreading) {
+         boolean syncCommitPhase, boolean syncRollbackPhase, TransactionManagerLookup transactionManagerLookup,
+         TransactionSynchronizationRegistryLookup transactionSynchronizationRegistryLookup, TransactionMode transactionMode,
+         boolean useEagerLocking, boolean useSynchronization, boolean use1PcForAutoCommitTransactions,
+         RecoveryConfiguration recovery, TransactionProtocol transactionProtocol, boolean use1PCInTotalOrder) {
       this.autoCommit = autoCommit;
       this.cacheStopTimeout = cacheStopTimeout;
       this.eagerLockingSingleNode = eagerLockingSingleNode;
@@ -71,9 +67,8 @@ public class TransactionConfiguration {
       this.useSynchronization = useSynchronization;
       this.recovery = recovery;
       this.use1PcForAutoCommitTransactions = use1PcForAutoCommitTransactions;
-      //Pedro -- total order stuff
       this.transactionProtocol = transactionProtocol;
-      this.totalOrderThreading = totalOrderThreading;
+      this.use1PCInTotalOrder = use1PCInTotalOrder;
    }
 
    /**
@@ -127,7 +122,7 @@ public class TransactionConfiguration {
    /**
     * Configures whether the cache uses optimistic or pessimistic locking. If the cache is not
     * transactional then the locking mode is ignored.
-    *
+    * 
     * @see TransactionConfiguration#transactionMode()
     */
    public LockingMode lockingMode() {
@@ -155,7 +150,7 @@ public class TransactionConfiguration {
     * synchronous, so Infinispan will wait for responses from all nodes to which the rollback was
     * sent. Otherwise, the rollback phase will be asynchronous. Keeping it as false improves
     * performance of 2PC transactions.
-    *
+    * 
     * @return
     */
    public boolean syncRollbackPhase() {
@@ -267,12 +262,71 @@ public class TransactionConfiguration {
             '}';
    }
 
-   //Pedro -- total order stuff
+   @Override
+   public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+
+      TransactionConfiguration that = (TransactionConfiguration) o;
+
+      if (autoCommit != that.autoCommit) return false;
+      if (cacheStopTimeout != that.cacheStopTimeout) return false;
+      if (eagerLockingSingleNode != that.eagerLockingSingleNode) return false;
+      if (syncCommitPhase != that.syncCommitPhase) return false;
+      if (syncRollbackPhase != that.syncRollbackPhase) return false;
+      if (use1PcForAutoCommitTransactions != that.use1PcForAutoCommitTransactions)
+         return false;
+      if (useEagerLocking != that.useEagerLocking) return false;
+      if (useSynchronization != that.useSynchronization) return false;
+      if (lockingMode != that.lockingMode) return false;
+      if (recovery != null ? !recovery.equals(that.recovery) : that.recovery != null)
+         return false;
+      if (transactionManagerLookup != null ? !transactionManagerLookup.equals(that.transactionManagerLookup) : that.transactionManagerLookup != null)
+         return false;
+      if (transactionMode != that.transactionMode) return false;
+      if (transactionSynchronizationRegistryLookup != null ? !transactionSynchronizationRegistryLookup.equals(that.transactionSynchronizationRegistryLookup) : that.transactionSynchronizationRegistryLookup != null)
+         return false;
+      if (use1PCInTotalOrder != that.use1PCInTotalOrder) {
+         return false;
+      }
+      if (transactionProtocol != that.transactionProtocol) {
+         return false;
+      }
+
+      return true;
+   }
+
+   @Override
+   public int hashCode() {
+      int result = (autoCommit ? 1 : 0);
+      result = 31 * result + (int) (cacheStopTimeout ^ (cacheStopTimeout >>> 32));
+      result = 31 * result + (eagerLockingSingleNode ? 1 : 0);
+      result = 31 * result + (lockingMode != null ? lockingMode.hashCode() : 0);
+      result = 31 * result + (syncCommitPhase ? 1 : 0);
+      result = 31 * result + (syncRollbackPhase ? 1 : 0);
+      result = 31 * result + (transactionManagerLookup != null ? transactionManagerLookup.hashCode() : 0);
+      result = 31 * result + (transactionSynchronizationRegistryLookup != null ? transactionSynchronizationRegistryLookup.hashCode() : 0);
+      result = 31 * result + (transactionMode != null ? transactionMode.hashCode() : 0);
+      result = 31 * result + (useEagerLocking ? 1 : 0);
+      result = 31 * result + (useSynchronization ? 1 : 0);
+      result = 31 * result + (recovery != null ? recovery.hashCode() : 0);
+      result = 31 * result + (use1PcForAutoCommitTransactions ? 1 : 0);
+      result = 31 * result + (transactionProtocol != null ? transactionProtocol.hashCode() : 0);
+      result = 31 * result + (use1PCInTotalOrder ? 1 : 0);
+      return result;
+   }
+
+   /**
+    * @return the transaction protocol in use (2PC or Total Order)
+    */
    public TransactionProtocol transactionProtocol() {
       return transactionProtocol;
    }
 
-   public TotalOrderThreadingConfiguration totalOrderThreading() {
-      return totalOrderThreading;
+   /**
+    * @return true if total order protocol is committing transactions in one phase
+    */
+   public boolean use1PCInTotalOrder() {
+      return use1PCInTotalOrder;
    }
 }

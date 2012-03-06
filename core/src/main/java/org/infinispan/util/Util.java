@@ -569,10 +569,14 @@ public final class Util {
         return hashFct.hash(key) & Integer.MAX_VALUE; // make sure no negative numbers are involved.
     }
 
-    //Pedro -- pretty print global transaction, ie, transaction ID
-    //most of the time I only need information about address and ID and don't the keys and so one
-    public static String prettyPrintGlobalTransaction(GlobalTransaction gtx) {
-        return gtx.getAddress() + ":" + gtx.getId();
-    }
+   /**
+    * pretty print the global transaction instance: address + counter
+    *
+    * @param gtx the global transaction
+    * @return a string representing the global transaction
+    */
+   public static String prettyPrintGlobalTransaction(GlobalTransaction gtx) {
+      return gtx.getAddress() + ":" + gtx.getId();
+   }
 
 }

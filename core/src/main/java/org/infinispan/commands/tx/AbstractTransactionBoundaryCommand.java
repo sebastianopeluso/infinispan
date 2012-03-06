@@ -41,6 +41,7 @@ import org.infinispan.util.logging.LogFactory;
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
  * @since 4.0
  */
 public abstract class AbstractTransactionBoundaryCommand implements TransactionBoundaryCommand {
@@ -55,11 +56,6 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    protected TransactionTable txTable;
    protected Configuration configuration;
    private Address origin;
-
-   //Pedro -- meaning:
-   // PrepareCommand: this command must be sent in total order...
-   // Commit/RollbackCommand: this command must be sent in OOB to obtain faster commit
-   protected boolean totalOrdered = false;
 
    public AbstractTransactionBoundaryCommand(String cacheName) {
       this.cacheName = cacheName;
@@ -107,7 +103,7 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
       if (ctx != null) throw new IllegalStateException("Expected null context!");
       markGtxAsRemote();
       RemoteTransaction transaction = txTable.getRemoteTransaction(globalTx);
-      if (transaction == null) {
+      if (transaction == null || transaction.isMissingModifications()) {
          if (trace) log.tracef("Did not find a RemoteTransaction for %s", globalTx);
          return invalidRemoteTxReturnValue();
       }
@@ -120,28 +116,36 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    }
 
    /**
-    * Pedro -- total order protocol. The commit or the rollback command can be received before the prepare message
+    * Note: Used by total order protocol.
+    *
+    * The commit or the rollback command can be received before the prepare message
     * we let the commands be invoked in the interceptor chain. They will be block in TotalOrderInterceptor while the
     * prepare command doesn't arrives
+    *
     * @param ctx the same as {@link #perform(org.infinispan.context.InvocationContext)}
     * @return the same as {@link #perform(org.infinispan.context.InvocationContext)}
     * @throws Throwable the same as {@link #perform(org.infinispan.context.InvocationContext)}
     */
    protected Object performIgnoringUnexistingTransaction(InvocationContext ctx) throws Throwable {
-      if (ctx != null) throw new IllegalStateException("Expected null context!");
+      if (ctx != null) {
+         throw new IllegalStateException("Expected null context!");
+      }
       markGtxAsRemote();
-      RemoteTransaction transaction = txTable.getRemoteTransaction(globalTx);
-      if (transaction != null) {
-         visitRemoteTransaction(transaction);
-      } else {
-         log.warnf("Will execute tx command %s without the remote transaction [%s]", this,
+      RemoteTransaction transaction = txTable.getOrCreateIfAbsentRemoteTransaction(globalTx);
+
+      visitRemoteTransaction(transaction);
+
+      if (transaction.isMissingModifications()) {
+         log.tracef("Will execute tx command %s without the remote transaction [%s]", this,
                Util.prettyPrintGlobalTransaction(globalTx));
       }
 
       RemoteTxInvocationContext ctxt = icc.createRemoteTxInvocationContext(
             transaction, getOrigin());
 
-      if (trace) log.tracef("About to execute tx command %s", this);
+      if (trace) {
+         log.tracef("About to execute tx command %s", this);
+      }
       return invoker.invoke(ctxt, this);
    }
 
@@ -188,27 +192,17 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    private void markGtxAsRemote() {
       globalTx.setRemote(true);
    }
-
+   
    public Address getOrigin() {
-      return origin;
+	   return origin;
    }
-
+   
    public void setOrigin(Address origin) {
-      this.origin = origin;
+	   this.origin = origin;
    }
 
    @Override
    public boolean isReturnValueExpected() {
       return true;
-   }
-
-   //Pedro -- setter and getter
-
-   public boolean isTotalOrdered() {
-      return totalOrdered;
-   }
-
-   public void setTotalOrdered(boolean totalOrdered) {
-      this.totalOrdered = totalOrdered;
    }
 }

@@ -31,59 +31,65 @@ import org.infinispan.transaction.xa.GlobalTransaction;
  * Command corresponding to the 2nd phase of 2PC.
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
+ * @author Pedro Ruivo
  * @since 4.0
  */
 public class CommitCommand extends AbstractTransactionBoundaryCommand {
-    public static final byte COMMAND_ID = 14;
-    /**
-     * This is sent back to callers if the global transaction is not reconised.  It can happen if a prepare is sent to one
-     * set of nodes, which then fail, and a commit is sent to a "new" data owner which has not seen the prepare.
-     *
-     * Responding with this value instructs the caller to re-send the prepare.  See DistributionInterceptor.visitCommitCommand()
-     * for details.
-     */
-    public static final byte RESEND_PREPARE = 1;
+   public static final byte COMMAND_ID = 14;
+   /**
+    * This is sent back to callers if the global transaction is not reconised.  It can happen if a prepare is sent to one
+    * set of nodes, which then fail, and a commit is sent to a "new" data owner which has not seen the prepare.
+    *
+    * Responding with this value instructs the caller to re-send the prepare.  See DistributionInterceptor.visitCommitCommand()
+    * for details.
+    */
+   public static final byte RESEND_PREPARE = 1;
 
-    private CommitCommand() {
-        super(null); // For command id uniqueness test
-    }
+   private CommitCommand() {
+      super(null); // For command id uniqueness test
+   }
 
-    public CommitCommand(String cacheName, GlobalTransaction gtx) {
-        super(cacheName);
-        this.globalTx = gtx;
-    }
+   public CommitCommand(String cacheName, GlobalTransaction gtx) {
+      super(cacheName);
+      this.globalTx = gtx;
+   }
 
-    public CommitCommand(String cacheName) {
-        super(cacheName);
-    }
+   public CommitCommand(String cacheName) {
+      super(cacheName);
+   }
 
-    @Override
-    protected Object invalidRemoteTxReturnValue() {
-        return RESEND_PREPARE;
-    }
+   @Override
+   protected Object invalidRemoteTxReturnValue() {
+      return RESEND_PREPARE;
+   }
 
-    public Object acceptVisitor(InvocationContext ctx, Visitor visitor) throws Throwable {
-        return visitor.visitCommitCommand((TxInvocationContext) ctx, this);
-    }
+   public Object acceptVisitor(InvocationContext ctx, Visitor visitor) throws Throwable {
+      return visitor.visitCommitCommand((TxInvocationContext) ctx, this);
+   }
 
-    public byte getCommandId() {
-        return COMMAND_ID;
-    }
+   public byte getCommandId() {
+      return COMMAND_ID;
+   }
 
-    @Override
-    public String toString() {
-        return "CommitCommand {" + super.toString();
-    }
+   @Override
+   public String toString() {
+      return "CommitCommand {" + super.toString();
+   }
 
-    //Pedro -- added new type of performing
-
-    @Override
-    public Object perform(InvocationContext ctx) throws Throwable {
-        if (totalOrdered) {
-            return super.performIgnoringUnexistingTransaction(ctx);
-        } else {
-            return super.perform(ctx);
-        }
-    }
+   /**
+    * choose the method to invoke depending if the total order protocol is be used or not
+    *
+    * @param ctx the context
+    * @return the value to be returned to the invoked
+    * @throws Throwable if something goes wrong
+    */
+   @Override
+   public Object perform(InvocationContext ctx) throws Throwable {
+      if (configuration.isTotalOrder()) {
+         return super.performIgnoringUnexistingTransaction(ctx);
+      } else {
+         return super.perform(ctx);
+      }
+   }
 
 }

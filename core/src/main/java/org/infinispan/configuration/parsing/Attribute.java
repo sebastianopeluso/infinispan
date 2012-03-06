@@ -27,7 +27,7 @@ import java.util.Map;
 
 /**
  * Enumerates the attributes used in Infinispan
- *
+ * 
  * @author Pete Muir
  */
 public enum Attribute {
@@ -129,14 +129,8 @@ public enum Attribute {
     WRITE_SKEW_CHECK("writeSkewCheck"),
     USE_1PC_FOR_AUTOCOMMIT_TX("use1PcForAutoCommitTransactions"),
     VERSIONING_SCHEME("versioningScheme"),
-
-    //Pedro -- total order stuff
-    TRANSACTION_PROTOCOL("transactionProtocol"),
-    CORE_POOL_SIZE("corePoolSize"),
-    MAXIMUM_POOL_SIZE("maximumPoolSize"),
-    KEEP_ALIVE_TIME("keepAliveTime"),
-    QUEUE_SIZE("queueSize"),
-    ONE_PHASE_COMMIT("onePhaseCommit")
+   TRANSACTION_PROTOCOL("transactionProtocol"),
+   USE_1PC_IN_TOTAL_ORDER("use1PCInTotalOrder")
     ;
 
     private final String name;

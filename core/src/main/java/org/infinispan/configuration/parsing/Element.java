@@ -79,8 +79,7 @@ public enum Element {
     TRANSPORT("transport"),
     UNSAFE("unsafe"),
     VERSIONING("versioning"),
-    //total order thread pool configuration
-    TOTAL_ORDER_THREADING("totalOrderThreading")
+   TOTAL_ORDER_EXECUTOR("totalOrderExecutor")
     ;
 
     private final String name;

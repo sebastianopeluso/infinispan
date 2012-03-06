@@ -25,11 +25,15 @@ package org.infinispan.interceptors.locking;
 
 import org.infinispan.CacheException;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.config.Configuration;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.entries.ClusteredRepeatableReadEntry;
-import org.infinispan.container.versioning.*;
+import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.EntryVersionsMap;
+import org.infinispan.container.versioning.IncrementableEntryVersion;
+import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.context.Flag;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.distribution.DistributionManager;
@@ -40,7 +44,6 @@ import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.WriteSkewHelper;
 import org.infinispan.transaction.xa.CacheTransaction;
-import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -54,6 +57,7 @@ import static org.infinispan.transaction.WriteSkewHelper.performWriteSkewCheckAn
  * the <b>Implementor</b> and various LockingInterceptors are the <b>Abstraction</b>.
  *
  * @author Mircea Markus
+ * @author Pedro Ruivo
  * @since 5.1
  */
 @Scope(Scopes.NAMED_CACHE)
@@ -70,7 +74,7 @@ public interface ClusteringDependentLogic {
    Collection<Address> getOwners(Collection<Object> keys);
 
    EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand);
-
+   
    Address getAddress();
 
 
@@ -116,7 +120,7 @@ public interface ClusteringDependentLogic {
       public Collection<Address> getOwners(Collection<Object> keys) {
          return null;
       }
-
+      
       @Override
       public Address getAddress() {
          return rpcManager.getAddress();
@@ -128,8 +132,8 @@ public interface ClusteringDependentLogic {
          if (rpcManager.getTransport().isCoordinator()) {
             // Perform a write skew check on each entry.
             EntryVersionsMap uv = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
-                  versionGenerator, context,
-                  keySpecificLogic);
+                                                                            versionGenerator, context,
+                                                                            keySpecificLogic);
             context.getCacheTransaction().setUpdatedEntryVersions(uv);
             return uv;
          }
@@ -202,8 +206,8 @@ public interface ClusteringDependentLogic {
       public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand) {
          // Perform a write skew check on mapped entries.
          EntryVersionsMap uv = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
-               versionGenerator, context,
-               keySpecificLogic);
+                                                                         versionGenerator, context,
+                                                                         keySpecificLogic);
 
          CacheTransaction cacheTransaction = context.getCacheTransaction();
          EntryVersionsMap uvOld = cacheTransaction.getUpdatedEntryVersions();
@@ -216,11 +220,19 @@ public interface ClusteringDependentLogic {
       }
    }
 
-   //Pedro -- Logic for total order protocol in replicated mode
+   /**
+    * Logic for total order protocol in replicated mode
+    */
    public static final class TotalOrderAllNodesLogic implements ClusteringDependentLogic {
 
       private DataContainer dataContainer;
       private RpcManager rpcManager;
+      private static final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
+         @Override
+         public boolean performCheckOnKey(Object key) {
+            return true;
+         }
+      };
 
       @Inject
       public void init(DataContainer dc, RpcManager rpcManager) {
@@ -259,62 +271,22 @@ public interface ClusteringDependentLogic {
          }
 
          EntryVersionsMap updatedVersionMap = new EntryVersionsMap();
-         EntryVersionsMap versionsSeenMap = prepareCommand.getVersionsSeen();
 
-         for (Object key : prepareCommand.getAffectedKeys()) {
-            ClusteredRepeatableReadEntry entry = (ClusteredRepeatableReadEntry) context.lookupEntry(key);
-
-            //save the original version and updates to the version that transaction reads
-            IncrementableEntryVersion originalLocalVersion = (IncrementableEntryVersion) entry.getVersion();
-            entry.setVersion(versionsSeenMap.get(key));
-
-            if (context.hasFlag(Flag.SKIP_WRITE_SKEW_CHECK) ||
-                  !entry.isMarkedForWriteSkew() ||
-                  entry.performWriteSkewCheck(dataContainer)) {
-               IncrementableEntryVersion newVersion = createNewVersion(originalLocalVersion,
-                     (IncrementableEntryVersion) entry.getVersion(),
-                     versionGenerator);
-
-               updatedVersionMap.put(key, newVersion);
-            } else {
-               // Write skew check detected!
-               throw new CacheException("Write skew detected on key " + key + " for transaction " +
-                     Util.prettyPrintGlobalTransaction(prepareCommand.getGlobalTransaction()));
-            }
+         if (!context.hasFlag(Flag.SKIP_WRITE_SKEW_CHECK)) {
+            updatedVersionMap = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
+                  versionGenerator, context,
+                  keySpecificLogic);
+            context.getCacheTransaction().setUpdatedEntryVersions(updatedVersionMap);
+         } else {
+            updatedVersionMap.putAll(context.getCacheTransaction().getUpdatedEntryVersions());
          }
 
-         context.getCacheTransaction().setUpdatedEntryVersions(updatedVersionMap);
          return updatedVersionMap;
       }
 
       @Override
       public Address getAddress() {
          return rpcManager.getAddress();
-      }
-
-      private IncrementableEntryVersion createNewVersion(IncrementableEntryVersion originalLocalVersion,
-                                                         IncrementableEntryVersion versionSeen, VersionGenerator versionGenerator) {
-         if (originalLocalVersion == null) {
-            if (versionSeen == null) {
-               //both are null (new entry)
-               return versionGenerator.generateNew();
-            } else {
-               //version seen is not null... increment that one
-               return versionGenerator.increment(versionSeen);
-            }
-         } else {
-            if (versionSeen == null) {
-               //original version is not null
-               return versionGenerator.increment(originalLocalVersion);
-            } else {
-               //both are not null. choose the greatest
-               if (originalLocalVersion.compareTo(versionSeen) == InequalVersionComparisonResult.AFTER) {
-                  return versionGenerator.increment(originalLocalVersion);
-               } else {
-                  return versionGenerator.increment(versionSeen);
-               }
-            }
-         }
       }
    }
 }
