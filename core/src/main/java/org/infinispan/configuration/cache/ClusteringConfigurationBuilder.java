@@ -20,9 +20,9 @@ package org.infinispan.configuration.cache;
 
 /**
  * Defines clustered characteristics of the cache.
- *
+ * 
  * @author pmuir
- *
+ * 
  */
 public class ClusteringConfigurationBuilder extends AbstractConfigurationChildBuilder<ClusteringConfiguration> implements
       ClusteringConfigurationChildBuilder {

@@ -133,8 +133,8 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
    }
 
    protected void broadcastPrepare(TxInvocationContext context, PrepareCommand command) {
-      boolean async = configuration.getCacheMode() == Configuration.CacheMode.REPL_ASYNC &&
-            !configuration.isTotalOrder();
+      boolean async = configuration.getCacheMode() == Configuration.CacheMode.REPL_ASYNC ||
+            configuration.isTotalOrder();
       rpcManager.broadcastRpcCommand(command, !async, false);
    }
 
