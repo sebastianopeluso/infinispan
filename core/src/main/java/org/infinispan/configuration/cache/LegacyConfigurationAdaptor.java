@@ -53,7 +53,7 @@ public class LegacyConfigurationAdaptor {
       if (config == null)
          return null;
       
-      FluentConfiguration legacy = new Configuration().fluent();
+      FluentConfiguration legacy = new Configuration(config).fluent();
       
       legacy.clustering()
          .mode(CacheMode.valueOf(config.clustering().cacheMode().name()));

@@ -87,6 +87,7 @@ public final class ComponentRegistry extends AbstractComponentRegistry {
 
          registerComponent(this, ComponentRegistry.class);
          registerComponent(configuration, Configuration.class);
+         registerComponent(configuration.newConfiguration(), org.infinispan.configuration.cache.Configuration.class);
          registerComponent(new BootstrapFactory(cache, configuration, this), BootstrapFactory.class);
 
          // register any module-specific command initializers
