@@ -1,0 +1,67 @@
+commit 3e1bbd7a5a4aca16be8368cfff58f709e081e38c
+Author: Dan Berindei <dan@infinispan.org>
+Date:   Tue Mar 27 17:53:48 2012 +0100
+
+    ISPN-1934 - Joiners fail to start if the coordinator leaves before responding to the join request
+    
+    This is caused by the way JGroups immediately throws SuspectExceptions for unicast requests like our join request.
+    We work around it by forcing commands through the anycast branch when the response mode is SYNCHRONOUS_IGNORE_LEAVERS.
+
+diff --git a/core/src/main/java/org/infinispan/remoting/transport/jgroups/JGroupsTransport.java b/core/src/main/java/org/infinispan/remoting/transport/jgroups/JGroupsTransport.java
+index 5cae975..272fbbe 100644
+--- a/core/src/main/java/org/infinispan/remoting/transport/jgroups/JGroupsTransport.java
++++ b/core/src/main/java/org/infinispan/remoting/transport/jgroups/JGroupsTransport.java
+@@ -447,12 +447,13 @@ public Address getAddress() {
+       if (trace)
+          log.tracef("dests=%s, command=%s, mode=%s, timeout=%s", recipients, rpcCommand, mode, timeout);
+       Address self = getAddress();
++      boolean ignoreLeavers = mode == ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS || mode == ResponseMode.WAIT_FOR_VALID_RESPONSE;
+       if (mode.isSynchronous() && recipients != null && !getMembers().containsAll(recipients)) {
+-         if (mode == ResponseMode.SYNCHRONOUS)
+-            throw new SuspectException("One or more nodes have left the cluster while replicating command " + rpcCommand);
+-         else { // SYNCHRONOUS_IGNORE_LEAVERS || WAIT_FOR_VALID_RESPONSE
++         if (ignoreLeavers) { // SYNCHRONOUS_IGNORE_LEAVERS || WAIT_FOR_VALID_RESPONSE
+             recipients = new HashSet<Address>(recipients);
+             recipients.retainAll(getMembers());
++         } else { // SYNCHRONOUS
++            throw new SuspectException("One or more nodes have left the cluster while replicating command " + rpcCommand);
+          }
+       }
+       boolean asyncMarshalling = mode == ResponseMode.ASYNCHRONOUS;
+@@ -473,13 +474,13 @@ public Address getAddress() {
+                asyncMarshalling);
+       } else {         
+          if (jgAddressList == null || !jgAddressList.isEmpty()) {
+-            boolean singleRecipient = jgAddressList != null && jgAddressList.size() == 1;
++            boolean singleRecipient = !ignoreLeavers && jgAddressList != null && jgAddressList.size() == 1;
+             boolean skipRpc = false;
+             if (jgAddressList == null) {
+                ArrayList<Address> others = new ArrayList<Address>(members);
+                others.remove(self);
+                skipRpc = others.isEmpty();
+-               singleRecipient = others.size() == 1;
++               singleRecipient = !ignoreLeavers && others.size() == 1;
+                if (singleRecipient) singleJGAddress = toJGroupsAddress(others.get(0));
+             }
+             if (!skipRpc) {
+@@ -509,7 +510,6 @@ public Address getAddress() {
+       } else {      
+          Map<Address, Response> retval = new HashMap<Address, Response>(rsps.size());
+ 
+-         boolean ignoreLeavers = mode == ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS || mode == ResponseMode.WAIT_FOR_VALID_RESPONSE;
+          boolean noValidResponses = true;
+          for (Rsp<Object> rsp : rsps.values()) {
+             noValidResponses &= parseResponseAndAddToResponseList(rsp.getValue(), rsp.getException(), retval, rsp.wasSuspected(), rsp.wasReceived(), fromJGroupsAddress(rsp.getSender()),
+diff --git a/core/src/test/java/org/infinispan/test/fwk/UnitTestTestNGListener.java b/core/src/test/java/org/infinispan/test/fwk/UnitTestTestNGListener.java
+index 2bb7c9c..bb455bb 100644
+--- a/core/src/test/java/org/infinispan/test/fwk/UnitTestTestNGListener.java
++++ b/core/src/test/java/org/infinispan/test/fwk/UnitTestTestNGListener.java
+@@ -120,8 +120,6 @@ public void beforeInvocation(IInvokedMethod method, ITestResult testResult) {
+ 
+    @Override
+    public void afterInvocation(IInvokedMethod method, ITestResult testResult) {
+-      if (!method.isTestMethod())
+-         return;
+       if (testResult.getThrowable() != null)
+          log.errorf(testResult.getThrowable(), "Method %s threw an exception", getTestDesc(testResult));
+    }

@@ -67,9 +67,6 @@ public class TransactionCoordinator {
 
    boolean trace;
 
-   //Indicates if the versioning is enabled, ie, is repeatable read with write skew, optimistic locking
-   //and versioning
-   private boolean versioningEnabled;
 
    @Inject
    public void init(CommandsFactory commandsFactory, InvocationContextContainer icc, InterceptorChain invoker,
@@ -94,11 +91,8 @@ public class TransactionCoordinator {
 
    @Start
    public void start() {
-      versioningEnabled = configuration.isWriteSkewCheck() &&
-            configuration.getTransactionLockingMode() == LockingMode.OPTIMISTIC &&
-            configuration.isEnableVersioning();
 
-      if (versioningEnabled) {
+      if (configuration.isRequireVersioning()) {
          // We need to create versioned variants of PrepareCommand and CommitCommand
          commandCreator = new CommandCreator() {
             @Override
@@ -179,19 +173,7 @@ public class TransactionCoordinator {
          validateNotMarkedForRollback(localTransaction);
 
          if (trace) log.trace("Doing an 1PC prepare call on the interceptor chain");
-         PrepareCommand command;
-
-         //If the versioning scheme is enabled, then create a versioned prepare command. in 2PC this must not happen!
-         if (versioningEnabled) {
-            command = commandsFactory.buildVersionedPrepareCommand(localTransaction.getGlobalTransaction(),
-                  localTransaction.getModifications(), true);
-            if(!configuration.isTotalOrder()) {
-               throw new IllegalStateException("Cannot create versioned prepare command with one phase commit in 2PC");
-            }
-         } else {
-            command = commandsFactory.buildPrepareCommand(localTransaction.getGlobalTransaction(),
-                  localTransaction.getModifications(), true);
-         }
+         PrepareCommand command = commandsFactory.buildPrepareCommand(localTransaction.getGlobalTransaction(), localTransaction.getModifications(), true);
 
          try {
             invoker.invoke(ctx, command);
@@ -274,7 +256,7 @@ public class TransactionCoordinator {
     * @return true if it can use 1PC false otherwise
     */
    private boolean isOnePhaseTotalOrder() {
-      return configuration.isTotalOrder() && (!versioningEnabled || configuration.isUse1PCInTotalOrder());
+      return configuration.isTotalOrder() && (!configuration.isRequireVersioning() || configuration.isUse1PCInTotalOrder());
    }
 
    private static interface CommandCreator {

@@ -42,9 +42,12 @@ import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
+import org.infinispan.totalorder.ParallelTotalOrderManager;
+import org.infinispan.totalorder.SequentialTotalOrderManager;
 import org.infinispan.totalorder.TotalOrderManager;
 import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.xa.recovery.RecoveryAdminOperations;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.concurrent.locks.containers.LockContainer;
 import org.infinispan.util.concurrent.locks.containers.OwnableReentrantPerEntryLockContainer;
 import org.infinispan.util.concurrent.locks.containers.OwnableReentrantStripedLockContainer;
@@ -110,10 +113,11 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
                notTransactional ? new ReentrantPerEntryLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantPerEntryLockContainer(configuration.getConcurrencyLevel());
          return (T) lockContainer;
       } else if (componentType.equals(TotalOrderManager.class)) {
-         return (T) new TotalOrderManager();
+         boolean needsMultiThreadValidation = configuration.getIsolationLevel() == IsolationLevel.REPEATABLE_READ &&
+               configuration.isWriteSkewCheck() && !configuration.isUse1PCInTotalOrder();
+
+         return needsMultiThreadValidation ? (T) new ParallelTotalOrderManager() : (T) new SequentialTotalOrderManager();
       }
-
-
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());
 

@@ -24,6 +24,7 @@ package org.infinispan.config;
 
 import org.infinispan.config.Configuration.EvictionType;
 import org.infinispan.config.GlobalConfiguration.TransportType;
+import org.infinispan.configuration.cache.VersioningScheme;
 import org.infinispan.loaders.CacheLoaderConfig;
 import org.infinispan.loaders.CacheStoreConfig;
 import org.infinispan.loaders.decorators.SingletonStoreConfig;
@@ -169,24 +170,27 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
          }
       }
 
-      if(!bean.transactionProtocol.isTotalOrder()) {
-         //no total order => no validation needed
-         return;
-      }
+      if (bean.transactionProtocol.isTotalOrder()) {
 
-      //in the future we can allow this in total order??
-      if(bean.transactionMode == TransactionMode.NON_TRANSACTIONAL) {
-         log.tracef("Non transactional cache is not supported in Total Order protocol. Total Order protocol will" +
-               " be ignored.");
-         return;
-      }
+         //in the future we can allow this in total order??
+         if (bean.transactionMode == TransactionMode.NON_TRANSACTIONAL) {
+            log.tracef("Non transactional cache is not supported in Total Order protocol. Total Order protocol will" +
+                             " be ignored.");
+            return;
+         }
 
+         //for now, only supports full replication
+         if (!cfg.getCacheMode().isReplicated()) {
+            log.cacheModeNotSupportedByTOProtocol(cfg.getCacheModeString());
+            bean.transactionProtocol(TransactionProtocol.TWO_PHASE_COMMIT);
+            return;
+         }
 
-      //for now, only supports full replication
-      if(!cfg.getCacheMode().isReplicated()) {
-         log.cacheModeNotSupportedByTOProtocol(cfg.getCacheModeString());
-         bean.transactionProtocol(TransactionProtocol.TWO_PHASE_COMMIT);
-         return;
+         if (cfg.isRequireVersioning() && cfg.getVersioningScheme() == null) {
+            log.trace("No versioning scheme specified but versioning is required, defaulting to simple versioning.");
+            cfg.setVersioningScheme(VersioningScheme.SIMPLE);
+         }
+
       }
 
       //eager locking is no longer needed

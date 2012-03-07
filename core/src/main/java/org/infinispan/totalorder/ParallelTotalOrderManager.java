@@ -1,0 +1,359 @@
+package org.infinispan.totalorder;
+
+import org.infinispan.CacheException;
+import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.context.Flag;
+import org.infinispan.context.impl.TxInvocationContext;
+import org.infinispan.factories.annotations.ComponentName;
+import org.infinispan.factories.annotations.Inject;
+import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.jmx.annotations.MBean;
+import org.infinispan.jmx.annotations.ManagedAttribute;
+import org.infinispan.jmx.annotations.ManagedOperation;
+import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.TxDependencyLatch;
+import org.infinispan.transaction.totalOrder.TotalOrderRemoteTransaction;
+import org.infinispan.transaction.xa.GlobalTransaction;
+import org.rhq.helpers.pluginAnnotations.agent.DisplayType;
+import org.rhq.helpers.pluginAnnotations.agent.Metric;
+import org.rhq.helpers.pluginAnnotations.agent.Operation;
+import org.rhq.helpers.pluginAnnotations.agent.Units;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static org.infinispan.factories.KnownComponentNames.TOTAL_ORDER_EXECUTOR;
+
+/**
+ * @author Pedro Ruivo
+ * @author Mircea.markus@jboss.org
+ * @since 5.2
+ */
+@MBean(objectName = "TotalOrderManager", description = "Concurrent total order management")
+public class ParallelTotalOrderManager extends BaseTotalOrderManager {
+
+   private final AtomicLong waitTimeInQueue = new AtomicLong(0);
+   private final AtomicLong initializationDuration = new AtomicLong(0);
+
+   /**
+    * this map is used to keep track of concurrent transactions.
+    */
+   private final ConcurrentMap<Object, TxDependencyLatch> keysLocked = new ConcurrentHashMap<Object, TxDependencyLatch>();
+
+   private volatile ExecutorService validationExecutorService;
+
+   @Inject
+   public void inject(@ComponentName(TOTAL_ORDER_EXECUTOR) ExecutorService e) {
+      validationExecutorService = e;
+   }
+
+   @Override
+   public final void validateTransaction(PrepareCommand prepareCommand, TxInvocationContext ctx,
+                                   CommandInterceptor invoker) {
+      if(trace) log.tracef("validate transaction %s", prepareCommand.getGlobalTransaction().prettyPrint());
+
+      TotalOrderRemoteTransaction remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
+
+      MultiThreadValidation mtv = new MultiThreadValidation(prepareCommand, ctx, invoker, remoteTransaction);
+      Set<TxDependencyLatch> previousTxs = new HashSet<TxDependencyLatch>();
+
+      //this will collect all the count down latch corresponding to the previous transactions in the queue
+      for(Object key : remoteTransaction.getModifiedKeys()) {
+         TxDependencyLatch prevTx = keysLocked.put(key, remoteTransaction.getLatch());
+         if(prevTx != null) {
+            previousTxs.add(prevTx);
+         }
+      }
+
+      mtv.setPreviousTransactions(previousTxs);
+
+      if(trace)
+         log.tracef("Transaction [%s] write set is %s", remoteTransaction.getLatch(), remoteTransaction.getModifiedKeys());
+
+      validationExecutorService.execute(mtv);
+   }
+
+   @Override
+   public final void finishTransaction(TotalOrderRemoteTransaction remoteTransaction) {
+      super.finishTransaction(remoteTransaction);
+      for (Object key : remoteTransaction.getModifiedKeys()) {
+         this.keysLocked.remove(key, remoteTransaction.getLatch());
+      }
+   }
+
+   /**
+    * This class is used to validate transaction in repeatable read with write skew check
+    */
+   private class MultiThreadValidation implements Runnable {
+
+      //the set of others transaction's count down latch (it will be unblocked when the transaction finishes)
+      private final Set<TxDependencyLatch> previousTransactions;
+
+      private TotalOrderRemoteTransaction remoteTransaction = null;
+
+      protected final PrepareCommand prepareCommand;
+      protected final TxInvocationContext txInvocationContext;
+      private final CommandInterceptor invoker;
+
+      private long creationTime = -1;
+      private long validationStartTime = -1;
+      private long validationEndTime = -1;
+      private long initializationEndTime = -1;
+
+      private MultiThreadValidation(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
+                                    CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
+         if (prepareCommand == null || txInvocationContext == null || invoker == null) {
+            throw new IllegalArgumentException("Arguments must not be null");
+         }
+         this.prepareCommand = prepareCommand;
+         this.txInvocationContext = txInvocationContext;
+         this.invoker = invoker;
+         this.creationTime = System.nanoTime();
+         this.previousTransactions = new HashSet<TxDependencyLatch>();
+         this.remoteTransaction = remoteTransaction;
+      }
+
+      public void setPreviousTransactions(Set<TxDependencyLatch> previousTransactions) {
+         this.previousTransactions.addAll(previousTransactions);
+      }
+
+      /**
+       * set the initialization of the thread before the validation ensures the validation order in conflicting
+       * transactions
+       *
+       * @throws InterruptedException if this thread was interrupted
+       */
+      protected void initializeValidation() throws Exception {
+         String gtx = prepareCommand.getGlobalTransaction().prettyPrint();
+         //todo is this really needed?
+         invocationContextContainer.setContext(txInvocationContext);
+
+         if (remoteTransaction.isMarkedForRollback()) {
+            throw new CacheException("Cannot prepare transaction" + gtx + ". it was already marked as rollback");
+         }
+
+         if (previousTransactions.contains(remoteTransaction.getLatch())) {
+            throw new IllegalStateException("Dependency transaction must not contains myself in the set");
+         }
+
+         for (TxDependencyLatch prevTx : previousTransactions) {
+            if (trace)  log.tracef("Transaction %s will wait for %s", gtx, prevTx);
+            prevTx.await();
+         }
+
+         remoteTransaction.markForPreparing();
+
+         if (remoteTransaction.isMarkedForRollback()) {
+            throw new CacheException("Cannot prepare transaction" + gtx + ". it was already marked as rollback");
+         }
+
+         if (remoteTransaction.isMarkedForCommit()) {
+            txInvocationContext.setFlags(Flag.SKIP_WRITE_SKEW_CHECK);
+            prepareCommand.setOnePhaseCommit(true);
+         }
+      }
+
+      @Override
+      public void run() {
+         validationStartTime = System.nanoTime();
+         Object result = null;
+         boolean exception = false;
+         try {
+            if (trace) {
+               log.tracef("Thread %s is validating transaction %s", Thread.currentThread().getName(),
+                          prepareCommand.getGlobalTransaction().prettyPrint());
+            }
+            initializeValidation();
+            initializationEndTime = System.nanoTime();
+
+            //invoke next interceptor in the chain
+            result = prepareCommand.acceptVisitor(txInvocationContext, invoker);
+         } catch (Throwable t) {
+            log.trace("Exception while processing the rest of the interceptor chain", t);
+            if (initializationEndTime == -1) {
+               initializationEndTime = System.nanoTime();
+            }
+            result = t;
+            exception = true;
+         } finally {
+            if (trace) {
+               log.tracef("Transaction %s finished validation (%s). Validation result is %s ",
+                          prepareCommand.getGlobalTransaction().prettyPrint(),
+                          (exception ? "failed" : "ok"), (exception ? ((Throwable) result).getMessage() : result));
+            }
+            finalizeValidation(result, exception);
+            validationEndTime = System.nanoTime();
+            updateDurationStats(creationTime, validationStartTime, validationEndTime, initializationEndTime);
+         }
+      }
+
+      /**
+       * finishes the transaction, ie, mark the modification as applied and set the result (exception or not) invokes
+       * the method #finishTransaction if the transaction has the one phase commit set to true
+       *
+       * @param result    the validation return value
+       * @param exception true if the return value is an exception
+       */
+      protected void finalizeValidation(Object result, boolean exception) {
+         remoteTransaction.markPreparedAndNotify();
+         updateLocalTransaction(result, exception, prepareCommand);
+         if (prepareCommand.isOnePhaseCommit() || exception) {
+            markTxCompleted();
+         }
+      }
+
+      private void markTxCompleted() {
+         finishTransaction(remoteTransaction);
+         transactionTable.removeRemoteTransaction(prepareCommand.getGlobalTransaction());
+      }
+   }
+
+   /**
+    * updates the accumulating time for profiling information
+    *
+    * @param creationTime          the arrival timestamp of the prepare command to this component in remote
+    * @param validationStartTime   the processing start timestamp
+    * @param validationEndTime     the validation ending timestamp
+    * @param initializationEndTime the initialization ending timestamp
+    */
+   private void updateDurationStats(long creationTime, long validationStartTime, long validationEndTime,
+                                    long initializationEndTime) {
+      if (statisticsEnabled) {
+         //set the profiling information
+         waitTimeInQueue.addAndGet(validationStartTime - creationTime);
+         initializationDuration.addAndGet(initializationEndTime - validationStartTime);
+         validationDuration.addAndGet(validationEndTime - initializationEndTime);
+         numberOfTxValidated.incrementAndGet();
+      }
+   }
+
+   @ManagedOperation(description = "Resets the statistics")
+   public void resetStatistics() {
+      super.resetStatistics();
+      waitTimeInQueue.set(0);
+      initializationDuration.set(0);
+   }
+
+
+   @ManagedAttribute(description = "The minimum number of threads in the thread pool")
+   @Metric(displayName = "Minimum Number of Threads", displayType = DisplayType.DETAIL)
+   public int getThreadPoolCoreSize() {
+      if (validationExecutorService instanceof ThreadPoolExecutor) {
+         return ((ThreadPoolExecutor) validationExecutorService).getCorePoolSize();
+      } else {
+         return -1;
+      }
+   }
+
+   @ManagedAttribute(description = "The maximum number of threads in the thread pool")
+   @Metric(displayName = "Maximum Number of Threads", displayType = DisplayType.DETAIL)
+   public int getThreadPoolMaximumPoolSize() {
+      if (validationExecutorService instanceof ThreadPoolExecutor) {
+         return ((ThreadPoolExecutor) validationExecutorService).getMaximumPoolSize();
+      } else {
+         return -1;
+      }
+   }
+
+   @ManagedAttribute(description = "The keep alive time of an idle thread in the thread pool (milliseconds)")
+   @Metric(displayName = "Keep Alive Time of a Idle Thread", units = Units.MILLISECONDS,
+           displayType = DisplayType.DETAIL)
+   public long getThreadPoolKeepTime() {
+      if (validationExecutorService instanceof ThreadPoolExecutor) {
+         return ((ThreadPoolExecutor) validationExecutorService).getKeepAliveTime(TimeUnit.MILLISECONDS);
+      } else {
+         return -1;
+      }
+   }
+
+   @ManagedAttribute(description = "The percentage of occupation of the queue")
+   @Metric(displayName = "Percentage of Occupation of the Queue", units = Units.PERCENTAGE,
+           displayType = DisplayType.SUMMARY)
+   public double getNumberOfTransactionInPendingQueue() {
+      if (validationExecutorService instanceof ThreadPoolExecutor) {
+         BlockingQueue queue = ((ThreadPoolExecutor) validationExecutorService).getQueue();
+         int remainingCapacity = queue.remainingCapacity();
+         int actualSize = queue.size();
+
+         double percentage;
+         if ((Integer.MAX_VALUE - remainingCapacity) > actualSize) {
+            percentage = actualSize * 100.0 / (remainingCapacity + actualSize);
+         } else {
+            percentage = actualSize * 100.0 / remainingCapacity;
+         }
+
+         return percentage > 100 ? 100.0 : percentage;
+      } else {
+         return -1D;
+      }
+   }
+
+   @ManagedAttribute(description = "The approximate percentage of active threads in the thread pool")
+   @Metric(displayName = "Percentage of Active Threads", units = Units.PERCENTAGE, displayType = DisplayType.SUMMARY)
+   public double getPercentageActiveThreads() {
+      if (validationExecutorService instanceof ThreadPoolExecutor) {
+         int max = ((ThreadPoolExecutor) validationExecutorService).getMaximumPoolSize();
+         int actual = ((ThreadPoolExecutor) validationExecutorService).getActiveCount();
+         double percentage = actual * 100.0 / max;
+         return percentage > 100 ? 100.0 : percentage;
+      } else {
+         return -1D;
+      }
+   }
+
+   @ManagedAttribute(description = "Average time in the queue before the validation (milliseconds)")
+   @Metric(displayName = "Average Waiting Duration In Queue", units = Units.MILLISECONDS,
+           displayType = DisplayType.SUMMARY)
+   public double getAverageWaitingTimeInQueue() {
+      long time = waitTimeInQueue.get();
+      int tx = numberOfTxValidated.get();
+      if (tx == 0) {
+         return 0;
+      }
+      return (time / tx) / 1000000.0;
+   }
+
+   @ManagedAttribute(description = "Average duration of a transaction initialization before validation, ie, " +
+         "ensuring the order of transactions (milliseconds)")
+   @Metric(displayName = "Average Initialization Duration", units = Units.MILLISECONDS,
+           displayType = DisplayType.SUMMARY)
+   public double getAverageInitializationDuration() {
+      long time = initializationDuration.get();
+      int tx = numberOfTxValidated.get();
+      if (tx == 0) {
+         return 0;
+      }
+      return (time / tx) / 1000000.0;
+   }
+
+   @ManagedOperation(description = "Set the minimum number of threads in the thread pool")
+   @Operation(displayName = "Set Minimum Number Of Threads")
+   public void setThreadPoolCoreSize(int size) {
+      if (validationExecutorService instanceof ThreadPoolExecutor) {
+         ((ThreadPoolExecutor) validationExecutorService).setCorePoolSize(size);
+      }
+   }
+
+   @ManagedOperation(description = "Set the maximum number of threads in the thread pool")
+   @Operation(displayName = "Set Maximum Number Of Threads")
+   public void setThreadPoolMaximumPoolSize(int size) {
+      if (validationExecutorService instanceof ThreadPoolExecutor) {
+         ((ThreadPoolExecutor) validationExecutorService).setMaximumPoolSize(size);
+      }
+   }
+
+   @ManagedOperation(description = "Set the idle time of a thread in the thread pool (milliseconds)")
+   @Operation(displayName = "Set Keep Alive Time of Idle Threads")
+   public void setThreadPoolKeepTime(long time) {
+      if (validationExecutorService instanceof ThreadPoolExecutor) {
+         ((ThreadPoolExecutor) validationExecutorService).setKeepAliveTime(time, TimeUnit.MILLISECONDS);
+      }
+   }
+}

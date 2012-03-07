@@ -490,7 +490,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
                if (singleRecipient) singleJGAddress = toJGroupsAddress(others.get(0));
             }
             if (!skipRpc) {
-               if (singleRecipient) {
+               if (singleRecipient && !totalOrder) {
                   if (singleJGAddress == null) singleJGAddress = jgAddressList.get(0);
                   singleResponse = dispatcher.invokeRemoteCommand(singleJGAddress, rpcCommand, toJGroupsMode(mode), timeout,
                                                                   usePriorityQueue, asyncMarshalling);
@@ -694,7 +694,22 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
       boolean hasSequencer = protocolStack.findProtocol(SEQUENCER.class) != null;
       if (!hasSequencer && protocolStack.findProtocol(GMS.class) != null) {
          try {
-            protocolStack.insertProtocol(new SEQUENCER(), ProtocolStack.ABOVE, GMS.class);
+            //hack! the sequencer cannot set into the jgroups channel before the start, as it might only be required
+            //by certain caches...
+            // todo Might be simpler to just ship the sequencer by default in our stack
+            SEQUENCER sequencer = new SEQUENCER();
+            View view = channel.getView();
+            try {
+               sequencer.down(new Event(Event.VIEW_CHANGE, view));
+            } catch (NullPointerException e) {
+               //ignore it, as the sequencer calls next.down and next is null at this stage
+            }
+            try {
+               sequencer.down(new Event(Event.SET_LOCAL_ADDRESS, channel.getAddress()));
+            } catch (NullPointerException e) {
+               //ignore it, as the sequencer calls next.down and next is null at this stage
+            }
+            protocolStack.insertProtocol(sequencer, ProtocolStack.ABOVE, GMS.class);
             log.trace("JGroups SEQUENCER not found, but added to the protocol stack.");
          } catch (Exception e) {
             log.cannotInsertJGroupsSequencer(e);

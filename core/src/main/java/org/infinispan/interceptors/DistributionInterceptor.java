@@ -312,7 +312,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
          stateTransferLock.waitForStateTransferToEnd(ctx, command, newCacheViewId);
          final Collection<Address> affectedNodes = dm.getAffectedNodes(command.getKeys());
          ((LocalTxInvocationContext) ctx).remoteLocksAcquired(affectedNodes);
-         rpcManager.invokeRemotely(affectedNodes, command, true, true);
+         rpcManager.invokeRemotely(affectedNodes, command, true, true, false);
       }
       return invokeNextInterceptor(ctx, command);
    }
@@ -378,7 +378,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
          }
       }
 
-      Map<Address, Response> responses = rpcManager.invokeRemotely(recipients, command, syncCommitPhase, true);
+      Map<Address, Response> responses = rpcManager.invokeRemotely(recipients, command, syncCommitPhase, true, false);
       if (!responses.isEmpty()) {
          List<Address> resendTo = new LinkedList<Address>();
          for (Map.Entry<Address, Response> r : responses.entrySet()) {
@@ -389,7 +389,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
          if (!resendTo.isEmpty()) {
             log.debugf("Need to resend prepares for %s to %s", command.getGlobalTransaction(), resendTo);
             PrepareCommand pc = buildPrepareCommandForResend(ctx, command);
-            rpcManager.invokeRemotely(resendTo, pc, true, true);
+            rpcManager.invokeRemotely(resendTo, pc, true, true, false);
          }
       }
    }
@@ -431,7 +431,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
       if (shouldInvokeRemoteTxCommand(ctx)) {
-         rpcManager.invokeRemotely(dm.getAffectedNodes(ctx.getAffectedKeys()), command, configuration.isSyncRollbackPhase(), true);
+         rpcManager.invokeRemotely(dm.getAffectedNodes(ctx.getAffectedKeys()), command, configuration.isSyncRollbackPhase(), true, false);
       }
 
       return invokeNextInterceptor(ctx, command);

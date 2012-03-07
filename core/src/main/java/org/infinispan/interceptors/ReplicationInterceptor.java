@@ -99,7 +99,7 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
          throws TimeoutException, InterruptedException {
       // may need to resend, so make the commit command synchronous
       // TODO keep the list of prepared nodes or the view id when the prepare command was sent to know whether we need to resend the prepare info
-      Map<Address, Response> responses = rpcManager.invokeRemotely(null, command, configuration.isSyncCommitPhase(), true);
+      Map<Address, Response> responses = rpcManager.invokeRemotely(null, command, configuration.isSyncCommitPhase(), true, false);
       if (!responses.isEmpty()) {
          List<Address> resendTo = new LinkedList<Address>();
          for (Map.Entry<Address, Response> r : responses.entrySet()) {
@@ -110,7 +110,7 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
          if (!resendTo.isEmpty()) {
             getLog().debugf("Need to resend prepares for %s to %s", command.getGlobalTransaction(), resendTo);
             PrepareCommand pc = buildPrepareCommandForResend(ctx, command);
-            rpcManager.invokeRemotely(resendTo, pc, true, true);
+            rpcManager.invokeRemotely(resendTo, pc, true, true, false);
          }
       }
    }
@@ -133,15 +133,14 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
    }
 
    protected void broadcastPrepare(TxInvocationContext context, PrepareCommand command) {
-      boolean async = configuration.getCacheMode() == Configuration.CacheMode.REPL_ASYNC &&
-            !configuration.isTotalOrder();
-      rpcManager.broadcastRpcCommand(command, !async, false);
+      boolean asyncPrepare =  !configuration.getCacheMode().isSynchronous() || configuration.isTotalOrder();
+      rpcManager.broadcastRpcCommand(command, asyncPrepare, false, configuration.isTotalOrder());
    }
 
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
       if (shouldInvokeRemoteTxCommand(ctx) && !configuration.isOnePhaseCommit()) {
-         rpcManager.broadcastRpcCommand(command, configuration.isSyncRollbackPhase(), true);
+         rpcManager.broadcastRpcCommand(command, configuration.isSyncRollbackPhase(), true, false);
       }
       return invokeNextInterceptor(ctx, command);
    }
@@ -187,7 +186,7 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
             rpcManager.broadcastRpcCommandInFuture(command, future);
             return future;
          } else {
-            rpcManager.broadcastRpcCommand(command, isSynchronous(ctx));
+            rpcManager.broadcastRpcCommand(command, isSynchronous(ctx), false);
          }
       }
       return returnValue;

@@ -78,7 +78,7 @@ public abstract class AbstractEnlistmentAdapter {
          final TxCompletionNotificationCommand command = commandsFactory.buildTxCompletionNotificationCommand(null, gtx);
          final Collection<Address> owners = clusteringLogic.getOwners(localTransaction.getAffectedKeys());
          log.tracef("About to invoke tx completion notification on nodes %s", owners);
-         rpcManager.invokeRemotely(owners, command, false, true);
+         rpcManager.invokeRemotely(owners, command, false, true, false);
       }
    }
 

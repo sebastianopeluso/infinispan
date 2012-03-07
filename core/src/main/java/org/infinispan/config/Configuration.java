@@ -4929,4 +4929,13 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    public org.infinispan.configuration.cache.Configuration newConfiguration() {
       return newConfig;
    }
+   
+   public boolean isRequireVersioning() {
+      boolean isOptimisticWithWSCheck = isTransactionalCache() && isWriteSkewCheck() &&
+            getTransactionLockingMode() == LockingMode.OPTIMISTIC && isEnableVersioning();
+      boolean isTransactionalWithTotalOrder = isTotalOrder() &&
+            locking.getIsolationLevel() == IsolationLevel.REPEATABLE_READ && locking.isWriteSkewCheck();
+
+      return isOptimisticWithWSCheck || isTransactionalWithTotalOrder;
+   }
 }

@@ -7,7 +7,6 @@ import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.VersionedEntryWrappingInterceptor;
-import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -17,10 +16,11 @@ import org.infinispan.util.logging.LogFactory;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class TOVersionedEntryWrappingInterceptor extends VersionedEntryWrappingInterceptor {
-   private static final Log log = LogFactory.getLog(TOVersionedEntryWrappingInterceptor.class);
+public class ToVersionedEntryWrappingInterceptor extends VersionedEntryWrappingInterceptor {
 
-   private boolean trace = false;
+   private static final Log log = LogFactory.getLog(ToVersionedEntryWrappingInterceptor.class);
+
+   private boolean trace;
 
    @Start
    public void setLogLevel() {
@@ -31,13 +31,13 @@ public class TOVersionedEntryWrappingInterceptor extends VersionedEntryWrappingI
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       String globalTransactionString = null;
       if (trace) {
-         globalTransactionString = Util.prettyPrintGlobalTransaction(command.getGlobalTransaction());
+         globalTransactionString = command.getGlobalTransaction().prettyPrint();
       }
 
       if (!ctx.isOriginLocal() || command.isReplayEntryWrapping()) {
-         if(trace) {
+         if (trace) {
             log.tracef("Received a prepare command. Transaction: %s, Versions: %s",
-                  globalTransactionString, ((VersionedPrepareCommand) command).getVersionsSeen());
+                       globalTransactionString, ((VersionedPrepareCommand) command).getVersionsSeen());
          }
          for (WriteCommand c : command.getModifications()) {
             c.acceptVisitor(ctx, entryWrappingVisitor);
@@ -49,18 +49,18 @@ public class TOVersionedEntryWrappingInterceptor extends VersionedEntryWrappingI
 
       if (!ctx.isOriginLocal()) {
          newVersionData = cll.createNewVersionsAndCheckForWriteSkews(versionGenerator, ctx,
-               (VersionedPrepareCommand) command);
+                                                                     (VersionedPrepareCommand) command);
          if (command.isOnePhaseCommit()) {
-            if(trace) {
+            if (trace) {
                log.tracef("Transaction %s is committing now. new versions are: %s",
-                     globalTransactionString, newVersionData);
+                          globalTransactionString, newVersionData);
             }
             ctx.getCacheTransaction().setUpdatedEntryVersions(newVersionData);
             commitContextEntries(ctx);
          } else {
-            if(trace) {
+            if (trace) {
                log.tracef("Transaction %s will be committed in the 2nd phase. new versions are: %s",
-                     globalTransactionString, newVersionData);
+                          globalTransactionString, newVersionData);
             }
          }
       }
