@@ -261,6 +261,16 @@ public class TotalOrderManager {
    }
 
    /**
+    * Added the new versions from the key owner. (only for Distribution)
+    * @param gtx the transaction
+    * @param result the result (new versions or an exception)
+    * @param exception true if result is an exception
+    */
+   public void addVersions(GlobalTransaction gtx, Object result, boolean exception) {
+      //no-op
+   }
+
+   /**
     * updates the accumulating time for profiling information
     * @param creationTime the arrival timestamp of the prepare command to this component in remote
     * @param validationStartTime the processing start timestamp
@@ -334,13 +344,7 @@ public class TotalOrderManager {
        * @param exception true if the return value is an exception
        */
       protected void finalizeValidation(Object result, boolean exception) {
-         GlobalTransaction gtx = prepareCommand.getGlobalTransaction();
-         LocalTransaction localTransaction = localTransactionMap.get(gtx);
-
-         if(localTransaction != null) {
-            localTransaction.addPrepareResult(result, exception);
-            localTransactionMap.remove(gtx);
-         }
+         notifyLocalTransaction(prepareCommand.getGlobalTransaction(), result, exception);         
       }
 
       @Override

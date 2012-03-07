@@ -53,6 +53,7 @@ public class DistributedTotalOrderManager extends TotalOrderManager {
       versionsCollectorMap.remove(gtx);
    }
 
+   @Override
    public void addVersions(GlobalTransaction gtx, Object result, boolean exception) {
       VersionsCollector versionsCollector = versionsCollectorMap.get(gtx);
       if (versionsCollector != null) {
@@ -144,7 +145,7 @@ public class DistributedTotalOrderManager extends TotalOrderManager {
          keysMissingVersions.removeAll(newVersions.keySet());
          finalVersions.putAll(newVersions);
          alreadyProcessed = keysMissingVersions.isEmpty();
-         return keysMissingVersions.isEmpty();
+         return alreadyProcessed;
       }
 
       public synchronized boolean addException(Object exceptionObject) {

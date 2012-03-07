@@ -430,7 +430,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
 
    @Override
    public Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout, boolean usePriorityQueue, ResponseFilter responseFilter,
-                                                boolean supportReplay, boolean totalOrder) throws Exception {
+                                                boolean supportReplay, boolean totalOrder, boolean distribution) throws Exception {
 
       if (recipients != null && recipients.isEmpty()) {
          // don't send if dest list is empty
@@ -449,6 +449,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
             recipients.retainAll(getMembers());
          }
       }
+            
       boolean asyncMarshalling = mode == ResponseMode.ASYNCHRONOUS;
       if (!usePriorityQueue && (ResponseMode.SYNCHRONOUS == mode || ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS == mode))
          usePriorityQueue = true;
@@ -464,7 +465,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
       if (broadcast) {
          rsps = dispatcher.broadcastRemoteCommands(rpcCommand, toJGroupsMode(mode), timeout, recipients != null,
                                                    usePriorityQueue, toJGroupsFilter(responseFilter), supportReplay,
-                                                   asyncMarshalling, totalOrder);
+                                                   asyncMarshalling, totalOrder, distribution);
       } else {         
          if (jgAddressList == null || !jgAddressList.isEmpty()) {
             boolean singleRecipient = jgAddressList != null && jgAddressList.size() == 1;
@@ -484,7 +485,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
                } else {
                   rsps = dispatcher.invokeRemoteCommands(jgAddressList, rpcCommand, toJGroupsMode(mode), timeout,
                                                          recipients != null, usePriorityQueue, toJGroupsFilter(responseFilter),
-                                                         supportReplay, asyncMarshalling, totalOrder);
+                                                         supportReplay, asyncMarshalling, totalOrder, distribution);
                }
             }
          }

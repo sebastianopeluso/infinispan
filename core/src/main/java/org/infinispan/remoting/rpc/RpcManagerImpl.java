@@ -29,6 +29,7 @@ import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.commands.tx.PrepareResponseCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.config.Configuration;
 import org.infinispan.config.ConfigurationException;
@@ -142,7 +143,7 @@ public class RpcManagerImpl implements RpcManager {
          forceOOB = configuration.isTotalOrder();
       }
 
-      usePriorityQueue = usePriorityQueue || forceOOB;
+      usePriorityQueue = usePriorityQueue || forceOOB || rpcCommand instanceof PrepareResponseCommand;
 
       List<Address> clusterMembers = t.getMembers();
       if (!sendInTotalOrder && clusterMembers.size() < 2) {
@@ -168,7 +169,8 @@ public class RpcManagerImpl implements RpcManager {
                   responseFilter = new IgnoreExtraResponsesValidityFilter(cacheMembers, getAddress());
                }
             }
-            Map<Address, Response> result = t.invokeRemotely(recipients, rpcCommand, mode, timeout, usePriorityQueue, responseFilter, stateTransferEnabled, sendInTotalOrder);
+            Map<Address, Response> result = t.invokeRemotely(recipients, rpcCommand, mode, timeout, usePriorityQueue, 
+                  responseFilter, stateTransferEnabled, sendInTotalOrder, configuration.getCacheMode().isDistributed());
             if (statisticsEnabled) replicationCount.incrementAndGet();
             return result;
          } catch (CacheException e) {

@@ -123,13 +123,8 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
 
       //load total order interceptor
       if (configuration.isTotalOrder()) {
-         if (configuration.getCacheMode().isDistributed()) {
-            interceptorChain.appendInterceptor(createInterceptor(new DistTotalOrderInterceptor(),
-                  DistTotalOrderInterceptor.class), false);
-         } else {
-            interceptorChain.appendInterceptor(createInterceptor(new TotalOrderInterceptor(),
-                  TotalOrderInterceptor.class), false);
-         }
+         interceptorChain.appendInterceptor(createInterceptor(new TotalOrderInterceptor(),
+               TotalOrderInterceptor.class), false);
       }
 
       // load the tx interceptor
@@ -220,8 +215,8 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          case DIST_SYNC:
             if (needsVersionAwareComponents) {
                if (configuration.isTotalOrder()) {
-                  interceptorChain.appendInterceptor(createInterceptor(new TODistributionInterceptor(),
-                        TODistributionInterceptor.class), false);
+                  interceptorChain.appendInterceptor(createInterceptor(new TOVersionedDistributionInterceptor(),
+                        TOVersionedDistributionInterceptor.class), false);
                } else {
                   interceptorChain.appendInterceptor(createInterceptor(new VersionedDistributionInterceptor(), VersionedDistributionInterceptor.class), false);
                }
@@ -271,14 +266,14 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             List<CommandInterceptor> withClassName = interceptorChain.getInterceptorsWithClassName(config.getAfter());
             if (withClassName.isEmpty()) {
                throw new ConfigurationException("Cannot add after class: " + config.getAfter()
-                                                      + " as no such interceptor exists in the default chain");
+                     + " as no such interceptor exists in the default chain");
             }
             interceptorChain.addInterceptorAfter(customInterceptor, withClassName.get(0).getClass());
          } else if (config.getBefore() != null) {
             List<CommandInterceptor> withClassName = interceptorChain.getInterceptorsWithClassName(config.getBefore());
             if (withClassName.isEmpty()) {
                throw new ConfigurationException("Cannot add before class: " + config.getAfter()
-                                                      + " as no such interceptor exists in the default chain");
+                     + " as no such interceptor exists in the default chain");
             }
             interceptorChain.addInterceptorBefore(customInterceptor, withClassName.get(0).getClass());
          }

@@ -87,12 +87,13 @@ public interface Transport extends Lifecycle {
     * @param responseFilter   a response filter with which to filter out failed/unwanted/invalid responses.
     * @param supportReplay    whether replays of missed messages is supported
     * @param totalOrder       the command will be send with total order properties
+    * @param distribution     indicates if the command is sent from a cache in distribution mode
     * @return a map of responses from each member contacted.
     * @throws Exception in the event of problems.
     */
    Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, ResponseMode mode, long timeout,
                                  boolean usePriorityQueue, ResponseFilter responseFilter, boolean supportReplay,
-                                 boolean totalOrder) throws Exception;
+                                 boolean totalOrder, boolean distribution) throws Exception;
 
    /**
     * @return true if the current Channel is the coordinator of the cluster.

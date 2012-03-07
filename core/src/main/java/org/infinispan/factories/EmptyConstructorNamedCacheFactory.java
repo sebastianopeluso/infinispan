@@ -115,9 +115,11 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
                notTransactional ? new ReentrantPerEntryLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantPerEntryLockContainer(configuration.getConcurrencyLevel());
          return (T) lockContainer;
       } else if (componentType.equals(TotalOrderManager.class)) {
-         return (T) new TotalOrderManager();
-      } else if (componentType.equals(DistributedTotalOrderManager.class)) {
-         return (T) new DistributedTotalOrderManager();
+         if (configuration.getCacheMode().isReplicated()) {
+            return (T) new TotalOrderManager();
+         } else {
+            return (T) new DistributedTotalOrderManager();
+         }
       }
 
 
