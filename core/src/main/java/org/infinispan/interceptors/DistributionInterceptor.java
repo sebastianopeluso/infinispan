@@ -398,7 +398,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       Object retVal = invokeNextInterceptor(ctx, command);
 
-      boolean sync = isSynchronous(ctx);
+      boolean sync = initContextAndCheckSync(ctx, command);
 
       if (shouldInvokeRemoteTxCommand(ctx)) {
          int newCacheViewId = -1;
@@ -577,4 +577,28 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
       }
    }
 
+   /**
+    * Initialize the context in Total Order protocol and check if the message must be send in a sync or an async way
+    * 
+    * @param context the context     
+    * @param command the prepare command
+    * @return true for sync, false otherwise
+    */
+   private boolean initContextAndCheckSync(TxInvocationContext context, PrepareCommand command) {
+      boolean totalOrder = configuration.isTotalOrder();
+      if (totalOrder) {
+         //Affected keys set in Total Order is not initialized (no locks to initialize)
+         context.addAllAffectedKeys(command.getAffectedKeys());
+      }
+      boolean sync = isSynchronous(context);
+      if (!sync) {
+         return false;
+      }
+      if (configuration.getCacheMode().isSynchronous() && totalOrder) {
+         return false; //we want async prepare command for total order 
+      }
+      //we have to send it sync because the flag in context is set
+      return true;      
+   }
+   
 }

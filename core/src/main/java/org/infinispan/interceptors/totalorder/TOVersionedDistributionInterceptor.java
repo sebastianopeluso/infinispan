@@ -26,14 +26,6 @@ public class TOVersionedDistributionInterceptor extends VersionedDistributionInt
    private static final Log log = LogFactory.getLog(TOVersionedDistributionInterceptor.class);
 
    @Override
-   public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-      //we have no locking interceptor and this set of affected keys is never populated! this solve
-      //the problem (locate keys is returning a empty list of address!!)
-      ctx.addAllAffectedKeys(command.getAffectedKeys());
-      return super.visitPrepareCommand(ctx, command);
-   }
-
-   @Override
    protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command,
                                          Collection<Address> recipients, boolean sync) {      
 

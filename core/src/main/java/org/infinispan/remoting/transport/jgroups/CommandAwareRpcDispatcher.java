@@ -333,6 +333,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             address.addAllAddress(card.members);
          } else {
             address.addAllAddress(dests);
+            address.addAddress(card.local_addr);
          }
          
          message.setDest(address);
