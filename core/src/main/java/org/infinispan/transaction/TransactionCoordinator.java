@@ -52,6 +52,7 @@ import static javax.transaction.xa.XAResource.XA_RDONLY;
  * through {@link org.infinispan.transaction.synchronization.SynchronizationAdapter}.
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
  * @since 5.0
  */
 public class TransactionCoordinator {
@@ -67,7 +68,7 @@ public class TransactionCoordinator {
 
    boolean trace;
 
-   //Pedro -- indicates if the versioning is enabled, ie, is repeatable read with write skew, optimistic locking
+   //Indicates if the versioning is enabled, ie, is repeatable read with write skew, optimistic locking
    //and versioning
    private boolean versioningEnabled;
 
@@ -132,18 +133,15 @@ public class TransactionCoordinator {
 
    public final int prepare(LocalTransaction localTransaction, boolean replayEntryWrapping) throws XAException {
       validateNotMarkedForRollback(localTransaction);
-      //Pedro -- total order protocol with one phase commit
+
       if (configuration.isOnePhaseCommit() || is1PcForAutoCommitTransaction(localTransaction) ||
-            isOnePhaseTotalOrder(localTransaction)) {
+            isOnePhaseTotalOrder()) {
          if (trace) log.tracef("Received prepare for tx: %s. Skipping call as 1PC will be used.", localTransaction);
          return XA_OK;
       }
 
       PrepareCommand prepareCommand = commandCreator.createPrepareCommand(localTransaction.getGlobalTransaction(), localTransaction.getModifications());
       if (trace) log.tracef("Sending prepare command through the chain: %s", prepareCommand);
-
-      //Pedro -- set the total order flags
-      setTOFlags(prepareCommand);
 
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();
       prepareCommand.setReplayEntryWrapping(replayEntryWrapping);
@@ -177,9 +175,8 @@ public class TransactionCoordinator {
       if (trace) log.tracef("Committing transaction %s", localTransaction.getGlobalTransaction());
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();
       ctx.setLocalTransaction(localTransaction);
-      //Pedro -- one phase total order commit
       if (configuration.isOnePhaseCommit() || isOnePhase || is1PcForAutoCommitTransaction(localTransaction) ||
-            isOnePhaseTotalOrder(localTransaction)) {
+            isOnePhaseTotalOrder()) {
          validateNotMarkedForRollback(localTransaction);
 
          if (trace) log.trace("Doing an 1PC prepare call on the interceptor chain");
@@ -197,8 +194,6 @@ public class TransactionCoordinator {
                   localTransaction.getModifications(), true);
          }
 
-         //Pedro -- set total order
-         setTOFlags(command);
          try {
             invoker.invoke(ctx, command);
          } catch (Throwable e) {
@@ -206,7 +201,6 @@ public class TransactionCoordinator {
          }
       } else {
          CommitCommand commitCommand = commandCreator.createCommitCommand(localTransaction.getGlobalTransaction());
-         setTOFlags(commitCommand);
          try {
             invoker.invoke(ctx, commitCommand);
             txTable.removeLocalTransaction(localTransaction);
@@ -252,10 +246,6 @@ public class TransactionCoordinator {
    private void rollbackInternal(LocalTransaction localTransaction) throws Throwable {
       if (trace) log.tracef("rollback transaction %s ", localTransaction.getGlobalTransaction());
       RollbackCommand rollbackCommand = commandsFactory.buildRollbackCommand(localTransaction.getGlobalTransaction());
-
-      //Pedro: set the Total Order flags
-      setTOFlags(rollbackCommand);
-
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();
       ctx.setLocalTransaction(localTransaction);
       invoker.invoke(ctx, rollbackCommand);
@@ -274,18 +264,14 @@ public class TransactionCoordinator {
       return configuration.isUse1PcForAutoCommitTransactions() && localTransaction.isImplicitTransaction();
    }
 
-   //Pedro -- one phase commit with total order protocol
-   //it can commit in one phase if the write skew is disable or the transaction doesn't need the write skew check
-   //ie, the intersection of readset and writeset is empty
-   //note: this method is invoked when configuration.isOnePhase() is false
-   private boolean isOnePhaseTotalOrder(LocalTransaction tx) {
-      return configuration.isTotalOrder() && (!versioningEnabled || tx.noWriteSkewCheckNeeded() ||
-            configuration.isTO1PC());
-   }
-
-   //Pedro: set the Total Order flags
-   private void setTOFlags(AbstractTransactionBoundaryCommand command) {
-      command.setTOFlags(configuration.isTotalOrder(), configuration.getCacheMode().isDistributed());
+   /**
+    * a transaction can commit in one phase, in total order protocol, when the write skew is disable or the one phase
+    * configuration parameter is set to true.
+    *
+    * @return true if it can use 1PC false otherwise
+    */
+   private boolean isOnePhaseTotalOrder() {
+      return configuration.isTotalOrder() && (!versioningEnabled || configuration.isUse1PCInTotalOrder());
    }
 
    private static interface CommandCreator {

@@ -43,9 +43,14 @@ import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
 import org.infinispan.totalorder.DistributedTotalOrderValidator;
-import org.infinispan.totalorder.TotalOrderValidator;
+import org.infinispan.totalorder.TotalOrderManager;
 import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.xa.recovery.RecoveryAdminOperations;
+import org.infinispan.util.concurrent.locks.containers.LockContainer;
+import org.infinispan.util.concurrent.locks.containers.OwnableReentrantPerEntryLockContainer;
+import org.infinispan.util.concurrent.locks.containers.OwnableReentrantStripedLockContainer;
+import org.infinispan.util.concurrent.locks.containers.ReentrantPerEntryLockContainer;
+import org.infinispan.util.concurrent.locks.containers.ReentrantStripedLockContainer;
 
 import static org.infinispan.util.Util.getInstance;
 
@@ -53,13 +58,14 @@ import static org.infinispan.util.Util.getInstance;
  * Simple factory that just uses reflection and an empty constructor of the component type.
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
+ * @author Pedro Ruivo
  * @since 4.0
  */
 @DefaultFactoryFor(classes = {CacheNotifier.class, CommandsFactory.class,
-      CacheLoaderManager.class, InvocationContextContainer.class, PassivationManager.class,
-      BatchContainer.class, EvictionManager.class,
-      TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
-      ClusteringDependentLogic.class, TotalOrderValidator.class, DistributedTotalOrderValidator.class})
+                              CacheLoaderManager.class, InvocationContextContainer.class, PassivationManager.class,
+                              BatchContainer.class, EvictionManager.class,
+                              TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
+                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class, DistributedTotalOrderValidator.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -102,9 +108,14 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          return (T) new StateTransferLockImpl();
       } else if (componentType.equals(EvictionManager.class)) {
          return (T) new EvictionManagerImpl();
-         //Pedro -- added the constructor for the total order validator
-      } else if (componentType.equals(TotalOrderValidator.class)) {
-         return (T) new TotalOrderValidator();
+      } else if (componentType.equals(LockContainer.class)) {
+         boolean  notTransactional = !configuration.isTransactionalCache();
+         LockContainer lockContainer = configuration.isUseLockStriping() ?
+               notTransactional ? new ReentrantStripedLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantStripedLockContainer(configuration.getConcurrencyLevel()) :
+               notTransactional ? new ReentrantPerEntryLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantPerEntryLockContainer(configuration.getConcurrencyLevel());
+         return (T) lockContainer;
+      } else if (componentType.equals(TotalOrderManager.class)) {
+         return (T) new TotalOrderManager();
       } else if (componentType.equals(DistributedTotalOrderValidator.class)) {
          return (T) new DistributedTotalOrderValidator();
       }

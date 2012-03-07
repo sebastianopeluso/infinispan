@@ -31,6 +31,7 @@ import org.infinispan.transaction.xa.GlobalTransaction;
  * Command corresponding to the 2nd phase of 2PC.
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
+ * @author Pedro Ruivo
  * @since 4.0
  */
 public class CommitCommand extends AbstractTransactionBoundaryCommand {
@@ -75,21 +76,19 @@ public class CommitCommand extends AbstractTransactionBoundaryCommand {
       return "CommitCommand {" + super.toString();
    }
 
-   //Pedro -- added new type of performing
-
+   /**
+    * choose the method to invoke depending if the total order protocol is be used or not
+    *
+    * @param ctx the context
+    * @return the value to be returned to the invoked
+    * @throws Throwable if something goes wrong
+    */
    @Override
    public Object perform(InvocationContext ctx) throws Throwable {
-      if (isOOB()) {
+      if (configuration.isTotalOrder()) {
          return super.performIgnoringUnexistingTransaction(ctx);
       } else {
          return super.perform(ctx);
       }
-   }
-
-   @Override
-   public void setTOFlags(boolean totalOrder, boolean distribution) {
-      if (totalOrder) {
-         setFlag(TO_OOB);
-      }
-   }
+   }   
 }

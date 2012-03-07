@@ -9,6 +9,7 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.totalOrder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
 import java.util.Collection;
@@ -23,7 +24,7 @@ import java.util.concurrent.ConcurrentMap;
  * @author pruivo
  * @since 4.0
  */
-public class DistributedTotalOrderValidator extends TotalOrderValidator {
+public class DistributedTotalOrderValidator extends TotalOrderManager {
 
    private CommandsFactory commandsFactory;
    private ConcurrentMap<GlobalTransaction, VersionsCollector> versionsCollectorMap =
@@ -73,15 +74,16 @@ public class DistributedTotalOrderValidator extends TotalOrderValidator {
 
    @Override
    protected MultiThreadValidation createMultiThreadValidation(PrepareCommand prepareCommand, TxInvocationContext ctx,
-                                                               CommandInterceptor invoker) {
-      return new DistMultiThreadValidation(prepareCommand, ctx, invoker);
+                                                               CommandInterceptor invoker, 
+                                                               TotalOrderRemoteTransaction totalOrderRemoteTransaction) {
+      return new DistMultiThreadValidation(prepareCommand, ctx, invoker, totalOrderRemoteTransaction);
    }
 
    protected class DistMultiThreadValidation extends MultiThreadValidation {
 
       private DistMultiThreadValidation(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
-                                        CommandInterceptor invoker) {
-         super(prepareCommand, txInvocationContext, invoker);
+                                        CommandInterceptor invoker, TotalOrderRemoteTransaction totalOrderRemoteTransaction) {
+         super(prepareCommand, txInvocationContext, invoker, totalOrderRemoteTransaction);
       }
 
       @Override
@@ -90,7 +92,7 @@ public class DistributedTotalOrderValidator extends TotalOrderValidator {
             super.finalizeValidation(result, exception);
             return;
          }
-         txInfo.markPreparedAndNotify();
+         remoteTransaction.markPreparedAndNotify();
          //result is the new versions (or an exception)
          GlobalTransaction gtx = prepareCommand.getGlobalTransaction();
          VersionsCollector versionsCollector = versionsCollectorMap.get(gtx);

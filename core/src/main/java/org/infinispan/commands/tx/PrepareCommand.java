@@ -45,6 +45,7 @@ import java.util.*;
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
  * @since 4.0
  */
 public class PrepareCommand extends AbstractTransactionBoundaryCommand {
@@ -59,7 +60,7 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
    protected CacheNotifier notifier;
    protected RecoveryManager recoveryManager;
    private transient boolean replayEntryWrapping  = false;
-
+   
    private static final WriteCommand[] EMPTY_WRITE_COMMAND_ARRAY = new WriteCommand[0];
 
 
@@ -100,7 +101,15 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       }
 
       // 1. first create a remote transaction
-      RemoteTransaction remoteTransaction = txTable.getRemoteTransaction(globalTx);
+      RemoteTransaction remoteTransaction;
+      //In total order protocol, a race condition can happen. see the javadoc in
+      //TransactionTable.getOrCreateIfAbsentRemoteTransaction
+      if (configuration.isTotalOrder()) {
+         remoteTransaction = txTable.getOrCreateIfAbsentRemoteTransaction(globalTx);
+      } else {
+         remoteTransaction = txTable.getRemoteTransaction(globalTx);
+      }
+
       boolean remoteTxInitiated = remoteTransaction != null;
       if (!remoteTxInitiated) {
          remoteTransaction = txTable.createRemoteTransaction(globalTx, modifications);
@@ -108,8 +117,8 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
          /*
           * remote tx was already created by Cache#lock() API call
           * set the proper modifications since lock has none
-          *
-          * @see LockControlCommand.java
+          * 
+          * @see LockControlCommand.java 
           * https://jira.jboss.org/jira/browse/ISPN-48
           */
          remoteTransaction.setModifications(getModifications());
@@ -156,7 +165,7 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       Object[] retval = new Object[numMods + params];
       retval[i++] = globalTx;
       retval[i++] = onePhaseCommit;
-      retval[i] = numMods;
+      retval[i++] = numMods;
       if (numMods > 0) System.arraycopy(modifications, 0, retval, params, numMods);
       return retval;
    }
@@ -237,19 +246,13 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       return false;
    }
 
-   //Pedro: setter
+   /**
+    * set the prepare command as one phase commit (when the commit or rollback commands
+    * are received before the prepare command in total order protocol)
+    *
+    * @param onePhaseCommit true for one phase commit, false otherwise
+    */
    public void setOnePhaseCommit(boolean onePhaseCommit) {
       this.onePhaseCommit = onePhaseCommit;
-   }
-
-   //Pedro: override
-   @Override
-   public void setTOFlags(boolean totalOrder, boolean distribution) {
-      if (totalOrder) {
-         setFlag(TO_SEND);
-      }
-      if (distribution) {
-         setFlag(TO_DIST);
-      }
    }
 }

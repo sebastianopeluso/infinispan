@@ -135,7 +135,10 @@ public class TestCacheManagerFactory {
    }
 
    private static void amendJTA(ConfigurationBuilder builder) {
-      builder.transaction().transactionManagerLookup((TransactionManagerLookup) Util.getInstance(TransactionSetup.getManagerLookup(), TestCacheManagerFactory.class.getClassLoader()));
+      org.infinispan.configuration.cache.Configuration c = builder.build();
+      if (c.transaction().transactionMode().equals(TransactionMode.TRANSACTIONAL) && c.transaction().transactionManagerLookup() == null) {
+         builder.transaction().transactionManagerLookup((TransactionManagerLookup) Util.getInstance(TransactionSetup.getManagerLookup(), TestCacheManagerFactory.class.getClassLoader()));
+      }
    }
 
    /**
@@ -169,6 +172,10 @@ public class TestCacheManagerFactory {
 
    public static EmbeddedCacheManager createClusteredCacheManager(GlobalConfigurationBuilder gcb, ConfigurationBuilder defaultCacheConfig) {
       return createClusteredCacheManager(gcb, defaultCacheConfig, new TransportFlags());
+   }
+
+   public static EmbeddedCacheManager createClusteredCacheManager(ConfigurationBuilder defaultCacheConfig) {
+      return createClusteredCacheManager(GlobalConfigurationBuilder.defaultClusteredBuilder(), defaultCacheConfig);
    }
 
    public static EmbeddedCacheManager createClusteredCacheManager(GlobalConfigurationBuilder gcb, ConfigurationBuilder defaultCacheConfig, TransportFlags flags) {
@@ -306,9 +313,14 @@ public class TestCacheManagerFactory {
    }
 
    public static ConfigurationBuilder getDefaultCacheConfiguration(boolean transactional) {
+      return getDefaultCacheConfiguration(transactional, false);
+   }
+
+   public static ConfigurationBuilder getDefaultCacheConfiguration(boolean transactional, boolean useCustomTxLookup) {
       ConfigurationBuilder builder = new ConfigurationBuilder();
       markAsTransactional(transactional, builder);
-      updateTransactionSupport(transactional, builder);
+      //don't changed the tx lookup.
+      if (useCustomTxLookup) updateTransactionSupport(transactional, builder);
       return builder;
    }
 

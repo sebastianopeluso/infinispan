@@ -25,135 +25,102 @@ package org.infinispan.commands.write;
 import org.infinispan.commands.AbstractFlagAffectedCommand;
 import org.infinispan.commands.Visitor;
 import org.infinispan.container.entries.CacheEntry;
-import org.infinispan.container.entries.ClusteredRepeatableReadEntry;
 import org.infinispan.container.entries.MVCCEntry;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.lifecycle.ComponentStatus;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
-
-import static org.infinispan.commands.write.AbstractDataWriteCommand.checkIfWriteSkewNeeded;
 
 /**
  * @author Mircea.Markus@jboss.com
  * @since 4.0
  */
 public class ClearCommand extends AbstractFlagAffectedCommand implements WriteCommand {
+   
+   public static final byte COMMAND_ID = 5;
+   CacheNotifier notifier;
 
-    public static final byte COMMAND_ID = 5;
-    CacheNotifier notifier;
+   public ClearCommand() {
+   }
 
-    //Pedro -- set of keys that needs write skew check
-    private Set<Object> keysMarkedForWriteSkew = new HashSet<Object>();
+   public ClearCommand(CacheNotifier notifier, Set<Flag> flags) {
+      this.notifier = notifier;
+      this.flags = flags;
+   }
 
-    public ClearCommand() {
-    }
+   public void init(CacheNotifier notifier) {
+      this.notifier = notifier;
+   }
 
-    public ClearCommand(CacheNotifier notifier, Set<Flag> flags) {
-        this.notifier = notifier;
-        this.flags = flags;
-    }
+   public Object acceptVisitor(InvocationContext ctx, Visitor visitor) throws Throwable {
+      return visitor.visitClearCommand(ctx, this);
+   }
 
-    public void init(CacheNotifier notifier) {
-        this.notifier = notifier;
-    }
+   public Object perform(InvocationContext ctx) throws Throwable {
+      for (CacheEntry e : ctx.getLookedUpEntries().values()) {
+         if (e instanceof MVCCEntry) {
+            MVCCEntry me = (MVCCEntry) e;
+            Object k = me.getKey(), v = me.getValue();
+            notifier.notifyCacheEntryRemoved(k, v, true, ctx);
+            me.setRemoved(true);
+            me.setValid(false);
+            notifier.notifyCacheEntryRemoved(k, null, false, ctx);
+         }
+      }
+      return null;
+   }
 
-    public Object acceptVisitor(InvocationContext ctx, Visitor visitor) throws Throwable {
-        return visitor.visitClearCommand(ctx, this);
-    }
+   public Object[] getParameters() {
+      return new Object[]{flags};
+   }
 
-    public Object perform(InvocationContext ctx) throws Throwable {
-        Collection<CacheEntry> cacheEntrySet = ctx.getLookedUpEntries().values();
+   public byte getCommandId() {
+      return COMMAND_ID;
+   }
 
-        //Pedro -- initialize the key set
-        if(ctx.isOriginLocal()) {
-            keysMarkedForWriteSkew = new HashSet<Object>(cacheEntrySet.size());
-        }
+   public void setParameters(int commandId, Object[] parameters) {
+      if (commandId != COMMAND_ID) throw new IllegalStateException("Invalid command id");
+      if (parameters.length > 0) {
+         this.flags = (Set<Flag>) parameters[0];
+      }
+   }
 
-        for (CacheEntry e : cacheEntrySet) {
-            if (e instanceof MVCCEntry) {
-                MVCCEntry me = (MVCCEntry) e;
+   public boolean shouldInvoke(InvocationContext ctx) {
+      return true;
+   }
 
-                Object k = me.getKey(), v = me.getValue();
+   @Override
+   public String toString() {
+      return new StringBuilder()
+         .append("ClearCommand{flags=")
+         .append(flags)
+         .append("}")
+         .toString();
+   }
 
-                if(me instanceof ClusteredRepeatableReadEntry) {
-                    checkIfWriteSkewNeeded((ClusteredRepeatableReadEntry) me, ctx.isOriginLocal(),
-                            keysMarkedForWriteSkew);
-                }
+   public boolean isSuccessful() {
+      return true;
+   }
 
-                notifier.notifyCacheEntryRemoved(k, v, true, ctx);
-                me.setRemoved(true);
-                me.setValid(false);
-                notifier.notifyCacheEntryRemoved(k, null, false, ctx);
-            }
-        }
-        return null;
-    }
+   public boolean isConditional() {
+      return false;
+   }
 
-    public Object[] getParameters() {
-        //Pedro -- send the key set, if it is not empty or null. otherwise send null
-        return new Object[]{(keysMarkedForWriteSkew != null && keysMarkedForWriteSkew.isEmpty() ?
-                null : keysMarkedForWriteSkew), flags};
-    }
+   public Set<Object> getAffectedKeys() {
+      return Collections.emptySet();
+   }
 
-    public byte getCommandId() {
-        return COMMAND_ID;
-    }
+   @Override
+   public boolean isReturnValueExpected() {
+      return false;
+   }
 
-    public void setParameters(int commandId, Object[] parameters) {
-        if (commandId != COMMAND_ID) throw new IllegalStateException("Invalid command id");
-
-        //Pedro -- receive the key set
-        keysMarkedForWriteSkew = (Set<Object>) parameters[0];
-
-        //Pedro -- it sends a null value if the set is empty
-        if(keysMarkedForWriteSkew == null) {
-            keysMarkedForWriteSkew = Collections.emptySet();
-        }
-
-        if (parameters.length > 1) {
-            this.flags = (Set<Flag>) parameters[1];
-        }
-    }
-
-    public boolean shouldInvoke(InvocationContext ctx) {
-        return true;
-    }
-
-    @Override
-    public String toString() {
-        return new StringBuilder()
-                .append("ClearCommand{flags=")
-                .append(flags)
-                .append("}")
-                .toString();
-    }
-
-    public boolean isSuccessful() {
-        return true;
-    }
-
-    public boolean isConditional() {
-        return false;
-    }
-
-    public Set<Object> getAffectedKeys() {
-        return Collections.emptySet();
-    }
-
-    @Override
-    public boolean isReturnValueExpected() {
-        return false;
-    }
-
-    @Override
-    public boolean ignoreCommandOnStatus(ComponentStatus status) {
-        return false;
-    }
+   @Override
+   public boolean ignoreCommandOnStatus(ComponentStatus status) {
+      return false;
+   }
 
 }

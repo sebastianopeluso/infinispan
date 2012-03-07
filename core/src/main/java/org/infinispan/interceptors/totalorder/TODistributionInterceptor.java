@@ -41,11 +41,7 @@ public class TODistributionInterceptor extends VersionedDistributionInterceptor 
 
    @Override
    protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command,
-                                         Collection<Address> recipients, boolean sync) {
-      if (!command.isTotalOrdered()) {
-         super.prepareOnAffectedNodes(ctx, command, recipients, sync);
-         return ;
-      }
+                                         Collection<Address> recipients, boolean sync) {      
 
       boolean trace = log.isTraceEnabled();
       String globalTransactionString = Util.prettyPrintGlobalTransaction(command.getGlobalTransaction());
@@ -68,7 +64,7 @@ public class TODistributionInterceptor extends VersionedDistributionInterceptor 
          try {
             Object retVal = localTransaction.awaitUntilModificationsApplied();
             if (retVal instanceof EntryVersionsMap) {
-                readVersionsFromResponse(new SuccessfulResponse(retVal), ctx.getCacheTransaction());
+                readVersionsFromResponse(SuccessfulResponse.create(retVal), ctx.getCacheTransaction());
             } else {
                 throw new IllegalStateException("This must not happen! we must receive the versions");
             }
@@ -82,14 +78,6 @@ public class TODistributionInterceptor extends VersionedDistributionInterceptor 
          }
       }
 
-   }
-
-   @Override
-   public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
-      if (command.shouldInvokedRemotely()) {
-         return super.visitRollbackCommand(ctx, command);
-      }
-      return invokeNextInterceptor(ctx, command);
    }
 
    @Override

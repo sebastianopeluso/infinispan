@@ -419,7 +419,7 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
                future.getCommand().init(cache);
                try {
                   result = future.getCommand().perform(null);
-                  return Collections.singletonMap(rpc.getAddress(), new SuccessfulResponse(result));
+                  return Collections.singletonMap(rpc.getAddress(), SuccessfulResponse.create(result));
                } catch (Throwable e) {
                   return e;
                } finally {
@@ -438,8 +438,22 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
    protected <K> Map<Address, List<K>> mapKeysToNodes(K... input) {
       DistributionManager dm = cache.getDistributionManager();
       Map<Address, List<K>> addressToKey = new HashMap<Address, List<K>>(input.length * 2);
+      boolean usingREPLMode = dm == null;      
+      List<Address> members = null;
+      if(usingREPLMode){
+         members = new ArrayList<Address>(cache.getRpcManager().getTransport().getMembers());
+      }
       for (K key : input) {
-         Address ownerOfKey = dm.getPrimaryLocation(key);
+         Address ownerOfKey = null;
+         if(usingREPLMode){
+            //using REPL mode https://issues.jboss.org/browse/ISPN-1886
+            // since keys and values are on all nodes, lets just pick randomly
+            Collections.shuffle(members);
+            ownerOfKey = members.get(0);
+         } else {            
+            //DIST mode
+            ownerOfKey = dm.getPrimaryLocation(key);
+         }
          List<K> keysAtNode = addressToKey.get(ownerOfKey);
          if (keysAtNode == null) {
             keysAtNode = new LinkedList<K>();

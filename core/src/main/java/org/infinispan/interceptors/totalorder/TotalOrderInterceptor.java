@@ -9,8 +9,10 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.base.CommandInterceptor;
-import org.infinispan.totalorder.TotalOrderValidator;
+import org.infinispan.remoting.RpcException;
+import org.infinispan.totalorder.TotalOrderManager;
 import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.totalOrder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -21,22 +23,20 @@ import static org.infinispan.util.Util.prettyPrintGlobalTransaction;
  * Created to control the total order validation. It disable the possibility of acquiring locks during execution through
  * the cache API
  *
- * Created by IntelliJ IDEA.
- * Date: 1/15/12
- * Time: 9:48 PM
  *
  * @author Pedro Ruivo
+ * @since 5.2
  */
 public class TotalOrderInterceptor extends CommandInterceptor {
 
    private static final Log log = LogFactory.getLog(TotalOrderInterceptor.class);
    private boolean trace;
 
-   private TotalOrderValidator totalOrderValidator;
+   private TotalOrderManager totalOrderManager;
 
    @Inject
-   public void inject(TotalOrderValidator totalOrderValidator) {
-      this.totalOrderValidator = totalOrderValidator;
+   public void inject(TotalOrderManager totalOrderManager) {
+      this.totalOrderManager = totalOrderManager;
    }
 
    @Start
@@ -55,11 +55,12 @@ public class TotalOrderInterceptor extends CommandInterceptor {
 
       try {
          if(ctx.isOriginLocal()) {
-            totalOrderValidator.addLocalTransaction(command.getGlobalTransaction(),
+            totalOrderManager.addLocalTransaction(command.getGlobalTransaction(),
                   (LocalTransaction) ctx.getCacheTransaction());
-            return invokeNextInterceptor(ctx, command);
+            Object retVal = invokeNextInterceptor(ctx, command);
+            return waitForDeliver(ctx, retVal);
          } else {
-            totalOrderValidator.validateTransaction(command, ctx, getNext());
+            totalOrderManager.validateTransaction(command, ctx, getNext());
             return null;
          }
       } catch (Throwable t) {
@@ -92,12 +93,9 @@ public class TotalOrderInterceptor extends CommandInterceptor {
       boolean processCommand = true;
 
       try {
-         if (ctx.isOriginLocal()) {
-            //only send the rollback command is the transaction was prepared previously.
-            //otherwise, doesn't send the rollback, because no locks are acquired remotely
-            command.setShouldInvokedRemotely(totalOrderValidator.isTransactionPrepared(gtx));
-         } else {
-            processCommand = totalOrderValidator.waitForTxPrepared(ctx, gtx, false, null);
+         if (!ctx.isOriginLocal()) {
+            processCommand = totalOrderManager.waitForTxPrepared(
+                  (TotalOrderRemoteTransaction) ctx.getCacheTransaction(), false, null);
             if (!processCommand) {
                return null;
             }
@@ -113,7 +111,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
          throw t;
       } finally {
          if (processCommand) {
-            totalOrderValidator.finishTransaction(gtx, !(command.shouldInvokedRemotely() && ctx.isOriginLocal()));
+            totalOrderManager.finishTransaction(gtx, !ctx.isOriginLocal());
          }
       }
    }
@@ -131,9 +129,11 @@ public class TotalOrderInterceptor extends CommandInterceptor {
 
       try {
          if (!ctx.isOriginLocal()) {
-            processCommand = totalOrderValidator.waitForTxPrepared(ctx, gtx, true,
-                  command instanceof VersionedCommitCommand ? ((VersionedCommitCommand) command).getUpdatedVersions()
-                        : null);
+            processCommand = totalOrderManager.waitForTxPrepared(
+                  (TotalOrderRemoteTransaction) ctx.getCacheTransaction(), false,
+                  command instanceof VersionedCommitCommand ?
+                        ((VersionedCommitCommand) command).getUpdatedVersions() :
+                        null);
             if (!processCommand) {
                return null;
             }
@@ -150,8 +150,35 @@ public class TotalOrderInterceptor extends CommandInterceptor {
          throw t;
       } finally {
          if (processCommand) {
-            totalOrderValidator.finishTransaction(gtx, false);
+            totalOrderManager.finishTransaction(gtx, false);
          }
       }
+   }
+
+   protected Object waitForDeliver(TxInvocationContext context, Object retVal) {
+      //broadcast the command
+      boolean sync = configuration.getCacheMode().isSynchronous();
+
+      if(sync) {
+         String globalTransactionString = prettyPrintGlobalTransaction(context.getGlobalTransaction());
+         //in sync mode, blocks in the LocalTransaction
+         if(trace) {
+            log.tracef("Transaction [%s] sent in synchronous mode. waiting until modification is applied",
+                  globalTransactionString);
+         }
+         //this is only invoked in local context
+         LocalTransaction localTransaction = (LocalTransaction) context.getCacheTransaction();
+         try {
+            return localTransaction.awaitUntilModificationsApplied();
+         } catch (Throwable throwable) {
+            throw new RpcException(throwable);
+         } finally {
+            if(trace) {
+               log.tracef("Transaction [%s] finishes the waiting time",
+                     globalTransactionString);
+            }
+         }
+      }
+      return retVal;
    }
 }

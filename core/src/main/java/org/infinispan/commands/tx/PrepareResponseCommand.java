@@ -20,14 +20,12 @@ public class PrepareResponseCommand extends AbstractTransactionBoundaryCommand {
    private Object result;
 
    public PrepareResponseCommand(String cacheName) {
-      super(cacheName);
-      setFlag(TO_OOB);
+      super(cacheName);     
    }
 
    public PrepareResponseCommand(String cacheName, GlobalTransaction gtx) {
       super(cacheName);
-      this.globalTx = gtx;
-      setFlag(TO_OOB);
+      this.globalTx = gtx;      
    }
 
    public void addException(Object exception) {

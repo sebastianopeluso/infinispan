@@ -29,7 +29,6 @@ import org.infinispan.loaders.CacheStoreConfig;
 import org.infinispan.loaders.decorators.SingletonStoreConfig;
 import org.infinispan.transaction.TransactionMode;
 import org.infinispan.transaction.TransactionProtocol;
-import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -37,11 +36,13 @@ import java.util.Set;
 
 /**
  * ConfigurationValidatingVisitor checks semantic validity of InfinispanConfiguration instance.
- *
- *
+ * 
+ * 
  * @author Vladimir Blagojevic
+ * @author Pedro Ruivo
  * @since 4.0
  */
+@SuppressWarnings("boxing")
 public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVisitor {
 
    private static final Log log = LogFactory.getLog(ConfigurationValidatingVisitor.class);
@@ -166,54 +167,29 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
          }
       }
 
-      //Pedro -- validate total order
       if(!bean.transactionProtocol.isTotalOrder()) {
          //no total order => no validation needed
          return;
       }
 
-      //in the future we can allow this??
+      //in the future we can allow this in total order??
       if(bean.transactionMode == TransactionMode.NON_TRANSACTIONAL) {
-         throw new ConfigurationException("Non transactional cache can't be used with total order protocol");
-      }
-
-      boolean isRepeatableReadEnabled = cfg.locking.isolationLevel == IsolationLevel.REPEATABLE_READ;
-      boolean isWriteSkewEnabled = cfg.isWriteSkewCheck();
-      boolean versioningEnabled = cfg.versioning.isEnabled();
-
-      //in the future it will be allowed with versioning...
-      if(isRepeatableReadEnabled && isWriteSkewEnabled && !versioningEnabled) {
-         log.warnf("Repeatable Read isolation level and write skew check enabled not " +
-               "allowed in total order scheme without versioning... changing to normal protocol");
-         bean.transactionProtocol(TransactionProtocol.NORMAL);
+         log.tracef("Non transactional cache is not supported in Total Order protocol. Total Order protocol will" +
+               " be ignored.");
          return;
       }
 
+
       //for now, only supports full replication
       if(!cfg.getCacheMode().isReplicated() && !cfg.getCacheMode().isDistributed()) {
-         throw new ConfigurationException("the cache mode [" + cfg.getCacheMode() + "] is not supported " +
-               "with total order protocol");
+         log.cacheModeNotSupportedByTOProtocol(cfg.getCacheModeString());
+         bean.transactionProtocol(TransactionProtocol.TWO_PHASE_COMMIT);
+         return;
       }
 
-      //eager locking no longer needed
+      //eager locking is no longer needed
       if(bean.isUseEagerLocking()) {
-         throw new ConfigurationException("Eager locking not allowed in total order protocol");
+         log.tracef("Eager locking will be ignore with Total Order protocol");
       }
-
-   }
-
-   //Validates the parameter
-   @Override
-   public void visitTotalOrderThreadingType(Configuration.TotalOrderThreadingType config) {
-      // if corePoolSize greater than maximumPoolSize.
-      if(config.corePoolSize <= 0 || config.keepAliveTime <= 0 || config.maximumPoolSize <= 0) {
-         throw new ConfigurationException("All the configuration values (corePoolSize, keepAliveTime, " +
-               "maximumPoolSize) must be greater than zero");
-      } else if(config.corePoolSize > config.maximumPoolSize) {
-         throw new ConfigurationException("Core pool size value is greater than the maximum pool size");
-      } else if(config.queueSize <= 0) {
-         throw new ConfigurationException("Queue size must be greater than zero");
-      }
-
    }
 }

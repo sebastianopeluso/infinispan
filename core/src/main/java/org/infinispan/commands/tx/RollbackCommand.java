@@ -32,13 +32,11 @@ import org.infinispan.transaction.xa.GlobalTransaction;
  * Command corresponding to a transaction rollback.
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
+ * @author Pedro Ruivo
  * @since 4.0
  */
 public class RollbackCommand extends AbstractTransactionBoundaryCommand {
    public static final byte COMMAND_ID = 13;
-
-   //Pedro -- check if the rollback command should be send over the cluster
-   private transient boolean shouldInvokedRemotely = true;
 
    private RollbackCommand() {
       super(null); // For command id uniqueness test
@@ -71,31 +69,19 @@ public class RollbackCommand extends AbstractTransactionBoundaryCommand {
       return "RollbackCommand {" + super.toString();
    }
 
-   //Pedro -- added new type of performing
-
+   /**
+    * choose the method to invoke depending if the total order protocol is be used or not
+    *
+    * @param ctx the context
+    * @return the value to be returned to the invoked
+    * @throws Throwable if something goes wrong
+    */
    @Override
    public Object perform(InvocationContext ctx) throws Throwable {
-      if (isOOB()) {
+      if (configuration.isTotalOrder()) {
          return super.performIgnoringUnexistingTransaction(ctx);
       } else {
          return super.perform(ctx);
-      }
-   }
-
-   //Pedro -- setter and getter
-
-   public boolean shouldInvokedRemotely() {
-      return shouldInvokedRemotely;
-   }
-
-   public void setShouldInvokedRemotely(boolean shouldInvokedRemotely) {
-      this.shouldInvokedRemotely = shouldInvokedRemotely;
-   }
-
-   @Override
-   public void setTOFlags(boolean totalOrder, boolean distribution) {
-      if (totalOrder) {
-         setFlag(TO_OOB);
       }
    }
 }

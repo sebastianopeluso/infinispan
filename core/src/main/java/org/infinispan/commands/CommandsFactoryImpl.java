@@ -54,6 +54,7 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.statetransfer.LockInfo;
 import org.infinispan.statetransfer.StateTransferManager;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
@@ -295,23 +296,23 @@ public class CommandsFactoryImpl implements CommandsFactory {
                DldGlobalTransaction transaction = (DldGlobalTransaction) pc.getGlobalTransaction();
                transaction.setLocksHeldAtOrigin(pc.getAffectedKeys());
             }
+            //The configuration is needed to check for total order
+            pc.injectComponents(configuration);
             break;
          case CommitCommand.COMMAND_ID:
          case VersionedCommitCommand.COMMAND_ID:
             CommitCommand commitCommand = (CommitCommand) c;
             commitCommand.init(interceptorChain, icc, txTable);
             commitCommand.markTransactionAsRemote(isRemote);
-            //Pedro -- mark as total order if needed
-            //note: the second parameter is not used
-            commitCommand.setTOFlags(configuration.isTotalOrder(), false);
+            //The configuration is needed to check for total order
+            commitCommand.injectComponents(configuration);
             break;
          case RollbackCommand.COMMAND_ID:
             RollbackCommand rollbackCommand = (RollbackCommand) c;
             rollbackCommand.init(interceptorChain, icc, txTable);
             rollbackCommand.markTransactionAsRemote(isRemote);
-            //Pedro -- mark as total order if needed
-            //note: the second parameter is not used
-            rollbackCommand.setTOFlags(configuration.isTotalOrder(), false);
+            //The configuration is needed to check for total order
+            rollbackCommand.injectComponents(configuration);
             break;
          case ClearCommand.COMMAND_ID:
             ClearCommand cc = (ClearCommand) c;
@@ -370,8 +371,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
             ccc.init(recoveryManager);
             break;
          case ApplyDeltaCommand.COMMAND_ID:
-            break;
-         //Pedro
+            break;         
          case PrepareResponseCommand.COMMAND_ID:
             PrepareResponseCommand prc = (PrepareResponseCommand) c;
             prc.init(interceptorChain, icc, txTable);
@@ -405,8 +405,8 @@ public class CommandsFactoryImpl implements CommandsFactory {
    }
 
    public StateTransferControlCommand buildStateTransferCommand(StateTransferControlCommand.Type type, Address sender,
-                                                                int viewId, Collection<InternalCacheEntry> state) {
-      return new StateTransferControlCommand(cacheName, type, sender, viewId, state);
+                                                                int viewId, Collection<InternalCacheEntry> state, Collection<LockInfo> lockInfo) {
+      return new StateTransferControlCommand(cacheName, type, sender, viewId, state, lockInfo);
    }
 
    public String getCacheName() {
@@ -453,8 +453,6 @@ public class CommandsFactoryImpl implements CommandsFactory {
       return new ApplyDeltaCommand(deltaAwareValueKey, delta, keys);
    }
 
-
-   //Pedro
    @Override
    public PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction) {
       return new PrepareResponseCommand(cacheName, globalTransaction);

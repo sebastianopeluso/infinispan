@@ -18,7 +18,6 @@
  */
 package org.infinispan.configuration.cache;
 
-import org.infinispan.config.ConfigurationException;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.transaction.TransactionMode;
 import org.infinispan.transaction.TransactionProtocol;
@@ -35,8 +34,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Defines transactional (JTA) characteristics of the cache.
- *
+ * 
  * @author pmuir
+ * @author Pedro Ruivo
  */
 public class TransactionConfigurationBuilder extends AbstractConfigurationChildBuilder<TransactionConfiguration> {
 
@@ -55,16 +55,12 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
    private boolean useSynchronization = false;
    private final RecoveryConfigurationBuilder recovery;
    private boolean use1PcForAutoCommitTransactions = false;
-
-   //Pedro -- total order stuff
-   private TransactionProtocol transactionProtocol = TransactionProtocol.NORMAL;
-   private final TotalOrderThreadingConfigurationBuilder totalOrderThreading;
+   private TransactionProtocol transactionProtocol = TransactionProtocol.TWO_PHASE_COMMIT;
+   private boolean use1PCInTotalOrder = true;
 
    TransactionConfigurationBuilder(ConfigurationBuilder builder) {
       super(builder);
       this.recovery = new RecoveryConfigurationBuilder(this);
-      //Pedro -- added the total order thread pool configuration
-      this.totalOrderThreading = new TotalOrderThreadingConfigurationBuilder(this);
    }
 
    /**
@@ -75,6 +71,23 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
     */
    public TransactionConfigurationBuilder autoCommit(boolean b) {
       this.autoCommit = b;
+      return this;
+   }
+
+   /**
+    * If there are any ongoing transactions when a cache is stopped, Infinispan waits for ongoing
+    * remote and local transactions to finish. The amount of time to wait for is defined by the
+    * cache stop timeout. It is recommended that this value does not exceed the transaction timeout
+    * because even if a new transaction was started just before the cache was stopped, this could
+    * only last as long as the transaction timeout allows it.
+    * <p/>
+    * This configuration property may be adjusted at runtime
+    *
+    * @deprecated use {@link #cacheStopTimeout(long)} instead
+    */
+   @Deprecated
+   public TransactionConfigurationBuilder cacheStopTimeout(int i) {
+      this.cacheStopTimeout = i;
       return this;
    }
 
@@ -111,7 +124,7 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
    /**
     * Configures whether the cache uses optimistic or pessimistic locking. If the cache is not
     * transactional then the locking mode is ignored.
-    *
+    * 
     * @see org.infinispan.config.Configuration#isTransactionalCache()
     */
    public TransactionConfigurationBuilder lockingMode(LockingMode lockingMode) {
@@ -139,9 +152,9 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
     * sent. Otherwise, the rollback phase will be asynchronous. Keeping it as false improves
     * performance of 2PC transactions.
     * <p />
-    *
+    * 
     * This configuration property may be adjusted at runtime.
-    *
+    * 
     * @param b
     * @return
     */
@@ -184,7 +197,7 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
     * <p />
     * Note: Starting with infinispan 5.1 eager locking is replaced with pessimistic locking and can
     * be enforced by setting transaction's locking mode to PESSIMISTIC.
-    *
+    * 
     * @param b
     * @return
     */
@@ -214,7 +227,7 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
       recovery.enable();
       return recovery;
    }
-
+   
    /**
     * Before Infinispan 5.1 you could access the cache both transactionally and
     * non-transactionally. Naturally the non-transactional access is faster and
@@ -244,26 +257,28 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
          }
       }
 
-      //Pedro -- validate total order stuff
       if(transactionProtocol != TransactionProtocol.TOTAL_ORDER) {
-         //no total order or not => no validation needed
+         //no total order => no validation needed
          return;
       }
 
-      //in the future we can allow this??
+      //total order only supports transactional caches
       if(transactionMode == TransactionMode.NON_TRANSACTIONAL) {
-         throw new ConfigurationException("Non transactional cache can't be used with total order protocol");
+         log.tracef("Non transactional cache is not supported in Total Order protocol. Total Order protocol will" +
+               " be ignored.");
+         return ;
       }
 
       //for now, only supports full replication
       if(!clustering().cacheMode().isReplicated() && !clustering().cacheMode().isDistributed()) {
-         throw new ConfigurationException("the cache mode [" + clustering().cacheMode() + "] is not supported " +
-               "with total order protocol");
+         log.cacheModeNotSupportedByTOProtocol(clustering().cacheMode().friendlyCacheModeString());
+         transactionProtocol = TransactionProtocol.TWO_PHASE_COMMIT;
+         return;
       }
 
-      //eager locking no longer needed
+      //eager locking is no longer needed
       if(useEagerLocking) {
-         throw new ConfigurationException("Eager locking not allowed in total order protocol");
+         log.tracef("Eager locking will be ignore with Total Order protocol");
       }
    }
 
@@ -276,11 +291,10 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
          transactionMode = TransactionMode.TRANSACTIONAL;
       else if (transactionMode == null)
          transactionMode = TransactionMode.NON_TRANSACTIONAL;
-
-      //Pedro -- added total order parameter
       return new TransactionConfiguration(autoCommit, cacheStopTimeout, eagerLockingSingleNode, lockingMode, syncCommitPhase,
             syncRollbackPhase, transactionManagerLookup, transactionSynchronizationRegistryLookup, transactionMode,
-            useEagerLocking, useSynchronization, use1PcForAutoCommitTransactions, recovery.create(), transactionProtocol, totalOrderThreading.create());
+            useEagerLocking, useSynchronization, use1PcForAutoCommitTransactions, recovery.create(), transactionProtocol,
+            use1PCInTotalOrder);
    }
 
    @Override
@@ -298,10 +312,8 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
       this.useSynchronization = template.useSynchronization();
       this.use1PcForAutoCommitTransactions = template.use1PcForAutoCommitTransactions();
       this.recovery.read(template.recovery());
-
-      //Pedro -- total order stuff
       this.transactionProtocol = template.transactionProtocol();
-      this.totalOrderThreading.read(template.totalOrderThreading());
+      this.use1PCInTotalOrder = template.use1PCInTotalOrder();
 
       return this;
    }
@@ -322,11 +334,8 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
             ", useSynchronization=" + useSynchronization +
             ", recovery=" + recovery +
             ", use1PcForAutoCommitTransactions=" + use1PcForAutoCommitTransactions +
+            ", use1PCInTotalOrder=" + use1PCInTotalOrder +
             '}';
-   }
-   //Pedro -- total order stuff
-   public TransactionProtocol transactionProtocol() {
-      return transactionProtocol;
    }
 
    public TransactionConfigurationBuilder transactionProtocol(TransactionProtocol transactionProtocol) {
@@ -334,7 +343,8 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
       return this;
    }
 
-   public TotalOrderThreadingConfigurationBuilder totalOrderThreading() {
-      return totalOrderThreading;
+   public TransactionConfigurationBuilder use1PCInTotalOrder(boolean b) {
+      this.use1PCInTotalOrder = b;
+      return this;
    }
 }

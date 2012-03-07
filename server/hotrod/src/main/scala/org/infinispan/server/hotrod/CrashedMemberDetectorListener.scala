@@ -63,7 +63,6 @@ class CrashedMemberDetectorListener(cache: Cache[Address, ServerAddress], server
             // guarantee that the cache will be up to date
             updateViewdId(e)
          }
-         updateViewdId(e)
       } catch {
          case t: Throwable => logErrorDetectingCrashedMember(t)
       }

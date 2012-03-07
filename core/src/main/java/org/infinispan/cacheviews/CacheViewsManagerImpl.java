@@ -38,6 +38,7 @@ import org.infinispan.remoting.responses.SuccessfulResponse;
 import org.infinispan.remoting.rpc.ResponseMode;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.remoting.transport.Transport;
+import org.infinispan.util.concurrent.ConcurrentMapFactory;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -51,7 +52,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -109,7 +109,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
 
    // the complete state of every cache in the cluster
    // entries can only be added, never removed
-   private final ConcurrentMap<String, CacheViewInfo> viewsInfo = new ConcurrentHashMap<String, CacheViewInfo>();
+   private final ConcurrentMap<String, CacheViewInfo> viewsInfo = ConcurrentMapFactory.makeConcurrentMap();
    // only used if this node is the coordinator
    private long timeout = 10 * 1000;
    // TODO Make the cooldown configurable, or change the view installation timing altogether
@@ -212,7 +212,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
                CacheViewControlCommand.Type.REQUEST_JOIN, self);
          // If we get a SuspectException we can ignore it, the new coordinator will come asking for our state anyway
          Map<Address,Response> rspList = transport.invokeRemotely(Collections.singleton(coordinator), cmd,
-               ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, false, null, false);
+               ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, false, null, false, false);
          checkRemoteResponse(cacheName, cmd, rspList);
       }
    }
@@ -231,7 +231,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
          final CacheViewControlCommand cmd = new CacheViewControlCommand(cacheName,
                CacheViewControlCommand.Type.REQUEST_LEAVE, self);
          // ignore any response from the other members
-         transport.invokeRemotely(members, cmd, ResponseMode.ASYNCHRONOUS, timeout, false, null, false);
+         transport.invokeRemotely(members, cmd, ResponseMode.ASYNCHRONOUS, timeout, false, null, false, false);
       } catch (Exception e) {
          log.debugf(e, "%s: Error while leaving cache view", cacheName);
       }
@@ -301,7 +301,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
          @Override
          public Map<Address, Response> call() throws Exception {
             Map<Address, Response> rspList = transport.invokeRemotely(pendingView.getMembers(), cmd,
-                  ResponseMode.SYNCHRONOUS, timeout, false, null, false);
+                  ResponseMode.SYNCHRONOUS, timeout, false, null, false, false);
             return rspList;
          }
       });
@@ -343,7 +343,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
                CacheViewControlCommand.Type.ROLLBACK_VIEW, self, newViewId, null, committedViewId, null);
          // wait until we get all the responses, but ignore the results
          Map<Address, Response> rspList = transport.invokeRemotely(validTargets, cmd,
-               ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, false, null, false);
+               ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, false, null, false, false);
          checkRemoteResponse(cacheName, cmd, rspList);
       } catch (Throwable t) {
          log.cacheViewRollbackFailure(t, committedViewId, cacheName);
@@ -375,7 +375,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
                CacheViewControlCommand.Type.COMMIT_VIEW, self, viewId);
          // wait until we get all the responses, but ignore the results
          Map<Address, Response> rspList = transport.invokeRemotely(validTargets, cmd,
-               ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, false, null, false);
+               ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, false, null, false, false);
          checkRemoteResponse(cacheName, cmd, rspList);
       } catch (Throwable t) {
          log.cacheViewCommitFailure(t, viewId, cacheName);
@@ -661,7 +661,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
                @Override
                public Map<Address, Response> call() throws Exception {
                   return transport.invokeRemotely(Collections.singleton(member), cmd,
-                        ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, true, null, false);
+                        ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, true, null, false, false);
                }
             });
             futures.add(future);
