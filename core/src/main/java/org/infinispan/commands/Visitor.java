@@ -92,7 +92,6 @@ public interface Visitor {
    
    Object visitInvalidateL1Command(InvocationContext ctx, InvalidateL1Command invalidateL1Command) throws Throwable;
 
-   //Pedro
    Object visitPrepareResponseCommand(TxInvocationContext ctx, PrepareResponseCommand command) throws Throwable;
 
    // locking commands

@@ -678,6 +678,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
 
    @Override
    public boolean hasCommunicationWithTotalOrderProperties() {
-      return channel.getProtocolStack().findProtocol(SEQUENCER.class) != null;
+      return channel.getProtocolStack().findProtocol(SEQUENCER.class) != null ||
+            channel.getProtocolStack().findProtocol(GROUP_MULTICAST.class) != null;      
    }
 }

@@ -21,10 +21,10 @@ import java.util.concurrent.ConcurrentMap;
 /**
  * // TODO: Document this
  *
- * @author pruivo
- * @since 4.0
+ * @author Pedro Ruivo
+ * @since 5.2
  */
-public class DistributedTotalOrderValidator extends TotalOrderManager {
+public class DistributedTotalOrderManager extends TotalOrderManager {
 
    private CommandsFactory commandsFactory;
    private ConcurrentMap<GlobalTransaction, VersionsCollector> versionsCollectorMap =

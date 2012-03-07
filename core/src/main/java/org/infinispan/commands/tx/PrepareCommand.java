@@ -38,7 +38,11 @@ import org.infinispan.transaction.xa.recovery.RecoveryManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Command corresponding to the 1st phase of 2PC.
@@ -62,7 +66,6 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
    private transient boolean replayEntryWrapping  = false;
    
    private static final WriteCommand[] EMPTY_WRITE_COMMAND_ARRAY = new WriteCommand[0];
-
 
    public void initialize(CacheNotifier notifier, RecoveryManager recoveryManager) {
       this.notifier = notifier;

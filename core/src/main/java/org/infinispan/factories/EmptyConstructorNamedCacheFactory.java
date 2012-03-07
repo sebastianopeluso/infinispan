@@ -42,7 +42,7 @@ import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
-import org.infinispan.totalorder.DistributedTotalOrderValidator;
+import org.infinispan.totalorder.DistributedTotalOrderManager;
 import org.infinispan.totalorder.TotalOrderManager;
 import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.xa.recovery.RecoveryAdminOperations;
@@ -65,7 +65,7 @@ import static org.infinispan.util.Util.getInstance;
                               CacheLoaderManager.class, InvocationContextContainer.class, PassivationManager.class,
                               BatchContainer.class, EvictionManager.class,
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
-                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class, DistributedTotalOrderValidator.class})
+                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class, DistributedTotalOrderManager.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -116,9 +116,10 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          return (T) lockContainer;
       } else if (componentType.equals(TotalOrderManager.class)) {
          return (T) new TotalOrderManager();
-      } else if (componentType.equals(DistributedTotalOrderValidator.class)) {
-         return (T) new DistributedTotalOrderValidator();
+      } else if (componentType.equals(DistributedTotalOrderManager.class)) {
+         return (T) new DistributedTotalOrderManager();
       }
+
 
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());

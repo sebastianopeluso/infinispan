@@ -23,7 +23,6 @@
 package org.infinispan.transaction;
 
 import org.infinispan.commands.CommandsFactory;
-import org.infinispan.commands.tx.AbstractTransactionBoundaryCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;

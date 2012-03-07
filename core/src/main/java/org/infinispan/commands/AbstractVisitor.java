@@ -129,9 +129,7 @@ public abstract class AbstractVisitor implements Visitor {
    public Object visitInvalidateL1Command(InvocationContext ctx, InvalidateL1Command invalidateL1Command) throws Throwable {
 	   return visitInvalidateCommand(ctx, invalidateL1Command);
    }
-
-   //Pedro
-   @Override
+   
    public Object visitPrepareResponseCommand(TxInvocationContext ctx, PrepareResponseCommand command) throws Throwable {
       return handleDefault(ctx, command);
    }

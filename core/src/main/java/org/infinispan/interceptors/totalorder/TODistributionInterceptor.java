@@ -24,8 +24,8 @@ import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepar
 /**
  * // TODO: Document this
  *
- * @author pruivo
- * @since 4.0
+ * @author Pedro Ruivo
+ * @since 5.2
  */
 public class TODistributionInterceptor extends VersionedDistributionInterceptor {
 

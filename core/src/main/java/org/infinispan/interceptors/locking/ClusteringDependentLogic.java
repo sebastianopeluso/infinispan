@@ -270,11 +270,6 @@ public interface ClusteringDependentLogic {
             throw new IllegalStateException("This must not be reached");
          }
 
-         if (context.hasFlag(Flag.SKIP_WRITE_SKEW_CHECK)) {
-            //the context, already has the new versions
-            return context.getCacheTransaction().getUpdatedEntryVersions();
-         }
-
          EntryVersionsMap updatedVersionMap = new EntryVersionsMap();
 
          if (!context.hasFlag(Flag.SKIP_WRITE_SKEW_CHECK)) {

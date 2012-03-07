@@ -368,6 +368,12 @@ public interface CommandsFactory {
     */
    ApplyDeltaCommand buildApplyDeltaCommand(Object deltaAwareValueKey, Delta delta, Collection keys);
 
-   //Pedro
+   /**
+    * Builds a PrepareResponseCommand used to send back the new versions of the keys validated by
+    * the keys owners
+    * 
+    * @param globalTransaction the transaction associated 
+    * @return instance
+    */
    PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction);
 }

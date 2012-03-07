@@ -121,8 +121,8 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       if (configuration.getCacheMode().isDistributed() || configuration.getCacheMode().isReplicated())
          interceptorChain.appendInterceptor(createInterceptor(new StateTransferLockInterceptor(), StateTransferLockInterceptor.class), false);
 
-      //Pedro -- load total order interceptor (question: this must be placed before or after StateTransfer??)
-      if(configuration.isTotalOrder()) {
+      //load total order interceptor
+      if (configuration.isTotalOrder()) {
          if (configuration.getCacheMode().isDistributed()) {
             interceptorChain.appendInterceptor(createInterceptor(new DistTotalOrderInterceptor(),
                   DistTotalOrderInterceptor.class), false);

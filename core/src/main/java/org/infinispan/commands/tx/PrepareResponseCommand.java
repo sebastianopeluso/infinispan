@@ -9,8 +9,8 @@ import org.infinispan.transaction.xa.GlobalTransaction;
 /**
  * // TODO: Document this
  *
- * @author pruivo
- * @since 4.0
+ * @author Pedro Ruivo
+ * @since 5.2
  */
 public class PrepareResponseCommand extends AbstractTransactionBoundaryCommand {
 
