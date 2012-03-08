@@ -266,9 +266,6 @@ public interface ClusteringDependentLogic {
       public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator,
                                                                      TxInvocationContext context,
                                                                      VersionedPrepareCommand prepareCommand) {
-         if (context.isOriginLocal()) {
-            throw new IllegalStateException("This must not be reached");
-         }
 
          EntryVersionsMap updatedVersionMap = new EntryVersionsMap();
 

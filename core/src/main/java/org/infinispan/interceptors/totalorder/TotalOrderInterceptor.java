@@ -2,6 +2,7 @@ package org.infinispan.interceptors.totalorder;
 
 import org.infinispan.commands.control.LockControlCommand;
 import org.infinispan.commands.tx.*;
+import org.infinispan.context.impl.LocalTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
@@ -88,11 +89,13 @@ public class TotalOrderInterceptor extends CommandInterceptor {
       }
 
       boolean processCommand = true;
+      TotalOrderRemoteTransaction remoteTransaction = null;
 
       try {
          if (!ctx.isOriginLocal()) {
+            remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
             processCommand = totalOrderManager.waitForTxPrepared(
-                  (TotalOrderRemoteTransaction) ctx.getCacheTransaction(), false, null);
+                  remoteTransaction, false, null);
             if (!processCommand) {
                return null;
             }
@@ -108,7 +111,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
          throw t;
       } finally {
          if (processCommand) {
-            totalOrderManager.finishTransaction(gtx, !ctx.isOriginLocal());
+            totalOrderManager.finishTransaction(gtx, !ctx.isOriginLocal(), remoteTransaction);
          }
       }
    }
@@ -123,11 +126,13 @@ public class TotalOrderInterceptor extends CommandInterceptor {
       }
 
       boolean processCommand = true;
+      TotalOrderRemoteTransaction remoteTransaction = null;
 
       try {
          if (!ctx.isOriginLocal()) {
+            remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
             processCommand = totalOrderManager.waitForTxPrepared(
-                  (TotalOrderRemoteTransaction) ctx.getCacheTransaction(), false,
+                  remoteTransaction, true,
                   command instanceof VersionedCommitCommand ?
                         ((VersionedCommitCommand) command).getUpdatedVersions() :
                         null);
@@ -147,7 +152,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
          throw t;
       } finally {
          if (processCommand) {
-            totalOrderManager.finishTransaction(gtx, false);
+            totalOrderManager.finishTransaction(gtx, false, remoteTransaction);
          }
       }
    }
@@ -165,8 +170,10 @@ public class TotalOrderInterceptor extends CommandInterceptor {
    protected Object waitForDeliver(TxInvocationContext context, Object retVal) {
       //broadcast the command
       boolean sync = configuration.getCacheMode().isSynchronous();
+      boolean wasInvokedRemotely = context.hasModifications() || 
+            !((LocalTxInvocationContext) context).getRemoteLocksAcquired().isEmpty();
 
-      if(sync) {
+      if(sync && wasInvokedRemotely) {
          String globalTransactionString = prettyPrintGlobalTransaction(context.getGlobalTransaction());
          //in sync mode, blocks in the LocalTransaction
          if(trace) {

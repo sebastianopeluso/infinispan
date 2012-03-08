@@ -119,8 +119,7 @@ public class TxInterceptor extends CommandInterceptor {
    public Object visitCommitCommand(TxInvocationContext ctx, CommitCommand command) throws Throwable {
       if (this.statisticsEnabled) commits.incrementAndGet();
       Object result = invokeNextInterceptor(ctx, command);
-      //In total order, we have remote transaction corresponding a local transaction
-      if (!ctx.isOriginLocal() || configuration.isTotalOrder()) {
+      if (!ctx.isOriginLocal()) {
          txTable.remoteTransactionCommitted(ctx.getGlobalTransaction());
       }
       return result;
@@ -129,8 +128,7 @@ public class TxInterceptor extends CommandInterceptor {
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
       if (this.statisticsEnabled) rollbacks.incrementAndGet();
-      //In total order, we have remote transaction corresponding a local transaction
-      if (!ctx.isOriginLocal() || configuration.isTotalOrder()) {
+      if (!ctx.isOriginLocal()) {
          txTable.remoteTransactionRollback(command.getGlobalTransaction());
       }
       return invokeNextInterceptor(ctx, command);

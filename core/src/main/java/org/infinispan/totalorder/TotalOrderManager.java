@@ -2,7 +2,7 @@ package org.infinispan.totalorder;
 
 import org.infinispan.CacheException;
 import org.infinispan.commands.tx.PrepareCommand;
-import org.infinispan.configuration.cache.Configuration;
+import org.infinispan.config.Configuration;
 import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContextContainer;
@@ -84,8 +84,10 @@ public class TotalOrderManager {
       this.invocationContextContainer = invocationContextContainer;
       this.transactionTable = transactionTable;
 
-      needsMultiThreadValidation = configuration.locking().isolationLevel() == IsolationLevel.REPEATABLE_READ &&
-            configuration.locking().writeSkewCheck() && !configuration.transaction().use1PCInTotalOrder();
+      needsMultiThreadValidation = configuration.getIsolationLevel() == IsolationLevel.REPEATABLE_READ &&
+            configuration.isWriteSkewCheck() && !configuration.isUse1PCInTotalOrder();
+      //configuration.locking().isolationLevel() == IsolationLevel.REPEATABLE_READ &&
+      //configuration.locking().writeSkewCheck() && !configuration.transaction().use1PCInTotalOrder();
 
       if (needsMultiThreadValidation) {
          validationExecutorService = e;
@@ -97,7 +99,8 @@ public class TotalOrderManager {
    @Start
    public void start() {
       setLogLevel();
-      setStatisticsEnabled(configuration.jmxStatistics().enabled());
+      //setStatisticsEnabled(configuration.jmxStatistics().enabled());
+      setStatisticsEnabled(configuration.isExposeJmxStatistics());
 
       if(info) {
          if (validationExecutorService instanceof ThreadPoolExecutor) {
@@ -191,12 +194,17 @@ public class TotalOrderManager {
     * @param gtx the global transaction
     * @param ignoreNullTxInfo ignore null remote tx info
     */
-   public void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo) {
+   public void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo,
+                                 TotalOrderRemoteTransaction transaction) {
       if(trace) {
          log.tracef("transaction %s is finished", prettyPrintGlobalTransaction(gtx));
       }
 
       TotalOrderRemoteTransaction remoteTransaction = (TotalOrderRemoteTransaction) transactionTable.removeRemoteTransaction(gtx);
+      if (remoteTransaction == null) {
+         remoteTransaction = transaction;
+      }
+
       if(remoteTransaction != null) {
          finishTransaction(remoteTransaction);
       } else if (!ignoreNullTxInfo) {
@@ -298,7 +306,7 @@ public class TotalOrderManager {
    }
 
    protected MultiThreadValidation createMultiThreadValidation(PrepareCommand prepareCommand, TxInvocationContext ctx,
-                                                               CommandInterceptor invoker, 
+                                                               CommandInterceptor invoker,
                                                                TotalOrderRemoteTransaction totalOrderRemoteTransaction) {
       return new MultiThreadValidation(prepareCommand, ctx, invoker, totalOrderRemoteTransaction);
    }
@@ -344,7 +352,7 @@ public class TotalOrderManager {
        * @param exception true if the return value is an exception
        */
       protected void finalizeValidation(Object result, boolean exception) {
-         notifyLocalTransaction(prepareCommand.getGlobalTransaction(), result, exception);         
+         notifyLocalTransaction(prepareCommand.getGlobalTransaction(), result, exception);
       }
 
       @Override
@@ -392,7 +400,7 @@ public class TotalOrderManager {
       protected TotalOrderRemoteTransaction remoteTransaction = null;
 
       protected MultiThreadValidation(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
-                                    CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
+                                      CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
          super(prepareCommand, txInvocationContext, invoker);
          this.previousTransactions = new HashSet<TxDependencyLatch>();
          this.remoteTransaction = remoteTransaction;
@@ -413,7 +421,7 @@ public class TotalOrderManager {
          super.initializeValidation();
 
          if(remoteTransaction.isMarkedForRollback()) {
-            throw new CacheException("Cannot prepare transaction" + gtx +". it was already marked as rollback");
+            throw new CacheException("Cannot prepare transaction " + gtx +". it was already marked as rollback");
          }
 
          if (previousTransactions.contains(remoteTransaction.getLatch())) {

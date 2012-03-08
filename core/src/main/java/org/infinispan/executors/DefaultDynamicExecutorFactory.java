@@ -42,12 +42,12 @@ public class DefaultDynamicExecutorFactory implements ExecutorFactory {
    public ExecutorService getExecutor(Properties p) {
       TypedProperties tp = TypedProperties.toTypedProperties(p);
       int minThreads = tp.getIntProperty("minThreads", 1);
-      int maxThreads = tp.getIntProperty("maxThreads", 10);
+      int maxThreads = tp.getIntProperty("maxThreads", 32);
       int queueSize = tp.getIntProperty("queueSize", 100000);
       long keepAliveTime = tp.getIntProperty("keepAliveTime", 100000);
       final int threadPrio = tp.getIntProperty("threadPriority", Thread.NORM_PRIORITY);
 
-      final String threadNamePrefix = tp.getProperty("threadNamePrefix", tp.getProperty("componentName", "Thread"));
+      final String threadNamePrefix = tp.getProperty("threadNamePrefix", "TO-Validation-Thread");
 
       ThreadFactory tf = new ThreadFactory() {
          public Thread newThread(Runnable r) {

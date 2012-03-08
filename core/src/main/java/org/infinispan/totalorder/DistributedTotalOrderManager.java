@@ -48,8 +48,9 @@ public class DistributedTotalOrderManager extends TotalOrderManager {
    }
 
    @Override
-   public void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo) {
-      super.finishTransaction(gtx, ignoreNullTxInfo);
+   public void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo, 
+                                 TotalOrderRemoteTransaction transaction) {
+      super.finishTransaction(gtx, ignoreNullTxInfo, transaction);
       versionsCollectorMap.remove(gtx);
    }
 

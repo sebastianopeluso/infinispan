@@ -297,6 +297,8 @@ interface FluentGlobalTypes {
 
    FluentGlobalConfiguration.ExecutorFactoryConfig<ScheduledExecutorFactory> replicationQueueScheduledExecutor();
 
+   FluentGlobalConfiguration.ExecutorFactoryConfig<ExecutorFactory> totalOrderExecutor();
+
    FluentGlobalConfiguration.ShutdownConfig shutdown();
 
    GlobalConfiguration build();
@@ -383,6 +385,7 @@ abstract class AbstractConfigurationBeanWithGCR extends AbstractConfigurationBea
       return globalConfig;
    }
 
+   @Override
    public FluentGlobalConfiguration.ExecutorFactoryConfig<ExecutorFactory> totalOrderExecutor() {
       return globalConfig.totalOrderExecutor;
    }

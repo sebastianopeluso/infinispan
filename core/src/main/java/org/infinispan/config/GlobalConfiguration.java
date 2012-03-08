@@ -136,7 +136,8 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
    private final ClassLoader cl;
 
    @XmlElement
-   ExecutorFactoryType totalOrderExecutor = new TotalOrderExecutorFactoryType().setGlobalConfiguration(this);
+   ExecutorFactoryType totalOrderExecutor = (ExecutorFactoryType) new ExecutorFactoryType().setGlobalConfiguration(this)
+         .factory(DefaultDynamicExecutorFactory.class);
 
    /**
     * Create a new GlobalConfiguration, using the Thread Context ClassLoader to load any
@@ -1802,30 +1803,6 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       ShutdownType setGlobalConfiguration(GlobalConfiguration globalConfig) {
          super.setGlobalConfiguration(globalConfig);
          return this;
-      }
-   }
-
-   /**
-    * Executor factory for the Total Order protocol.
-    */
-   @Deprecated public static class TotalOrderExecutorFactoryType extends ExecutorFactoryType {
-
-      public TotalOrderExecutorFactoryType(String factory) {
-         super(factory);
-         properties.put("threadNamePrefix", "Total-Order-Validation");
-      }
-
-      public TotalOrderExecutorFactoryType() {
-         super(DefaultDynamicExecutorFactory.class.getName());
-         properties.put("threadNamePrefix", "Total-Order-Validation");
-      }
-
-      @Override
-      public void accept(ConfigurationBeanVisitor v) {
-         if (!properties.contains("threadNamePrefix")) {
-            properties.put("threadNamePrefix", "Total-Order-Validation");
-         }
-         super.accept(v);
       }
    }
 }

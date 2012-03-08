@@ -4,6 +4,7 @@ import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.versioning.EntryVersionsMap;
+import org.infinispan.context.impl.LocalTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.VersionedEntryWrappingInterceptor;
@@ -47,7 +48,10 @@ public class TOVersionedEntryWrappingInterceptor extends VersionedEntryWrappingI
 
       Object retVal = invokeNextInterceptor(ctx, command);
 
-      if (!ctx.isOriginLocal()) {
+      boolean wasInvokedRemotely = ctx.isOriginLocal() && (ctx.hasModifications() ||
+            !((LocalTxInvocationContext) ctx).getRemoteLocksAcquired().isEmpty());
+
+      if (!ctx.isOriginLocal() || !wasInvokedRemotely) {
          newVersionData = cll.createNewVersionsAndCheckForWriteSkews(versionGenerator, ctx,
                (VersionedPrepareCommand) command);
          if (command.isOnePhaseCommit()) {

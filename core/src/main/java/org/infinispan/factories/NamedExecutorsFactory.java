@@ -98,7 +98,7 @@ public class NamedExecutorsFactory extends NamedComponentFactory implements Auto
          } else if (componentName.equals(TOTAL_ORDER_EXECUTOR)) {
             synchronized (this) {
                if (totalOrderExecutor == null) {
-                  totalOrderExecutor = buildAndConfigureScheduledExecutorService(
+                  totalOrderExecutor = buildAndConfigureExecutorService(
                         globalConfiguration.getTotalOrderExecutorFactorClass(),
                         globalConfiguration.getTotalOrderExecutorProperties(), componentName);
                }

@@ -32,6 +32,7 @@ import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.SingleKeyNonTxInvocationContext;
+import org.infinispan.context.impl.LocalTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.base.CommandInterceptor;
@@ -286,7 +287,10 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
     * @return true if the modification should be committed, false otherwise
     */
    protected boolean shouldCommitEntries(PrepareCommand command, TxInvocationContext ctx) {
-      return (configuration.isTotalOrder() && command.isOnePhaseCommit() && !ctx.isOriginLocal()) ||
+      boolean wasInvokedRemotely = ctx.isOriginLocal() && (ctx.hasModifications() ||
+            !((LocalTxInvocationContext) ctx).getRemoteLocksAcquired().isEmpty());
+      return (configuration.isTotalOrder() && command.isOnePhaseCommit() &&
+            (!ctx.isOriginLocal() || !wasInvokedRemotely)) ||
             (!configuration.isTotalOrder() && command.isOnePhaseCommit());
    }
 }
