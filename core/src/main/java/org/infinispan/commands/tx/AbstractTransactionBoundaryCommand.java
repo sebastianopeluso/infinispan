@@ -68,10 +68,11 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
       return configuration;
    }
 
-   public void init(InterceptorChain chain, InvocationContextContainer icc, TransactionTable txTable) {
+   public void init(InterceptorChain chain, InvocationContextContainer icc, TransactionTable txTable, Configuration configuration) {
       this.invoker = chain;
       this.icc = icc;
       this.txTable = txTable;
+      this.configuration = configuration;
    }
 
    @Override

@@ -504,7 +504,7 @@ public abstract class MultipleCacheManagersTest extends AbstractCacheTest {
    protected boolean checkTxCount(int cacheIndex, int localTx, int remoteTx) {
       final int localTxCount = TestingUtil.getTransactionTable(cache(cacheIndex)).getLocalTxCount();
       final int remoteTxCount = TestingUtil.getTransactionTable(cache(cacheIndex)).getRemoteTxCount();
-      log.tracef("Cache index %s, local tx %4s, remote tx %4s \n", cacheIndex, localTxCount, remoteTxCount);
+      log.tracef("Cache index %s: local tx %4s, remote tx %4s \n", cacheIndex, localTxCount, remoteTxCount);
       return localTxCount == localTx && remoteTxCount == remoteTx;
    }
 

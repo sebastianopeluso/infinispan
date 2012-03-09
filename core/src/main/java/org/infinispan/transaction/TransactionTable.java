@@ -232,7 +232,7 @@ public class TransactionTable {
       for (GlobalTransaction gtx : toKill) {
          log.tracef("Killing remote transaction originating on leaver %s", gtx);
          RollbackCommand rc = new RollbackCommand(configuration.getName(), gtx);
-         rc.init(invoker, icc, TransactionTable.this);
+         rc.init(invoker, icc, TransactionTable.this, configuration);
          try {
             rc.perform(null);
             log.tracef("Rollback of transaction %s complete.", gtx);

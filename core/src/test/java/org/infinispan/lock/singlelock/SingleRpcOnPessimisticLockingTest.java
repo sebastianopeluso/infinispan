@@ -187,15 +187,14 @@ public class SingleRpcOnPessimisticLockingTest extends MultipleCacheManagersTest
 
       public Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync, boolean usePriorityQueue, boolean totalOrder) throws RpcException {
          log.trace("invokeRemotely5");
-         Map<Address, Response> responses = realOne.invokeRemotely(recipients, rpc, sync, usePriorityQueue, totalOrder);
-         return responses;
+         return realOne.invokeRemotely(recipients, rpc, sync, usePriorityQueue, totalOrder);
       }
 
 
       public void broadcastRpcCommand(ReplicableCommand rpc, boolean sync, boolean totalOrder) throws RpcException {
          log.trace("ControlledRpcManager.broadcastRpcCommand1");
          aboutToInvokeRpc(rpc);
-         realOne.broadcastRpcCommand(rpc, sync, false);
+         realOne.broadcastRpcCommand(rpc, sync, totalOrder);
       }
 
       public void broadcastRpcCommand(ReplicableCommand rpc, boolean sync, boolean usePriorityQueue, boolean totalOrder) throws RpcException {

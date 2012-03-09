@@ -329,7 +329,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
          case PrepareCommand.COMMAND_ID:
          case VersionedPrepareCommand.COMMAND_ID:
             PrepareCommand pc = (PrepareCommand) c;
-            pc.init(interceptorChain, icc, txTable);
+            pc.init(interceptorChain, icc, txTable, configuration);
             pc.initialize(notifier, recoveryManager);
             if (pc.getModifications() != null)
                for (ReplicableCommand nested : pc.getModifications())  {
@@ -340,24 +340,18 @@ public class CommandsFactoryImpl implements CommandsFactory {
                DldGlobalTransaction transaction = (DldGlobalTransaction) pc.getGlobalTransaction();
                transaction.setLocksHeldAtOrigin(pc.getAffectedKeys());
             }
-            //The configuration is needed to check for total order
-            pc.injectComponents(configuration);
             break;
          case CommitCommand.COMMAND_ID:
          case VersionedCommitCommand.COMMAND_ID:
             CommitCommand commitCommand = (CommitCommand) c;
-            commitCommand.init(interceptorChain, icc, txTable);
+            commitCommand.init(interceptorChain, icc, txTable, configuration);
             commitCommand.markTransactionAsRemote(isRemote);
-            //The configuration is needed to check for total order
-            commitCommand.injectComponents(configuration);
 
             break;
          case RollbackCommand.COMMAND_ID:
             RollbackCommand rollbackCommand = (RollbackCommand) c;
-            rollbackCommand.init(interceptorChain, icc, txTable);
+            rollbackCommand.init(interceptorChain, icc, txTable, configuration);
             rollbackCommand.markTransactionAsRemote(isRemote);
-            //The configuration is needed to check for total order
-            rollbackCommand.injectComponents(configuration);
             break;
          case ClearCommand.COMMAND_ID:
             ClearCommand cc = (ClearCommand) c;
@@ -369,7 +363,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
             break;
          case LockControlCommand.COMMAND_ID:
             LockControlCommand lcc = (LockControlCommand) c;
-            lcc.init(interceptorChain, icc, txTable);
+            lcc.init(interceptorChain, icc, txTable, configuration);
             lcc.markTransactionAsRemote(isRemote);
             if (configuration.isEnableDeadlockDetection() && isRemote) {
                DldGlobalTransaction gtx = (DldGlobalTransaction) lcc.getGlobalTransaction();

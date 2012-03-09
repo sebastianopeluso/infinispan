@@ -124,7 +124,7 @@ public class StaleTransactionCleanupService {
             Set<Flag> flags = EnumSet.of(Flag.CACHE_MODE_LOCAL);
             String cacheName = transactionTable.configuration.getName();
             LockControlCommand unlockCmd = new LockControlCommand(keys, cacheName, flags, gtx);
-            unlockCmd.init(invoker, transactionTable.icc, transactionTable);
+            unlockCmd.init(invoker, transactionTable.icc, transactionTable, null);
             unlockCmd.setUnlock(true);
             try {
                unlockCmd.perform(null);
@@ -137,7 +137,7 @@ public class StaleTransactionCleanupService {
             if (!txHasLocalKeys) {
                log.tracef("Killing remote transaction without any local keys %s", gtx);
                RollbackCommand rc = new RollbackCommand(cacheName, gtx);
-               rc.init(invoker, transactionTable.icc, transactionTable);
+               rc.init(invoker, transactionTable.icc, transactionTable, null);
                try {
                   rc.perform(null);
                   log.tracef("Rollback of transaction %s complete.", gtx);
