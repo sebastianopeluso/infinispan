@@ -479,7 +479,7 @@ public class TransactionTable {
     *
     * @param globalTransaction the global transaction
     * @return the remote transaction. This remote transaction implements the interface
-    *         {@link org.infinispan.transaction.totalOrder.TotalOrderRemoteTransaction}
+    *         {@link org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction}
     */
    public RemoteTransaction getOrCreateIfAbsentRemoteTransaction(GlobalTransaction globalTransaction) {
       RemoteTransaction remoteTransaction = remoteTransactions.get(globalTransaction);

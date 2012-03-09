@@ -12,7 +12,7 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.totalorder.TotalOrderManager;
 import org.infinispan.transaction.LocalTransaction;
-import org.infinispan.transaction.totalOrder.TotalOrderRemoteTransaction;
+import org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;

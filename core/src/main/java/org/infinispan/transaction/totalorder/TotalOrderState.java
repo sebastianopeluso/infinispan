@@ -1,4 +1,4 @@
-package org.infinispan.transaction.totalOrder;
+package org.infinispan.transaction.totalorder;
 
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.transaction.TxDependencyLatch;

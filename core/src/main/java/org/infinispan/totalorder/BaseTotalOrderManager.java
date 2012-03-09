@@ -13,7 +13,7 @@ import org.infinispan.remoting.RpcException;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.TxDependencyLatch;
-import org.infinispan.transaction.totalOrder.TotalOrderRemoteTransaction;
+import org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;

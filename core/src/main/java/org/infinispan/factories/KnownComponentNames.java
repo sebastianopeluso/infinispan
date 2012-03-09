@@ -44,7 +44,7 @@ public class KnownComponentNames {
    public static final String GLOBAL_MARSHALLER = "org.infinispan.marshaller.global";
    public static final String CACHE_MARSHALLER = "org.infinispan.marshaller.cache";
    public static final String CLASS_LOADER = "java.lang.ClassLoader";
-   public static final String TOTAL_ORDER_EXECUTOR = "org.infinispan.executors.totalOrder";
+   public static final String TOTAL_ORDER_EXECUTOR = "org.infinispan.executors.totalorder";
 
    // Please make sure this is kept up to date
    public static final Collection<String> ALL_KNOWN_COMPONENT_NAMES = Arrays.asList(
