@@ -87,13 +87,6 @@ public interface ClusteringDependentLogic {
       private DataContainer dataContainer;
 
       private RpcManager rpcManager;
-      private static final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
-         @Override
-         public boolean performCheckOnKey(Object key) {
-            return true;
-         }
-      };
-
 
       @Inject
       public void init(DataContainer dc, RpcManager rpcManager) {
@@ -133,7 +126,7 @@ public interface ClusteringDependentLogic {
             // Perform a write skew check on each entry.
             EntryVersionsMap uv = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
                                                                             versionGenerator, context,
-                                                                            keySpecificLogic);
+                                                                            this);
             context.getCacheTransaction().setUpdatedEntryVersions(uv);
             return uv;
          } else if (prepareCommand.getModifications().length == 0) {
@@ -153,12 +146,6 @@ public interface ClusteringDependentLogic {
       private DataContainer dataContainer;
       private Configuration configuration;
       private RpcManager rpcManager;
-      private final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
-         @Override
-         public boolean performCheckOnKey(Object key) {
-            return localNodeIsOwner(key);
-         }
-      };
 
       @Inject
       public void init(DistributionManager dm, DataContainer dataContainer, Configuration configuration, RpcManager rpcManager) {
@@ -213,7 +200,7 @@ public interface ClusteringDependentLogic {
          // Perform a write skew check on mapped entries.
          EntryVersionsMap uv = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
                                                                          versionGenerator, context,
-                                                                         keySpecificLogic);
+                                                                         this);
 
          CacheTransaction cacheTransaction = context.getCacheTransaction();
          EntryVersionsMap uvOld = cacheTransaction.getUpdatedEntryVersions();
@@ -233,12 +220,6 @@ public interface ClusteringDependentLogic {
 
       private DataContainer dataContainer;
       private RpcManager rpcManager;
-      private static final WriteSkewHelper.KeySpecificLogic keySpecificLogic = new WriteSkewHelper.KeySpecificLogic() {
-         @Override
-         public boolean performCheckOnKey(Object key) {
-            return true;
-         }
-      };
 
       @Inject
       public void init(DataContainer dc, RpcManager rpcManager) {
@@ -281,7 +262,7 @@ public interface ClusteringDependentLogic {
          if (!context.hasFlag(Flag.SKIP_WRITE_SKEW_CHECK)) {
             updatedVersionMap = performWriteSkewCheckAndReturnNewVersions(prepareCommand, dataContainer,
                   versionGenerator, context,
-                  keySpecificLogic);
+                  this);
             context.getCacheTransaction().setUpdatedEntryVersions(updatedVersionMap);
          } else {
             updatedVersionMap.putAll(context.getCacheTransaction().getUpdatedEntryVersions());

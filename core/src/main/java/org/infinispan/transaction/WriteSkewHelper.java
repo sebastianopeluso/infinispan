@@ -29,6 +29,7 @@ import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.container.versioning.IncrementableEntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.context.impl.TxInvocationContext;
+import org.infinispan.interceptors.locking.ClusteringDependentLogic;
 import org.infinispan.remoting.responses.Response;
 import org.infinispan.remoting.responses.SuccessfulResponse;
 import org.infinispan.transaction.xa.CacheTransaction;
@@ -65,11 +66,11 @@ public class WriteSkewHelper {
                                                                             DataContainer dataContainer,
                                                                             VersionGenerator versionGenerator,
                                                                             TxInvocationContext context,
-                                                                            KeySpecificLogic ksl) {
+                                                                            ClusteringDependentLogic cdl) {
       EntryVersionsMap uv = new EntryVersionsMap();
       for (WriteCommand c : prepareCommand.getModifications()) {
          for (Object k : c.getAffectedKeys()) {
-            if (ksl.performCheckOnKey(k)) {
+            if (cdl.localNodeIsOwner(k)) {
                ClusteredRepeatableReadEntry entry = (ClusteredRepeatableReadEntry) context.lookupEntry(k);
 
                if (!context.isOriginLocal()) {
