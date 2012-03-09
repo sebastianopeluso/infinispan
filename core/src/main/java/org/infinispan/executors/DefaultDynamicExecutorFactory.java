@@ -60,7 +60,7 @@ public class DefaultDynamicExecutorFactory implements ExecutorFactory {
 
       return new ThreadPoolExecutor(minThreads, maxThreads,
                                     keepAliveTime, TimeUnit.MILLISECONDS,
-                                    new LinkedBlockingQueue<Runnable>(queueSize),
-                                    tf);
+                                    new ArrayBlockingQueue<Runnable>(queueSize),
+                                    tf, new ThreadPoolExecutor.CallerRunsPolicy());
    }
 }

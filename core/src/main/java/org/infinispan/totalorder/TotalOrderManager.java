@@ -7,6 +7,7 @@ import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.impl.TxInvocationContext;
+import org.infinispan.executors.ControllableExecutorService;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
@@ -31,7 +32,9 @@ import org.rhq.helpers.pluginAnnotations.agent.Units;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -64,11 +67,12 @@ public class TotalOrderManager {
 
    //the multithread validation is only possible in repeatable read with write skew, where we can validate non
    //conflicting transactions in parallel
-   private volatile boolean needsMultiThreadValidation;
-   private volatile ExecutorService validationExecutorService;
+   private boolean needsMultiThreadValidation;
+   private ExecutorService validationExecutorService;
 
    private boolean trace;
    private boolean info;
+   private boolean controllableExecutorService;
 
    //some profiling information (wasted time in queue and validation duration)
    private final AtomicLong waitTimeInQueue = new AtomicLong(0);
@@ -91,8 +95,10 @@ public class TotalOrderManager {
 
       if (needsMultiThreadValidation) {
          validationExecutorService = e;
+         controllableExecutorService = validationExecutorService instanceof ControllableExecutorService;
       } else {
          validationExecutorService = new WithinThreadExecutor();
+         controllableExecutorService = false;
       }
    }
 
@@ -103,12 +109,12 @@ public class TotalOrderManager {
       setStatisticsEnabled(configuration.isExposeJmxStatistics());
 
       if(info) {
-         if (validationExecutorService instanceof ThreadPoolExecutor) {
-            ThreadPoolExecutor tpe = (ThreadPoolExecutor) validationExecutorService;
+         if (controllableExecutorService) {
+            ControllableExecutorService ces = (ControllableExecutorService) validationExecutorService;
             log.startTotalOrderManager(needsMultiThreadValidation ? "yes" : "no",
-                  tpe.getCorePoolSize(),
-                  tpe.getMaximumPoolSize(),
-                  tpe.getKeepAliveTime(TimeUnit.MILLISECONDS));
+                  ces.getCorePoolSize(),
+                  ces.getMaximumPoolSize(),
+                  ces.getKeepAliveTime());
          } else {
             log.startTotalOrderManager(needsMultiThreadValidation ? "yes" : "no");
          }
@@ -193,6 +199,7 @@ public class TotalOrderManager {
     * in repeatable read with write skew (not implemented yet!)
     * @param gtx the global transaction
     * @param ignoreNullTxInfo ignore null remote tx info
+    * @param transaction the remote transaction
     */
    public void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo,
                                  TotalOrderRemoteTransaction transaction) {
@@ -232,8 +239,8 @@ public class TotalOrderManager {
                                     EntryVersionsMap newVersions) {
       GlobalTransaction gtx = remoteTransaction.getGlobalTransaction();
       if(trace) {
-         log.tracef("Waiting until transaction %s is prepared. New versions are %s",
-               prettyPrintGlobalTransaction(gtx), newVersions);
+         log.tracef("%s command was received. Waiting until transaction %s is prepared. New versions are %s",
+               commit ? "Commit" : "Rollback", prettyPrintGlobalTransaction(gtx), newVersions);
       }
 
       boolean needsToProcessCommand = false;
@@ -244,7 +251,8 @@ public class TotalOrderManager {
          needsToProcessCommand = false;
       } finally {
          if(trace) {
-            log.tracef("Transaction %s finishes the waiting time", prettyPrintGlobalTransaction(gtx));
+            log.tracef("%s command finishes the waiting time [%s]", commit ? "Commit": "Rollback",
+                  prettyPrintGlobalTransaction(gtx));
          }
       }
       return needsToProcessCommand;
@@ -472,8 +480,8 @@ public class TotalOrderManager {
    @ManagedAttribute(description = "The minimum number of threads in the thread pool")
    @Metric(displayName = "Minimum Number of Threads", displayType = DisplayType.DETAIL)
    public int getThreadPoolCoreSize() {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         return ((ThreadPoolExecutor) validationExecutorService).getCorePoolSize();
+      if (controllableExecutorService) {
+         return ((ControllableExecutorService) validationExecutorService).getCorePoolSize();
       } else {
          return -1;
       }
@@ -482,8 +490,8 @@ public class TotalOrderManager {
    @ManagedAttribute(description = "The maximum number of threads in the thread pool")
    @Metric(displayName = "Maximum Number of Threads", displayType = DisplayType.DETAIL)
    public int getThreadPoolMaximumPoolSize() {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         return ((ThreadPoolExecutor) validationExecutorService).getMaximumPoolSize();
+      if (controllableExecutorService) {
+         return ((ControllableExecutorService) validationExecutorService).getMaximumPoolSize();
       } else {
          return -1;
       }
@@ -493,8 +501,8 @@ public class TotalOrderManager {
    @Metric(displayName = "Keep Alive Time of a Idle Thread", units = Units.MILLISECONDS,
          displayType = DisplayType.DETAIL)
    public long getThreadPoolKeepTime() {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         return ((ThreadPoolExecutor) validationExecutorService).getKeepAliveTime(TimeUnit.MILLISECONDS);
+      if (controllableExecutorService) {
+         return ((ControllableExecutorService) validationExecutorService).getKeepAliveTime();
       } else {
          return -1;
       }
@@ -504,19 +512,8 @@ public class TotalOrderManager {
    @Metric(displayName = "Percentage of Occupation of the Queue", units = Units.PERCENTAGE,
          displayType = DisplayType.SUMMARY)
    public double getNumberOfTransactionInPendingQueue() {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         BlockingQueue queue = ((ThreadPoolExecutor) validationExecutorService).getQueue();
-         int remainingCapacity = queue.remainingCapacity();
-         int actualSize = queue.size();
-
-         double percentage;
-         if ((Integer.MAX_VALUE - remainingCapacity) > actualSize) {
-            percentage = actualSize * 100.0 / (remainingCapacity + actualSize);
-         } else {
-            percentage = actualSize * 100.0 / remainingCapacity;
-         }
-
-         return percentage > 100 ? 100.0 : percentage;
+      if (controllableExecutorService) {
+         return ((ControllableExecutorService) validationExecutorService).getQueueOccupationPercentage();
       } else {
          return -1D;
       }
@@ -525,11 +522,8 @@ public class TotalOrderManager {
    @ManagedAttribute(description = "The approximate percentage of active threads in the thread pool")
    @Metric(displayName = "Percentage of Active Threads", units = Units.PERCENTAGE, displayType = DisplayType.SUMMARY)
    public double getPercentageActiveThreads() {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         int max = ((ThreadPoolExecutor) validationExecutorService).getMaximumPoolSize();
-         int actual = ((ThreadPoolExecutor) validationExecutorService).getActiveCount();
-         double percentage = actual * 100.0 / max;
-         return percentage > 100 ? 100.0 : percentage;
+      if (controllableExecutorService) {
+         return ((ControllableExecutorService) validationExecutorService).getUsagePercentage();
       } else {
          return -1D;
       }
@@ -574,24 +568,24 @@ public class TotalOrderManager {
    @ManagedOperation(description = "Set the minimum number of threads in the thread pool")
    @Operation(displayName = "Set Minimum Number Of Threads")
    public void setThreadPoolCoreSize(int size) {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         ((ThreadPoolExecutor) validationExecutorService).setCorePoolSize(size);
+      if (controllableExecutorService) {
+         ((ControllableExecutorService) validationExecutorService).setCorePoolSize(size);
       }
    }
 
    @ManagedOperation(description = "Set the maximum number of threads in the thread pool")
    @Operation(displayName = "Set Maximum Number Of Threads")
    public void setThreadPoolMaximumPoolSize(int size) {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         ((ThreadPoolExecutor) validationExecutorService).setMaximumPoolSize(size);
+      if (controllableExecutorService) {
+         ((ControllableExecutorService) validationExecutorService).setMaximumPoolSize(size);
       }
    }
 
    @ManagedOperation(description = "Set the idle time of a thread in the thread pool (milliseconds)")
    @Operation(displayName = "Set Keep Alive Time of Idle Threads")
    public void setThreadPoolKeepTime(long time) {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         ((ThreadPoolExecutor) validationExecutorService).setKeepAliveTime(time, TimeUnit.MILLISECONDS);
+      if (controllableExecutorService) {
+         ((ControllableExecutorService) validationExecutorService).setKeepAliveTime(time);
       }
    }
 
