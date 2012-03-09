@@ -5,6 +5,7 @@ import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
+import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
@@ -112,20 +113,15 @@ public class TotalOrderInterceptor extends CommandInterceptor {
    public Object visitCommitCommand(TxInvocationContext ctx, CommitCommand command) throws Throwable {
       GlobalTransaction gtx = command.getGlobalTransaction();
 
-      if (trace) {
-         log.tracef("Visit Commit Command. Transaction is %s",
-                    gtx.prettyPrint());
-      }
+      if (trace) log.tracef("Visit Commit Command. Transaction is %s", gtx.prettyPrint());
 
       boolean processCommand = true;
 
       try {
          if (!ctx.isOriginLocal()) {
-            processCommand = totalOrderManager.waitForTxPrepared(
-                  (TotalOrderRemoteTransaction) ctx.getCacheTransaction(), false,
-                  command instanceof VersionedCommitCommand ?
-                        ((VersionedCommitCommand) command).getUpdatedVersions() :
-                        null);
+            EntryVersionsMap newVersions =
+                  command instanceof VersionedCommitCommand ? ((VersionedCommitCommand) command).getUpdatedVersions() : null;
+            processCommand = totalOrderManager.waitForTxPrepared( (TotalOrderRemoteTransaction) ctx.getCacheTransaction(), true, newVersions);
             if (!processCommand) {
                return null;
             }

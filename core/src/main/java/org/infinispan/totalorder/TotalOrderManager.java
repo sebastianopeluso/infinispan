@@ -57,4 +57,6 @@ public interface TotalOrderManager {
     * container
     */
    void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction);
+
+   void waitForPrepareToSucceed(TxInvocationContext context);
 }

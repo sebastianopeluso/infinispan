@@ -14,6 +14,8 @@ import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.TxDependencyLatch;
 import org.infinispan.transaction.totalOrder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 import org.rhq.helpers.pluginAnnotations.agent.DisplayType;
 import org.rhq.helpers.pluginAnnotations.agent.Metric;
 import org.rhq.helpers.pluginAnnotations.agent.Operation;
@@ -39,6 +41,8 @@ import static org.infinispan.factories.KnownComponentNames.TOTAL_ORDER_EXECUTOR;
 @MBean(objectName = "TotalOrderManager", description = "Concurrent total order management")
 public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
+   private static final Log log = LogFactory.getLog(ParallelTotalOrderManager.class);
+
    private final AtomicLong waitTimeInQueue = new AtomicLong(0);
    private final AtomicLong initializationDuration = new AtomicLong(0);
 
@@ -56,8 +60,8 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
    @Override
    public final void validateTransaction(PrepareCommand prepareCommand, TxInvocationContext ctx,
-                                   CommandInterceptor invoker) {
-      if(trace) log.tracef("validate transaction %s", prepareCommand.getGlobalTransaction().prettyPrint());
+                                         CommandInterceptor invoker) {
+      if (trace) log.tracef("Validating transaction %s", prepareCommand.getGlobalTransaction().prettyPrint());
 
       TotalOrderRemoteTransaction remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
 
@@ -65,16 +69,16 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
       Set<TxDependencyLatch> previousTxs = new HashSet<TxDependencyLatch>();
 
       //this will collect all the count down latch corresponding to the previous transactions in the queue
-      for(Object key : remoteTransaction.getModifiedKeys()) {
+      for (Object key : remoteTransaction.getModifiedKeys()) {
          TxDependencyLatch prevTx = keysLocked.put(key, remoteTransaction.getLatch());
-         if(prevTx != null) {
+         if (prevTx != null) {
             previousTxs.add(prevTx);
          }
       }
 
       mtv.setPreviousTransactions(previousTxs);
 
-      if(trace)
+      if (trace)
          log.tracef("Transaction [%s] write set is %s", remoteTransaction.getLatch(), remoteTransaction.getModifiedKeys());
 
       validationExecutorService.execute(mtv);
@@ -104,7 +108,6 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
       private long creationTime = -1;
       private long validationStartTime = -1;
-      private long validationEndTime = -1;
       private long initializationEndTime = -1;
 
       private MultiThreadValidation(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
@@ -115,7 +118,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          this.prepareCommand = prepareCommand;
          this.txInvocationContext = txInvocationContext;
          this.invoker = invoker;
-         this.creationTime = System.nanoTime();
+         this.creationTime = now();
          this.previousTransactions = new HashSet<TxDependencyLatch>();
          this.remoteTransaction = remoteTransaction;
       }
@@ -144,7 +147,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          }
 
          for (TxDependencyLatch prevTx : previousTransactions) {
-            if (trace)  log.tracef("Transaction %s will wait for %s", gtx, prevTx);
+            if (trace) log.tracef("Transaction %s will wait for %s", gtx, prevTx);
             prevTx.await();
          }
 
@@ -155,6 +158,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          }
 
          if (remoteTransaction.isMarkedForCommit()) {
+            log.tracef("Transaction %s marked for commit, skipping the write skew check and forcing 1PC", gtx);
             txInvocationContext.setFlags(Flag.SKIP_WRITE_SKEW_CHECK);
             prepareCommand.setOnePhaseCommit(true);
          }
@@ -162,44 +166,38 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
       @Override
       public void run() {
-         validationStartTime = System.nanoTime();
+         validationStartTime = now();
          Object result = null;
          boolean exception = false;
          try {
-            if (trace) {
-               log.tracef("Thread %s is validating transaction %s", Thread.currentThread().getName(),
-                          prepareCommand.getGlobalTransaction().prettyPrint());
-            }
+            if (trace) log.tracef("Validating transaction %s", prepareCommand.getGlobalTransaction().prettyPrint());
+
             initializeValidation();
-            initializationEndTime = System.nanoTime();
+            initializationEndTime = now();
 
             //invoke next interceptor in the chain
             result = prepareCommand.acceptVisitor(txInvocationContext, invoker);
          } catch (Throwable t) {
             log.trace("Exception while processing the rest of the interceptor chain", t);
             if (initializationEndTime == -1) {
-               initializationEndTime = System.nanoTime();
+               initializationEndTime = now();
             }
             result = t;
             exception = true;
          } finally {
-            if (trace) {
+            if (trace)
                log.tracef("Transaction %s finished validation (%s). Validation result is %s ",
                           prepareCommand.getGlobalTransaction().prettyPrint(),
                           (exception ? "failed" : "ok"), (exception ? ((Throwable) result).getMessage() : result));
-            }
+
             finalizeValidation(result, exception);
-            validationEndTime = System.nanoTime();
-            updateDurationStats(creationTime, validationStartTime, validationEndTime, initializationEndTime);
+            updateDurationStats(creationTime, validationStartTime, now(), initializationEndTime);
          }
       }
 
       /**
        * finishes the transaction, ie, mark the modification as applied and set the result (exception or not) invokes
        * the method #finishTransaction if the transaction has the one phase commit set to true
-       *
-       * @param result    the validation return value
-       * @param exception true if the return value is an exception
        */
       protected void finalizeValidation(Object result, boolean exception) {
          remoteTransaction.markPreparedAndNotify();

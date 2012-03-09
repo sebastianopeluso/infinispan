@@ -4,6 +4,8 @@ import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.jmx.annotations.MBean;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 /**
  * @author mircea.markus@jboss.com
@@ -12,6 +14,8 @@ import org.infinispan.jmx.annotations.MBean;
  */
 @MBean(objectName = "TotalOrderManager", description = "Simple total order management")
 public class SequentialTotalOrderManager extends BaseTotalOrderManager {
+
+   private static final Log log = LogFactory.getLog(SequentialTotalOrderManager.class);
 
    public final void validateTransaction(PrepareCommand prepareCommand, TxInvocationContext ctx, CommandInterceptor invoker) {
       if (trace)

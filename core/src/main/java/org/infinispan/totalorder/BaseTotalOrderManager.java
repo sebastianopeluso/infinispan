@@ -4,10 +4,12 @@ import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.InvocationContextContainer;
+import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
+import org.infinispan.remoting.RpcException;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.TxDependencyLatch;
@@ -30,13 +32,13 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public abstract class BaseTotalOrderManager implements TotalOrderManager {
 
-   protected final Log log = LogFactory.getLog(getClass());
+   private static final Log log = LogFactory.getLog(BaseTotalOrderManager.class);
+   protected static boolean trace;
 
    protected Configuration configuration;
    protected InvocationContextContainer invocationContextContainer;
-   protected TransactionTable transactionTable;
 
-   protected boolean trace;
+   protected TransactionTable transactionTable;
 
    protected final AtomicLong validationDuration = new AtomicLong(0);
    protected final AtomicInteger numberOfTxValidated = new AtomicInteger(0);
@@ -53,26 +55,8 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
     * Volatile as its value can be changed by a JMX thread.
     */
    protected volatile boolean statisticsEnabled;
-
-
-   protected final void updateLocalTransaction(Object result, boolean exception, PrepareCommand prepareCommand) {
-      GlobalTransaction gtx = prepareCommand.getGlobalTransaction();
-      LocalTransaction localTransaction = localTransactionMap.get(gtx);
-
-      if (localTransaction != null) {
-         localTransaction.addPrepareResult(result, exception);
-         localTransactionMap.remove(gtx);
-      } else {
-         log.tracef("There's no local transaction corresponding to this(%s) remote transaction", gtx);
-      }
-   }
-
-   public final void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction) {
-      if (trace)
-         log.tracef("Receiving local prepare command. Transaction is %s", globalTransaction.prettyPrint());
-      localTransactionMap.put(globalTransaction, localTransaction);
-   }
-
+   private boolean isSync;
+   private long replTimeout;
 
    @Inject
    public void inject(Configuration configuration, InvocationContextContainer invocationContextContainer,
@@ -86,6 +70,37 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    public void start() {
       trace = log.isTraceEnabled();
       setStatisticsEnabled(configuration.jmxStatistics().enabled());
+      isSync = configuration.clustering().cacheMode().isSynchronous();
+      replTimeout = configuration.clustering().sync().replTimeout();
+   }
+
+   @Override
+   public final void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction) {
+      localTransactionMap.put(globalTransaction, localTransaction);
+   }
+
+   @Override
+   public void waitForPrepareToSucceed(TxInvocationContext ctx) {
+      if (!ctx.isOriginLocal()) throw new IllegalStateException();
+
+      if (isSync) {
+
+         //in sync mode, blocks in the LocalTransaction
+         if (trace)
+            log.tracef("Transaction [%s] sent in synchronous mode. waiting until prepare is processed locally.",
+                       ctx.getGlobalTransaction().prettyPrint());
+
+         LocalTransaction localTransaction = (LocalTransaction) ctx.getCacheTransaction();
+         try {
+            localTransaction.awaitUntilModificationsApplied(replTimeout);
+            if (trace)
+               log.tracef("Prepare succeeded on time for transaction %s, waking up..", ctx.getGlobalTransaction().prettyPrint());
+         } catch (Throwable th) {
+            if (trace)
+               log.tracef(th, "Transaction %s hasn't prepare correctly", ctx.getGlobalTransaction().prettyPrint());
+            throw new RpcException(th);
+         }
+      }
    }
 
    @Override
@@ -102,19 +117,18 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
 
    @Override
    public final boolean waitForTxPrepared(TotalOrderRemoteTransaction remoteTransaction, boolean commit,
-                                    EntryVersionsMap newVersions) {
+                                          EntryVersionsMap newVersions) {
       GlobalTransaction gtx = remoteTransaction.getGlobalTransaction();
       if (trace)
          log.tracef("Waiting until transaction %s is prepared. New versions are %s", gtx.prettyPrint(), newVersions);
 
-      boolean needsToProcessCommand = false;
+      boolean needsToProcessCommand;
       try {
          needsToProcessCommand = remoteTransaction.waitPrepared(commit, newVersions);
+         if (trace) log.tracef("Transaction  %s successfully finishes the waiting time", gtx.prettyPrint());
       } catch (InterruptedException e) {
          log.timeoutWaitingUntilTransactionPrepared(gtx.prettyPrint());
          needsToProcessCommand = false;
-      } finally {
-         if (trace) log.tracef("Transaction %s finishes the waiting time", gtx.prettyPrint());
       }
       return needsToProcessCommand;
    }
@@ -122,7 +136,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    @Override
    public void finishTransaction(TotalOrderRemoteTransaction remoteTransaction) {
       TxDependencyLatch latch = remoteTransaction.getLatch();
-      if (trace)  log.tracef("Releasing resources for transaction %s", remoteTransaction);
+      if (trace) log.tracef("Releasing resources for transaction %s", remoteTransaction);
       latch.countDown();
    }
 
@@ -154,8 +168,21 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       this.statisticsEnabled = statisticsEnabled;
    }
 
+   protected final void updateLocalTransaction(Object result, boolean exception, PrepareCommand prepareCommand) {
+      GlobalTransaction gtx = prepareCommand.getGlobalTransaction();
+      LocalTransaction localTransaction = localTransactionMap.get(gtx);
+
+      if (localTransaction != null) {
+         localTransaction.addPrepareResult(result, exception);
+         localTransactionMap.remove(gtx);
+      } else {
+         log.tracef("There's no local transaction corresponding to this(%s) remote transaction", gtx);
+      }
+   }
+
    protected final long now() {
       //we know that this is only used for stats
       return statisticsEnabled ? System.nanoTime() : -1;
    }
+
 }
