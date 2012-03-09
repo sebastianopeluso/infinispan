@@ -28,6 +28,8 @@ import org.infinispan.config.GlobalConfiguration;
 import org.infinispan.eviction.EvictionStrategy;
 import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.util.concurrent.BoundedConcurrentHashMap;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 import org.testng.annotations.*;
 
 import java.util.*;
@@ -50,6 +52,8 @@ public class MapStressTest {
    static final int LOOP_FACTOR = 10;
    static final long RUNNING_TIME = Integer.getInteger("time", 1) * 60 * 1000;
    final int CAPACITY = Integer.getInteger("size", 100000);
+   private static Log log = LogFactory.getLog(MapStressTest.class);
+
 
    private static final Random RANDOM = new Random(12345);
 
@@ -57,8 +61,7 @@ public class MapStressTest {
    private List<String> keys = new ArrayList<String>();
 
    public MapStressTest() {
-      System.out.printf("\nMapStressTest configuration: capacity %d, test running time %d seconds\n",
-            CAPACITY, RUNNING_TIME/1000);
+      log.infof("\nMapStressTest configuration: capacity %d, test running time %d seconds\n", CAPACITY, RUNNING_TIME/1000);
    }
 
 
