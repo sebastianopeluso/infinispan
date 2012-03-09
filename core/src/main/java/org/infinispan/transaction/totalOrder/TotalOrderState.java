@@ -3,6 +3,8 @@ package org.infinispan.transaction.totalOrder;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.transaction.TxDependencyLatch;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.*;
 
@@ -14,6 +16,8 @@ import java.util.*;
  * @since 5.2
  */
 public class TotalOrderState {
+
+   private static Log log = LogFactory.getLog(TotalOrderState.class);
 
    private enum State {
       /**
@@ -82,16 +86,22 @@ public class TotalOrderState {
     * @return true if the command needs to be processed, false otherwise
     * @throws InterruptedException when it is interrupted while waiting
     */
-   public synchronized boolean waitPrepared(boolean commit) throws InterruptedException {
+   public final synchronized boolean waitPrepared(boolean commit) throws InterruptedException {
+      boolean result;
       if (state.contains(State.PREPARED)) {
-         return true;
-      }
-      if (state.contains(State.PREPARING)) {
+         result = true;
+         log.tracef("Finished waiting: transaction already prepared");
+      } else  if (state.contains(State.PREPARING)) {
          this.wait();
-         return true;
+         result = true;
+         log.tracef("Transaction was in PREPARING state but now it is prepared");
+      } else {
+         State status = commit ? State.COMMIT_ONLY : State.ROLLBACK_ONLY;
+         log.tracef("Transaction hasn't received the prepare yer, setting status to: %s", status);
+         state.add(status);
+         result = false;
       }
-      state.add(commit ? State.COMMIT_ONLY : State.ROLLBACK_ONLY);
-      return false;
+      return result;
    }
 
    /**

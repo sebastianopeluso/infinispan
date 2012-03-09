@@ -57,9 +57,7 @@ public class VersionedEntryWrappingInterceptor extends EntryWrappingInterceptor 
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-      if (!ctx.isOriginLocal() || command.isReplayEntryWrapping()) {
-         for (WriteCommand c : command.getModifications()) c.acceptVisitor(ctx, entryWrappingVisitor);
-      }
+      wrapEntriesForPrepare(ctx, command);
       EntryVersionsMap newVersionData= null;
       if (ctx.isOriginLocal()) newVersionData = cll.createNewVersionsAndCheckForWriteSkews(versionGenerator, ctx, (VersionedPrepareCommand) command);
 
@@ -72,7 +70,6 @@ public class VersionedEntryWrappingInterceptor extends EntryWrappingInterceptor 
       if (command.isOnePhaseCommit()) commitContextEntries(ctx);
       return retval;
    }
-
 
    @Override
    public Object visitCommitCommand(TxInvocationContext ctx, CommitCommand command) throws Throwable {

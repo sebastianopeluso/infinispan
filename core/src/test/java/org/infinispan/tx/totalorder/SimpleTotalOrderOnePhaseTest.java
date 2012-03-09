@@ -46,8 +46,8 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
    }
 
    public void testToCacheIsTransactional() {
-      assertTrue(cache(0).getCacheConfiguration().transaction().autoCommit());
-      assertTrue(cache(0).getCacheConfiguration().transaction().transactionMode() == TransactionMode.TRANSACTIONAL);
+      assertTrue(cache(0).getConfiguration().isTransactionAutoCommit());
+      assertTrue(cache(0).getConfiguration().getTransactionMode() == TransactionMode.TRANSACTIONAL);
    }
 
    public void testPut() {
@@ -135,7 +135,7 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
       cache(0).remove("key", "value2");
 
       assert cache(0).get("key") == null;
-      assert cache(1).get("key") == null;
+      assertEventuallyEqual(1, "key", null);
    }
 
    public void testClear() {
@@ -147,7 +147,7 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
       cache(0).clear();
 
       assert cache(0).get("key") == null;
-      assert cache(1).get("key") == null;
+      assertEventuallyEqual(1, "key", null);
    }
 
    public void testReplace() {

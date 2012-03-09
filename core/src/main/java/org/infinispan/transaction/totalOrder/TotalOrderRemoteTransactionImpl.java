@@ -20,11 +20,6 @@ public class TotalOrderRemoteTransactionImpl extends RemoteTransaction implement
 
    private TotalOrderState state;
 
-   public TotalOrderRemoteTransactionImpl(WriteCommand[] modifications, GlobalTransaction tx, int viewId) {
-      super(modifications, tx, viewId);
-      state = new TotalOrderState(tx);
-   }
-
    public TotalOrderRemoteTransactionImpl(GlobalTransaction tx, int viewId) {
       super(tx, viewId);
       state = new TotalOrderState(tx);

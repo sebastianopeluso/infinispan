@@ -33,10 +33,10 @@ import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.interceptors.locking.NonTransactionalLockingInterceptor;
 import org.infinispan.interceptors.locking.OptimisticLockingInterceptor;
 import org.infinispan.interceptors.locking.PessimisticLockingInterceptor;
-import org.infinispan.interceptors.totalorder.ToVersionedEntryWrappingInterceptor;
-import org.infinispan.interceptors.totalorder.TOVersionedReplicationInterceptor;
+import org.infinispan.interceptors.totalorder.TotalOrderVersionedEntryWrappingInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderReplicationInterceptor;
+import org.infinispan.interceptors.totalorder.TotalOrderVersionedReplicationInterceptor;
 import org.infinispan.loaders.CacheLoaderConfig;
 import org.infinispan.loaders.CacheStoreConfig;
 import org.infinispan.transaction.LockingMode;
@@ -160,8 +160,8 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       if (needsVersionAwareComponents && configuration.getCacheMode().isClustered()) {
          //added custom entry wrapping interceptor for total order protocol
          if (configuration.isTotalOrder()) {
-            interceptorChain.appendInterceptor(createInterceptor(new ToVersionedEntryWrappingInterceptor(),
-                  ToVersionedEntryWrappingInterceptor.class), false);
+            interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedEntryWrappingInterceptor(),
+                  TotalOrderVersionedEntryWrappingInterceptor.class), false);
          } else {
             interceptorChain.appendInterceptor(createInterceptor(new VersionedEntryWrappingInterceptor(), VersionedEntryWrappingInterceptor.class), false);
          }
@@ -202,8 +202,8 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             if (needsVersionAwareComponents) {
                //added custom interceptor to replace the original
                if (configuration.isTotalOrder()) {
-                  interceptorChain.appendInterceptor(createInterceptor(new TOVersionedReplicationInterceptor(),
-                        TOVersionedReplicationInterceptor.class), false);
+                  interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedReplicationInterceptor(),
+                        TotalOrderVersionedReplicationInterceptor.class), false);
                } else {
                   interceptorChain.appendInterceptor(createInterceptor(new VersionedReplicationInterceptor(), VersionedReplicationInterceptor.class), false);
                }

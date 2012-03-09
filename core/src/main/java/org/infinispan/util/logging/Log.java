@@ -875,7 +875,7 @@ public interface Log extends BasicLogger {
    @Message(value = "Starting Total Order Manager component. Using multiple threads for validation ? %s.", id = 192)
    void startTotalOrderManager(String multiThread);
 
-   @LogMessage(level = WARN)
+   @LogMessage(level = INFO)
    @Message(value = "Timeout while waiting for the transaction validation. The command will not be processed. " +
          "Transaction is %s", id = 193)
    void timeoutWaitingUntilTransactionPrepared(String globalTx);
