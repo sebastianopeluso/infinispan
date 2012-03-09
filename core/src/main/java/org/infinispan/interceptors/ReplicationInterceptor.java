@@ -32,7 +32,6 @@ import org.infinispan.commands.write.PutMapCommand;
 import org.infinispan.commands.write.RemoveCommand;
 import org.infinispan.commands.write.ReplaceCommand;
 import org.infinispan.commands.write.WriteCommand;
-import org.infinispan.config.Configuration;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.LocalTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
@@ -133,8 +132,8 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
    }
 
    protected void broadcastPrepare(TxInvocationContext context, PrepareCommand command) {
-      boolean asyncPrepare =  !configuration.getCacheMode().isSynchronous() || configuration.isTotalOrder();
-      rpcManager.broadcastRpcCommand(command, asyncPrepare, false, configuration.isTotalOrder());
+      boolean syncPrepare =  configuration.getCacheMode().isSynchronous() && !configuration.isTotalOrder();
+      rpcManager.broadcastRpcCommand(command, syncPrepare, false, configuration.isTotalOrder());
    }
 
    @Override
