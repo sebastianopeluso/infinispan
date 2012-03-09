@@ -151,8 +151,7 @@ public interface Transport extends Lifecycle {
 
    /**
     * check if the transport has configured with total order deliver properties (has the sequencer in JGroups
-    * protocol stack. If it cannot find it in the jgroups stack then it tries to add it: if cannot add it an
-    * exception is thrown.
+    * protocol stack.
     */
-   void checkOrFixTotalOrderSupport();
+   void checkTotalOrderSupported();
 }

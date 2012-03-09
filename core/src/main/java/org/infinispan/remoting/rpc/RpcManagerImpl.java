@@ -27,9 +27,6 @@ import org.infinispan.cacheviews.CacheViewsManager;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
-import org.infinispan.commands.tx.CommitCommand;
-import org.infinispan.commands.tx.PrepareCommand;
-import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.config.Configuration;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
@@ -116,7 +113,7 @@ public class RpcManagerImpl implements RpcManager {
       stateTransferEnabled = configuration.isStateTransferEnabled();
       statisticsEnabled = configuration.isExposeJmxStatistics();
 
-      if (configuration.isTotalOrder()) t.checkOrFixTotalOrderSupport();
+      if (configuration.isTotalOrder()) t.checkTotalOrderSupported();
    }
 
    @ManagedAttribute(description = "Retrieves the committed view.")
