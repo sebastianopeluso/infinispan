@@ -28,7 +28,7 @@ public interface TotalOrderManager {
     * This will mark a global transaction as finished. It will be invoked in the processing of the commit command in
     * repeatable read with write skew (not implemented yet!)
     */
-   void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo);
+   void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo, TotalOrderRemoteTransaction transaction);
 
    /**
     * This ensures the order between the commit/rollback commands and the prepare command.
@@ -45,12 +45,6 @@ public interface TotalOrderManager {
     * @return true if the command needs to be processed, false otherwise
     */
    boolean waitForTxPrepared(TotalOrderRemoteTransaction remoteTransaction, boolean commit, EntryVersionsMap newVersions);
-
-   /**
-    * Remove the keys from the map (if their didn't change) and release the count down latch, unblocking the next
-    * transaction
-    */
-   void finishTransaction(TotalOrderRemoteTransaction remoteTransaction);
 
    /**
     * Adds a local transaction to the map. Later, it will be notified when the modifications are applied in the data

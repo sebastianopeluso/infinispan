@@ -84,11 +84,12 @@ public class TotalOrderInterceptor extends CommandInterceptor {
       if (trace)  log.tracef("Visit Rollback Command. Transaction is %s", gtx.prettyPrint());
 
       boolean processCommand = true;
+      TotalOrderRemoteTransaction remoteTransaction = null;
 
       try {
          if (!ctx.isOriginLocal()) {
-            processCommand = totalOrderManager.waitForTxPrepared(
-                  (TotalOrderRemoteTransaction) ctx.getCacheTransaction(), false, null);
+            remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction(); 
+            processCommand = totalOrderManager.waitForTxPrepared(remoteTransaction, false, null);
             if (!processCommand) {
                return null;
             }
@@ -104,7 +105,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
          throw t;
       } finally {
          if (processCommand) {
-            totalOrderManager.finishTransaction(gtx, !ctx.isOriginLocal());
+            totalOrderManager.finishTransaction(gtx, !ctx.isOriginLocal(), remoteTransaction);
          }
       }
    }
@@ -116,12 +117,14 @@ public class TotalOrderInterceptor extends CommandInterceptor {
       if (trace) log.tracef("Visit Commit Command. Transaction is %s", gtx.prettyPrint());
 
       boolean processCommand = true;
+      TotalOrderRemoteTransaction remoteTransaction = null;
 
       try {
          if (!ctx.isOriginLocal()) {
             EntryVersionsMap newVersions =
                   command instanceof VersionedCommitCommand ? ((VersionedCommitCommand) command).getUpdatedVersions() : null;
-            processCommand = totalOrderManager.waitForTxPrepared( (TotalOrderRemoteTransaction) ctx.getCacheTransaction(), true, newVersions);
+            remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
+            processCommand = totalOrderManager.waitForTxPrepared(remoteTransaction, true, newVersions);
             if (!processCommand) {
                return null;
             }
@@ -138,7 +141,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
          throw t;
       } finally {
          if (processCommand) {
-            totalOrderManager.finishTransaction(gtx, false);
+            totalOrderManager.finishTransaction(gtx, false, remoteTransaction);
          }
       }
    }

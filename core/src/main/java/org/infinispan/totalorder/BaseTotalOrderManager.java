@@ -104,10 +104,15 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    }
 
    @Override
-   public final void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo) {
+   public final void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo, TotalOrderRemoteTransaction transaction) {
       if (trace) log.tracef("transaction %s is finished", gtx.prettyPrint());
 
       TotalOrderRemoteTransaction remoteTransaction = (TotalOrderRemoteTransaction) transactionTable.removeRemoteTransaction(gtx);
+      
+      if (remoteTransaction == null) {
+         remoteTransaction = transaction;
+      }
+      
       if (remoteTransaction != null) {
          finishTransaction(remoteTransaction);
       } else if (!ignoreNullTxInfo) {
@@ -133,8 +138,11 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       return needsToProcessCommand;
    }
 
-   @Override
-   public void finishTransaction(TotalOrderRemoteTransaction remoteTransaction) {
+    /**
+    * Remove the keys from the map (if their didn't change) and release the count down latch, unblocking the next
+    * transaction
+    */
+   protected void finishTransaction(TotalOrderRemoteTransaction remoteTransaction) {
       TxDependencyLatch latch = remoteTransaction.getLatch();
       if (trace) log.tracef("Releasing resources for transaction %s", remoteTransaction);
       latch.countDown();
