@@ -23,6 +23,7 @@
 
 package org.infinispan.configuration.global;
 
+import org.infinispan.executors.DefaultDynamicExecutorFactory;
 import org.infinispan.remoting.transport.jgroups.JGroupsTransport;
 
 import static java.util.Arrays.asList;
@@ -51,7 +52,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
       this.replicationQueueScheduledExecutor = new ScheduledExecutorFactoryConfigurationBuilder(this);
       this.shutdown = new ShutdownConfigurationBuilder(this);
       //set a new executor by default, that allows to set the core number of threads and the keep alive time
-      this.totalOrderExecutor = new TotalOrderExecutorFactoryConfigurationBuilder(this);
+      this.totalOrderExecutor = new ExecutorFactoryConfigurationBuilder(this).factory(new DefaultDynamicExecutorFactory());
    }
    
    /**
