@@ -125,12 +125,15 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
                                           EntryVersionsMap newVersions) {
       GlobalTransaction gtx = remoteTransaction.getGlobalTransaction();
       if (trace)
-         log.tracef("Waiting until transaction %s is prepared. New versions are %s", gtx.prettyPrint(), newVersions);
+         log.tracef("%s command received. Waiting until transaction %s is prepared. New versions are %s",
+                    commit ? "Commit" : "Rollback", gtx.prettyPrint(), newVersions);
 
       boolean needsToProcessCommand;
       try {
          needsToProcessCommand = remoteTransaction.waitPrepared(commit, newVersions);
-         if (trace) log.tracef("Transaction  %s successfully finishes the waiting time", gtx.prettyPrint());
+         if (trace) log.tracef("Transaction %s successfully finishes the waiting time until prepared. " +
+                                     "%s command will be processed? %s", gtx.prettyPrint(), 
+                               commit ? "Commit" : "Rollback", needsToProcessCommand ? "yes" : "no");
       } catch (InterruptedException e) {
          log.timeoutWaitingUntilTransactionPrepared(gtx.prettyPrint());
          needsToProcessCommand = false;
