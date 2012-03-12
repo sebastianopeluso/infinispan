@@ -56,7 +56,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
     */
    protected volatile boolean statisticsEnabled;
    private boolean isSync;
-   private long replTimeout;
+   //private long replTimeout;
 
    @Inject
    public void inject(Configuration configuration, InvocationContextContainer invocationContextContainer,
@@ -71,7 +71,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       trace = log.isTraceEnabled();
       setStatisticsEnabled(configuration.jmxStatistics().enabled());
       isSync = configuration.clustering().cacheMode().isSynchronous();
-      replTimeout = configuration.clustering().sync().replTimeout();
+      //replTimeout = configuration.clustering().sync().replTimeout();
    }
 
    @Override
@@ -92,7 +92,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
 
          LocalTransaction localTransaction = (LocalTransaction) ctx.getCacheTransaction();
          try {
-            localTransaction.awaitUntilModificationsApplied(replTimeout);
+            localTransaction.awaitUntilModificationsApplied();
             if (trace)
                log.tracef("Prepare succeeded on time for transaction %s, waking up..", ctx.getGlobalTransaction().prettyPrint());
          } catch (Throwable th) {

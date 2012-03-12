@@ -215,11 +215,12 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
     *
     * @throws Throwable throw the validation result if it is an exception
     */
-   public final void awaitUntilModificationsApplied(long timeout) throws Throwable {
+   public final void awaitUntilModificationsApplied() throws Throwable {
 
-      if (!prepareResult.await(timeout, TimeUnit.MILLISECONDS)) {
-         throw new TimeoutException("Modifications not applied in " + timeout + " millis.");
-      }
+      //if (!prepareResult.await(timeout, TimeUnit.MILLISECONDS)) {
+      //   throw new TimeoutException("Modifications not applied in " + timeout + " millis.");
+      //}
+      prepareResult.await();      
 
       if (!prepareResult.modificationsApplied) {
          throw new TimeoutException("Unable to wait until modifications are applied");
