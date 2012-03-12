@@ -124,15 +124,15 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       if (configuration.getCacheMode().isDistributed() || configuration.getCacheMode().isReplicated())
          interceptorChain.appendInterceptor(createInterceptor(new StateTransferLockInterceptor(), StateTransferLockInterceptor.class), false);
 
-      // load the tx interceptor
-      if (configuration.isTransactionalCache())
-         interceptorChain.appendInterceptor(createInterceptor(new TxInterceptor(), TxInterceptor.class), false);
-
       //load total order interceptor
       if (configuration.isTotalOrder()) {
          interceptorChain.appendInterceptor(createInterceptor(new TotalOrderInterceptor(), TotalOrderInterceptor.class),
                                             false);
       }
+      
+      // load the tx interceptor
+      if (configuration.isTransactionalCache())
+         interceptorChain.appendInterceptor(createInterceptor(new TxInterceptor(), TxInterceptor.class), false);      
 
       if (isUsingMarshalledValues(configuration))
          interceptorChain.appendInterceptor(createInterceptor(new MarshalledValueInterceptor(), MarshalledValueInterceptor.class), false);
