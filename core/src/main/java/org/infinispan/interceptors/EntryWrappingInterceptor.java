@@ -317,7 +317,9 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
     * 2PC condition: only commits if the prepare has the flag 1PC set
     */
    protected boolean shouldCommitEntries(PrepareCommand command, TxInvocationContext ctx) {
-      return (configuration.isTotalOrder() && command.isOnePhaseCommit() && !ctx.isOriginLocal()) ||
+      //one phase commit in remote context in total order or it has no modifications (local commands)
+      return (configuration.isTotalOrder() && command.isOnePhaseCommit() && (!ctx.isOriginLocal()) || !ctx.hasModifications()) ||            
+            //original condition: one phase commit
             (!configuration.isTotalOrder() && command.isOnePhaseCommit());
    }
 }

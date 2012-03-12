@@ -60,6 +60,10 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
    public final void validateTransaction(PrepareCommand prepareCommand, TxInvocationContext ctx,
                                          CommandInterceptor invoker) {
       if (trace) log.tracef("Validating transaction %s", prepareCommand.getGlobalTransaction().prettyPrint());
+      
+      if (ctx.isOriginLocal()) throw new IllegalArgumentException("Local invocation not allowed!");
+      
+      copyLookedUpEntriesToRemoteContext(ctx);
 
       TotalOrderRemoteTransaction remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
 

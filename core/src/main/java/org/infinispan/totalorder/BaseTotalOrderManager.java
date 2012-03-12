@@ -185,4 +185,10 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       return statisticsEnabled ? System.nanoTime() : -1;
    }
 
+   protected final void copyLookedUpEntriesToRemoteContext(TxInvocationContext ctx) {
+      LocalTransaction localTransaction = localTransactionMap.get(ctx.getGlobalTransaction());
+      if (localTransaction != null) {
+         ctx.putLookedUpEntries(localTransaction.getLookedUpEntries());
+      }
+   }  
 }

@@ -23,6 +23,8 @@ public class SequentialTotalOrderManager extends BaseTotalOrderManager {
 
       if (ctx.isOriginLocal()) throw new IllegalArgumentException("Local invocation not allowed!");
 
+      copyLookedUpEntriesToRemoteContext(ctx);
+      
       Object result = null;
       boolean exception = false;
       long startTime = now();
