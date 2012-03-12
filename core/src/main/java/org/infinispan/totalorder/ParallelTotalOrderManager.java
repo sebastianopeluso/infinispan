@@ -4,6 +4,7 @@ import org.infinispan.CacheException;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.context.Flag;
 import org.infinispan.context.impl.TxInvocationContext;
+import org.infinispan.executors.ControllableExecutorService;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.base.CommandInterceptor;
@@ -21,12 +22,9 @@ import org.rhq.helpers.pluginAnnotations.agent.Units;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.infinispan.factories.KnownComponentNames.TOTAL_ORDER_EXECUTOR;
@@ -50,10 +48,12 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
    private final ConcurrentMap<Object, TxDependencyLatch> keysLocked = new ConcurrentHashMap<Object, TxDependencyLatch>();
 
    private volatile ExecutorService validationExecutorService;
+   private volatile boolean controllableExecutorService;
 
    @Inject
    public void inject(@ComponentName(TOTAL_ORDER_EXECUTOR) ExecutorService e) {
       validationExecutorService = e;
+      controllableExecutorService = validationExecutorService instanceof ControllableExecutorService;
    }
 
    @Override
@@ -241,20 +241,20 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
    @ManagedAttribute(description = "The minimum number of threads in the thread pool")
    @Metric(displayName = "Minimum Number of Threads", displayType = DisplayType.DETAIL)
    public int getThreadPoolCoreSize() {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         return ((ThreadPoolExecutor) validationExecutorService).getCorePoolSize();
+      if (controllableExecutorService) {
+         return ((ControllableExecutorService) validationExecutorService).getCorePoolSize();
       } else {
-         return -1;
+         return 1;
       }
    }
 
    @ManagedAttribute(description = "The maximum number of threads in the thread pool")
    @Metric(displayName = "Maximum Number of Threads", displayType = DisplayType.DETAIL)
    public int getThreadPoolMaximumPoolSize() {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         return ((ThreadPoolExecutor) validationExecutorService).getMaximumPoolSize();
+      if (controllableExecutorService) {
+         return ((ControllableExecutorService) validationExecutorService).getMaximumPoolSize();
       } else {
-         return -1;
+         return 1;
       }
    }
 
@@ -262,10 +262,10 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
    @Metric(displayName = "Keep Alive Time of a Idle Thread", units = Units.MILLISECONDS,
            displayType = DisplayType.DETAIL)
    public long getThreadPoolKeepTime() {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         return ((ThreadPoolExecutor) validationExecutorService).getKeepAliveTime(TimeUnit.MILLISECONDS);
+      if (controllableExecutorService) {
+         return ((ControllableExecutorService) validationExecutorService).getKeepAliveTime();
       } else {
-         return -1;
+         return 0;
       }
    }
 
@@ -273,34 +273,20 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
    @Metric(displayName = "Percentage of Occupation of the Queue", units = Units.PERCENTAGE,
            displayType = DisplayType.SUMMARY)
    public double getNumberOfTransactionInPendingQueue() {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         BlockingQueue queue = ((ThreadPoolExecutor) validationExecutorService).getQueue();
-         int remainingCapacity = queue.remainingCapacity();
-         int actualSize = queue.size();
-
-         double percentage;
-         if ((Integer.MAX_VALUE - remainingCapacity) > actualSize) {
-            percentage = actualSize * 100.0 / (remainingCapacity + actualSize);
-         } else {
-            percentage = actualSize * 100.0 / remainingCapacity;
-         }
-
-         return percentage > 100 ? 100.0 : percentage;
+      if (controllableExecutorService) {
+         return ((ControllableExecutorService) validationExecutorService).getQueueOccupationPercentage();
       } else {
-         return -1D;
+         return 0D;
       }
    }
 
    @ManagedAttribute(description = "The approximate percentage of active threads in the thread pool")
    @Metric(displayName = "Percentage of Active Threads", units = Units.PERCENTAGE, displayType = DisplayType.SUMMARY)
    public double getPercentageActiveThreads() {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         int max = ((ThreadPoolExecutor) validationExecutorService).getMaximumPoolSize();
-         int actual = ((ThreadPoolExecutor) validationExecutorService).getActiveCount();
-         double percentage = actual * 100.0 / max;
-         return percentage > 100 ? 100.0 : percentage;
+      if (controllableExecutorService) {
+         return ((ControllableExecutorService) validationExecutorService).getUsagePercentage();
       } else {
-         return -1D;
+         return 0D;
       }
    }
 
@@ -332,24 +318,24 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
    @ManagedOperation(description = "Set the minimum number of threads in the thread pool")
    @Operation(displayName = "Set Minimum Number Of Threads")
    public void setThreadPoolCoreSize(int size) {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         ((ThreadPoolExecutor) validationExecutorService).setCorePoolSize(size);
+      if (controllableExecutorService) {
+         ((ControllableExecutorService) validationExecutorService).setCorePoolSize(size);
       }
    }
 
    @ManagedOperation(description = "Set the maximum number of threads in the thread pool")
    @Operation(displayName = "Set Maximum Number Of Threads")
    public void setThreadPoolMaximumPoolSize(int size) {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         ((ThreadPoolExecutor) validationExecutorService).setMaximumPoolSize(size);
+      if (controllableExecutorService) {
+         ((ControllableExecutorService) validationExecutorService).setMaximumPoolSize(size);
       }
    }
 
    @ManagedOperation(description = "Set the idle time of a thread in the thread pool (milliseconds)")
    @Operation(displayName = "Set Keep Alive Time of Idle Threads")
    public void setThreadPoolKeepTime(long time) {
-      if (validationExecutorService instanceof ThreadPoolExecutor) {
-         ((ThreadPoolExecutor) validationExecutorService).setKeepAliveTime(time, TimeUnit.MILLISECONDS);
+      if (controllableExecutorService) {
+         ((ControllableExecutorService) validationExecutorService).setKeepAliveTime(time);
       }
    }
 }

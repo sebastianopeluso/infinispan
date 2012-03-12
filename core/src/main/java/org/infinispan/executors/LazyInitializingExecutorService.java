@@ -23,10 +23,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -37,11 +39,12 @@ import java.util.concurrent.TimeoutException;
  * @author Manik Surtani
  * @since 5.1
  */
-public final class LazyInitializingExecutorService implements ExecutorService {
+public final class LazyInitializingExecutorService implements ExecutorService, ControllableExecutorService {
 
    private volatile ExecutorService delegate;
    private final ExecutorFactory factory;
    private final Properties executorProperties;
+   private volatile boolean isThreadPoolExecutorService = false;
 
    public LazyInitializingExecutorService(ExecutorFactory factory, Properties executorProperties) {
       this.factory = factory;
@@ -53,6 +56,7 @@ public final class LazyInitializingExecutorService implements ExecutorService {
          synchronized (this) {
             if (delegate == null) {
                delegate = factory.getExecutor(executorProperties);
+               isThreadPoolExecutorService = delegate instanceof ThreadPoolExecutor;
             }
          }
       }
@@ -135,5 +139,79 @@ public final class LazyInitializingExecutorService implements ExecutorService {
    public void execute(Runnable command) {
       initIfNeeded();
       delegate.execute(command);
+   }
+
+   @Override
+   public int getCorePoolSize() {
+      return isThreadPoolExecutorService ?
+            ((ThreadPoolExecutor) delegate).getCorePoolSize() :
+            1;
+   }
+
+   @Override
+   public int getMaximumPoolSize() {
+      return isThreadPoolExecutorService ?
+            ((ThreadPoolExecutor) delegate).getMaximumPoolSize() :
+            1;
+   }
+
+   @Override
+   public long getKeepAliveTime() {
+      return isThreadPoolExecutorService ?
+            ((ThreadPoolExecutor) delegate).getKeepAliveTime(TimeUnit.MILLISECONDS) :
+            0L;
+   }
+
+   @Override
+   public double getQueueOccupationPercentage() {
+      if (isThreadPoolExecutorService) {
+         BlockingQueue queue = ((ThreadPoolExecutor) delegate).getQueue();
+         int remainingCapacity = queue.remainingCapacity();
+         int actualSize = queue.size();
+
+         double percentage;
+         if ((Integer.MAX_VALUE - remainingCapacity) > actualSize) {
+            percentage = actualSize * 100.0 / (remainingCapacity + actualSize);
+         } else {
+            percentage = actualSize * 100.0 / remainingCapacity;
+         }
+
+         return percentage > 100 ? 100.0 : percentage;
+      } else {
+         return 0D;
+      }
+   }
+
+   @Override
+   public double getUsagePercentage() {
+      if (isThreadPoolExecutorService) {
+         int max = ((ThreadPoolExecutor) delegate).getMaximumPoolSize();
+         int actual = ((ThreadPoolExecutor) delegate).getActiveCount();
+         double percentage = actual * 100.0 / max;
+         return percentage > 100 ? 100.0 : percentage;
+      } else {
+         return 0D;
+      }
+   }
+
+   @Override
+   public void setCorePoolSize(int size) {
+      if (isThreadPoolExecutorService) {
+         ((ThreadPoolExecutor) delegate).setCorePoolSize(size);
+      }
+   }
+
+   @Override
+   public void setMaximumPoolSize(int size) {
+      if (isThreadPoolExecutorService) {
+         ((ThreadPoolExecutor) delegate).setMaximumPoolSize(size);
+      }
+   }
+
+   @Override
+   public void setKeepAliveTime(long milliseconds) {
+      if (isThreadPoolExecutorService) {
+         ((ThreadPoolExecutor) delegate).setKeepAliveTime(milliseconds, TimeUnit.MILLISECONDS);
+      }
    }
 }
