@@ -318,7 +318,7 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
     */
    protected boolean shouldCommitEntries(PrepareCommand command, TxInvocationContext ctx) {
       //one phase commit in remote context in total order or it has no modifications (local commands)
-      return (configuration.isTotalOrder() && command.isOnePhaseCommit() && (!ctx.isOriginLocal()) || !ctx.hasModifications()) ||            
+      return (configuration.isTotalOrder() && command.isOnePhaseCommit() && (!ctx.isOriginLocal() || !ctx.hasModifications())) ||
             //original condition: one phase commit
             (!configuration.isTotalOrder() && command.isOnePhaseCommit());
    }
