@@ -47,13 +47,12 @@ public class TransactionConfiguration {
    private final RecoveryConfiguration recovery;
    private final boolean use1PcForAutoCommitTransactions;
    private final TransactionProtocol transactionProtocol; //2PC or Total order protocol
-   private final boolean use1PCInTotalOrder; //One phase to commit transaction
 
    TransactionConfiguration(boolean autoCommit, long cacheStopTimeout, boolean eagerLockingSingleNode, LockingMode lockingMode,
          boolean syncCommitPhase, boolean syncRollbackPhase, TransactionManagerLookup transactionManagerLookup,
          TransactionSynchronizationRegistryLookup transactionSynchronizationRegistryLookup, TransactionMode transactionMode,
          boolean useEagerLocking, boolean useSynchronization, boolean use1PcForAutoCommitTransactions,
-         RecoveryConfiguration recovery, TransactionProtocol transactionProtocol, boolean use1PCInTotalOrder) {
+         RecoveryConfiguration recovery, TransactionProtocol transactionProtocol) {
       this.autoCommit = autoCommit;
       this.cacheStopTimeout = cacheStopTimeout;
       this.eagerLockingSingleNode = eagerLockingSingleNode;
@@ -68,7 +67,6 @@ public class TransactionConfiguration {
       this.recovery = recovery;
       this.use1PcForAutoCommitTransactions = use1PcForAutoCommitTransactions;
       this.transactionProtocol = transactionProtocol;
-      this.use1PCInTotalOrder = use1PCInTotalOrder;
    }
 
    /**
@@ -286,9 +284,6 @@ public class TransactionConfiguration {
       if (transactionMode != that.transactionMode) return false;
       if (transactionSynchronizationRegistryLookup != null ? !transactionSynchronizationRegistryLookup.equals(that.transactionSynchronizationRegistryLookup) : that.transactionSynchronizationRegistryLookup != null)
          return false;
-      if (use1PCInTotalOrder != that.use1PCInTotalOrder) {
-         return false;
-      }
       if (transactionProtocol != that.transactionProtocol) {
          return false;
       }
@@ -312,7 +307,6 @@ public class TransactionConfiguration {
       result = 31 * result + (recovery != null ? recovery.hashCode() : 0);
       result = 31 * result + (use1PcForAutoCommitTransactions ? 1 : 0);
       result = 31 * result + (transactionProtocol != null ? transactionProtocol.hashCode() : 0);
-      result = 31 * result + (use1PCInTotalOrder ? 1 : 0);
       return result;
    }
 
@@ -321,12 +315,5 @@ public class TransactionConfiguration {
     */
    public TransactionProtocol transactionProtocol() {
       return transactionProtocol;
-   }
-
-   /**
-    * @return true if total order protocol is committing transactions in one phase
-    */
-   public boolean use1PCInTotalOrder() {
-      return use1PCInTotalOrder;
    }
 }

@@ -268,8 +268,7 @@ public class LegacyConfigurationAdaptor {
          .useEagerLocking(config.transaction().useEagerLocking())
          .useSynchronization(config.transaction().useSynchronization())
          .use1PcForAutoCommitTransactions(config.transaction().use1PcForAutoCommitTransactions())
-         .transactionProtocol(config.transaction().transactionProtocol())
-         .use1PCInTotalOrder(config.transaction().use1PcForAutoCommitTransactions());
+         .transactionProtocol(config.transaction().transactionProtocol());
       
       if (config.transaction().recovery().enabled()) {
          legacy.transaction().recovery().recoveryInfoCacheName(config.transaction().recovery().recoveryInfoCacheName());
@@ -500,8 +499,7 @@ public class LegacyConfigurationAdaptor {
          .transactionSynchronizationRegistryLookup(legacy.getTransactionSynchronizationRegistryLookup())
          .useEagerLocking(legacy.isUseEagerLocking())
          .useSynchronization(legacy.isUseSynchronizationForTransactions())
-         .transactionProtocol(legacy.getTransactionProtocol())
-         .use1PCInTotalOrder(legacy.isUse1PCInTotalOrder());
+         .transactionProtocol(legacy.getTransactionProtocol());
       
       builder.transaction().recovery().enabled(legacy.isTransactionRecoveryEnabled());
         

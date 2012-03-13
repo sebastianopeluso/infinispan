@@ -1275,13 +1275,6 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       return transaction.use1PcForAutoCommitTransactions;
    }
 
-   /**    
-    * @return true if the transactions should be committed in one phase in total order protocol
-    */
-   public boolean isUse1PCInTotalOrder() {
-      return transaction.use1PCInTotalOrder;
-   }
-
    public IsolationLevel getIsolationLevel() {
       return locking.isolationLevel;
    }
@@ -1846,10 +1839,6 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       @XmlAttribute
       protected TransactionProtocol transactionProtocol = TransactionProtocol.TWO_PHASE_COMMIT;
 
-      //the total order protocol can be used to commit transactions in One Phase (for repeatable read with write skew)
-      @ConfigurationDocRef(bean = Configuration.class, targetElement = "use1PCInTotalOrder")
-      private boolean use1PCInTotalOrder = true;
-
       public TransactionType(String transactionManagerLookupClass) {
          this.transactionManagerLookupClass = transactionManagerLookupClass;
       }
@@ -2190,36 +2179,6 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
             dolly.recovery = (RecoveryType) recovery.clone();
          return dolly;
       }
-
-      /**
-       * set if the total order protocol should commit transactions in One Phase or not
-       *
-       * Note: only works for repeatable read with write skew. In other consistencies, it commits always in One Phase
-       * @param b true if it should commit in One Phase, false otherwise
-       * @return the modified transaction configuration
-       */
-      @Override
-      public TransactionConfig use1PCInTotalOrder(boolean b) {
-         testImmutability("use1PCInTotalOrder");
-         this.use1PCInTotalOrder = b;
-         return this;
-   }
-
-   /**
-       * @return true if total order protocols commits transactions in one phase
-       */
-      @XmlAttribute
-      public boolean getUse1PCInTotalOrder() {
-         return use1PCInTotalOrder;
-      }
-
-      /**
-       * see {@link #use1PCInTotalOrder(boolean)}
-       * @param use1PCInTotalOrder
-       */
-      public void setUse1PCInTotalOrder(boolean use1PCInTotalOrder) {
-         this.use1PCInTotalOrder = use1PCInTotalOrder;
-      }
    }
 
    /**
@@ -2478,11 +2437,6 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       @Override
       public TransactionType use1PcForAutoCommitTransactions(boolean b) {
          return transaction().use1PcForAutoCommitTransactions(b);
-      }
-
-      @Override
-      public TransactionConfig use1PCInTotalOrder(boolean b) {
-         return transaction().use1PCInTotalOrder(b);
       }
    }
 

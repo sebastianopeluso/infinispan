@@ -256,7 +256,8 @@ public class TransactionCoordinator {
     * @return true if it can use 1PC false otherwise
     */
    private boolean isOnePhaseTotalOrder() {
-      return configuration.isTotalOrder() && (!configuration.isRequireVersioning() || configuration.isUse1PCInTotalOrder());
+      return configuration.isTotalOrder() && (!configuration.isRequireVersioning() ||
+                                                    configuration.isUseSynchronizationForTransactions());
    }
 
    private static interface CommandCreator {

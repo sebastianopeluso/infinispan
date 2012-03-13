@@ -130,8 +130,7 @@ public enum Attribute {
     WRITE_SKEW_CHECK("writeSkewCheck"),
     USE_1PC_FOR_AUTOCOMMIT_TX("use1PcForAutoCommitTransactions"),
     VERSIONING_SCHEME("versioningScheme"),
-   TRANSACTION_PROTOCOL("transactionProtocol"),
-   USE_1PC_IN_TOTAL_ORDER("use1PCInTotalOrder")
+   TRANSACTION_PROTOCOL("transactionProtocol")
     ;
 
     private final String name;

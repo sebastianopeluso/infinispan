@@ -382,9 +382,6 @@ public class Parser {
             case TRANSACTION_PROTOCOL:
                builder.transaction().transactionProtocol(TransactionProtocol.valueOf(value));
                break;
-            case USE_1PC_IN_TOTAL_ORDER:
-               builder.transaction().use1PCInTotalOrder(Boolean.valueOf(value));
-               break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
          }

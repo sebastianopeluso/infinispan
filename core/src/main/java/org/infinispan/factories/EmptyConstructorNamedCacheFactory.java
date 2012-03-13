@@ -114,7 +114,7 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          return (T) lockContainer;
       } else if (componentType.equals(TotalOrderManager.class)) {
          boolean needsMultiThreadValidation = configuration.getIsolationLevel() == IsolationLevel.REPEATABLE_READ &&
-               configuration.isWriteSkewCheck() && !configuration.isUse1PCInTotalOrder();
+               configuration.isWriteSkewCheck() && !configuration.isUseSynchronizationForTransactions();
 
          return needsMultiThreadValidation ? (T) new ParallelTotalOrderManager() : (T) new SequentialTotalOrderManager();
       }
