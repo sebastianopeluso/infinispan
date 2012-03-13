@@ -140,9 +140,21 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          //todo is this really needed?
          invocationContextContainer.setContext(txInvocationContext);
 
-         if (remoteTransaction.isMarkedForRollback()) {
-            throw new CacheException("Cannot prepare transaction" + gtx + ". it was already marked as rollback");
-         }
+         /*
+         we need to ensure the order before cancelling the transaction, because of this scenario:
+
+         Tx2 receives a rollback command
+         Tx1 is deliver and touch Key_X
+         Tx1 is blocked (ensure the order)
+         Tx2 is deliver and touch Key_X (and saves the latch of Tx1)
+         Tx3 is deliver and touch Key_X (and saves the latch of Tx2)
+         Tx2 is immediately aborted (already received the rollback) and releases the latch
+         Tx3 commits and writes in Key_X
+         Tx1 later aborts (in the other nodes, Tx1 commits and Tx3 aborts)
+         */
+         //if (remoteTransaction.isMarkedForRollback()) {
+         //   throw new CacheException("Cannot prepare transaction" + gtx + ". it was already marked as rollback");
+         //} 
 
          if (previousTransactions.contains(remoteTransaction.getLatch())) {
             throw new IllegalStateException("Dependency transaction must not contains myself in the set");
