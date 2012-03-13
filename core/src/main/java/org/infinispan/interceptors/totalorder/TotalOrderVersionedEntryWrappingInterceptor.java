@@ -1,5 +1,6 @@
 package org.infinispan.interceptors.totalorder;
 
+import org.infinispan.CacheException;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.commands.write.WriteCommand;
@@ -107,7 +108,17 @@ public class TotalOrderVersionedEntryWrappingInterceptor extends VersionedEntryW
 
       private MVCCEntry checkForWriteSkew(MVCCEntry mvccEntry) {
          ClusteredRepeatableReadEntry clusterMvccEntry = (ClusteredRepeatableReadEntry) mvccEntry;
-         clusterMvccEntry.performWriteSkewCheck(dataContainer);
+
+         EntryVersion versionSeen = prepareCommand.getVersionsSeen().get(clusterMvccEntry.getKey());
+
+         if (versionSeen != null) {
+            clusterMvccEntry.setVersion(versionSeen);
+         }
+
+         if(!clusterMvccEntry.performWriteSkewCheck(dataContainer)) {
+            throw new CacheException("Write skew detected on key " + clusterMvccEntry.getKey() +
+                                           " for transaction " + prepareCommand.getGlobalTransaction().prettyPrint());
+         }
          return clusterMvccEntry;
       }
    }
