@@ -167,7 +167,7 @@ public class DistributionManagerImpl implements DistributionManager {
       targets.retainAll(rpcManager.getTransport().getMembers());
       ResponseFilter filter = new ClusteredGetResponseValidityFilter(targets, getAddress());
       Map<Address, Response> responses = rpcManager.invokeRemotely(targets, get, ResponseMode.WAIT_FOR_VALID_RESPONSE,
-                                                                   configuration.getSyncReplTimeout(), true, filter);
+                                                                   configuration.getSyncReplTimeout(), true, filter, false);
 
       if (!responses.isEmpty()) {
          for (Response r : responses.values()) {

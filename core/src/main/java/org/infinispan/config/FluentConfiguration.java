@@ -284,8 +284,6 @@ public class FluentConfiguration extends AbstractFluentConfigurationBean {
       Configuration.TransactionType use1PcForAutoCommitTransactions(boolean b);
 
       TransactionConfig transactionProtocol(TransactionProtocol transactionProtocol);
-
-      TransactionConfig use1PCInTotalOrder(boolean b);
    }
 
    /**

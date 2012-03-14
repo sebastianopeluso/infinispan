@@ -869,8 +869,12 @@ public interface Log extends BasicLogger {
    @Message(value = "Starting Total Order Manager component. Using multiple threads for validation ? %s.", id = 188)
    void startTotalOrderManager(String multiThread);
 
-   @LogMessage(level = WARN)
+   @LogMessage(level = INFO)
    @Message(value = "Timeout while waiting for the transaction validation. The command will not be processed. " +
          "Transaction is %s", id = 189)
    void timeoutWaitingUntilTransactionPrepared(String globalTx);
+
+   @LogMessage(level = WARN)
+   @Message(value = "Cannot insert jgroups sequencer", id = 190)
+   void cannotInsertJGroupsSequencer(@Cause Throwable t);
 }

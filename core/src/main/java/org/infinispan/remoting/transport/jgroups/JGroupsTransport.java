@@ -25,6 +25,7 @@ package org.infinispan.remoting.transport.jgroups;
 import org.infinispan.CacheException;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.config.ConfigurationException;
 import org.infinispan.config.parsing.XmlConfigHelper;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.jmx.JmxUtil;
@@ -65,7 +66,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
@@ -478,7 +478,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
                if (singleRecipient) singleJGAddress = toJGroupsAddress(others.get(0));
             }
             if (!skipRpc) {
-               if (singleRecipient) {
+               if (singleRecipient && !totalOrder) {
                   if (singleJGAddress == null) singleJGAddress = jgAddressList.get(0);
                   singleResponse = dispatcher.invokeRemoteCommand(singleJGAddress, rpcCommand, toJGroupsMode(mode), timeout,
                                                                   usePriorityQueue, supportReplay, asyncMarshalling);
@@ -678,8 +678,13 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
    }
 
    @Override
-   public boolean hasCommunicationWithTotalOrderProperties() {
-      return channel.getProtocolStack().findProtocol(SEQUENCER.class) != null ||
-            channel.getProtocolStack().findProtocol(GROUP_MULTICAST.class) != null;      
+   public final void checkTotalOrderSupported(boolean distributed) {
+      if (!distributed && channel.getProtocolStack().findProtocol(SEQUENCER.class) == null)  {
+         throw new ConfigurationException("In order to support total order based transaction, the SEQUENCER protocol " +
+                                                "must be present in the jgroups's config.");
+      } else if (distributed && channel.getProtocolStack().findProtocol(GROUP_MULTICAST.class) == null) {
+         throw new ConfigurationException("In order to support total order based transaction, the GROUP_MULTICAST protocol " +
+                                                "must be present in the jgroups's config.");
+      }
    }
 }

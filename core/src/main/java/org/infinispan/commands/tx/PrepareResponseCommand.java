@@ -1,10 +1,11 @@
 package org.infinispan.commands.tx;
 
 import org.infinispan.commands.Visitor;
-import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.transaction.xa.GlobalTransaction;
+
+import java.util.Set;
 
 /**
  * // TODO: Document this
@@ -16,8 +17,8 @@ public class PrepareResponseCommand extends AbstractTransactionBoundaryCommand {
 
    public static final byte COMMAND_ID = 100;
 
-   private boolean exception;
-   private Object result;
+   private Throwable exception;
+   private Set<Object> keysValidated;
 
    public PrepareResponseCommand(String cacheName) {
       super(cacheName);     
@@ -28,34 +29,35 @@ public class PrepareResponseCommand extends AbstractTransactionBoundaryCommand {
       this.globalTx = gtx;      
    }
 
-   public void addException(Object exception) {
-      this.exception = true;
-      this.result = exception;
+   public void setException(Throwable exception) {
+      this.exception = exception;
    }
 
-   public void addVersions(EntryVersionsMap versionsMap) {
-      this.exception = false;
-      this.result = versionsMap;
+   public void setKeysValidated(Set<Object> keysValidated) {
+      if (keysValidated == null || keysValidated.isEmpty()) {
+         return;
+      }
+      this.keysValidated = keysValidated;
    }
 
-   public boolean isException() {
+   public Throwable getException() {
       return exception;
    }
 
-   public Object getResult() {
-      return result;
+   public Set<Object> getKeysValidated() {
+      return keysValidated;
    }
 
    @Override
    public Object[] getParameters() {
-      return new Object[]{globalTx, exception, result};
+      return new Object[]{globalTx, exception, keysValidated};
    }
 
    @Override
    public void setParameters(int commandId, Object[] args) {
       this.globalTx = (GlobalTransaction) args[0];
-      this.exception = (Boolean) args[1];
-      this.result = args[2];
+      this.exception = (Throwable) args[1];
+      this.keysValidated = (Set<Object>) args[2];
    }
 
    @Override
@@ -72,7 +74,7 @@ public class PrepareResponseCommand extends AbstractTransactionBoundaryCommand {
    public String toString() {
       return "PrepareResponseCommand{" +
             "exception=" + exception +
-            ", result=" + result +
+            ", keysValidated=" + keysValidated +
             super.toString();
    }
 }

@@ -32,7 +32,6 @@ import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.GlobalTransaction;
-import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -69,10 +68,11 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
       return configuration;
    }
 
-   public void init(InterceptorChain chain, InvocationContextContainer icc, TransactionTable txTable) {
+   public void init(InterceptorChain chain, InvocationContextContainer icc, TransactionTable txTable, Configuration configuration) {
       this.invoker = chain;
       this.icc = icc;
       this.txTable = txTable;
+      this.configuration = configuration;
    }
 
    public String getCacheName() {
@@ -137,7 +137,7 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
 
       if (transaction.isMissingModifications()) {
          log.tracef("Will execute tx command %s without the remote transaction [%s]", this,
-               Util.prettyPrintGlobalTransaction(globalTx));
+                    globalTx.prettyPrint());
       }
 
       RemoteTxInvocationContext ctxt = icc.createRemoteTxInvocationContext(

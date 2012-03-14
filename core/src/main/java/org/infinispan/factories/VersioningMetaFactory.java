@@ -28,7 +28,7 @@ public class VersioningMetaFactory extends AbstractNamedCacheComponentFactory im
    @SuppressWarnings("unchecked")
    @Override
    public <T> T construct(Class<T> componentType) {
-      if (!configuration.isEnableVersioning())
+      if (!configuration.isRequireVersioning())
          return null;
 
       switch (configuration.getVersioningScheme()) {

@@ -193,7 +193,7 @@ public class SyncReplTest extends MultipleCacheManagersTest {
          expect(
                mockTransport.invokeRemotely((List<Address>) anyObject(),
                      (CacheRpcCommand) anyObject(), eq(ResponseMode.SYNCHRONOUS), anyLong(),
-                     anyBoolean(), (ResponseFilter) anyObject(), anyBoolean())).andReturn(
+                     anyBoolean(), (ResponseFilter) anyObject(), anyBoolean(), anyBoolean(), anyBoolean())).andReturn(
                   emptyResponses).once();
 
          replay(mockTransport);
@@ -211,7 +211,7 @@ public class SyncReplTest extends MultipleCacheManagersTest {
          expect(
                   mockTransport.invokeRemotely((List<Address>) anyObject(),
                            (CacheRpcCommand) anyObject(), eq(ResponseMode.ASYNCHRONOUS), anyLong(),
-                           anyBoolean(), (ResponseFilter) anyObject(), anyBoolean())).andReturn(
+                           anyBoolean(), (ResponseFilter) anyObject(), anyBoolean(), anyBoolean(), anyBoolean())).andReturn(
                   emptyResponses).once();
 
          replay(mockTransport);

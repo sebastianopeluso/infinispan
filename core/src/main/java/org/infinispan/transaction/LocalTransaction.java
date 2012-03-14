@@ -91,9 +91,9 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
          remoteLockedNodes.addAll(nodes);
    }
 
-   public Collection<Address> getRemoteLocksAcquired(){
-	   if (remoteLockedNodes == null) return Collections.emptySet();
-	   return remoteLockedNodes;
+   public Collection<Address> getRemoteLocksAcquired() {
+      if (remoteLockedNodes == null) return Collections.emptySet();
+      return remoteLockedNodes;
    }
 
    public void clearRemoteLocksAcquired() {
@@ -159,7 +159,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    @Override
    public int hashCode() {
       long id = tx.getId();
-      return (int)(id ^ (id >>> 32));
+      return (int) (id ^ (id >>> 32));
    }
 
    @Override
@@ -196,32 +196,33 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
 
    /**
     * waits until the modification are applied
-    * @return the validation return value
+    *
     * @throws Throwable throw the validation result if it is an exception
     */
-   public Object awaitUntilModificationsApplied() throws Throwable {
+   public final void awaitUntilModificationsApplied() throws Throwable {
 
-      try {
-         prepareResult.await();
-      } catch (InterruptedException e) {
-         //do nothing
-      }
-      if(!prepareResult.modificationsApplied) {
+      //if (!prepareResult.await(timeout, TimeUnit.MILLISECONDS)) {
+      //   throw new TimeoutException("Modifications not applied in " + timeout + " millis.");
+      //}
+      prepareResult.await();      
+
+      if (!prepareResult.modificationsApplied) {
          throw new TimeoutException("Unable to wait until modifications are applied");
       }
-      if(prepareResult.exception) {
+      if (prepareResult.exception) {
          throw (Throwable) prepareResult.result;
       }
-      return prepareResult.result;
    }
 
 
    /**
     * add the transaction result and notify
-    * @param object the validation result
+    *
+    * @param object    the validation result
     * @param exception is it an exception?
     */
    public void addPrepareResult(Object object, boolean exception) {
+      log.tracef("Received prepare result %s, is exception? %s", object, false);
       prepareResult.modificationsApplied = true;
       prepareResult.result = object;
       prepareResult.exception = exception;

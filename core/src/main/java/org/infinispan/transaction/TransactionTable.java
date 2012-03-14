@@ -232,7 +232,7 @@ public class TransactionTable {
       for (GlobalTransaction gtx : toKill) {
          log.tracef("Killing remote transaction originating on leaver %s", gtx);
          RollbackCommand rc = new RollbackCommand(configuration.getName(), gtx);
-         rc.init(invoker, icc, TransactionTable.this);
+         rc.init(invoker, icc, TransactionTable.this, configuration);
          try {
             rc.perform(null);
             log.tracef("Rollback of transaction %s complete.", gtx);
@@ -478,7 +478,7 @@ public class TransactionTable {
     *
     * @param globalTransaction the global transaction
     * @return the remote transaction. This remote transaction implements the interface
-    *         {@link org.infinispan.transaction.totalOrder.TotalOrderRemoteTransaction}
+    *         {@link org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction}
     */
    public RemoteTransaction getOrCreateIfAbsentRemoteTransaction(GlobalTransaction globalTransaction) {
       RemoteTransaction remoteTransaction = remoteTransactions.get(globalTransaction);

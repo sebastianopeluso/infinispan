@@ -201,8 +201,7 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
       try {
          return doInvokeAny(tasks, false, 0);
       } catch (TimeoutException cannotHappen) {
-         assert false;
-         return null;
+         throw new IllegalStateException("Cannot happen!", cannotHappen);
       }
    }
 

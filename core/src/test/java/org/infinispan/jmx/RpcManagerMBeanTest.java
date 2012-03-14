@@ -164,7 +164,7 @@ public class RpcManagerMBeanTest extends MultipleCacheManagersTest {
          expect(transport.getAddress()).andReturn(null).anyTimes();
          expect(transport.invokeRemotely(EasyMock.<Collection<Address>>anyObject(), EasyMock.<ReplicableCommand>anyObject(),
                                                   EasyMock.<ResponseMode>anyObject(), anyLong(), anyBoolean(), EasyMock.<ResponseFilter>anyObject(),
-                                                  anyBoolean())).andThrow(new RuntimeException()).anyTimes();
+                                                  anyBoolean(), anyBoolean(), anyBoolean())).andThrow(new RuntimeException()).anyTimes();
          replay(transport);
          rpcManager.setTransport(transport);
          cache1.put("a5", "b5");

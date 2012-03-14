@@ -62,7 +62,7 @@ public abstract class BaseRpcInterceptor extends CommandInterceptor {
          boolean sync = !command.isUnlock();
          command.setFlags(ctx.getFlags());
          ((LocalTxInvocationContext) ctx).remoteLocksAcquired(rpcManager.getTransport().getMembers());
-         rpcManager.broadcastRpcCommand(command, sync, false);
+         rpcManager.broadcastRpcCommand(command, sync, false, false);
       }
       return retVal;
    }

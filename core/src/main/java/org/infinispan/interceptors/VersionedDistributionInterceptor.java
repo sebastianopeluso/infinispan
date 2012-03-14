@@ -22,15 +22,9 @@ package org.infinispan.interceptors;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
-import org.infinispan.commands.write.WriteCommand;
-import org.infinispan.container.entries.CacheEntry;
-import org.infinispan.container.versioning.EntryVersionsMap;
-import org.infinispan.container.versioning.IncrementableEntryVersion;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.remoting.responses.Response;
-import org.infinispan.remoting.responses.SuccessfulResponse;
 import org.infinispan.remoting.transport.Address;
-import org.infinispan.transaction.WriteSkewHelper;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -72,7 +66,7 @@ public class VersionedDistributionInterceptor extends DistributionInterceptor {
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
 
       // Perform the RPC
-      Map<Address, Response> resps = rpcManager.invokeRemotely(recipients, command, true, true);
+      Map<Address, Response> resps = rpcManager.invokeRemotely(recipients, command, true, true, false);
 
       // Now store newly generated versions from lock owners for use during the commit phase.
       CacheTransaction ct = ctx.getCacheTransaction();

@@ -568,15 +568,4 @@ public final class Util {
       // more efficient impl
       return hashFct.hash(key) & Integer.MAX_VALUE; // make sure no negative numbers are involved.
    }
-
-   /**
-    * pretty print the global transaction instance: address + counter
-    *
-    * @param gtx the global transaction
-    * @return a string representing the global transaction
-    */
-   public static String prettyPrintGlobalTransaction(GlobalTransaction gtx) {
-      return gtx.getAddress() + ":" + gtx.getId();
-   }
-
 }

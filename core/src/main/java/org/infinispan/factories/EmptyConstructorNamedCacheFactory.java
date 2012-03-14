@@ -42,15 +42,14 @@ import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
-import org.infinispan.totalorder.DistributedTotalOrderManager;
+import org.infinispan.totalorder.DistParallelTotalOrderManager;
+import org.infinispan.totalorder.ParallelTotalOrderManager;
+import org.infinispan.totalorder.SequentialTotalOrderManager;
 import org.infinispan.totalorder.TotalOrderManager;
 import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.xa.recovery.RecoveryAdminOperations;
-import org.infinispan.util.concurrent.locks.containers.LockContainer;
-import org.infinispan.util.concurrent.locks.containers.OwnableReentrantPerEntryLockContainer;
-import org.infinispan.util.concurrent.locks.containers.OwnableReentrantStripedLockContainer;
-import org.infinispan.util.concurrent.locks.containers.ReentrantPerEntryLockContainer;
-import org.infinispan.util.concurrent.locks.containers.ReentrantStripedLockContainer;
+import org.infinispan.util.concurrent.IsolationLevel;
+import org.infinispan.util.concurrent.locks.containers.*;
 
 import static org.infinispan.util.Util.getInstance;
 
@@ -65,7 +64,7 @@ import static org.infinispan.util.Util.getInstance;
                               CacheLoaderManager.class, InvocationContextContainer.class, PassivationManager.class,
                               BatchContainer.class, EvictionManager.class,
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
-                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class, DistributedTotalOrderManager.class})
+                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -114,15 +113,16 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
                notTransactional ? new ReentrantStripedLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantStripedLockContainer(configuration.getConcurrencyLevel()) :
                notTransactional ? new ReentrantPerEntryLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantPerEntryLockContainer(configuration.getConcurrencyLevel());
          return (T) lockContainer;
-      } else if (componentType.equals(TotalOrderManager.class)) {
-         if (configuration.getCacheMode().isReplicated()) {
-            return (T) new TotalOrderManager();
-         } else {
-            return (T) new DistributedTotalOrderManager();
-         }
+      } else if (componentType.equals(TotalOrderManager.class)) {     
+         boolean needsMultiThreadValidation = configuration.getIsolationLevel() == IsolationLevel.REPEATABLE_READ &&
+               configuration.isWriteSkewCheck() && !configuration.isUseSynchronizationForTransactions();
+
+         return needsMultiThreadValidation ?
+               (configuration.getCacheMode().isDistributed() ?
+                     (T) new DistParallelTotalOrderManager() :
+                     (T) new ParallelTotalOrderManager())
+               : (T) new SequentialTotalOrderManager();
       }
-
-
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());
 

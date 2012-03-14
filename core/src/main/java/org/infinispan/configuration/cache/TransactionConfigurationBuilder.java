@@ -56,7 +56,6 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
    private final RecoveryConfigurationBuilder recovery;
    private boolean use1PcForAutoCommitTransactions = false;
    private TransactionProtocol transactionProtocol = TransactionProtocol.TWO_PHASE_COMMIT;
-   private boolean use1PCInTotalOrder = true;
 
    TransactionConfigurationBuilder(ConfigurationBuilder builder) {
       super(builder);
@@ -293,8 +292,7 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
          transactionMode = TransactionMode.NON_TRANSACTIONAL;
       return new TransactionConfiguration(autoCommit, cacheStopTimeout, eagerLockingSingleNode, lockingMode, syncCommitPhase,
             syncRollbackPhase, transactionManagerLookup, transactionSynchronizationRegistryLookup, transactionMode,
-            useEagerLocking, useSynchronization, use1PcForAutoCommitTransactions, recovery.create(), transactionProtocol,
-            use1PCInTotalOrder);
+            useEagerLocking, useSynchronization, use1PcForAutoCommitTransactions, recovery.create(), transactionProtocol);
    }
 
    @Override
@@ -313,7 +311,6 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
       this.use1PcForAutoCommitTransactions = template.use1PcForAutoCommitTransactions();
       this.recovery.read(template.recovery());
       this.transactionProtocol = template.transactionProtocol();
-      this.use1PCInTotalOrder = template.use1PCInTotalOrder();
 
       return this;
    }
@@ -334,17 +331,11 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
             ", useSynchronization=" + useSynchronization +
             ", recovery=" + recovery +
             ", use1PcForAutoCommitTransactions=" + use1PcForAutoCommitTransactions +
-            ", use1PCInTotalOrder=" + use1PCInTotalOrder +
             '}';
    }
 
    public TransactionConfigurationBuilder transactionProtocol(TransactionProtocol transactionProtocol) {
       this.transactionProtocol = transactionProtocol;
-      return this;
-   }
-
-   public TransactionConfigurationBuilder use1PCInTotalOrder(boolean b) {
-      this.use1PCInTotalOrder = b;
       return this;
    }
 }

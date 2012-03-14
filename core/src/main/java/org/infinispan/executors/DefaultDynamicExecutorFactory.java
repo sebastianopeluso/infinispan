@@ -41,7 +41,7 @@ public class DefaultDynamicExecutorFactory implements ExecutorFactory {
 
    public ExecutorService getExecutor(Properties p) {
       TypedProperties tp = TypedProperties.toTypedProperties(p);
-      int minThreads = tp.getIntProperty("minThreads", 1);
+      int minThreads = tp.getIntProperty("minThreads", 4);
       int maxThreads = tp.getIntProperty("maxThreads", 32);
       int queueSize = tp.getIntProperty("queueSize", 100000);
       long keepAliveTime = tp.getIntProperty("keepAliveTime", 100000);

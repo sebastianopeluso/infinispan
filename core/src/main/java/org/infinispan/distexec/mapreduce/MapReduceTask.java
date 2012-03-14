@@ -237,7 +237,7 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
          selfCmd = cmd;
          try {
             log.debugf("Invoking %s across entire cluster ", cmd);
-            Map<Address, Response> map = rpc.invokeRemotely(null, cmd, true, false);
+            Map<Address, Response> map = rpc.invokeRemotely(null, cmd, true, false, false);
             log.debugf("Invoked %s across entire cluster, results are %s", cmd, map);
             results.putAll(map);
          } catch (Throwable e) {

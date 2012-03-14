@@ -83,8 +83,7 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
    }
 
    public InterceptorChain buildInterceptorChain() {
-      boolean needsVersionAwareComponents = configuration.isTransactionalCache() && configuration.isWriteSkewCheck() &&
-            configuration.getTransactionLockingMode() == LockingMode.OPTIMISTIC && configuration.isEnableVersioning();
+      boolean needsVersionAwareComponents = configuration.isRequireVersioning();
 
       boolean invocationBatching = configuration.isInvocationBatchingEnabled();
       // load the icInterceptor first
@@ -156,8 +155,8 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       if (needsVersionAwareComponents && configuration.getCacheMode().isClustered()) {
          //added custom entry wrapping interceptor for total order protocol
          if (configuration.isTotalOrder()) {
-            interceptorChain.appendInterceptor(createInterceptor(new TOVersionedEntryWrappingInterceptor(),
-                  TOVersionedEntryWrappingInterceptor.class), false);
+            interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedEntryWrappingInterceptor(),
+                  TotalOrderVersionedEntryWrappingInterceptor.class), false);
          } else {
             interceptorChain.appendInterceptor(createInterceptor(new VersionedEntryWrappingInterceptor(), VersionedEntryWrappingInterceptor.class), false);
          }
@@ -198,11 +197,14 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             if (needsVersionAwareComponents) {
                //added custom interceptor to replace the original
                if (configuration.isTotalOrder()) {
-                  interceptorChain.appendInterceptor(createInterceptor(new TOVersionedReplicationInterceptor(),
-                        TOVersionedReplicationInterceptor.class), false);
+                  interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedReplicationInterceptor(),
+                        TotalOrderVersionedReplicationInterceptor.class), false);
                } else {
                   interceptorChain.appendInterceptor(createInterceptor(new VersionedReplicationInterceptor(), VersionedReplicationInterceptor.class), false);
                }
+               break;
+            } else if (configuration.isTotalOrder()) {
+               interceptorChain.appendInterceptor(createInterceptor(new TotalOrderReplicationInterceptor(), TotalOrderReplicationInterceptor.class), false);
                break;
             }
          case REPL_ASYNC:
@@ -215,11 +217,14 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          case DIST_SYNC:
             if (needsVersionAwareComponents) {
                if (configuration.isTotalOrder()) {
-                  interceptorChain.appendInterceptor(createInterceptor(new TOVersionedDistributionInterceptor(),
-                        TOVersionedDistributionInterceptor.class), false);
+                  interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedDistributionInterceptor(),
+                        TotalOrderVersionedDistributionInterceptor.class), false);
                } else {
                   interceptorChain.appendInterceptor(createInterceptor(new VersionedDistributionInterceptor(), VersionedDistributionInterceptor.class), false);
                }
+               break;
+            } else if (configuration.isTotalOrder()) {
+               interceptorChain.appendInterceptor(createInterceptor(new TotalOrderDistributionInterceptor(), TotalOrderDistributionInterceptor.class), false);
                break;
             }
          case DIST_ASYNC:

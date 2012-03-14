@@ -21,34 +21,39 @@ import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepar
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class TOVersionedDistributionInterceptor extends VersionedDistributionInterceptor {
+public class TotalOrderVersionedDistributionInterceptor extends VersionedDistributionInterceptor {
 
-   private static final Log log = LogFactory.getLog(TOVersionedDistributionInterceptor.class);
+   private static final Log log = LogFactory.getLog(TotalOrderVersionedDistributionInterceptor.class);
 
    @Override
    protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command,
                                          Collection<Address> recipients, boolean sync) {      
 
-      boolean trace = log.isTraceEnabled();
-      String globalTransactionString = Util.prettyPrintGlobalTransaction(command.getGlobalTransaction());
+      boolean trace = log.isTraceEnabled();      
 
       if(trace) {
-         log.tracef("Total Order Multicast transaction %s with Total Order", globalTransactionString);
+         log.tracef("Total Order Multicast transaction %s with Total Order", command.getGlobalTransaction().prettyPrint());
       }
       
       if (!(command instanceof VersionedPrepareCommand)) {
          throw new IllegalStateException("Expected a Versioned Prepare Command in version aware component");
       }
 
+      recipients.add(rpcManager.getAddress());
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
-      rpcManager.invokeRemotely(recipients, command, false);      
+      rpcManager.invokeRemotely(recipients, command, false, false, true);      
    }
 
    @Override
    public Object visitPrepareResponseCommand(TxInvocationContext ctx, PrepareResponseCommand command) throws Throwable {
-      Collection<Address> dest = Collections.singleton(command.getGlobalTransaction().getAddress());
+      Address destination = command.getGlobalTransaction().getAddress();
+      Collection<Address> destinationList = Collections.singleton(destination);
       Object retVal = invokeNextInterceptor(ctx, command);
-      rpcManager.invokeRemotely(dest, command, false);
+      
+      if (!destination.equals(rpcManager.getAddress())) {
+         //don't send to myself
+         rpcManager.invokeRemotely(destinationList, command, false);
+      }
       return retVal;
    }
 }
