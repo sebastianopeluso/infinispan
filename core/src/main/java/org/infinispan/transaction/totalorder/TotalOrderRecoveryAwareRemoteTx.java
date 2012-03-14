@@ -12,7 +12,7 @@ import java.util.Set;
  * Implements the Total Order Remote Transaction interface to be used with the Total Order protocol for Recovery Aware
  * Transactions
  *
- * ps. the javadoc is in the interface
+ * ps. the javadoc is in the interface   
  *
  * @author Pedro Ruivo
  * @since 5.2

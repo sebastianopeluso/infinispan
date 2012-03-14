@@ -1,4 +1,4 @@
-package org.infinispan.transaction.totalorder;
+package org.infinispan.transaction.totalorder;   
 
 import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.transaction.TxDependencyLatch;
@@ -10,7 +10,7 @@ import java.util.Set;
  * The interface needed for Remote Transaction in Total Order protocol. This manage the state of a transaction, using the
  * {@link TotalOrderState}
  *
- * @author Pedro Ruivo
+ * @author Pedro Ruivo  
  * @since 5.2
  */
 public interface TotalOrderRemoteTransaction extends CacheTransaction {
@@ -18,7 +18,7 @@ public interface TotalOrderRemoteTransaction extends CacheTransaction {
    /**
     * check if the transaction is marked for rollback (by the Rollback Command)
     * @return true if it is marked for rollback, false otherwise
-    */
+    */        
    boolean isMarkedForRollback();
 
    /**

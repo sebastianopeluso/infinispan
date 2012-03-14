@@ -13,7 +13,7 @@ import java.util.Set;
  *
  * ps. the javadoc is in the interface
  *
- * @author Pedro Ruivo
+ * @author Pedro Ruivo  
  * @since 5.2
  */
 public class TotalOrderRemoteTransactionImpl extends RemoteTransaction implements TotalOrderRemoteTransaction {

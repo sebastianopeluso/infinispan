@@ -10,7 +10,7 @@ import java.util.*;
  * The state of a Remote Transaction to be used in Total Order protocol. It behaves as a synchronization point between
  * commit/rollback command and the prepare command
  *
- * @author Pedro Ruivo
+ * @author Pedro Ruivo      
  * @since 5.2
  */
 public class TotalOrderState {
