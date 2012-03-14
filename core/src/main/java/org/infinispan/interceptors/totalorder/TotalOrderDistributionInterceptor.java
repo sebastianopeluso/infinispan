@@ -26,6 +26,7 @@ public class TotalOrderDistributionInterceptor extends DistributionInterceptor {
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
+      ctx.addAllAffectedKeys(command.getAffectedKeys());      
       Object result = super.visitPrepareCommand(ctx, command);
       if (shouldInvokeRemoteTxCommand(ctx)) {
          //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication
@@ -37,9 +38,7 @@ public class TotalOrderDistributionInterceptor extends DistributionInterceptor {
    }
 
    @Override
-   protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command, Collection<Address> recipients, boolean sync) {
-      //we need to add myself to the recipients list
-      recipients.add(rpcManager.getAddress());
-      super.prepareOnAffectedNodes(ctx, command, recipients, sync);
+   protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command, Collection<Address> recipients, boolean sync) {      
+      rpcManager.invokeRemotely(recipients, command, false, false, true);
    }
 }

@@ -4,9 +4,10 @@ import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.PrepareResponseCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.context.impl.TxInvocationContext;
+import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.VersionedDistributionInterceptor;
 import org.infinispan.remoting.transport.Address;
-import org.infinispan.util.Util;
+import org.infinispan.totalorder.TotalOrderManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -25,6 +26,25 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
 
    private static final Log log = LogFactory.getLog(TotalOrderVersionedDistributionInterceptor.class);
 
+   private TotalOrderManager totalOrderManager;
+
+   @Inject
+   public void injectDependencies(TotalOrderManager totalOrderManager) {
+      this.totalOrderManager = totalOrderManager;
+   }
+
+   @Override
+   public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
+      ctx.addAllAffectedKeys(command.getAffectedKeys());
+      
+      Object result = super.visitPrepareCommand(ctx, command);
+      
+      //we need to wait for the answer of the key owners.
+      totalOrderManager.waitForPrepareToSucceed(ctx);
+
+      return result;
+   }
+
    @Override
    protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command,
                                          Collection<Address> recipients, boolean sync) {      
@@ -39,7 +59,6 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
          throw new IllegalStateException("Expected a Versioned Prepare Command in version aware component");
       }
 
-      recipients.add(rpcManager.getAddress());
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
       rpcManager.invokeRemotely(recipients, command, false, false, true);      
    }
