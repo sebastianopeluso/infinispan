@@ -36,8 +36,13 @@ public class TotalOrderVersionedEntryWrappingInterceptor extends VersionedEntryW
    @Override
    public final Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
 
-      if (ctx.isOriginLocal())
-         return invokeNextInterceptor(ctx, command);
+      if (ctx.isOriginLocal()) {
+         Object retVal = invokeNextInterceptor(ctx, command);
+         if (shouldCommitEntries(command, ctx)) {
+            commitContextEntries(ctx);            
+         }
+         return retVal;
+      }
 
       VersionCheckWrappingEntryVisitor visitor = new VersionCheckWrappingEntryVisitor(command);
 

@@ -173,12 +173,16 @@ public class TransactionCoordinator {
          validateNotMarkedForRollback(localTransaction);
 
          if (trace) log.trace("Doing an 1PC prepare call on the interceptor chain");
-         PrepareCommand command = commandsFactory.buildPrepareCommand(localTransaction.getGlobalTransaction(), localTransaction.getModifications(), true);
+         PrepareCommand command = commandCreator.createPrepareCommand(localTransaction.getGlobalTransaction(), localTransaction.getModifications());
+         command.setOnePhaseCommit(true);
 
          try {
             invoker.invoke(ctx, command);
          } catch (Throwable e) {
-            handleCommitFailure(e, localTransaction, true);
+            log.errorProcessing1pcPrepareCommand(e);
+            if (!isOnePhaseTotalOrder()) { //in total order and 1PC, the rollback command is not needed
+               handleCommitFailure(e, localTransaction);
+            }
          }
       } else {
          CommitCommand commitCommand = commandCreator.createCommitCommand(localTransaction.getGlobalTransaction());
@@ -186,7 +190,8 @@ public class TransactionCoordinator {
             invoker.invoke(ctx, commitCommand);
             txTable.removeLocalTransaction(localTransaction);
          } catch (Throwable e) {
-            handleCommitFailure(e, localTransaction, false);
+            log.errorProcessing2pcCommitCommand(e);
+            handleCommitFailure(e, localTransaction);
          }
       }
    }
@@ -209,13 +214,8 @@ public class TransactionCoordinator {
       }
    }
 
-   private void handleCommitFailure(Throwable e, LocalTransaction localTransaction, boolean onePhaseCommit) throws XAException {
+   private void handleCommitFailure(Throwable e, LocalTransaction localTransaction) throws XAException {
       if (trace) log.tracef("Couldn't commit transaction %s, trying to rollback.", localTransaction);
-      if (onePhaseCommit) {
-         log.errorProcessing1pcPrepareCommand(e);
-      } else {
-         log.errorProcessing2pcCommitCommand(e);
-      }
       try {
          rollbackInternal(localTransaction);
       } catch (Throwable e1) {
