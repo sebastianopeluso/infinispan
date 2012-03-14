@@ -877,4 +877,8 @@ public interface Log extends BasicLogger {
    @LogMessage(level = WARN)
    @Message(value = "Cannot insert jgroups sequencer", id = 190)
    void cannotInsertJGroupsSequencer(@Cause Throwable t);
+   
+   @LogMessage(level = WARN)
+   @Message(value = "Exception while sending the Prepare Response Command", id = 191)
+   void exceptionWhileSendingPrepareResponseCommand(@Cause Throwable t);
 }

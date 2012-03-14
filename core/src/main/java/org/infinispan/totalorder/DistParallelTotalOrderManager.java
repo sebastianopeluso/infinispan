@@ -11,25 +11,28 @@ import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * // TODO: Document this
- *
  * @author Pedro Ruivo
  * @since 5.2
  */
 public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
 
+   private static final Log log = LogFactory.getLog(DistParallelTotalOrderManager.class);
+
    private CommandsFactory commandsFactory;
    private DistributionManager distributionManager;
-   private ConcurrentMap<GlobalTransaction, VersionsCollector> versionsCollectorMap =
-         new ConcurrentHashMap<GlobalTransaction, VersionsCollector>();
+   private ConcurrentMap<GlobalTransaction, AcksCollector> versionsCollectorMap =
+         new ConcurrentHashMap<GlobalTransaction, AcksCollector>();
 
    @Inject
    public void inject(CommandsFactory commandsFactory, DistributionManager distributionManager) {
@@ -40,28 +43,63 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
    @Override
    protected void afterAddLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction) {
       Set<Object> keys = getModifiedKeys(localTransaction.getModifications());
-      versionsCollectorMap.put(globalTransaction, new VersionsCollector(keys));
+
+      if (keys.isEmpty()) {
+         return;
+      }
+
+      AcksCollector collector = new AcksCollector(keys);
+      versionsCollectorMap.put(globalTransaction, collector);
+
+      if (trace) {
+         log.tracef("Create an Ack Collector %s for transaction %s", collector, globalTransaction.prettyPrint());
+      }
    }
 
    @Override
    protected void afterFinishTransaction(GlobalTransaction globalTransaction) {
+      if (trace) {
+         log.tracef("Remove the Ack Collector of transaction %s", globalTransaction.prettyPrint());
+      }
       versionsCollectorMap.remove(globalTransaction);
    }
 
    @Override
    public void addVersions(GlobalTransaction gtx, Throwable exception, Set<Object> keysValidated) {
-      VersionsCollector versionsCollector = versionsCollectorMap.get(gtx);
-      if (versionsCollector != null) {
+      AcksCollector collector = versionsCollectorMap.get(gtx);
+      if (addToAcksCollector(exception, keysValidated, collector, gtx)) {
+         updateLocalTransaction(collector.getException(), collector.getException() != null, gtx);
+      }
+   }
+
+   private boolean addToAcksCollector(Throwable exception, Set<Object> keysValidated, AcksCollector collector,
+                                      GlobalTransaction gtx) {
+      boolean updateLocalTransaction = false;
+      if (collector != null) {
          if (exception != null) {
-            if (versionsCollector.addException(exception)) {
-               updateLocalTransaction(versionsCollector.getException(), true, gtx);
+            updateLocalTransaction = collector.addException(exception);
+
+            if (trace) {
+               log.tracef("Added an exception [%s] to the acks collector %s. Transaction is %s. Is it ready to " +
+                     "update the Local Transaction? %s", exception.getMessage(), collector, gtx.prettyPrint(),
+                     updateLocalTransaction ? "yes" : "no");
             }
-         } else if (versionsCollector.addKeysValidated(keysValidated)) {
-            updateLocalTransaction(null, false, gtx);
+         } else {
+            updateLocalTransaction = collector.addKeysValidated(keysValidated);
+            if (trace) {
+               log.tracef("Added keys validated [%s] to the acks collector %s. Transaction is %s. Is it ready to " +
+                     "update the Local Transaction? %s", keysValidated, collector, gtx.prettyPrint(),
+                     updateLocalTransaction ? "yes" : "no");
+            }
          }
       } else {
-         //TODO log in debug or trace
+         //can be the case where the transaction is finished
+         if (trace) {
+            log.tracef("Received an Prepare Response but the Acks collector does not exists. Transaction is %s",
+                  gtx.prettyPrint());
+         }
       }
+      return updateLocalTransaction;
    }
 
    @Override
@@ -87,14 +125,12 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
          remoteTransaction.markPreparedAndNotify();
          //result is the new versions (or an exception)
          GlobalTransaction gtx = prepareCommand.getGlobalTransaction();
-         VersionsCollector versionsCollector = versionsCollectorMap.get(gtx);
-         if (versionsCollector != null) {
-            if (exception) {
-               if (versionsCollector.addException((Throwable) result)) {
-                  updateLocalTransaction(versionsCollector.getException(), true, gtx);
-               }
-            } else if (versionsCollector.addKeysValidated(getLocalKeys(prepareCommand.getModifications()))) {
-               updateLocalTransaction(null, false, gtx);
+         AcksCollector collector = versionsCollectorMap.get(gtx);
+         if (collector != null) {
+            if (addToAcksCollector(exception ? (Throwable) result : null,
+                  exception ? null : getLocalKeys(prepareCommand.getModifications()),
+                  collector, gtx)) {
+               updateLocalTransaction(collector.getException(), collector.getException() != null, gtx);
             }
          } else {
             //send the response            
@@ -105,47 +141,65 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
                Set<Object> keysValidated = getLocalKeys(prepareCommand.getModifications());
                prepareResponseCommand.setKeysValidated(keysValidated);
             }
+
+            if (trace) {
+               log.tracef("Send the Prepare Response Command %s back to originator", prepareResponseCommand);
+            }
+
             try {
                prepareResponseCommand.acceptVisitor(txInvocationContext, invoker);
             } catch (Throwable throwable) {
-               //TODO: log this exception
+               log.exceptionWhileSendingPrepareResponseCommand(throwable);
             }
          }
       }
    }
 
-   protected class VersionsCollector {
-      private Set<Object> keysMissingVersions;
-      private Throwable exceptionObject;
+   protected class AcksCollector {
+      private Set<Object> keysMissingValidation;
+      private Throwable exception;
       private boolean alreadyProcessed;
 
-      public VersionsCollector(Collection<Object> keys) {
-         keysMissingVersions = new HashSet<Object>(keys);
+      public AcksCollector(Collection<Object> keys) {
+         keysMissingValidation = new HashSet<Object>(keys);
+         alreadyProcessed = keysMissingValidation.isEmpty();
       }
 
       public synchronized boolean addKeysValidated(Set<Object> keys) {
          if (alreadyProcessed || keys == null || keys.isEmpty()) {
             return false;
          }
-         keysMissingVersions.removeAll(keys);
-         return (alreadyProcessed = keysMissingVersions.isEmpty());
+         keysMissingValidation.removeAll(keys);
+         return (alreadyProcessed = keysMissingValidation.isEmpty());
       }
 
-      public synchronized boolean addException(Throwable exceptionObject) {
+      public synchronized boolean addException(Throwable exception) {
          if (alreadyProcessed) {
             return false;
          }
-         this.exceptionObject = exceptionObject;
+         this.exception = exception;
          alreadyProcessed = true;
          return true;
       }
 
       public synchronized Throwable getException() {
-         return exceptionObject;
+         return exception;
+      }
+
+      @Override
+      public String toString() {
+         return "AcksCollector{" +
+               "keysMissingValidation=" + keysMissingValidation +
+               ", exception=" + exception +
+               ", alreadyProcessed=" + alreadyProcessed +
+               '}';
       }
    }
 
    private Set<Object> getLocalKeys(WriteCommand... modifications) {
+      if (modifications == null) {
+         return Collections.emptySet();
+      }
       Set<Object> localKeys = new HashSet<Object>(modifications.length);
 
       for (WriteCommand wc : modifications) {
@@ -155,11 +209,15 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
             }
          }
       }
-      
+
       return localKeys;
    }
 
    private Set<Object> getModifiedKeys(Collection<WriteCommand> modifications) {
+      if (modifications == null) {
+         return Collections.emptySet();
+      }
+
       Set<Object> modifiedKeys = new HashSet<Object>();
       for (WriteCommand wc : modifications) {
          modifiedKeys.addAll(wc.getAffectedKeys());

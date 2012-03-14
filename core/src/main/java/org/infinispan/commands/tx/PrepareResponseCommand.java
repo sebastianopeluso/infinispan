@@ -75,6 +75,6 @@ public class PrepareResponseCommand extends AbstractTransactionBoundaryCommand {
       return "PrepareResponseCommand{" +
             "exception=" + exception +
             ", keysValidated=" + keysValidated +
-            super.toString();
+            ", " + super.toString();
    }
 }
