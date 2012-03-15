@@ -2,7 +2,9 @@ package org.infinispan.commands.tx;
 
 import org.infinispan.commands.Visitor;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.context.impl.RemoteTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
+import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
 import java.util.Set;
@@ -21,12 +23,12 @@ public class PrepareResponseCommand extends AbstractTransactionBoundaryCommand {
    private Set<Object> keysValidated;
 
    public PrepareResponseCommand(String cacheName) {
-      super(cacheName);     
+      super(cacheName);
    }
 
    public PrepareResponseCommand(String cacheName, GlobalTransaction gtx) {
       super(cacheName);
-      this.globalTx = gtx;      
+      this.globalTx = gtx;
    }
 
    public void setException(Throwable exception) {
@@ -49,10 +51,26 @@ public class PrepareResponseCommand extends AbstractTransactionBoundaryCommand {
    }
 
    @Override
+   public Object perform(InvocationContext context) throws Throwable {
+      if (context != null) {
+         throw new IllegalStateException("Expected null context!");
+      }
+
+      globalTx.setRemote(true);
+      RemoteTransaction transaction = txTable.getRemoteTransaction(globalTx);
+
+      //remote transaction can be null. However, it is not needed while processing this command
+      RemoteTxInvocationContext ctx = icc.createRemoteTxInvocationContext(transaction, getOrigin());
+
+      return invoker.invoke(ctx, this);
+   }
+
+   @Override
    public Object[] getParameters() {
       return new Object[]{globalTx, exception, keysValidated};
    }
 
+   @SuppressWarnings({"unchecked"})
    @Override
    public void setParameters(int commandId, Object[] args) {
       this.globalTx = (GlobalTransaction) args[0];

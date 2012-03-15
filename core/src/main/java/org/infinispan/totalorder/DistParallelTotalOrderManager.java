@@ -67,17 +67,17 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
    @Override
    public void addVersions(GlobalTransaction gtx, Throwable exception, Set<Object> keysValidated) {
       AcksCollector collector = versionsCollectorMap.get(gtx);
-      if (addToAcksCollector(exception, keysValidated, collector, gtx)) {
+      if (addToAcksCollector(exception, keysValidated, collector, gtx, false)) {
          updateLocalTransaction(collector.getException(), collector.getException() != null, gtx);
       }
    }
 
    private boolean addToAcksCollector(Throwable exception, Set<Object> keysValidated, AcksCollector collector,
-                                      GlobalTransaction gtx) {
+                                      GlobalTransaction gtx, boolean isThePrepareResult) {
       boolean updateLocalTransaction = false;
       if (collector != null) {
          if (exception != null) {
-            updateLocalTransaction = collector.addException(exception);
+            updateLocalTransaction = collector.addException(exception, isThePrepareResult);
 
             if (trace) {
                log.tracef("Added an exception [%s] to the acks collector %s. Transaction is %s. Is it ready to " +
@@ -85,7 +85,7 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
                      updateLocalTransaction ? "yes" : "no");
             }
          } else {
-            updateLocalTransaction = collector.addKeysValidated(keysValidated);
+            updateLocalTransaction = collector.addKeysValidated(keysValidated, isThePrepareResult);
             if (trace) {
                log.tracef("Added keys validated [%s] to the acks collector %s. Transaction is %s. Is it ready to " +
                      "update the Local Transaction? %s", keysValidated, collector, gtx.prettyPrint(),
@@ -118,18 +118,27 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
 
       @Override
       protected void finalizeValidation(Object result, boolean exception) {
-         if (prepareCommand.isOnePhaseCommit()) {
-            super.finalizeValidation(result, exception);
-            return;
-         }
          remoteTransaction.markPreparedAndNotify();
-         //result is the new versions (or an exception)
          GlobalTransaction gtx = prepareCommand.getGlobalTransaction();
+
+         if (prepareCommand.isOnePhaseCommit() || remoteTransaction.isMarkedForRollback()) {
+            //release the count down latch and the keys;
+            finishTransaction(remoteTransaction);
+            //commit or rollback command will not be received. delete the remote transaction
+            transactionTable.removeRemoteTransaction(gtx);
+            afterFinishTransaction(gtx);
+            return;
+         } else if (exception) {
+            //release the resources
+            finishTransaction(remoteTransaction);
+            //don't remote the remote transaction. the rollback will be received later
+         }
+
          AcksCollector collector = versionsCollectorMap.get(gtx);
          if (collector != null) {
             if (addToAcksCollector(exception ? (Throwable) result : null,
                   exception ? null : getLocalKeys(prepareCommand.getModifications()),
-                  collector, gtx)) {
+                  collector, gtx, true)) {
                updateLocalTransaction(collector.getException(), collector.getException() != null, gtx);
             }
          } else {
@@ -158,32 +167,49 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
    protected class AcksCollector {
       private Set<Object> keysMissingValidation;
       private Throwable exception;
-      private boolean alreadyProcessed;
+      private boolean txOutcomeReady;
+      private boolean prepareProcessed;
 
       public AcksCollector(Collection<Object> keys) {
          keysMissingValidation = new HashSet<Object>(keys);
-         alreadyProcessed = keysMissingValidation.isEmpty();
+         txOutcomeReady = keysMissingValidation.isEmpty();
+         prepareProcessed = false;
       }
 
-      public synchronized boolean addKeysValidated(Set<Object> keys) {
-         if (alreadyProcessed || keys == null || keys.isEmpty()) {
+      public synchronized boolean addKeysValidated(Set<Object> keys, boolean isThePrepareResult) {
+         if (notifyLocalTransaction()) {
             return false;
          }
-         keysMissingValidation.removeAll(keys);
-         return (alreadyProcessed = keysMissingValidation.isEmpty());
+         prepareProcessed = prepareProcessed || isThePrepareResult;
+
+         if (!txOutcomeReady && keys != null && !keys.isEmpty()) {
+            keysMissingValidation.removeAll(keys);
+            txOutcomeReady = keysMissingValidation.isEmpty();
+         }
+
+         return notifyLocalTransaction();
       }
 
-      public synchronized boolean addException(Throwable exception) {
-         if (alreadyProcessed) {
+      public synchronized boolean addException(Throwable exception, boolean isThePrepareResult) {
+         if (notifyLocalTransaction()) {
             return false;
          }
-         this.exception = exception;
-         alreadyProcessed = true;
-         return true;
+         prepareProcessed = prepareProcessed || isThePrepareResult;
+
+         if (!txOutcomeReady) {
+            this.exception = exception;
+            txOutcomeReady = true;
+         }
+         
+         return prepareProcessed;
       }
 
       public synchronized Throwable getException() {
          return exception;
+      }
+
+      private boolean notifyLocalTransaction() {
+         return txOutcomeReady && prepareProcessed;
       }
 
       @Override
@@ -191,7 +217,8 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
          return "AcksCollector{" +
                "keysMissingValidation=" + keysMissingValidation +
                ", exception=" + exception +
-               ", alreadyProcessed=" + alreadyProcessed +
+               ", txOutcomeReady=" + txOutcomeReady +
+               ", prepareProcessed=" + prepareProcessed +
                '}';
       }
    }

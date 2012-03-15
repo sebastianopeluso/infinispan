@@ -1,6 +1,5 @@
 package org.infinispan.transaction.totalorder;
 
-import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TxDependencyLatch;

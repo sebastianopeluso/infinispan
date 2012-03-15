@@ -80,7 +80,7 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
             }
          } else {
             if (configuration.isTotalOrder()) {
-               return componentType.cast(new ClusteringDependentLogic.TotalOrderAllNodesLogic());
+               return componentType.cast(new ClusteringDependentLogic.TotalOrderDistributionLogic());
             } else {
                return componentType.cast(new ClusteringDependentLogic.DistributionLogic());
             }
