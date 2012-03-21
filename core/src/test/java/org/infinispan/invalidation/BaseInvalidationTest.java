@@ -224,8 +224,7 @@ public abstract class BaseInvalidationTest extends MultipleCacheManagersTest {
          when(mockTransport.getAddress()).thenReturn(addressOne);
          when(mockTransport.invokeRemotely((List<Address>) anyObject(), (CacheRpcCommand) anyObject(),
                                              eq(isSync ? ResponseMode.SYNCHRONOUS : ResponseMode.ASYNCHRONOUS_WITH_SYNC_MARSHALLING),
-                                             anyLong(), anyBoolean(), (ResponseFilter) anyObject(), anyBoolean())).andReturn(null).anyTimes();
-         replay(mockTransport);
+                                             anyLong(), anyBoolean(), (ResponseFilter) anyObject(), anyBoolean())).thenReturn(null);
 
          cache1.put("k", "v");
 
