@@ -213,7 +213,7 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
       }
 
       @Override
-      public String toString() {
+      public synchronized String toString() {
          return "AcksCollector{" +
                "keysMissingValidation=" + keysMissingValidation +
                ", exception=" + exception +
