@@ -140,9 +140,8 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
 
    public void testClear() {
       cache(0).put("key", "value1");
-      cache(1).put("key", "value2");
-      assert cache(0).get("key").equals("value2");
-      assertEventuallyEqual(1, "key", "value2");
+      assert cache(0).get("key").equals("value1");
+      assertEventuallyEqual(1, "key", "value1");
 
       cache(0).clear();
 
