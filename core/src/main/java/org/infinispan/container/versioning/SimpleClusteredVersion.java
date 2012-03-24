@@ -67,4 +67,12 @@ public class SimpleClusteredVersion implements IncrementableEntryVersion, Serial
             ", version=" + version +
             '}';
    }
+
+   public int getViewId() {
+      return viewId;
+   }
+
+   public long getVersion() {
+      return version;
+   }
 }

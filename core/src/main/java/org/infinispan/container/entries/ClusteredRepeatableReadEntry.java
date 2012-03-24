@@ -22,6 +22,8 @@ package org.infinispan.container.entries;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.InequalVersionComparisonResult;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 /**
  * A version of RepeatableReadEntry that can perform write-skew checks during prepare.
@@ -30,6 +32,9 @@ import org.infinispan.container.versioning.InequalVersionComparisonResult;
  * @since 5.1
  */
 public class ClusteredRepeatableReadEntry extends RepeatableReadEntry {
+   
+   private static Log log = LogFactory.getLog(ClusteredRepeatableReadEntry.class);
+   
    private EntryVersion version;
 
    public ClusteredRepeatableReadEntry(Object key, Object value, EntryVersion version, long lifespan) {
@@ -44,6 +49,7 @@ public class ClusteredRepeatableReadEntry extends RepeatableReadEntry {
          throw new IllegalStateException("Entries cannot have null versions!");
       // Could be that we didn't do a remote get first ... so we haven't effectively read this entry yet.
       if (version == null) return true;
+      log.tracef("Current version is: %s, version at read time is %s", ice.getVersion(), version);
       return InequalVersionComparisonResult.AFTER != ice.getVersion().compareTo(version);
    }
 

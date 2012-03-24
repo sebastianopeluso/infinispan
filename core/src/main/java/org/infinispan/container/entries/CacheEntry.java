@@ -49,6 +49,9 @@ public interface CacheEntry extends Map.Entry<Object, Object>, Versioned {
     */
    boolean isChanged();
 
+
+   void setChanged(boolean b);
+
    /**
     * @return true if this entry has been newly created, false otherwise.
     */

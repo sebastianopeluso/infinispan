@@ -184,9 +184,9 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          Object result = null;
          boolean exception = false;
          try {
-            if (trace) log.tracef("Validating transaction %s in thread %s",
-                                  prepareCommand.getGlobalTransaction().prettyPrint(),
-                                  Thread.currentThread().getName());
+            if (trace) log.tracef("Validating transaction %s ",
+                                  prepareCommand.getGlobalTransaction().prettyPrint());
+
 
             initializeValidation();
             initializationEndTime = now();
