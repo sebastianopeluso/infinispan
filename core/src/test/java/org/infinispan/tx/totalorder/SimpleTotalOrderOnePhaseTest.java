@@ -10,8 +10,6 @@ import org.infinispan.test.MultipleCacheManagersTest;
 import org.infinispan.transaction.TransactionMode;
 import org.infinispan.transaction.TransactionProtocol;
 import org.testng.Assert;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Factory;
 import org.testng.annotations.Test;
 
 import java.util.HashMap;
@@ -19,6 +17,7 @@ import java.util.Map;
 
 import static junit.framework.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 /**
@@ -194,5 +193,11 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
             return value == null ? value == cache(cacheIndex).get(key) : value.equals(cache(cacheIndex).get(key));
          }
       });
+   }
+
+   public void testRemoveUnexistingEntry() {
+      cache(0).remove("k");
+      assertNull(cache(0).get("k"));
+      assertNull(cache(1).get("k"));
    }
 }

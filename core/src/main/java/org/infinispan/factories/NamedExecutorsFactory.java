@@ -23,7 +23,6 @@
 package org.infinispan.factories;
 
 import org.infinispan.config.ConfigurationException;
-import org.infinispan.executors.DefaultDynamicExecutorFactory;
 import org.infinispan.executors.ExecutorFactory;
 import org.infinispan.executors.LazyInitializingExecutorService;
 import org.infinispan.executors.LazyInitializingScheduledExecutorService;
@@ -101,8 +100,7 @@ public class NamedExecutorsFactory extends NamedComponentFactory implements Auto
             synchronized (this) {
                if (totalOrderExecutor == null) {
                   totalOrderExecutor = buildAndConfigureExecutorService(
-                        //globalConfiguration.getTotalOrderExecutorFactorClass(),
-                        DefaultDynamicExecutorFactory.class.getName(),
+                        globalConfiguration.getTotalOrderExecutorFactoryClass(),
                         globalConfiguration.getTotalOrderExecutorProperties(), componentName);
                }
             }

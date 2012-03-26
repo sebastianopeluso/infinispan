@@ -8,6 +8,7 @@ import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.entries.ClusteredRepeatableReadEntry;
 import org.infinispan.container.entries.MVCCEntry;
 import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.container.versioning.IncrementableEntryVersion;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
@@ -98,7 +99,12 @@ public class TotalOrderVersionedEntryWrappingInterceptor extends VersionedEntryW
 
       @Override
       protected final MVCCEntry wrapEntryForRemove(InvocationContext ctx, Object key) throws InterruptedException {
-         return checkForWriteSkew(super.wrapEntryForRemove(ctx, key));
+         MVCCEntry mvccEntry = super.wrapEntryForRemove(ctx, key);
+         if (mvccEntry != null) {
+            return checkForWriteSkew(mvccEntry);
+         } else {
+            return null;
+         }
       }
 
       @Override
@@ -114,7 +120,8 @@ public class TotalOrderVersionedEntryWrappingInterceptor extends VersionedEntryW
       private MVCCEntry checkForWriteSkew(MVCCEntry mvccEntry) {
          ClusteredRepeatableReadEntry clusterMvccEntry = (ClusteredRepeatableReadEntry) mvccEntry;
 
-         EntryVersion versionSeen = prepareCommand.getVersionsSeen().get(clusterMvccEntry.getKey());
+         EntryVersionsMap versionsSeen = prepareCommand.getVersionsSeen();
+         EntryVersion versionSeen = versionsSeen.get(clusterMvccEntry.getKey());
 
          if (versionSeen != null) {
             clusterMvccEntry.setVersion(versionSeen);

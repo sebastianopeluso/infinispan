@@ -411,7 +411,7 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       totalOrderExecutor.setFactory(totalOrderExecutorFactoryClass);
    }
 
-   public String getTotalOrderExecutorFactorClass() {
+   public String getTotalOrderExecutorFactoryClass() {
       return totalOrderExecutor.factory;
    }
 
