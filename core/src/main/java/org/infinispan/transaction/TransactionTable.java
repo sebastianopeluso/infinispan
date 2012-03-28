@@ -254,7 +254,7 @@ public class TransactionTable {
 
    public void remoteTransactionRollback(GlobalTransaction gtx) {
       final RemoteTransaction remove = removeRemoteTransaction(gtx);
-      log.tracef("Removed local transaction %s? %b", gtx, remove);
+      log.tracef("Removed remote transaction %s? %b", gtx, remove);
    }
 
    /**
@@ -330,8 +330,9 @@ public class TransactionTable {
     * Removes the {@link RemoteTransaction} corresponding to the given tx.
     */
    public void remoteTransactionCommitted(GlobalTransaction gtx) {
-      if (configuration.isSecondPhaseAsync()) {
+      if (configuration.isSecondPhaseAsync() || configuration.isTotalOrder()) {
          removeRemoteTransaction(gtx);
+         log.tracef("Remote transaction removed %s", gtx);
       }
    }
 
@@ -465,6 +466,7 @@ public class TransactionTable {
       if (txsOnGoing) {
          log.unfinishedTransactionsRemain(localTransactions == null ? 0 : localTransactions.size(),
                                           remoteTransactions == null ? 0 : remoteTransactions.size());
+         log.debugf("Local active transactions: %s, Remote active transactions %s", localTransactions, remoteTransactions);
       } else {
          log.debug("All transactions terminated");
       }
