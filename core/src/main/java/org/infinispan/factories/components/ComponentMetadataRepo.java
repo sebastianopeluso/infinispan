@@ -44,7 +44,6 @@ public class ComponentMetadataRepo {
    static final Map<String, ComponentMetadata> COMPONENT_METADATA_MAP = new HashMap<String, ComponentMetadata>(128);
    static final Map<String, String> FACTORIES = new HashMap<String, String>(16);
    private static final ComponentMetadata DEPENDENCY_FREE_COMPONENT = new ComponentMetadata();
-   private static final Log log = LogFactory.getLog(ComponentMetadataRepo.class);
 
    @SuppressWarnings("unchecked")
    public synchronized static void readMetadata(URL metadataFile) throws IOException, ClassNotFoundException {
