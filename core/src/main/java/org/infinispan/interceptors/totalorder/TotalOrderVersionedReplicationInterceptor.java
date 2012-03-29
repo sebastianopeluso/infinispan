@@ -37,7 +37,7 @@ public class TotalOrderVersionedReplicationInterceptor extends VersionedReplicat
       }
 
       if (log.isTraceEnabled())
-         log.tracef("Broadcasting prepare for transaction %s with total order", command.getGlobalTransaction().prettyPrint());
+         log.tracef("Broadcasting prepare for transaction %s with total order", command.getGlobalTransaction());
 
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
       //broadcast the command

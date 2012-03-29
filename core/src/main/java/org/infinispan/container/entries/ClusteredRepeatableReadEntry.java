@@ -44,7 +44,10 @@ public class ClusteredRepeatableReadEntry extends RepeatableReadEntry {
 
    public boolean performWriteSkewCheck(DataContainer container) {
       InternalCacheEntry ice = container.get(key);
-      if (ice == null) return version == null;
+      if (ice == null) {
+         log.tracef("Entry for key '%s' doesn't exist in the container and current version is %s", key, version);
+         return version == null;
+      }
       if (ice.getVersion() == null)
          throw new IllegalStateException("Entries cannot have null versions!");
       // Could be that we didn't do a remote get first ... so we haven't effectively read this entry yet.
