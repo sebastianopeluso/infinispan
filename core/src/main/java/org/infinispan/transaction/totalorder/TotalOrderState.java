@@ -97,7 +97,7 @@ public class TotalOrderState {
          log.tracef("Transaction was in PREPARING state but now it is prepared");
       } else {
          State status = commit ? State.COMMIT_ONLY : State.ROLLBACK_ONLY;
-         log.tracef("Transaction hasn't received the prepare yer, setting status to: %s", status);
+         log.tracef("Current status is %s, setting status to: %s", state, status);
          state.add(status);
          result = false;
       }
@@ -136,5 +136,9 @@ public class TotalOrderState {
             "latch=" + latch +
             ", state=" + state +
             '}';
+   }
+
+   public EnumSet<State> getState() {
+      return state;
    }
 }
