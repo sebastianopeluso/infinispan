@@ -276,4 +276,12 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
       return returnValue;
    }
 
+   /**
+    * check if the prepare command should be invoked remotely when passive replicaion is used
+    * @param command the prepare command
+    * @return true to invoke remotely, false otherwise
+    */
+   private boolean shouldInvokeRemoteTxCommandInPassiveReplication(PrepareCommand command) {
+      return cacheConfiguration.transaction().transactionProtocol().isPassiveReplication() && command.isOnePhaseCommit();
+   }
 }
