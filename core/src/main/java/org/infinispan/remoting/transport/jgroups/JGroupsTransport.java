@@ -55,9 +55,7 @@ import org.jgroups.View;
 import org.jgroups.blocks.RspFilter;
 import org.jgroups.jmx.JmxConfigurator;
 import org.jgroups.protocols.SEQUENCER;
-import org.jgroups.protocols.pbcast.GMS;
 import org.jgroups.stack.AddressGenerator;
-import org.jgroups.stack.ProtocolStack;
 import org.jgroups.util.Rsp;
 import org.jgroups.util.RspList;
 import org.jgroups.util.TopologyUUID;
@@ -692,7 +690,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
    public final void checkTotalOrderSupported() {
       if (channel.getProtocolStack().findProtocol(SEQUENCER.class) == null)  {
          throw new ConfigurationException("In order to support total order based transaction, the SEQUENCER protocol " +
-                                                "must be present in the jgorup's config.");
+                                                "must be present in the jgroups' config.");
       }
    }
 }
