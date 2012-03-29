@@ -73,6 +73,7 @@ public class TransactionXaAdapter extends AbstractEnlistmentAdapter implements X
    private boolean recoveryEnabled;
    private String cacheName;
    private boolean onePhaseTotalOrder;
+   private boolean onePhasePassiveReplication;
 
    public TransactionXaAdapter(LocalXaTransaction localTransaction, TransactionTable txTable,
                                RecoveryManager rm, TransactionCoordinator txCoordinator,
@@ -105,6 +106,7 @@ public class TransactionXaAdapter extends AbstractEnlistmentAdapter implements X
       //in distributed mode, we only allow 2 phases!!
       this.onePhaseTotalOrder = configuration.transaction().transactionProtocol().isTotalOrder() &&
             !configuration.clustering().cacheMode().isDistributed();
+      this.onePhasePassiveReplication = configuration.transaction().transactionProtocol().isPassiveReplication();
    }
 
    /**
@@ -124,7 +126,7 @@ public class TransactionXaAdapter extends AbstractEnlistmentAdapter implements X
    public void commit(Xid externalXid, boolean isOnePhase) throws XAException {
       Xid xid = convertXid(externalXid);
       LocalXaTransaction localTransaction = getLocalTransactionAndValidate(xid);
-      if (isOnePhase && onePhaseTotalOrder) {
+      if (isOnePhase && (onePhaseTotalOrder || onePhasePassiveReplication)) {
          txCoordinator.commit(localTransaction, true);
       } else if (isOnePhase) {
          //isOnePhase being true means that we're the only participant in the distributed transaction and TM does the

@@ -61,4 +61,8 @@ public class Configurations {
             cfg.versioning().enabled();
    }
 
+   public static boolean isOnePhasePassiveReplication(Configuration cfg) {
+      return cfg.transaction().transactionProtocol().isPassiveReplication() &&
+            (!isVersioningEnabled(cfg) || cfg.transaction().useSynchronization());
+   }
 }

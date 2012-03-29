@@ -276,6 +276,15 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
          if (lockingMode != LockingMode.OPTIMISTIC) {
             throw new ConfigurationException("Total Order based protocol not available with " + lockingMode);
          }
+      } else if (transactionProtocol == TransactionProtocol.PASSIVE_REPLICATION) {
+         //passive replication only supports transactional caches
+         if(transactionMode != TransactionMode.NON_TRANSACTIONAL) {
+            throw new ConfigurationException("Passive Replication based not available in " + transactionMode + " cache");
+         }
+
+         if(!clustering().cacheMode().isReplicated()) {
+            throw new ConfigurationException(clustering().cacheMode().friendlyCacheModeString() + " is not supported by Passive Replication based protocol");
+         }
       }
    }
 
