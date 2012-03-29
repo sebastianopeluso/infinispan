@@ -58,7 +58,7 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
 
 
       assert cache(0).get("key").equals("value");
-      assertEventuallyEqual(1, "key", "value");
+      assertEventuallyEquals(1, "key", "value");
 
       Map map = new HashMap();
       map.put("key2", "value2");
@@ -67,38 +67,42 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
       cache(0).putAll(map);
 
       assert cache(0).get("key").equals("value");
-      assertEventuallyEqual(1, "key", "value");
+      assertEventuallyEquals(1, "key", "value");
       assert cache(0).get("key2").equals("value2");
-      assertEventuallyEqual(1, "key2", "value2");
+      assertEventuallyEquals(1, "key2", "value2");
       assert cache(0).get("key3").equals("value3");
-      assertEventuallyEqual(1, "key3", "value3");
+      assertEventuallyEquals(1, "key3", "value3");
+
+      assertNoTransactions();
    }
 
    public void removeTest() {
       cache(1).put("key", "value");
       assert cache(1).get("key").equals("value");
-      assertEventuallyEqual(0, "key", "value");
+      assertEventuallyEquals(0, "key", "value");
 
       cache(0).remove("key");
 
       assert cache(0).get("key") == null;
-      assertEventuallyEqual(1, "key", null);
+      assertEventuallyEquals(1, "key", null);
 
       cache(0).put("key", "value");
 
       assert cache(0).get("key").equals("value");
-      assertEventuallyEqual(1, "key", "value");
+      assertEventuallyEquals(1, "key", "value");
 
       cache(0).remove("key");
 
       assert cache(0).get("key") == null;
-      assertEventuallyEqual(1, "key", null);
+      assertEventuallyEquals(1, "key", null);
+
+      assertNoTransactions();
    }
 
    public void testPutIfAbsent() {
       cache(1).put("key", "valueOld");
       assert cache(0).get("key").equals("valueOld");
-      assertEventuallyEqual(1, "key", "valueOld");
+      assertEventuallyEquals(1, "key", "valueOld");
 
       cache(0).putIfAbsent("key", "value");
 
@@ -107,7 +111,7 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
 
       cache(1).put("key", "value2");
 
-      assertEventuallyEqual(0, "key", "value2");
+      assertEventuallyEquals(0, "key", "value2");
       assert cache(1).get("key").equals("value2");
 
       cache(0).putIfAbsent("key", "value3");
@@ -117,7 +121,9 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
 
       cache(0).putIfAbsent("key2", "value3");
       assert cache(0).get("key2").equals("value3");
-      assertEventuallyEqual(1, "key2", "value3");
+      assertEventuallyEquals(1, "key2", "value3");
+
+      assertNoTransactions();
    }
 
    public void testRemoveIfPresent() {
@@ -134,43 +140,47 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
       cache(0).remove("key", "value2");
 
       assert cache(0).get("key") == null;
-      assertEventuallyEqual(1, "key", null);
+      assertEventuallyEquals(1, "key", null);
+
+      assertNoTransactions();
    }
 
    public void testClear() {
       cache(0).put("key", "value1");
       assert cache(0).get("key").equals("value1");
-      assertEventuallyEqual(1, "key", "value1");
+      assertEventuallyEquals(1, "key", "value1");
 
       cache(0).clear();
 
       assert cache(0).get("key") == null;
-      assertEventuallyEqual(1, "key", null);
+      assertEventuallyEquals(1, "key", null);
+
+      assertNoTransactions();
    }
 
    public void testReplace() {
 
       cache(1).put("key", "value2");
-      assertEventuallyEqual(0, "key", "value2");
+      assertEventuallyEquals(0, "key", "value2");
       assert cache(1).get("key").equals("value2");
 
       Assert.assertEquals(cache(0).replace("key", "value1"), "value2");
 
       assertEquals(cache(0).get("key"), "value1");
-      assertEventuallyEqual(1, "key", "value1");
+      assertEventuallyEquals(1, "key", "value1");
 
       cache(0).put("key", "valueN");
 
       cache(0).replace("key", "valueN");
 
       assert cache(0).get("key").equals("valueN");
-      assertEventuallyEqual(1, "key", "valueN");
+      assertEventuallyEquals(1, "key", "valueN");
    }
 
    public void testReplaceWithOldVal() {
       cache(1).put("key", "value2");
       assert cache(0).get("key").equals("value2");
-      assertEventuallyEqual(1, "key", "value2");
+      assertEventuallyEquals(1, "key", "value2");
 
 
       cache(0).put("key", "valueN");
@@ -178,26 +188,20 @@ public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
       cache(0).replace("key", "valueOld", "value1");
 
       assert cache(0).get("key").equals("valueN");
-      assertEventuallyEqual(1, "key", "valueN");
+      assertEventuallyEquals(1, "key", "valueN");
 
       cache(0).replace("key", "valueN", "value1");
 
       assert cache(0).get("key").equals("value1");
-      assertEventuallyEqual(1, "key", "value1");
-   }
+      assertEventuallyEquals(1, "key", "value1");
 
-   void assertEventuallyEqual(final int cacheIndex, final Object key, final Object value) {
-      eventually(new Condition() {
-         @Override
-         public boolean isSatisfied() throws Exception {
-            return value == null ? value == cache(cacheIndex).get(key) : value.equals(cache(cacheIndex).get(key));
-         }
-      });
+      assertNoTransactions();
    }
 
    public void testRemoveUnexistingEntry() {
       cache(0).remove("k");
       assertNull(cache(0).get("k"));
       assertNull(cache(1).get("k"));
+      assertNoTransactions();
    }
 }
