@@ -177,20 +177,6 @@ public class ReplWriteSkewTest extends AbstractClusteredWriteSkewTest {
       // Auto-commit is true
       cache0.put("hello", "world");
 
-      JGroupsTransport jt = (JGroupsTransport) advancedCache(0).getRpcManager().getTransport();
-      ProtocolStack ps = jt.getChannel().getProtocolStack();
-      for (Protocol p : ps.getProtocols()) {
-         if (p instanceof TCP) {
-            TCP tcp = (TCP) p;
-            System.out.println("tcp.getThreadPoolMaxThreads() = " + tcp.getThreadPoolMaxThreads());
-            System.out.println("tcp.getThreadPoolMinThreads() = " + tcp.getThreadPoolMinThreads());
-         }
-         System.out.println("protocol= " + p);
-      }
-      log.trace("Before sleep!");
-//      Thread.sleep(10000);
-      log.trace("After sleep!");
-
       // create a write skew
       tm(0).begin();
       assert "world".equals(cache0.get("hello"));

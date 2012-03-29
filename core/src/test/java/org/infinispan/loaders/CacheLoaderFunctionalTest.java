@@ -278,7 +278,7 @@ public class CacheLoaderFunctionalTest extends AbstractInfinispanTest {
       // make sure we have no stale locks!!
       assertNoLocks(cache);
 
-      assert cache.size() == 2 : "Expected the cache to contain 3 elements but contained " + cache.size();
+      assert cache.size() == 3 : "Expected the cache to contain 3 elements but contained " + cache.size();
 
       for (int i = 1; i < 5; i++) cache.evict("k" + i);
       // make sure we have no stale locks!!
