@@ -249,6 +249,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
       } else {
          //disable flow control -- send immediately to avoid long commit phases
          msg.setFlag(Message.Flag.NO_FC);
+         msg.setFlag(Message.DONT_BUNDLE);
       }
 
       if (recipient != null) msg.setDest(recipient);
