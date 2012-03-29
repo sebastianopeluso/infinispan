@@ -36,6 +36,7 @@ import org.infinispan.manager.EmbeddedCacheManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.test.fwk.TestCacheManagerFactory;
 import org.infinispan.test.fwk.TransportFlags;
+import org.infinispan.transaction.TransactionTable;
 import org.infinispan.util.concurrent.locks.LockManager;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -51,6 +52,8 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static junit.framework.Assert.assertEquals;
 
 /**
  * Base class for tests that operates on clusters of caches. The way tests extending this class operates is:
@@ -562,5 +565,40 @@ public abstract class MultipleCacheManagersTest extends AbstractCacheTest {
       TransactionManager tm = tm(cacheIndex);
       Transaction tx = tm.getTransaction();
       tx.enlistResource(new XAResourceAdapter());
+   }
+
+   protected void assertNoTransactions() {
+      eventually(new Condition() {
+         @Override
+         public boolean isSatisfied() throws Exception {
+            for (int i = 0; i < caches().size(); i++) {
+               int localTxCount = transactionTable(i).getLocalTxCount();
+               int remoteTxCount = transactionTable(i).getRemoteTxCount();
+               if (localTxCount != 0 || remoteTxCount != 0) {
+                  log.tracef("Local tx=%s, remote tx=%s, for cache %s ", localTxCount, remoteTxCount, i);
+                  return false;
+               }
+            }
+            return true;
+         }
+      });
+   }
+
+   protected void assertTransactionCount(int cacheIndex, int local, int remote) {
+      assertEquals(local ,transactionTable(cacheIndex).getLocalTxCount());
+      assertEquals(remote, transactionTable(cacheIndex).getRemoteTxCount());
+   }
+
+   protected TransactionTable transactionTable(int cacheIndex) {
+      return advancedCache(cacheIndex).getComponentRegistry().getComponent(TransactionTable.class);
+   }
+
+   protected void assertEventuallyEquals(final int cacheIndex, final Object key, final Object value) {
+      eventually(new Condition() {
+         @Override
+         public boolean isSatisfied() throws Exception {
+            return value == null ? value == cache(cacheIndex).get(key) : value.equals(cache(cacheIndex).get(key));
+         }
+      });
    }
 }
