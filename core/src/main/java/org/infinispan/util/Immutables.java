@@ -539,6 +539,11 @@ public class Immutables {
       }
 
       @Override
+      public void setChanged(boolean b) {
+         throw new UnsupportedOperationException();
+      }
+
+
       public void touch() {
          throw new UnsupportedOperationException();
       }
