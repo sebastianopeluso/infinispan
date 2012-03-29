@@ -27,11 +27,6 @@ public class TotalOrderWriteSkewTest extends ReplWriteSkewTest {
             .versioning().enable().scheme(VersioningScheme.SIMPLE);
    }
 
-   @Override
-   public void testSharedCounter() {
-      super.testSharedCounter();    // TODO: Customise this generated block
-   }
-
    public void transactionCleanupWithWriteSkew() throws Exception {
       cache(0).put("k","v");
       tm(0).begin();
