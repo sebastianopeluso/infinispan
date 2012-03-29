@@ -50,7 +50,7 @@ public abstract class AbstractClusteredWriteSkewTest extends MultipleCacheManage
             .writeSkewCheck(true)
             .transaction()
             .lockingMode(LockingMode.OPTIMISTIC)
-            .syncCommitPhase(true);
+            .syncCommitPhase(true).transaction().cacheStopTimeout(0);
 
       decorate(builder);
 
@@ -69,23 +69,23 @@ public abstract class AbstractClusteredWriteSkewTest extends MultipleCacheManage
    // This test is based on a contribution by Pedro Ruivo of INESC-ID, working on the Cloud-TM project.
    public void testSharedCounter() {
       int counterMaxValue = 1000;
-      Cache<String, Integer> c1 = cache(0);
-      Cache<String, Integer> c2 = cache(1);
+      Cache<String, Integer> c0 = cache(0);
+      Cache<String, Integer> c1 = cache(1);
 
       //initialize the counter
-      c1.put("counter", 0);
+      c0.put("counter", 0);
 
       //check if the counter is initialized in all caches
-      assert c1.get("counter") == 0 : "Initial value is different from zero in cache 1";
-      assert c2.get("counter") == 0 : "Initial value is different from zero in cache 2";
+      assert c0.get("counter") == 0 : "Initial value is different from zero in cache 1";
+      assert c1.get("counter") == 0 : "Initial value is different from zero in cache 2";
 
       //this will keep the values put by both threads. any duplicate value will be detected because of the
       //return value of add() method
       ConcurrentSkipListSet<Integer> uniqueValuesIncremented = new ConcurrentSkipListSet<Integer>();
 
       //create both threads (simulate a node)
-      IncrementCounterThread ict1 = new IncrementCounterThread("Node-1", c1, uniqueValuesIncremented, counterMaxValue);
-      IncrementCounterThread ict2 = new IncrementCounterThread("Node-2", c2, uniqueValuesIncremented, counterMaxValue);
+      IncrementCounterThread ict1 = new IncrementCounterThread("Node-1", c0, uniqueValuesIncremented, counterMaxValue);
+      IncrementCounterThread ict2 = new IncrementCounterThread("Node-2", c1, uniqueValuesIncremented, counterMaxValue);
 
       try {
          //start and wait to finish
@@ -99,14 +99,16 @@ public abstract class AbstractClusteredWriteSkewTest extends MultipleCacheManage
       }
 
       //check if all caches obtains the counter_max_values
-      assert c1.get("counter") >= counterMaxValue : "Final value is less than " + counterMaxValue +
+      assert c0.get("counter") >= counterMaxValue : "Final value is less than " + counterMaxValue +
             " in cache 1";
-      assert c2.get("counter") >= counterMaxValue : "Final value is less than " + counterMaxValue +
+      assert c1.get("counter") >= counterMaxValue : "Final value is less than " + counterMaxValue +
             " in cache 2";
 
       //check is any duplicate value is detected
       assert ict1.result : ict1.getName() + " has put a duplicate value";
       assert ict2.result : ict2.getName() + " has put a duplicate value";
+
+      assertNoTransactions();
    }
 
    private static class IncrementCounterThread extends Thread {
