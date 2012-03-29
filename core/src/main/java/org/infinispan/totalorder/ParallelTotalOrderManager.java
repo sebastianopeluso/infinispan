@@ -156,7 +156,10 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          //   throw new CacheException("Cannot prepare transaction" + gtx + ". it was already marked as rollback");
          //} 
 
-         if (previousTransactions.contains(remoteTransaction.getLatch())) {
+         boolean isResend = prepareCommand.isOnePhaseCommit();
+         if (isResend) {
+            previousTransactions.remove(remoteTransaction.getLatch());
+         } else if (previousTransactions.contains(remoteTransaction.getLatch())) {
             throw new IllegalStateException("Dependency transaction must not contains myself in the set");
          }
 
@@ -168,6 +171,8 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          remoteTransaction.markForPreparing();
 
          if (remoteTransaction.isMarkedForRollback()) {
+            //this means that rollback has already been received
+            transactionTable.removeRemoteTransaction(remoteTransaction.getGlobalTransaction());
             throw new CacheException("Cannot prepare transaction" + gtx + ". it was already marked as rollback");
          }
 
@@ -225,7 +230,6 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
       private void markTxCompleted() {
          finishTransaction(remoteTransaction);
-         transactionTable.removeRemoteTransaction(prepareCommand.getGlobalTransaction());
       }
    }
 
