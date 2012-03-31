@@ -24,9 +24,12 @@ package org.infinispan.commands.tx;
 
 import org.infinispan.commands.Visitor;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.context.impl.RemoteTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 /**
  * Command corresponding to a transaction rollback.
@@ -36,6 +39,9 @@ import org.infinispan.transaction.RemoteTransaction;
  */
 public class RollbackCommand extends AbstractTransactionBoundaryCommand {
    public static final byte COMMAND_ID = 13;
+
+   private static final Log log = LogFactory.getLog(RollbackCommand.class);
+   private boolean trace = log.isTraceEnabled();
 
    private RollbackCommand() {
       super(null); // For command id uniqueness test
@@ -66,5 +72,21 @@ public class RollbackCommand extends AbstractTransactionBoundaryCommand {
    @Override
    public String toString() {
       return "RollbackCommand {" + super.toString();
+   }
+
+   @Override
+   public Object perform(InvocationContext ctx) throws Throwable {
+      if (ctx != null) throw new IllegalStateException("Expected null context!");
+      markTransactionAsRemote(true);
+      RemoteTransaction transaction = txTable.getOrCreateIfAbsentRemoteTransaction(globalTx);
+      if (transaction.isMissingModifications()) {
+         if (trace) log.tracef("Did not find a RemoteTransaction for %s", globalTx);
+      }
+      visitRemoteTransaction(transaction);
+      RemoteTxInvocationContext ctxt = icc.createRemoteTxInvocationContext(
+            transaction, getOrigin());
+
+      if (trace) log.tracef("About to execute tx command %s", this);
+      return invoker.invoke(ctxt, this);
    }
 }

@@ -469,4 +469,30 @@ public class TransactionTable {
       }
    }
 
+   /**
+    * This method is used when Total Order protocol is enabled. The commit/rollback command can be deliver before the
+    * prepare command. In total order, it allows the processing the commit/rollback without the remote transaction and
+    * this can originate a race condition to create a remote transaction.
+    *
+    * This method creates only one transaction per global transaction, resolving the race condition
+    *
+    * Note: this method was copied from total order branch and the same technique will be applied to 2PC prepare and
+    * rollback commands (commit command are not involved here)
+    *
+    * @param globalTransaction the global transaction
+    * @return the remote transaction.
+    */
+   public RemoteTransaction getOrCreateIfAbsentRemoteTransaction(GlobalTransaction globalTransaction) {
+      RemoteTransaction remoteTransaction = remoteTransactions.get(globalTransaction);
+      if (remoteTransaction == null) {
+         remoteTransaction = txFactory.newRemoteTransaction(globalTransaction, currentViewId);
+         //try to register
+         RemoteTransaction existing = remoteTransactions.putIfAbsent(globalTransaction, remoteTransaction);
+         if (existing != null) {
+            remoteTransaction = existing;
+         }
+      }
+
+      return remoteTransaction;
+   }
 }

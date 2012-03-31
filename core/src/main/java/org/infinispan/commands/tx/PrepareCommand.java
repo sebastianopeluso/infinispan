@@ -63,7 +63,7 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
    protected CacheNotifier notifier;
    protected RecoveryManager recoveryManager;
    private transient boolean replayEntryWrapping  = false;
-   
+
    private static final WriteCommand[] EMPTY_WRITE_COMMAND_ARRAY = new WriteCommand[0];
 
    public void initialize(CacheNotifier notifier, RecoveryManager recoveryManager) {
@@ -103,20 +103,17 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       }
 
       // 1. first create a remote transaction
-      RemoteTransaction remoteTransaction = txTable.getRemoteTransaction(globalTx);
-      boolean remoteTxInitiated = remoteTransaction != null;
-      if (!remoteTxInitiated) {
-         remoteTransaction = txTable.createRemoteTransaction(globalTx, modifications);
-      } else {
-         /*
-          * remote tx was already created by Cache#lock() API call
-          * set the proper modifications since lock has none
-          * 
-          * @see LockControlCommand.java 
-          * https://jira.jboss.org/jira/browse/ISPN-48
-          */
-         remoteTransaction.setModifications(getModifications());
-      }
+      RemoteTransaction remoteTransaction = txTable.getOrCreateIfAbsentRemoteTransaction(globalTx);
+      //Note: the remote transaction is always different from null!
+      /*
+      * remote tx was already created by Cache#lock() API call
+      * set the proper modifications since lock has none
+      *
+      * @see LockControlCommand.java
+      * https://jira.jboss.org/jira/browse/ISPN-48
+      */
+      remoteTransaction.setModifications(getModifications());
+
 
       // 2. then set it on the invocation context
       RemoteTxInvocationContext ctx = icc.createRemoteTxInvocationContext(remoteTransaction, getOrigin());
