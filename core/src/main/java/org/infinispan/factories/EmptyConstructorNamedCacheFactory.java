@@ -48,6 +48,7 @@ import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
+import org.infinispan.stats.StreamLibContainer;
 import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.totalorder.ParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.SequentialTotalOrderManager;
@@ -77,7 +78,8 @@ import static org.infinispan.util.Util.getInstance;
                               BatchContainer.class, EvictionManager.class,
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
                               ClusteringDependentLogic.class, LockContainer.class,
-                              L1Manager.class, TransactionFactory.class, BackupSender.class, TotalOrderManager.class})
+                              L1Manager.class, TransactionFactory.class, BackupSender.class, TotalOrderManager.class,
+                              StreamLibContainer.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -142,6 +144,10 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          } else if (componentType.equals(TotalOrderManager.class)) {
             return Configurations.isOnePhaseTotalOrderCommit(configuration) ? (T) new SequentialTotalOrderManager() :
                   (T) new ParallelTotalOrderManager();
+         } else if (componentType.equals(StreamLibContainer.class)) {
+            StreamLibContainer streamLibContainer = StreamLibContainer.getInstance();
+            streamLibContainer.setActive(configuration.jmxStatistics().enabled());
+            return (T) streamLibContainer;
          }
       }
 

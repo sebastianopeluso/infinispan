@@ -30,6 +30,8 @@ import org.infinispan.configuration.cache.CustomInterceptorsConfiguration;
 import org.infinispan.configuration.cache.InterceptorConfiguration;
 import org.infinispan.configuration.cache.CacheLoaderConfiguration;
 import org.infinispan.configuration.cache.CacheStoreConfiguration;
+import org.infinispan.distribution.wrappers.DistCustomStatsInterceptor;
+import org.infinispan.distribution.wrappers.ReplCustomStatsInterceptor;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.interceptors.*;
 import org.infinispan.interceptors.base.CommandInterceptor;
@@ -128,8 +130,20 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       }
 
       // load the cache management interceptor next
-      if (configuration.jmxStatistics().enabled())
+      if (configuration.jmxStatistics().enabled()) {
          interceptorChain.appendInterceptor(createInterceptor(new CacheMgmtInterceptor(), CacheMgmtInterceptor.class), false);
+         if (configuration.clustering().cacheMode().isDistributed()) {
+            interceptorChain.appendInterceptor(createInterceptor(new DistStreamLibInterceptor(), 
+                  DistStreamLibInterceptor.class), false);
+            interceptorChain.appendInterceptor(createInterceptor(new DistCustomStatsInterceptor(),
+                                                                 DistCustomStatsInterceptor.class),false);
+         } else {
+            interceptorChain.appendInterceptor(createInterceptor(new StreamLibInterceptor(), 
+                  StreamLibInterceptor.class), false);
+            interceptorChain.appendInterceptor(createInterceptor(new ReplCustomStatsInterceptor(),
+                                                                 ReplCustomStatsInterceptor.class),false);
+         }
+      }
 
       // load the state transfer lock interceptor
       // the state transfer lock ensures that the cache member list is up-to-date

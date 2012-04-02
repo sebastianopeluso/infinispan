@@ -64,10 +64,13 @@ import org.rhq.helpers.pluginAnnotations.agent.MeasurementType;
 import org.rhq.helpers.pluginAnnotations.agent.Metric;
 import org.rhq.helpers.pluginAnnotations.agent.Operation;
 import org.rhq.helpers.pluginAnnotations.agent.Parameter;
+import org.rhq.helpers.pluginAnnotations.agent.Units;
 
 import javax.transaction.Status;
 import javax.transaction.SystemException;
 import javax.transaction.Transaction;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -87,8 +90,16 @@ public class TxInterceptor extends CommandInterceptor {
    private final AtomicLong prepares = new AtomicLong(0);
    private final AtomicLong commits = new AtomicLong(0);
    private final AtomicLong rollbacks = new AtomicLong(0);
+   private final AtomicLong localPrepares = new AtomicLong(0);
+   private final AtomicLong localCommits = new AtomicLong(0);
+   private final AtomicLong localRollbacks = new AtomicLong(0);
    @ManagedAttribute(description = "Enables or disables the gathering of statistics by this component", writable = true)
    private boolean statisticsEnabled;
+
+   private final Map<Transaction, Long> startPrepare = new ConcurrentHashMap<Transaction, Long>();
+   private final AverageLatency successfulTxCommit = new AverageLatency();
+   private final AverageLatency failedTxCommit = new AverageLatency();
+
    protected TransactionCoordinator txCoordinator;
    protected RpcManager rpcManager;
 
@@ -114,8 +125,29 @@ public class TxInterceptor extends CommandInterceptor {
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       //if it is remote and 2PC then first log the tx only after replying mods
-      if (this.statisticsEnabled) prepares.incrementAndGet();
-      Object result = invokeNextInterceptorAndVerifyTransaction(ctx, command);
+      boolean shouldAddTxCommitLatency = false;
+      if (this.statisticsEnabled) {
+         if (ctx.isOriginLocal()) {
+            localPrepares.incrementAndGet();
+            startPrepare.put(ctx.getTransaction(), System.nanoTime());
+            shouldAddTxCommitLatency = command.isOnePhaseCommit();
+         }
+         prepares.incrementAndGet();
+      }
+
+      Object result;
+      try {
+         result = invokeNextInterceptorAndVerifyTransaction(ctx, command);
+      } catch (Throwable t) {
+         if (shouldAddTxCommitLatency) {
+            updateTxCommitLatency(false, ctx.getTransaction());
+         }
+         throw t;
+      } finally {
+         if (shouldAddTxCommitLatency) {
+            updateTxCommitLatency(true, ctx.getTransaction());
+         }
+      }
       if (!ctx.isOriginLocal()) {
          if (command.isOnePhaseCommit()) {
             txTable.remoteTransactionCommitted(command.getGlobalTransaction());
@@ -152,17 +184,31 @@ public class TxInterceptor extends CommandInterceptor {
 
    @Override
    public Object visitCommitCommand(TxInvocationContext ctx, CommitCommand command) throws Throwable {
-      if (this.statisticsEnabled) commits.incrementAndGet();
+      if (this.statisticsEnabled) {
+         if (ctx.isOriginLocal()) {
+            localCommits.incrementAndGet();
+         }
+         commits.incrementAndGet();
+      }
       Object result = invokeNextInterceptor(ctx, command);
       if (!ctx.isOriginLocal()) {
          txTable.remoteTransactionCommitted(ctx.getGlobalTransaction());
+      }
+
+      if (this.statisticsEnabled && ctx.isOriginLocal()) {
+         updateTxCommitLatency(true, ctx.getTransaction());
       }
       return result;
    }
 
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
-      if (this.statisticsEnabled) rollbacks.incrementAndGet();
+      if (this.statisticsEnabled) {
+         if (ctx.isOriginLocal()) {
+            localRollbacks.incrementAndGet();
+         }
+         rollbacks.incrementAndGet();
+      }
       if (!ctx.isOriginLocal()) {
          txTable.remoteTransactionRollback(command.getGlobalTransaction());
       }
@@ -174,6 +220,9 @@ public class TxInterceptor extends CommandInterceptor {
          if (recoveryManager!=null) {
             GlobalTransaction gtx = command.getGlobalTransaction();
             recoveryManager.removeRecoveryInformation(((RecoverableTransactionIdentifier)gtx).getXid());
+         }
+         if (this.statisticsEnabled && ctx.isOriginLocal()) {
+            updateTxCommitLatency(false, ctx.getTransaction());
          }
       }
    }
@@ -295,12 +344,30 @@ public class TxInterceptor extends CommandInterceptor {
       return true;
    }
 
+   private void updateTxCommitLatency(boolean successful, Transaction transaction) {
+      Long start = startPrepare.remove(transaction);
+      if (start == null) {
+         return;
+      }
+      if (successful) {
+         successfulTxCommit.add(System.nanoTime() - start);
+      } else {
+         failedTxCommit.add(System.nanoTime() - start);
+      }
+   }
+
    @ManagedOperation(description = "Resets statistics gathered by this component")
    @Operation(displayName = "Reset Statistics")
    public void resetStatistics() {
       prepares.set(0);
       commits.set(0);
       rollbacks.set(0);
+      localCommits.set(0);
+      localPrepares.set(0);
+      localRollbacks.set(0);
+      successfulTxCommit.reset();
+      failedTxCommit.reset();
+      startPrepare.clear();
    }
 
    @Operation(displayName = "Enable/disable statistics")
@@ -333,5 +400,80 @@ public class TxInterceptor extends CommandInterceptor {
    @SuppressWarnings("unused")
    public long getRollbacks() {
       return rollbacks.get();
+   }
+
+   @ManagedAttribute(description = "Number of local originated transaction prepares performed since last reset")
+   @Metric(displayName = "LocalPrepares", measurementType = MeasurementType.TRENDSUP, displayType = DisplayType.SUMMARY)
+   public long getLocalPrepares() {
+      return localPrepares.get();
+   }
+
+   @ManagedAttribute(description = "Number of local originated transaction commits performed since last reset")
+   @Metric(displayName = "LocalCommits", measurementType = MeasurementType.TRENDSUP, displayType = DisplayType.SUMMARY)
+   public long getLocalCommits() {
+      return localCommits.get();
+   }
+
+   @ManagedAttribute(description = "Number of local originated transaction rollbacks performed since last reset")
+   @Metric(displayName = "LocalRollbacks", measurementType = MeasurementType.TRENDSUP, displayType = DisplayType.SUMMARY)
+   public long getLocalRollbacks() {
+      return localRollbacks.get();
+   }
+
+   @ManagedAttribute(description = "Average confirm phase latency of successful committed transactions")
+   @Metric(displayName = "AvgSuccessfulTxCommit", measurementType = MeasurementType.TRENDSUP,
+           displayType = DisplayType.SUMMARY, units = Units.MILLISECONDS)
+   public double getAvgSuccessfulTxCommit() {
+      return successfulTxCommit.get();
+   }
+
+   @ManagedAttribute(description = "Average confirm phase latency of failed committed transactions")
+   @Metric(displayName = "AvgFailedTxCommit", measurementType = MeasurementType.TRENDSUP,
+           displayType = DisplayType.SUMMARY, units = Units.MILLISECONDS)
+   public double getAvgFailedTxCommit() {
+      return failedTxCommit.get();
+   }
+
+   @ManagedAttribute(description = "Number of local successful committed transaction since last reset")
+   @Metric(displayName = "SuccessfulCommits", measurementType = MeasurementType.TRENDSUP, displayType = DisplayType.SUMMARY)
+   public long getSuccessfulCommits() {
+      return successfulTxCommit.getCounter();
+   }
+
+   @ManagedAttribute(description = "Number of local failed committed transaction since last reset")
+   @Metric(displayName = "FailedCommits", measurementType = MeasurementType.TRENDSUP, displayType = DisplayType.SUMMARY)
+   public long getFailedCommits() {
+      return failedTxCommit.getCounter();
+   }
+
+   private class AverageLatency {
+      private long duration;
+      private long counter;
+
+      public synchronized void add(long duration) {
+         this.duration += duration;
+         this.counter++;
+      }
+
+      //in milliseconds
+      public synchronized double get() {
+         if (counter == 0) {
+            return 0;
+         }
+         return convertToMillis(duration * 1.0 / counter);
+      }
+
+      public synchronized long getCounter() {
+         return counter;
+      }
+
+      public synchronized void reset() {
+         duration = 0;
+         counter = 0;
+      }
+
+      private double convertToMillis(double value) {
+         return value / 1000000.0;
+      }
    }
 }
