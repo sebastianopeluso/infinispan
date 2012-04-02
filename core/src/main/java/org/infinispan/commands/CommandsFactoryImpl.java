@@ -573,4 +573,9 @@ public class CommandsFactoryImpl implements CommandsFactory {
    public CancelCommand buildCancelCommandCommand(UUID commandUUID) {
       return new CancelCommand(cacheName, commandUUID);
    }
+
+   @Override
+   public SetClassCommand buildSetClassCommand(String transactionalClass) {
+      return new SetClassCommand(transactionalClass);
+   }
 }
