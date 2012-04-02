@@ -36,7 +36,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
    @Override
    public Object visitGetKeyValueCommand(InvocationContext ctx, GetKeyValueCommand command) throws Throwable {
 
-      if(getStatisticsEnabled()) {
+      if(getStatisticsEnabled() && ctx.isInTxScope() && ctx.isOriginLocal()) {
          streamLibContainer.addGet(command.getKey(), isRemote(command.getKey()));
       }
       return invokeNextInterceptor(ctx, command);
@@ -44,7 +44,7 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
 
    @Override
    public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
-      if(getStatisticsEnabled()) {
+      if(getStatisticsEnabled() && ctx.isInTxScope() && ctx.isOriginLocal()) {
          streamLibContainer.addPut(command.getKey(), isRemote(command.getKey()));
       }
       return invokeNextInterceptor(ctx, command);
