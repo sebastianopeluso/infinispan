@@ -31,6 +31,7 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.marshall.MarshalledValue;
+import org.infinispan.stats.StreamLibContainer;
 import org.infinispan.util.Util;
 import org.infinispan.util.concurrent.TimeoutException;
 import org.infinispan.util.concurrent.locks.containers.*;
@@ -64,17 +65,38 @@ public class LockManagerImpl implements LockManager {
    protected static final boolean trace = log.isTraceEnabled();
    private static final String ANOTHER_THREAD = "(another thread)";
 
+   protected StreamLibContainer streamLibContainer;
+
    @Inject
-   public void injectDependencies(Configuration configuration, LockContainer<?> lockContainer) {
+   public void injectDependencies(Configuration configuration, LockContainer<?> lockContainer,
+                                  StreamLibContainer streamLibContainer) {
       this.configuration = configuration;
       this.lockContainer = lockContainer;
+      this.streamLibContainer = streamLibContainer;
    }
 
    public boolean lockAndRecord(Object key, InvocationContext ctx, long timeoutMillis) throws InterruptedException {
       if (trace) log.tracef("Attempting to lock %s with acquisition timeout of %s millis", key, timeoutMillis);
+
+      boolean contention = false;
+      if (ctx.isInTxScope()) {
+         Object lockHolder = getOwner(key);
+         contention = lockHolder != null && !lockHolder.equals(ctx.getLockOwner());
+      }
+
       if (lockContainer.acquireLock(ctx.getLockOwner(), key, timeoutMillis, MILLISECONDS) != null) {
          if (trace) log.tracef("Successfully acquired lock %s!", key);
+
+         if (ctx.isInTxScope()) {
+            //acquired
+            streamLibContainer.addLockInformation(key, contention, false);
+         }
          return true;
+      }
+
+      if (ctx.isInTxScope()) {
+         //not acquired
+         streamLibContainer.addLockInformation(key, contention, true);
       }
 
       // couldn't acquire lock!
