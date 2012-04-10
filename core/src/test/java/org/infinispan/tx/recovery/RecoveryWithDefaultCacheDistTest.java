@@ -27,11 +27,9 @@ import org.infinispan.test.MultipleCacheManagersTest;
 import org.infinispan.test.TestingUtil;
 import org.infinispan.test.fwk.CleanupAfterMethod;
 import org.infinispan.transaction.TransactionMode;
-import org.infinispan.transaction.lookup.DummyTransactionManagerLookup;
 import org.infinispan.transaction.tm.DummyTransaction;
 import org.infinispan.transaction.xa.recovery.RecoveryManager;
 import org.infinispan.transaction.xa.recovery.SerializableXid;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import javax.transaction.xa.Xid;
@@ -144,9 +142,8 @@ public class RecoveryWithDefaultCacheDistTest extends MultipleCacheManagersTest 
       assert inDoubtTransactions.contains(new SerializableXid(t1_2.getXid()));
       assert inDoubtTransactions.contains(new SerializableXid(t1_3.getXid()));
 
-      configuration.fluent().transaction().transactionMode(TransactionMode.TRANSACTIONAL);
-      addClusterEnabledCacheManager(configuration);
-      defineRecoveryCache(1);
+      addAnotherCache();
+
       TestingUtil.blockUntilViewsReceived(60000, cache(0), cache(1));
       DummyTransaction t1_4 = beginAndSuspendTx(cache(1));
       prepareTransaction(t1_4);
@@ -189,6 +186,12 @@ public class RecoveryWithDefaultCacheDistTest extends MultipleCacheManagersTest 
          }
       });
       assertEquals(0, rm(cache(0)).getInDoubtTransactionInfo().size());
+   }
+
+   protected void addAnotherCache() {
+      configuration.fluent().transaction().transactionMode(TransactionMode.TRANSACTIONAL);
+      addClusterEnabledCacheManager(configuration);
+      defineRecoveryCache(1);
    }
 
    protected void defineRecoveryCache(int cacheManagerIndex) {
