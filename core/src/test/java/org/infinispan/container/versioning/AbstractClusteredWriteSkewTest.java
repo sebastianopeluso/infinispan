@@ -69,15 +69,20 @@ public abstract class AbstractClusteredWriteSkewTest extends MultipleCacheManage
    // This test is based on a contribution by Pedro Ruivo of INESC-ID, working on the Cloud-TM project.
    public void testSharedCounter() {
       int counterMaxValue = 1000;
-      Cache<String, Integer> c0 = cache(0);
-      Cache<String, Integer> c1 = cache(1);
+      final Cache<String, Integer> c0 = cache(0);
+      final Cache<String, Integer> c1 = cache(1);
 
       //initialize the counter
       c0.put("counter", 0);
 
       //check if the counter is initialized in all caches
       assert c0.get("counter") == 0 : "Initial value is different from zero in cache 1";
-      assert c1.get("counter") == 0 : "Initial value is different from zero in cache 2";
+      eventually(new Condition() {
+         @Override
+         public boolean isSatisfied() throws Exception {
+            return c1.get("counter") == 0;
+         }
+      });
 
       //this will keep the values put by both threads. any duplicate value will be detected because of the
       //return value of add() method
