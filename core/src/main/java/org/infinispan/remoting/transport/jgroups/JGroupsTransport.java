@@ -467,7 +467,7 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
       List<org.jgroups.Address> jgAddressList = toJGroupsAddressListExcludingSelf(recipients);
       int membersSize = members.size();
       boolean broadcast = jgAddressList == null || recipients.size() == membersSize;
-      if (membersSize < 3 || (jgAddressList != null && jgAddressList.size() < 2)) broadcast = false;
+      if (!totalOrder && (membersSize < 3 || (jgAddressList != null && jgAddressList.size() < 2))) broadcast = false;
       RspList<Object> rsps = null;
       Response singleResponse = null;
       org.jgroups.Address singleJGAddress = null;
