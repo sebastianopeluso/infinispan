@@ -130,8 +130,10 @@ public class StateTransferLockImpl implements StateTransferLock {
 
    @Override
    public boolean acquireForCommand(TxInvocationContext ctx, PrepareCommand command) throws InterruptedException, TimeoutException {
-      if (!shouldAcquireLock(ctx, command))
+      if (!shouldAcquireLock(ctx, command)) {
+         log.trace("Skipping lock acquisition.");
          return true;
+      }
 
       return acquireLockForWriteCommand(ctx);
    }
@@ -293,8 +295,10 @@ public class StateTransferLockImpl implements StateTransferLock {
       // origin, we never wait for the state transfer lock on remote nodes.
       // The originator should wait for the state transfer to end and retry the command,
       // unless we are async, in which case we can't retry
-      if (!ctx.isOriginLocal() && isSync)
+      if (!ctx.isOriginLocal() && isSync) {
+         log.trace("Couldn't acquire state transfer lock for remote sync call.");
          return false;
+      }
 
       // A state transfer is in progress, wait for it to end
       long timeout = lockTimeout;
@@ -310,8 +314,10 @@ public class StateTransferLockImpl implements StateTransferLock {
 
             // retry, unless the timeout expired
             timeout = endTime - currentMillisFromNanotime();
-            if (timeout <= 0)
+            if (timeout <= 0) {
+               if (trace) log.tracef("Couldn't acquire lock in lockTimeout: %s", lockTimeout);
                return false;
+            }
          }
       }
    }

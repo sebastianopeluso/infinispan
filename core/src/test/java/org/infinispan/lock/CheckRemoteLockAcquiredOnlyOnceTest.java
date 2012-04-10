@@ -29,6 +29,7 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.test.MultipleCacheManagersTest;
 import org.infinispan.transaction.LockingMode;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.util.Collections;
@@ -58,6 +59,11 @@ public class CheckRemoteLockAcquiredOnlyOnceTest extends MultipleCacheManagersTe
       controlInterceptor = new ControlInterceptor();
       cache(0).getAdvancedCache().addInterceptor(controlInterceptor, 1);
       key = "k";
+   }
+
+   @BeforeMethod
+   void resetInvocationCount() {
+      controlInterceptor.remoteInvocations = 0;
    }
 
    public void testLockThenLock() throws Exception {

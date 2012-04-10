@@ -4,6 +4,7 @@ import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.statetransfer.StateTransferInProgressException;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
@@ -53,4 +54,6 @@ public interface TotalOrderManager {
    void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction);
 
    void waitForPrepareToSucceed(TxInvocationContext context);
+
+   void notifyStateTransferInProgress(GlobalTransaction globalTransaction, StateTransferInProgressException e);
 }

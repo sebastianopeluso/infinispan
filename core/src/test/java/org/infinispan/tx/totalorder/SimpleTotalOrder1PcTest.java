@@ -25,7 +25,7 @@ import static org.testng.Assert.assertTrue;
  * @since 5.2.0
  */
 @Test(groups = "functional", testName = "tx.totalorder.SimpleTotalOrderOnePhaseTest")
-public class SimpleTotalOrderOnePhaseTest extends MultipleCacheManagersTest {
+public class SimpleTotalOrder1PcTest extends MultipleCacheManagersTest {
 
    protected int clusterSize = 2;
 

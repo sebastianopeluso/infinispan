@@ -26,7 +26,7 @@ public class TotalOrderStateTransferLockInterceptor extends StateTransferLockInt
       boolean release = true;
       if (!stateTransferLock.acquireForCommand(ctx, command)) {
          try {
-            signalStateTransferInProgress();
+            signalStateTransferInProgress(ctx);
          } catch (StateTransferInProgressException e) {
             if (!ctx.isOriginLocal())
                tom.notifyStateTransferInProgress(command.getGlobalTransaction(), e);
@@ -39,7 +39,7 @@ public class TotalOrderStateTransferLockInterceptor extends StateTransferLockInt
          return handleWithRetries(ctx, command, rpcTimeout);
       } catch (StateTransferLockReacquisitionException e) {
          release = false;
-         return signalStateTransferInProgress();
+         return signalStateTransferInProgress(ctx);
       } finally {
          if (release) {
             stateTransferLock.releaseForCommand(ctx, command);

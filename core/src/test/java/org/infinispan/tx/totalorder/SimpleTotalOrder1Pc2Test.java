@@ -10,9 +10,9 @@ import org.testng.annotations.Test;
  * @since 5.2.0
  */
 @Test(groups = "functional", testName = "tx.totalorder.SimpleTotalOrderOnePhase2Test")
-public class SimpleTotalOrderOnePhase2Test extends SimpleTotalOrderOnePhaseTest {
+public class SimpleTotalOrder1Pc2Test extends SimpleTotalOrder1PcTest {
 
-   public SimpleTotalOrderOnePhase2Test() {
+   public SimpleTotalOrder1Pc2Test() {
       this.clusterSize = 3;
    }
 }
