@@ -162,6 +162,20 @@ public class StreamLibInterceptor extends JmxStatsCommandInterceptor {
       return res;
    }
 
+   @ManagedAttribute(description = "Show the top " + StreamLibContainer.MAX_CAPACITY + " keys whose write skew check was failed")
+   @Operation(displayName = "Top Keys whose Write Skew Check was failed")
+   public Map<Object, Long> getTopWriteSkewFailedKeys() {
+      return streamLibContainer.getTopKFrom(StreamLibContainer.Stat.MOST_WRITE_SKEW_FAILED_KEYS);
+   }
+
+   @ManagedOperation(description = "Show the top n keys whose write skew check was failed")
+   @Operation(displayName = "Top Keys whose Write Skew Check was failed")
+   public Map<Object, Long> getTopWriteSkewFailedKeys(int n) {
+      Map<Object, Long> res = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.MOST_WRITE_SKEW_FAILED_KEYS, n);
+      streamLibContainer.resetStat(StreamLibContainer.Stat.MOST_WRITE_SKEW_FAILED_KEYS);
+      return res;
+   }
+
    @Override
    public void setStatisticsEnabled(boolean enabled) {
       super.setStatisticsEnabled(enabled);

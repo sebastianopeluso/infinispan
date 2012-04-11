@@ -3,33 +3,28 @@ package org.infinispan.stats;
 import com.clearspring.analytics.stream.Counter;
 import com.clearspring.analytics.stream.StreamSummary;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Date: 12/20/11
- * Time: 6:23 PM
+ * This contains all the stream lib top keys. Stream lib is a space efficient technique to obtains the top-most
+ * counters.
  *
- * @author pruivo
+ * @author Pedro Ruivo
+ * @since 5.2
  */
 public class StreamLibContainer {
 
    private static final StreamLibContainer instance = new StreamLibContainer();
-   public static final int MAX_CAPACITY = 100;
-
-
-   //counters
-   private StreamSummary<Object> remoteGet;
-   private StreamSummary<Object> localGet;
-   private StreamSummary<Object> remotePut;
-   private StreamSummary<Object> localPut;
-
-   private StreamSummary<Object> mostLockedKey;
-   private StreamSummary<Object> mostContendedKey; //keys with more contention detected
-   private StreamSummary<Object> mostFailedKey;
+   public static final int MAX_CAPACITY = 1000;
 
    private int capacity = 100;
    private boolean active = false;
 
+   private final Map<Stat, StreamSummary<Object>> streamSummaryEnumMap;
 
    public static enum Stat {
       REMOTE_GET,
@@ -39,28 +34,17 @@ public class StreamLibContainer {
 
       MOST_LOCKED_KEYS,
       MOST_CONTENDED_KEYS,
-      MOST_FAILED_KEYS
+      MOST_FAILED_KEYS,
+      MOST_WRITE_SKEW_FAILED_KEYS
    }
 
-
-
-
    private StreamLibContainer() {
-      remoteGet = new StreamSummary<Object>(MAX_CAPACITY);
-      localGet = new StreamSummary<Object>(MAX_CAPACITY);
-      remotePut = new StreamSummary<Object>(MAX_CAPACITY);
-      localPut = new StreamSummary<Object>(MAX_CAPACITY);
-      mostLockedKey = new StreamSummary<Object>(MAX_CAPACITY);
-      mostContendedKey = new StreamSummary<Object>(MAX_CAPACITY);
-      mostFailedKey = new StreamSummary<Object>(MAX_CAPACITY);
+      streamSummaryEnumMap = Collections.synchronizedMap(new EnumMap<Stat, StreamSummary<Object>>(Stat.class));
+      clearAll();
    }
 
    public static StreamLibContainer getInstance() {
       return instance;
-   }
-
-   public int getCapacity() {
-      return capacity;
    }
 
    public boolean isActive() {
@@ -83,49 +67,50 @@ public class StreamLibContainer {
       if(!isActive()) {
          return;
       }
+      StreamSummary<Object> streamSummary;
+
       if(remote) {
-         synchronized (remoteGet) {
-            remoteGet.offer(key);
-         }
+         streamSummary = streamSummaryEnumMap.get(Stat.REMOTE_GET);
       } else {
-         synchronized (localGet) {
-            localGet.offer(key);
-         }
+         streamSummary = streamSummaryEnumMap.get(Stat.LOCAL_GET);
       }
+
+      offer(streamSummary, key);
    }
 
    public void addPut(Object key, boolean remote) {
       if(!isActive()) {
          return;
       }
+
+      StreamSummary<Object> streamSummary;
+
       if(remote) {
-         synchronized (remotePut) {
-            remotePut.offer(key);
-         }
+         streamSummary = streamSummaryEnumMap.get(Stat.REMOTE_PUT);
       } else {
-         synchronized (localPut) {
-            localPut.offer(key);
-         }
+         streamSummary = streamSummaryEnumMap.get(Stat.LOCAL_PUT);
       }
+
+      offer(streamSummary, key);
    }
 
    public void addLockInformation(Object key, boolean contention, boolean abort) {
       if(!isActive()) {
          return;
       }
-      synchronized (mostLockedKey) {
-         mostLockedKey.offer(key);
-      }
+
+      offer(streamSummaryEnumMap.get(Stat.MOST_LOCKED_KEYS), key);
+
       if(contention) {
-         synchronized (mostContendedKey) {
-            mostContendedKey.offer(key);
-         }
+         offer(streamSummaryEnumMap.get(Stat.MOST_CONTENDED_KEYS), key);
       }
       if(abort) {
-         synchronized (mostFailedKey) {
-            mostFailedKey.offer(key);
-         }
+         offer(streamSummaryEnumMap.get(Stat.MOST_FAILED_KEYS), key);
       }
+   }
+
+   public void addWriteSkewFailed(Object key) {
+      offer(streamSummaryEnumMap.get(Stat.MOST_WRITE_SKEW_FAILED_KEYS), key);
    }
 
    public Map<Object, Long> getTopKFrom(Stat stat) {
@@ -133,67 +118,46 @@ public class StreamLibContainer {
    }
 
    public Map<Object, Long> getTopKFrom(Stat stat, int topk) {
-      switch (stat) {
-         case REMOTE_GET: return getStatsFrom(remoteGet, topk);
-         case LOCAL_GET: return getStatsFrom(localGet, topk);
-         case REMOTE_PUT: return getStatsFrom(remotePut, topk);
-         case LOCAL_PUT: return getStatsFrom(localPut, topk);
-         case MOST_LOCKED_KEYS: return getStatsFrom(mostLockedKey, topk);
-         case MOST_FAILED_KEYS: return getStatsFrom(mostFailedKey, topk);
-         case MOST_CONTENDED_KEYS: return getStatsFrom(mostContendedKey, topk);
-      }
-      return Collections.emptyMap();
+      return getStatsFrom(streamSummaryEnumMap.get(stat), topk);
+
    }
 
+   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
    private Map<Object, Long> getStatsFrom(StreamSummary<Object> ss, int topk) {
-      List<Counter<Object>> counters = ss.topK(topk <= 0 ? 1 : topk);
-      Map<Object, Long> results = new HashMap<Object, Long>(topk);
+      synchronized (ss) {
+         List<Counter<Object>> counters = ss.topK(topk <= 0 ? 1 : topk);
+         Map<Object, Long> results = new HashMap<Object, Long>(topk);
 
-      for(Counter<Object> c : counters) {
-         results.put(c.getItem(), c.getCount());
+         for(Counter<Object> c : counters) {
+            results.put(c.getItem(), c.getCount());
+         }
+
+         return results;
       }
-
-      return results;
    }
 
    public void resetAll(){
-      synchronized (remoteGet){
-         remoteGet = createNewStreamSummary();
-      }
-      synchronized (remotePut){
-         remotePut = createNewStreamSummary();
-      }
-      synchronized (localPut){
-         localPut = createNewStreamSummary();
-      }
-      synchronized (localGet){
-         localGet = createNewStreamSummary();
-      }
-      synchronized (mostContendedKey){
-         mostContendedKey = createNewStreamSummary();
-      }
-      synchronized (mostFailedKey){
-         mostFailedKey = createNewStreamSummary();
-      }
-      synchronized (mostLockedKey){
-         mostLockedKey = createNewStreamSummary();
-      }
-
+      clearAll();
    }
 
    public void resetStat(Stat stat){
-      switch (stat){
-         case REMOTE_GET: remoteGet = createNewStreamSummary();
-         case LOCAL_GET: localGet = createNewStreamSummary();
-         case REMOTE_PUT: remotePut = createNewStreamSummary();
-         case LOCAL_PUT: localPut = createNewStreamSummary();
-         case MOST_LOCKED_KEYS: mostLockedKey = createNewStreamSummary();
-         case MOST_FAILED_KEYS: mostFailedKey = createNewStreamSummary();
-         case MOST_CONTENDED_KEYS: mostContendedKey = createNewStreamSummary();
-      }
+      streamSummaryEnumMap.put(stat, createNewStreamSummary());
    }
 
    private StreamSummary<Object> createNewStreamSummary() {
       return new StreamSummary<Object>(Math.max(MAX_CAPACITY, capacity));
+   }
+
+   private void clearAll() {
+      for (Stat stat : Stat.values()) {
+         streamSummaryEnumMap.put(stat, createNewStreamSummary());
+      }
+   }
+
+   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
+   private void offer(StreamSummary<Object> streamSummary, Object key) {
+      synchronized (streamSummary) {
+         streamSummary.offer(key);
+      }
    }
 }
