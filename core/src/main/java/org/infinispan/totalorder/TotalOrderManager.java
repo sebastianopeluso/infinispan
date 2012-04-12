@@ -20,10 +20,9 @@ import org.infinispan.transaction.xa.GlobalTransaction;
 public interface TotalOrderManager {
 
    /**
-    * Put the transaction in the validation queue for further validation. Transactions can be validated in parallel if
-    * it is possible.
+    * Processes the transaction as received from the sequencer.
     */
-   void validateTransaction(PrepareCommand prepareCommand, TxInvocationContext ctx, CommandInterceptor invoker);
+   void processTransactionFromSequencer(PrepareCommand prepareCommand, TxInvocationContext ctx, CommandInterceptor invoker);
 
    /**
     * This will mark a global transaction as finished. It will be invoked in the processing of the commit command in

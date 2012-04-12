@@ -12,7 +12,7 @@ import org.infinispan.util.logging.LogFactory;
 import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepareCommand;
 
 /**
- * Replication Interceptor for Total Order protocol with versioning
+ * Replication Interceptor for Total Order protocol with versioning.
  *
  * @author Pedro Ruivo
  * @author Mircea.Markus@jboss.com

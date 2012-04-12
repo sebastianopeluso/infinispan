@@ -17,11 +17,9 @@ public class SequentialTotalOrderManager extends BaseTotalOrderManager {
 
    private static final Log log = LogFactory.getLog(SequentialTotalOrderManager.class);
 
-   public final void validateTransaction(PrepareCommand prepareCommand, TxInvocationContext ctx, CommandInterceptor invoker) {
-      if (trace)
-         log.tracef("Validate transaction %s", prepareCommand.getGlobalTransaction().prettyPrint());
+   public final void processTransactionFromSequencer(PrepareCommand prepareCommand, TxInvocationContext ctx, CommandInterceptor invoker) {
 
-      if (ctx.isOriginLocal()) throw new IllegalArgumentException("Local invocation not allowed!");
+      logAndCheckContext(prepareCommand, ctx);
 
       copyLookedUpEntriesToRemoteContext(ctx);
       
@@ -35,23 +33,23 @@ public class SequentialTotalOrderManager extends BaseTotalOrderManager {
          result = t;
          exception = true;
       } finally {
-         logValidationFinalStatus(prepareCommand, result, exception);
+         logProcessingFinalStatus(prepareCommand, result, exception);
          updateLocalTransaction(result, exception, prepareCommand);
-         updateValidationDurationStats(startTime, now());
+         updateProcessingDurationStats(startTime, now());
       }
    }
 
-   private void updateValidationDurationStats(long start, long end) {
+   private void updateProcessingDurationStats(long start, long end) {
       if (statisticsEnabled) {
-         validationDuration.addAndGet(end - start);
+         processingDuration.addAndGet(end - start);
          numberOfTxValidated.incrementAndGet();
       }
    }
 
 
-   private void logValidationFinalStatus(PrepareCommand prepareCommand, Object result, boolean exception) {
+   private void logProcessingFinalStatus(PrepareCommand prepareCommand, Object result, boolean exception) {
       if (trace)
-         log.tracef("Transaction %s finished validation (%s). Validation result is %s ",
+         log.tracef("Transaction %s finished processing (%s). Validation result is %s ",
                     prepareCommand.getGlobalTransaction().prettyPrint(),
                     (exception ? "failed" : "ok"), (exception ? ((Throwable) result).getMessage() : result));
    }

@@ -57,7 +57,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
                                                   (LocalTransaction) ctx.getCacheTransaction());
             return invokeNextInterceptor(ctx, command);
          } else {
-            totalOrderManager.validateTransaction(command, ctx, getNext());
+            totalOrderManager.processTransactionFromSequencer(command, ctx, getNext());
             return null;
          }
       } catch (Throwable t) {

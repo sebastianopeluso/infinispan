@@ -57,17 +57,15 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
    }
 
    @Override
-   public final void validateTransaction(PrepareCommand prepareCommand, TxInvocationContext ctx,
-                                         CommandInterceptor invoker) {
-      if (trace) log.tracef("Validating transaction %s", prepareCommand.getGlobalTransaction().prettyPrint());
-      
-      if (ctx.isOriginLocal()) throw new IllegalArgumentException("Local invocation not allowed!");
+   public final void processTransactionFromSequencer(PrepareCommand prepareCommand, TxInvocationContext ctx,
+                                                     CommandInterceptor invoker) {
+      logAndCheckContext(prepareCommand, ctx);
       
       copyLookedUpEntriesToRemoteContext(ctx);
 
       TotalOrderRemoteTransaction remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
 
-      MultiThreadValidation mtv = new MultiThreadValidation(prepareCommand, ctx, invoker, remoteTransaction);
+      ParallelPrepareProcessor ppp = new ParallelPrepareProcessor(prepareCommand, ctx, invoker, remoteTransaction);
       Set<TxDependencyLatch> previousTxs = new HashSet<TxDependencyLatch>();
 
       //this will collect all the count down latch corresponding to the previous transactions in the queue
@@ -78,12 +76,12 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          }
       }
 
-      mtv.setPreviousTransactions(previousTxs);
+      ppp.setPreviousTransactions(previousTxs);
 
       if (trace)
          log.tracef("Transaction [%s] write set is %s", remoteTransaction.getLatch(), remoteTransaction.getModifiedKeys());
 
-      validationExecutorService.execute(mtv);
+      validationExecutorService.execute(ppp);
    }
 
    @Override
@@ -97,7 +95,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
    /**
     * This class is used to validate transaction in repeatable read with write skew check
     */
-   private class MultiThreadValidation implements Runnable {
+   private class ParallelPrepareProcessor implements Runnable {
 
       //the set of others transaction's count down latch (it will be unblocked when the transaction finishes)
       private final Set<TxDependencyLatch> previousTransactions;
@@ -109,11 +107,11 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
       private final CommandInterceptor invoker;
 
       private long creationTime = -1;
-      private long validationStartTime = -1;
+      private long processStartTime = -1;
       private long initializationEndTime = -1;
 
-      private MultiThreadValidation(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
-                                    CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
+      private ParallelPrepareProcessor(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
+                                       CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
          if (prepareCommand == null || txInvocationContext == null || invoker == null) {
             throw new IllegalArgumentException("Arguments must not be null");
          }
@@ -185,7 +183,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
       @Override
       public void run() {
-         validationStartTime = now();
+         processStartTime = now();
          Object result = null;
          boolean exception = false;
          try {
@@ -211,8 +209,8 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
                           prepareCommand.getGlobalTransaction().prettyPrint(),
                           (exception ? "failed" : "ok"), (exception ? ((Throwable) result).getMessage() : result));
 
-            finalizeValidation(result, exception);
-            updateDurationStats(creationTime, validationStartTime, now(), initializationEndTime);
+            finalizeProcessing(result, exception);
+            updateDurationStats(creationTime, processStartTime, now(), initializationEndTime);
          }
       }
 
@@ -220,7 +218,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
        * finishes the transaction, ie, mark the modification as applied and set the result (exception or not) invokes
        * the method #finishTransaction if the transaction has the one phase commit set to true
        */
-      protected void finalizeValidation(Object result, boolean exception) {
+      protected void finalizeProcessing(Object result, boolean exception) {
          remoteTransaction.markPreparedAndNotify();
          updateLocalTransaction(result, exception, prepareCommand);
          if (prepareCommand.isOnePhaseCommit() || exception) {
@@ -247,7 +245,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          //set the profiling information
          waitTimeInQueue.addAndGet(validationStartTime - creationTime);
          initializationDuration.addAndGet(initializationEndTime - validationStartTime);
-         validationDuration.addAndGet(validationEndTime - initializationEndTime);
+         processingDuration.addAndGet(validationEndTime - initializationEndTime);
          numberOfTxValidated.incrementAndGet();
       }
    }
