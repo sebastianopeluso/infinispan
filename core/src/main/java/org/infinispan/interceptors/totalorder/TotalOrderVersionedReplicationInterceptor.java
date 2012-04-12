@@ -5,7 +5,7 @@ import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.VersionedReplicationInterceptor;
-import org.infinispan.totalorder.TotalOrderManager;
+import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 

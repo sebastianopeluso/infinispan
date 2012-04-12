@@ -1,4 +1,4 @@
-package org.infinispan.totalorder;
+package org.infinispan.transaction.totalorder;
 
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.container.versioning.EntryVersionsMap;

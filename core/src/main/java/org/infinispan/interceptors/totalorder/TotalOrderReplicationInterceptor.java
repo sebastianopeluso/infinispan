@@ -3,13 +3,8 @@ package org.infinispan.interceptors.totalorder;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
-import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.ReplicationInterceptor;
-import org.infinispan.remoting.RpcException;
-import org.infinispan.totalorder.TotalOrderManager;
-import org.infinispan.transaction.LocalTransaction;
-import org.infinispan.util.logging.Log;
-import org.infinispan.util.logging.LogFactory;
+import org.infinispan.transaction.totalorder.TotalOrderManager;
 
 /**
  * @author mircea.markus@jboss.com

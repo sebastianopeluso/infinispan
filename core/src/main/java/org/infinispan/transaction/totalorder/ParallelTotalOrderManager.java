@@ -1,4 +1,4 @@
-package org.infinispan.totalorder;
+package org.infinispan.transaction.totalorder;
 
 import org.infinispan.CacheException;
 import org.infinispan.commands.tx.PrepareCommand;
@@ -12,7 +12,6 @@ import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
 import org.infinispan.transaction.TxDependencyLatch;
-import org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 import org.rhq.helpers.pluginAnnotations.agent.DisplayType;

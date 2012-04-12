@@ -1,4 +1,4 @@
-package org.infinispan.totalorder;
+package org.infinispan.transaction.totalorder;
 
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.configuration.cache.Configuration;
@@ -14,7 +14,6 @@ import org.infinispan.statetransfer.StateTransferInProgressException;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.TxDependencyLatch;
-import org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;

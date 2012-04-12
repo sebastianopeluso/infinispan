@@ -10,7 +10,7 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.base.CommandInterceptor;
-import org.infinispan.totalorder.TotalOrderManager;
+import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;

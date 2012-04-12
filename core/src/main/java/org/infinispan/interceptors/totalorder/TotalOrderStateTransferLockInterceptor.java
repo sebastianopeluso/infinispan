@@ -6,7 +6,7 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.StateTransferLockInterceptor;
 import org.infinispan.statetransfer.StateTransferInProgressException;
 import org.infinispan.statetransfer.StateTransferLockReacquisitionException;
-import org.infinispan.totalorder.TotalOrderManager;
+import org.infinispan.transaction.totalorder.TotalOrderManager;
 
 /**
  * @author Mircea Markus <mircea.markus@jboss.com> (C) 2011 Red Hat Inc.
