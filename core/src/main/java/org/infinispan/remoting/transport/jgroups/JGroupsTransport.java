@@ -44,16 +44,11 @@ import org.infinispan.util.concurrent.ConcurrentMapFactory;
 import org.infinispan.util.concurrent.TimeoutException;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
-import org.jgroups.Channel;
-import org.jgroups.Event;
-import org.jgroups.JChannel;
-import org.jgroups.MembershipListener;
-import org.jgroups.MergeView;
-import org.jgroups.View;
+import org.jgroups.*;
 import org.jgroups.blocks.RspFilter;
 import org.jgroups.jmx.JmxConfigurator;
 import org.jgroups.protocols.SEQUENCER;
-import org.jgroups.protocols.pmcast.GROUP_MULTICAST;
+import org.jgroups.protocols.tom.TOA;
 import org.jgroups.stack.AddressGenerator;
 import org.jgroups.util.Rsp;
 import org.jgroups.util.RspList;
@@ -61,13 +56,7 @@ import org.jgroups.util.TopologyUUID;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -681,10 +670,10 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
    public final void checkTotalOrderSupported(boolean distributed) {
       if (!distributed && channel.getProtocolStack().findProtocol(SEQUENCER.class) == null)  {
          throw new ConfigurationException("In order to support total order based transaction, the SEQUENCER protocol " +
-                                                "must be present in the jgroups's config.");
-      } else if (distributed && channel.getProtocolStack().findProtocol(GROUP_MULTICAST.class) == null) {
-         throw new ConfigurationException("In order to support total order based transaction, the GROUP_MULTICAST protocol " +
-                                                "must be present in the jgroups's config.");
+                                                "must be present in the JGroups's config.");
+      } else if (distributed && channel.getProtocolStack().findProtocol(TOA.class) == null) {
+         throw new ConfigurationException("In order to support total order based transaction, the TOA protocol " +
+                                                "must be present in the JGroups's config.");
       }
    }
 }

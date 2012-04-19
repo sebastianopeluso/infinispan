@@ -36,28 +36,16 @@ import org.infinispan.util.Util;
 import org.infinispan.util.concurrent.TimeoutException;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
-import org.jgroups.Address;
-import org.jgroups.Channel;
-import org.jgroups.Message;
-import org.jgroups.UpHandler;
+import org.jgroups.*;
 import org.jgroups.blocks.RequestOptions;
 import org.jgroups.blocks.ResponseMode;
 import org.jgroups.blocks.RpcDispatcher;
 import org.jgroups.blocks.RspFilter;
 import org.jgroups.blocks.mux.Muxer;
-import org.jgroups.groups.GroupAddress;
-import org.jgroups.util.Buffer;
-import org.jgroups.util.FutureListener;
-import org.jgroups.util.NotifyingFuture;
-import org.jgroups.util.Rsp;
-import org.jgroups.util.RspList;
+import org.jgroups.util.*;
 
 import java.io.NotSerializableException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -276,7 +264,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
       Buffer buf;
       buf = marshallCall(marshaller, command);
       retval = card.sendMessage(constructMessage(buf, destination, oob, mode, false),
-                                new RequestOptions(mode, timeout));
+              new RequestOptions(mode, timeout));
 
       // we only bother parsing responses if we are not in ASYNC mode.
       if (trace) log.tracef("Response: %s", retval);
@@ -328,12 +316,12 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          buf = marshallCall(marshaller, command);
          Message message = constructMessage(buf, null, oob, mode, totalOrder);
 
-         GroupAddress address = new GroupAddress();
+         AnycastAddress address = new AnycastAddress();
          if (dests == null) {
-            address.addAllAddress(card.members);
+            address.addAll(card.members);
          } else {
-            address.addAllAddress(dests);
-            address.addAddress(card.local_addr);
+            address.addAll(dests);
+            address.add(card.local_addr);
          }
          
          message.setDest(address);

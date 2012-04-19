@@ -31,7 +31,7 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
 
    private CommandsFactory commandsFactory;
    private DistributionManager distributionManager;
-   private ConcurrentMap<GlobalTransaction, AcksCollector> versionsCollectorMap =
+   private final ConcurrentMap<GlobalTransaction, AcksCollector> versionsCollectorMap =
          new ConcurrentHashMap<GlobalTransaction, AcksCollector>();
 
    @Inject
