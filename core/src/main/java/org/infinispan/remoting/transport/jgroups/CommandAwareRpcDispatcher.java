@@ -37,6 +37,7 @@ import org.infinispan.util.concurrent.TimeoutException;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 import org.jgroups.Address;
+import org.jgroups.AnycastAddress;
 import org.jgroups.Channel;
 import org.jgroups.Message;
 import org.jgroups.SuspectedException;
@@ -118,13 +119,13 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
     */
    public RspList<Object> invokeRemoteCommands(final List<Address> recipients, final ReplicableCommand command, final ResponseMode mode, final long timeout,
                                                final boolean anycasting, final boolean oob, final RspFilter filter,
-                                               boolean asyncMarshalling, final boolean totalOrder) throws InterruptedException {
+                                               boolean asyncMarshalling, final boolean totalOrder, final boolean distribution) throws InterruptedException {
       if (asyncMarshalling) {
          asyncExecutor.submit(new Callable<RspList<Object>>() {
             @Override
             public RspList<Object> call() throws Exception {
                return processCalls(command, recipients == null, timeout, filter, recipients, mode,
-                                   req_marshaller, CommandAwareRpcDispatcher.this, oob, anycasting, totalOrder);
+                     req_marshaller, CommandAwareRpcDispatcher.this, oob, anycasting, totalOrder, distribution);
             }
          });
          return null; // don't wait for a response!
@@ -132,7 +133,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          RspList<Object> response;
          try {
             response = processCalls(command, recipients == null, timeout, filter, recipients, mode,
-                                    req_marshaller, this, oob, anycasting, totalOrder);
+                  req_marshaller, this, oob, anycasting, totalOrder, distribution);
          } catch (InterruptedException e) {
             throw e;
          } catch (SuspectedException e) {
@@ -180,8 +181,9 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
 
    public RspList<Object> broadcastRemoteCommands(ReplicableCommand command, ResponseMode mode, long timeout,
                                                   boolean anycasting, boolean oob, RspFilter filter,
-                                                  boolean asyncMarshalling, boolean totalOrder) throws InterruptedException {
-      return invokeRemoteCommands(null, command, mode, timeout, anycasting, oob, filter, asyncMarshalling, totalOrder);
+                                                  boolean asyncMarshalling, boolean totalOrder, boolean distribution) throws InterruptedException {
+      return invokeRemoteCommands(null, command, mode, timeout, anycasting, oob, filter, asyncMarshalling,
+            totalOrder, distribution);
    }
 
    private boolean containsOnlyNulls(RspList<Object> l) {
@@ -299,7 +301,8 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
 
    private static RspList<Object> processCalls(ReplicableCommand command, boolean broadcast, long timeout,
                                                RspFilter filter, List<Address> dests, ResponseMode mode,
-                                               Marshaller marshaller, CommandAwareRpcDispatcher card, boolean oob, boolean anycasting, boolean totalOrder) throws Exception {
+                                               Marshaller marshaller, CommandAwareRpcDispatcher card, boolean oob, boolean anycasting, 
+                                               boolean totalOrder, boolean distribution) throws Exception {
       if (trace) log.tracef("Replication task sending %s to addresses %s", command, dests);
 
       /// HACK ALERT!  Used for ISPN-1789.  Enable RSVP if the command is a cache view control command.
@@ -307,7 +310,22 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
 
       RspList<Object> retval = null;
       Buffer buf;
-      if (broadcast || FORCE_MCAST || totalOrder) {
+      if (totalOrder && distribution) {
+         buf = marshallCall(marshaller, command);
+         Message message = constructMessage(buf, null, oob, mode, rsvp, totalOrder);
+
+         AnycastAddress address = new AnycastAddress();
+         if (dests == null) {
+            address.addAll(card.members);
+         } else {
+            address.addAll(dests);
+            address.add(card.local_addr);
+         }
+         
+         message.setDest(address);
+
+         retval = card.castMessage(dests, message, new RequestOptions(mode, timeout, false, filter));
+      } else if (broadcast || FORCE_MCAST || totalOrder) {
          buf = marshallCall(marshaller, command);
          RequestOptions opts = new RequestOptions(mode, timeout, false, filter);
 

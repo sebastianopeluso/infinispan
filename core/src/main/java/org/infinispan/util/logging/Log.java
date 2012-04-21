@@ -874,5 +874,8 @@ public interface Log extends BasicLogger {
    @Message(value = "Timeout while waiting for the transaction validation. The command will not be processed. " +
          "Transaction is %s", id = 190)
    void timeoutWaitingUntilTransactionPrepared(String globalTx);
-
+   
+   @LogMessage(level = WARN)
+   @Message(value = "Exception while sending the Prepare Response Command", id = 191)
+   void exceptionWhileSendingPrepareResponseCommand(@Cause Throwable t);
 }

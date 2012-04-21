@@ -41,6 +41,7 @@ import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.commands.tx.PrepareResponseCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
@@ -371,4 +372,13 @@ public interface CommandsFactory {
     * @see ApplyDeltaCommand
     */
    ApplyDeltaCommand buildApplyDeltaCommand(Object deltaAwareValueKey, Delta delta, Collection keys);
+
+   /**
+    * Builds a PrepareResponseCommand used to send back the new versions of the keys validated by
+    * the keys owners
+    * 
+    * @param globalTransaction the transaction associated 
+    * @return instance
+    */
+   PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction);
 }

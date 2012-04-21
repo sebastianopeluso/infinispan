@@ -43,6 +43,7 @@ import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.commands.tx.PrepareResponseCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
@@ -322,7 +323,6 @@ public class CommandsFactoryImpl implements CommandsFactory {
             CommitCommand commitCommand = (CommitCommand) c;
             commitCommand.init(interceptorChain, icc, txTable, configuration);
             commitCommand.markTransactionAsRemote(isRemote);
-
             break;
          case RollbackCommand.COMMAND_ID:
             RollbackCommand rollbackCommand = (RollbackCommand) c;
@@ -386,6 +386,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
             ccc.init(recoveryManager);
             break;
          case ApplyDeltaCommand.COMMAND_ID:
+            break;
+         case PrepareResponseCommand.COMMAND_ID:
+            PrepareResponseCommand prc = (PrepareResponseCommand) c;
+            prc.init(interceptorChain, icc, txTable, configuration);
             break;
          default:
             ModuleCommandInitializer mci = moduleCommandInitializers.get(c.getCommandId());
@@ -462,5 +466,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
    @Override
    public ApplyDeltaCommand buildApplyDeltaCommand(Object deltaAwareValueKey, Delta delta, Collection keys) {
       return new ApplyDeltaCommand(deltaAwareValueKey, delta, keys);
+   }
+
+   @Override
+   public PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction) {
+      return new PrepareResponseCommand(cacheName, globalTransaction);
    }
 }

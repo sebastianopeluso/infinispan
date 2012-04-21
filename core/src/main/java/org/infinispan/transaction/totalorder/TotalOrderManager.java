@@ -6,8 +6,9 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.statetransfer.StateTransferInProgressException;
 import org.infinispan.transaction.LocalTransaction;
-import org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
+
+import java.util.Set;
 
 /**
  * This class is responsible to validate transactions in the total order based protocol. It ensures the delivered order
@@ -55,4 +56,12 @@ public interface TotalOrderManager {
    void waitForPrepareToSucceed(TxInvocationContext context);
 
    void notifyStateTransferInProgress(GlobalTransaction globalTransaction, StateTransferInProgressException e);
+
+   /**
+    * Added the new versions from the key owner. (only for Distribution)
+    * @param gtx              the transaction
+    * @param exception        the exception or null    
+    * @param keysValidated    the keys in which the write skew check was performed and no problems was found
+    */
+   void addVersions(GlobalTransaction gtx, Throwable exception, Set<Object> keysValidated);
 }
