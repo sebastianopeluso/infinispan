@@ -91,25 +91,30 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
       }
    }
 
+   protected ParallelPrepareProcessor buildMultiThreadValidation(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
+                                    CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
+      return new ParallelPrepareProcessor(prepareCommand, txInvocationContext, invoker, remoteTransaction);
+   }
+
    /**
     * This class is used to validate transaction in repeatable read with write skew check
     */
-   private class ParallelPrepareProcessor implements Runnable {
+   protected class ParallelPrepareProcessor implements Runnable {
 
       //the set of others transaction's count down latch (it will be unblocked when the transaction finishes)
       private final Set<TxDependencyLatch> previousTransactions;
 
-      private TotalOrderRemoteTransaction remoteTransaction = null;
+      protected TotalOrderRemoteTransaction remoteTransaction = null;
 
       protected final PrepareCommand prepareCommand;
       protected final TxInvocationContext txInvocationContext;
-      private final CommandInterceptor invoker;
+      protected final CommandInterceptor invoker;
 
       private long creationTime = -1;
       private long processStartTime = -1;
       private long initializationEndTime = -1;
 
-      private ParallelPrepareProcessor(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
+      protected ParallelPrepareProcessor(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
                                        CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
          if (prepareCommand == null || txInvocationContext == null || invoker == null) {
             throw new IllegalArgumentException("Arguments must not be null");
@@ -219,7 +224,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
        */
       protected void finalizeProcessing(Object result, boolean exception) {
          remoteTransaction.markPreparedAndNotify();
-         updateLocalTransaction(result, exception, prepareCommand);
+         updateLocalTransaction(result, exception, prepareCommand.getGlobalTransaction());
          if (prepareCommand.isOnePhaseCommit() || exception) {
             markTxCompleted();
          }
@@ -227,6 +232,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
       private void markTxCompleted() {
          finishTransaction(remoteTransaction);
+         transactionTable.removeRemoteTransaction(prepareCommand.getGlobalTransaction());
       }
    }
 

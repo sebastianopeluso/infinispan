@@ -3,6 +3,7 @@ package org.infinispan.interceptors.totalorder;
 import org.infinispan.commands.control.LockControlCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.commands.tx.PrepareResponseCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.container.versioning.EntryVersionsMap;
@@ -144,5 +145,14 @@ public class TotalOrderInterceptor extends CommandInterceptor {
             totalOrderManager.finishTransaction(gtx, false, remoteTransaction);
          }
       }
+   }
+
+   @Override
+   public Object visitPrepareResponseCommand(TxInvocationContext ctx, PrepareResponseCommand command) throws Throwable {
+      if (trace) {
+         log.tracef("Add response %s to transaction %s", command, command.getGlobalTransaction().prettyPrint());               
+      }
+      totalOrderManager.addVersions(command.getGlobalTransaction(), command.getException(), command.getKeysValidated());
+      return null;
    }
 }

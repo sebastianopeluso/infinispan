@@ -41,6 +41,7 @@ import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.commands.tx.PrepareResponseCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
@@ -217,6 +218,9 @@ public class RemoteCommandsFactory {
                break;
             case CacheViewControlCommand.COMMAND_ID:
                command = new CacheViewControlCommand(cacheName);
+               break;                      
+            case PrepareResponseCommand.COMMAND_ID:
+               command = new PrepareResponseCommand(cacheName);
                break;                      
             default:
                throw new CacheException("Unknown command id " + id + "!");

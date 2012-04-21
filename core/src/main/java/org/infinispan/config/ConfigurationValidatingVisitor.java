@@ -180,7 +180,7 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
          }
 
          //for now, only supports full replication
-         if (!cfg.getCacheMode().isReplicated()) {
+         if (!cfg.getCacheMode().isReplicated() && !cfg.getCacheMode().isDistributed()) {
             log.cacheModeNotSupportedByTOProtocol(cfg.getCacheModeString());
             bean.transactionProtocol(TransactionProtocol.TWO_PHASE_COMMIT);
             return;
@@ -191,11 +191,10 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
             cfg.setVersioningScheme(VersioningScheme.SIMPLE);
          }
 
-      }
-
-      //eager locking is no longer needed
-      if(bean.isUseEagerLocking()) {
-         log.tracef("Eager locking will be ignore with Total Order protocol");
+         //eager locking is no longer needed
+         if(bean.isUseEagerLocking()) {
+            log.tracef("Eager locking will be ignore with Total Order protocol");
+         }
       }
    }
 }

@@ -20,6 +20,7 @@ import org.rhq.helpers.pluginAnnotations.agent.DisplayType;
 import org.rhq.helpers.pluginAnnotations.agent.Metric;
 import org.rhq.helpers.pluginAnnotations.agent.Units;
 
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -74,6 +75,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    @Override
    public final void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction) {
       localTransactionMap.put(globalTransaction, localTransaction);
+      afterAddLocalTransaction(globalTransaction, localTransaction);
    }
 
    @Override
@@ -123,6 +125,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       } else if (!ignoreNullTxInfo) {
          log.remoteTransactionIsNull(gtx.prettyPrint());
       }
+      afterFinishTransaction(gtx);
    }
 
    @Override
@@ -146,6 +149,11 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       return needsToProcessCommand;
    }
 
+   @Override
+   public void addVersions(GlobalTransaction gtx, Throwable exception, Set<Object> keysValidated) {
+      //by default, no-op
+   }
+
     /**
     * Remove the keys from the map (if their didn't change) and release the count down latch, unblocking the next
     * transaction
@@ -154,6 +162,14 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       TxDependencyLatch latch = remoteTransaction.getLatch();
       if (trace) log.tracef("Releasing resources for transaction %s", remoteTransaction);
       latch.countDown();
+   }
+
+   protected void afterAddLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction) {
+
+   }
+   
+   protected void afterFinishTransaction(GlobalTransaction globalTransaction) {
+      
    }
 
 
@@ -184,8 +200,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       this.statisticsEnabled = statisticsEnabled;
    }
 
-   protected final void updateLocalTransaction(Object result, boolean exception, PrepareCommand prepareCommand) {
-      GlobalTransaction gtx = prepareCommand.getGlobalTransaction();
+   protected final void updateLocalTransaction(Object result, boolean exception, GlobalTransaction gtx) {      
       LocalTransaction localTransaction = localTransactionMap.get(gtx);
 
       if (localTransaction != null) {
