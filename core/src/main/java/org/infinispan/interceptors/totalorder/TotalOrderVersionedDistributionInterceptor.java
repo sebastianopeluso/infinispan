@@ -1,7 +1,6 @@
 package org.infinispan.interceptors.totalorder;
 
 import org.infinispan.commands.tx.PrepareCommand;
-import org.infinispan.commands.tx.PrepareResponseCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
@@ -12,13 +11,14 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
-import java.util.Collections;
 
 import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepareCommand;
 
 /**
- * // TODO: Document this
- *
+ * This interceptor is used in total order in distributed mode when the write skew check is enabled.
+ * After sending the prepare through TOA (Total Order Anycast), it blocks the execution thread until the transaction 
+ * outcome is know (i.e., the write skew check passes in all keys owners)
+ *  
  * @author Pedro Ruivo
  * @since 5.2
  */
@@ -56,7 +56,7 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
       boolean trace = log.isTraceEnabled();
 
       if(trace) {
-         log.tracef("Total Order Multicast transaction %s with Total Order", command.getGlobalTransaction().prettyPrint());
+         log.tracef("Total Order Anycast transaction %s with Total Order", command.getGlobalTransaction().prettyPrint());
       }
 
       if (!(command instanceof VersionedPrepareCommand)) {
@@ -65,28 +65,5 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
 
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
       rpcManager.invokeRemotely(recipients, command, false, false, true);
-   }
-
-   @Override
-   public Object visitPrepareResponseCommand(TxInvocationContext ctx, PrepareResponseCommand command) throws Throwable {
-      boolean trace = log.isTraceEnabled();
-
-      Address destination = command.getGlobalTransaction().getAddress();
-      Collection<Address> destinationList = Collections.singleton(destination);
-      Object retVal = invokeNextInterceptor(ctx, command);
-
-      //don't send to myself
-      if (!destination.equals(rpcManager.getAddress())) {
-         if (trace) {
-            log.tracef("Sending the Prepare Response %s to %s", command, destinationList);
-         }
-         rpcManager.invokeRemotely(destinationList, command, false, true, false);
-      } else {
-         if (trace) {
-            log.tracef("Skip sending the Prepare Response %s because the destination [%s] is myself [%s]",
-                       command, destinationList, rpcManager.getAddress());
-         }
-      }
-      return retVal;
    }
 }

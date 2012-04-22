@@ -77,11 +77,5 @@ public interface TotalOrderManager {
 
    void notifyStateTransferInProgress(GlobalTransaction globalTransaction, Throwable e);
 
-   /**
-    * Added the new versions from the key owner. (only for Distribution)
-    * @param gtx              the transaction
-    * @param exception        the exception or null    
-    * @param keysValidated    the keys in which the write skew check was performed and no problems was found
-    */
-   void addVersions(GlobalTransaction gtx, Throwable exception, Set<Object> keysValidated);
+   LocalTransaction getLocalTransaction(GlobalTransaction globalTransaction);
 }

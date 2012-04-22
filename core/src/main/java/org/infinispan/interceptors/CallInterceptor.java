@@ -27,7 +27,6 @@ import org.infinispan.commands.VisitableCommand;
 import org.infinispan.commands.control.LockControlCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
-import org.infinispan.commands.tx.PrepareResponseCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
@@ -75,12 +74,6 @@ public class CallInterceptor extends CommandInterceptor {
    @Override
    public Object visitLockControlCommand(TxInvocationContext ctx, LockControlCommand c) throws Throwable {
       if (trace) log.trace("Suppressing invocation of method handleLockControlCommand.");
-      return null;
-   }
-
-   @Override
-   public Object visitPrepareResponseCommand(TxInvocationContext ctx, PrepareResponseCommand command) throws Throwable {
-      if (trace) log.trace("Suppressing invocation of method visitPrepareResponseCommand.");
       return null;
    }
 

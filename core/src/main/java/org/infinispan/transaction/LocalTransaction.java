@@ -205,8 +205,23 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       //the validation result
       private volatile Object result;
 
+      //for distribution:
+      //has a set of keys that are not validated yet
+      private Set<Object> keysMissingValidation;
+      //true if the transaction was locally prepared
+      private volatile boolean localPrepared;
+
       public PrepareResult() {
          super(1);
+      }
+
+      private void initKeysNeededValidationIfNeeded() {
+         if (keysMissingValidation == null) {
+            keysMissingValidation = new HashSet<Object>();
+            for (WriteCommand wc : modifications) {
+               keysMissingValidation.addAll(wc.getAffectedKeys());
+            }
+         }
       }
    }
 
@@ -220,7 +235,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       //if (!prepareResult.await(timeout, TimeUnit.MILLISECONDS)) {
       //   throw new TimeoutException("Modifications not applied in " + timeout + " millis.");
       //}
-      prepareResult.await();      
+      prepareResult.await();
 
       if (!prepareResult.modificationsApplied) {
          throw new TimeoutException("Unable to wait until modifications are applied");
@@ -230,7 +245,6 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       }
    }
 
-
    /**
     * add the transaction result and notify
     *
@@ -238,7 +252,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
     * @param exception is it an exception?
     */
    public void addPrepareResult(Object object, boolean exception) {
-      log.tracef("Received prepare result %s, is exception? %s", object, false);
+      log.tracef("Received prepare result %s, is exception? %s", object, exception);
       prepareResult.modificationsApplied = true;
       prepareResult.result = object;
       prepareResult.exception = exception;
@@ -248,5 +262,43 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       }
 
       prepareResult.countDown();
+   }
+
+   private void checkIfPrepared() {
+      if (prepareResult.localPrepared && prepareResult.keysMissingValidation.isEmpty()) {
+         prepareResult.modificationsApplied = true;
+         prepareResult.countDown();
+      }
+   }
+
+   public final void addKeysValidated(Collection<Object> keysValidated, boolean local) {
+      synchronized (prepareResult) {
+         if (prepareResult.modificationsApplied) {
+            return; //already prepared
+         }
+         prepareResult.initKeysNeededValidationIfNeeded();         
+         prepareResult.keysMissingValidation.removeAll(keysValidated);
+         if (local) {
+            prepareResult.localPrepared = true;
+         }
+         checkIfPrepared();
+      }
+   }
+
+   public final void addException(Exception exception, boolean local) {
+      synchronized (prepareResult) {
+         if (prepareResult.modificationsApplied) {
+            return; //already prepared
+         }
+         
+         prepareResult.result = exception;
+         prepareResult.exception = true;
+         prepareResult.keysMissingValidation = Collections.emptySet();
+         
+         if (local) {
+            prepareResult.localPrepared = true;
+         }
+         checkIfPrepared();
+      }
    }
 }

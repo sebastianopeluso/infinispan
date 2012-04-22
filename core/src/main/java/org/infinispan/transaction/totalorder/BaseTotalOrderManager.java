@@ -1,6 +1,7 @@
 package org.infinispan.transaction.totalorder;
 
 import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.InvocationContextContainer;
@@ -20,6 +21,8 @@ import org.rhq.helpers.pluginAnnotations.agent.DisplayType;
 import org.rhq.helpers.pluginAnnotations.agent.Metric;
 import org.rhq.helpers.pluginAnnotations.agent.Units;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -75,11 +78,10 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    @Override
    public final void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction) {
       localTransactionMap.put(globalTransaction, localTransaction);
-      afterAddLocalTransaction(globalTransaction, localTransaction);
    }
 
    @Override
-   public void waitForPrepareToSucceed(TxInvocationContext ctx) {
+   public final void waitForPrepareToSucceed(TxInvocationContext ctx) {
       if (!ctx.isOriginLocal()) throw new IllegalStateException();
 
       if (isSync) {
@@ -98,6 +100,9 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
             if (trace)
                log.tracef(th, "Transaction %s hasn't prepare correctly", ctx.getGlobalTransaction().prettyPrint());
             throw new RpcException(th);
+         } finally {
+            //the transaction is no longer needed
+            localTransactionMap.remove(ctx.getGlobalTransaction());
          }
       }
    }
@@ -125,7 +130,6 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       } else if (!ignoreNullTxInfo) {
          log.remoteTransactionIsNull(gtx.prettyPrint());
       }
-      afterFinishTransaction(gtx);
    }
 
    @Override
@@ -149,27 +153,15 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       return needsToProcessCommand;
    }
 
-   @Override
-   public void addVersions(GlobalTransaction gtx, Throwable exception, Set<Object> keysValidated) {
-      //by default, no-op
-   }
-
     /**
     * Remove the keys from the map (if their didn't change) and release the count down latch, unblocking the next
     * transaction
-    */
+     * @param remoteTransaction the remote transaction
+     */
    protected void finishTransaction(TotalOrderRemoteTransaction remoteTransaction) {
       TxDependencyLatch latch = remoteTransaction.getLatch();
       if (trace) log.tracef("Releasing resources for transaction %s", remoteTransaction);
       latch.countDown();
-   }
-
-   protected void afterAddLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction) {
-
-   }
-   
-   protected void afterFinishTransaction(GlobalTransaction globalTransaction) {
-      
    }
 
 
@@ -227,5 +219,21 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       if (trace) log.tracef("Processing transaction from sequencer: %s", prepareCommand.getGlobalTransaction().prettyPrint());
 
       if (ctx.isOriginLocal()) throw new IllegalArgumentException("Local invocation not allowed!");
+   }
+   
+   protected final void removeLocalTransaction(GlobalTransaction globalTransaction) {
+      localTransactionMap.remove(globalTransaction);
+   }
+   
+   public final LocalTransaction getLocalTransaction(GlobalTransaction globalTransaction) {
+      return localTransactionMap.get(globalTransaction);
+   }
+      
+   protected Set<Object> getModifiedKeyFromModifications(Collection<WriteCommand> modifications) {
+      Set<Object> keys = new HashSet<Object>(modifications.size());
+      for (WriteCommand wc : modifications) {
+         keys.addAll(wc.getAffectedKeys());
+      }
+      return keys;
    }
 }
