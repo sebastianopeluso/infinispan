@@ -57,11 +57,6 @@ public class TotalOrderRecoveryAwareRemoteTx extends RecoveryAwareRemoteTransact
    }
 
    @Override
-   public Set<Object> getModifiedKeys() {
-      return TotalOrderState.getModifiedKeys(getModifications());
-   }
-
-   @Override
    public TxDependencyLatch getLatch() {
       return state.getLatch();
    }

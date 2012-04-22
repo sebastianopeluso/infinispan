@@ -64,11 +64,12 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
       TotalOrderRemoteTransaction remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
 
-      ParallelPrepareProcessor ppp = new ParallelPrepareProcessor(prepareCommand, ctx, invoker, remoteTransaction);
+      ParallelPrepareProcessor ppp = constructParallelPrepareProcessor(prepareCommand, ctx, invoker, remoteTransaction);
       Set<TxDependencyLatch> previousTxs = new HashSet<TxDependencyLatch>();
+      Set<Object> keysModified = getModifiedKeyFromModifications(remoteTransaction.getModifications());
 
       //this will collect all the count down latch corresponding to the previous transactions in the queue
-      for (Object key : remoteTransaction.getModifiedKeys()) {
+      for (Object key : keysModified) {
          TxDependencyLatch prevTx = keysLocked.put(key, remoteTransaction.getLatch());
          if (prevTx != null) {
             previousTxs.add(prevTx);
@@ -78,7 +79,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
       ppp.setPreviousTransactions(previousTxs);
 
       if (trace)
-         log.tracef("Transaction [%s] write set is %s", remoteTransaction.getLatch(), remoteTransaction.getModifiedKeys());
+         log.tracef("Transaction [%s] write set is %s", remoteTransaction.getLatch(), keysModified);
 
       validationExecutorService.execute(ppp);
    }
@@ -86,13 +87,13 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
    @Override
    public final void finishTransaction(TotalOrderRemoteTransaction remoteTransaction) {
       super.finishTransaction(remoteTransaction);
-      for (Object key : remoteTransaction.getModifiedKeys()) {
+      for (Object key : getModifiedKeyFromModifications(remoteTransaction.getModifications())) {
          this.keysLocked.remove(key, remoteTransaction.getLatch());
       }
    }
 
-   protected ParallelPrepareProcessor buildMultiThreadValidation(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
-                                    CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
+   protected ParallelPrepareProcessor constructParallelPrepareProcessor(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
+                                                                        CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
       return new ParallelPrepareProcessor(prepareCommand, txInvocationContext, invoker, remoteTransaction);
    }
 
@@ -104,11 +105,10 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
       //the set of others transaction's count down latch (it will be unblocked when the transaction finishes)
       private final Set<TxDependencyLatch> previousTransactions;
 
-      protected TotalOrderRemoteTransaction remoteTransaction = null;
-
+      protected final TotalOrderRemoteTransaction remoteTransaction;
       protected final PrepareCommand prepareCommand;
-      protected final TxInvocationContext txInvocationContext;
-      protected final CommandInterceptor invoker;
+      private final TxInvocationContext txInvocationContext;
+      private final CommandInterceptor invoker;
 
       private long creationTime = -1;
       private long processStartTime = -1;
@@ -139,7 +139,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
        */
       protected void initializeValidation() throws Exception {
          String gtx = prepareCommand.getGlobalTransaction().prettyPrint();
-         //todo is this really needed?
+         //TODO is this really needed?
          invocationContextContainer.setContext(txInvocationContext);
 
          /*
@@ -220,7 +220,9 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
       /**
        * finishes the transaction, ie, mark the modification as applied and set the result (exception or not) invokes
-       * the method #finishTransaction if the transaction has the one phase commit set to true
+       * the method {@link this.finishTransaction} if the transaction has the one phase commit set to true
+       * @param result the prepare result
+       * @param exception true if the result is an exception
        */
       protected void finalizeProcessing(Object result, boolean exception) {
          remoteTransaction.markPreparedAndNotify();
@@ -230,7 +232,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          }
       }
 
-      private void markTxCompleted() {
+      protected void markTxCompleted() {
          finishTransaction(remoteTransaction);
          transactionTable.removeRemoteTransaction(prepareCommand.getGlobalTransaction());
       }

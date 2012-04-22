@@ -45,10 +45,6 @@ public class TotalOrderRemoteTransactionImpl extends RemoteTransaction implement
       return state.waitPrepared(commit);
    }
 
-   public Set<Object> getModifiedKeys() {
-      return TotalOrderState.getModifiedKeys(getModifications());
-   }
-
    public TxDependencyLatch getLatch() {
       return state.getLatch();
    }
@@ -56,8 +52,7 @@ public class TotalOrderRemoteTransactionImpl extends RemoteTransaction implement
    @Override
    public String toString() {
       return "TotalOrderRemoteTransaction{" +
-            "totalOrderState=" + state +
-            ", modifications=" + getModifiedKeys() +
+            "totalOrderState=" + state +            
             '}';
    }
 }
