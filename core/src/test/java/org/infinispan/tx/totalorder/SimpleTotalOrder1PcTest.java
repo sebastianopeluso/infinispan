@@ -101,8 +101,8 @@ public class SimpleTotalOrder1PcTest extends MultipleCacheManagersTest {
 
    public void testPutIfAbsent() {
       cache(1).put("key", "valueOld");
-      assert cache(0).get("key").equals("valueOld");
-      assertEventuallyEquals(1, "key", "valueOld");
+      assertEventuallyEquals(0, "key", "valueOld");
+      assert cache(1).get("key").equals("valueOld");
 
       cache(0).putIfAbsent("key", "value");
 
@@ -179,8 +179,8 @@ public class SimpleTotalOrder1PcTest extends MultipleCacheManagersTest {
 
    public void testReplaceWithOldVal() {
       cache(1).put("key", "value2");
-      assert cache(0).get("key").equals("value2");
-      assertEventuallyEquals(1, "key", "value2");
+      assertEventuallyEquals(0, "key", "value2");
+      assert cache(1).get("key").equals("value2");
 
 
       cache(0).put("key", "valueN");
