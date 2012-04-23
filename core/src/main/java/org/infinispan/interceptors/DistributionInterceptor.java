@@ -253,7 +253,10 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    }
 
    private void lockAndWrap(InvocationContext ctx, Object key, InternalCacheEntry ice) throws InterruptedException {
-      lockManager.acquireLock(ctx, key);
+      if (!configuration.isTotalOrder()) {
+         //we don't have locks in total order
+         lockManager.acquireLock(ctx, key);
+      }
       entryFactory.wrapEntryForPut(ctx, key, ice, false);
    }
 
