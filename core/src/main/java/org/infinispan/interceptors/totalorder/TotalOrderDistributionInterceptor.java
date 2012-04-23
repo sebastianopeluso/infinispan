@@ -1,12 +1,15 @@
 package org.infinispan.interceptors.totalorder;
 
 import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.container.DataContainer;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.DistributionInterceptor;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
+import org.infinispan.util.Util;
 
+import java.util.Arrays;
 import java.util.Collection;
 
 /**
@@ -18,15 +21,17 @@ import java.util.Collection;
 public class TotalOrderDistributionInterceptor extends DistributionInterceptor {
 
    private TotalOrderManager totalOrderManager;
+   private DataContainer dataContainer;
 
    @Inject
-   public void injectDependencies(TotalOrderManager totalOrderManager) {
+   public void injectDependencies(TotalOrderManager totalOrderManager, DataContainer dataContainer) {
       this.totalOrderManager = totalOrderManager;
+      this.dataContainer = dataContainer;
    }
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-      ctx.addAllAffectedKeys(command.getAffectedKeys());
+      ctx.addAllAffectedKeys(Util.getAffectedKeys(Arrays.asList(command.getModifications()), dataContainer));
       Object result = super.visitPrepareCommand(ctx, command);
       if (shouldInvokeRemoteTxCommand(ctx)) {
          //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication

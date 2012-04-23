@@ -4,6 +4,7 @@ import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.PrepareResponseCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.write.WriteCommand;
+import org.infinispan.container.DataContainer;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.distribution.DistributionManager;
 import org.infinispan.factories.annotations.Inject;
@@ -11,12 +12,13 @@ import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -30,12 +32,21 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
    private CommandsFactory commandsFactory;
    private DistributionManager distributionManager;
    private RpcManager rpcManager;
+   private DataContainer dataContainer;
 
    @Inject
-   public void inject(CommandsFactory commandsFactory, DistributionManager distributionManager, RpcManager rpcManager) {
+   public void inject(CommandsFactory commandsFactory, DistributionManager distributionManager, RpcManager rpcManager,
+                      DataContainer dataContainer) {
       this.commandsFactory = commandsFactory;
       this.distributionManager = distributionManager;
       this.rpcManager = rpcManager;
+      this.dataContainer = dataContainer;
+   }
+
+   @Override
+   public void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction) {
+      super.addLocalTransaction(globalTransaction, localTransaction);
+      localTransaction.initToCollectAcks(Util.getAffectedKeys(localTransaction.getModifications(), dataContainer));
    }
 
    @Override
@@ -62,25 +73,26 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
             markTxCompleted();
             removeLocalTransaction(gtx);
             return;
-         } else if (exception) {            
+         } else if (exception) {
             if (localTransaction != null) {
                //the tx is local. release the keys and remove the remote transaction
                markTxCompleted();
                //we can remove the local transaction. The others responses are not needed
                removeLocalTransaction(gtx);
-               
+
             } else {
                //the tx is remote. release the resources but don't remove the remote transaction because
                // the rollback will be received later
                finishTransaction(remoteTransaction);
-            }                        
+            }
          }
 
          if (localTransaction != null) {
             if (exception) {
                localTransaction.addException((Exception) result, true);
             } else {
-               localTransaction.addKeysValidated(getModifiedKeyFromModifications(remoteTransaction.getModifications()), true);
+               localTransaction.addKeysValidated(getModifiedKeyFromModifications(remoteTransaction.getModifications()),
+                                                 true);
             }
          } else {
             //send the response            
@@ -107,15 +119,13 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
    @Override
    protected Set<Object> getModifiedKeyFromModifications(Collection<WriteCommand> modifications) {
       if (modifications == null) {
-         return Collections.emptySet();
+         return null;
       }
-      Set<Object> localKeys = new HashSet<Object>(modifications.size());
+      Set<Object> localKeys = Util.getAffectedKeys(modifications, dataContainer);
 
-      for (WriteCommand wc : modifications) {
-         for (Object key : wc.getAffectedKeys()) {
-            if (distributionManager.getLocality(key).isLocal()) {
-               localKeys.add(key);
-            }
+      for (Iterator<Object> iterator = localKeys.iterator(); iterator.hasNext(); ) {
+         if (!distributionManager.getLocality(iterator.next()).isLocal()) {
+            iterator.remove();
          }
       }
 

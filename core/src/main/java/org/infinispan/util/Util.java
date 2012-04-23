@@ -24,7 +24,16 @@ package org.infinispan.util;
 
 import org.infinispan.CacheConfigurationException;
 import org.infinispan.CacheException;
+import org.infinispan.commands.write.ApplyDeltaCommand;
+import org.infinispan.commands.write.ClearCommand;
+import org.infinispan.commands.write.DataWriteCommand;
+import org.infinispan.commands.write.PutKeyValueCommand;
+import org.infinispan.commands.write.PutMapCommand;
+import org.infinispan.commands.write.RemoveCommand;
+import org.infinispan.commands.write.ReplaceCommand;
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.commons.hash.Hash;
+import org.infinispan.container.DataContainer;
 import org.infinispan.marshall.Marshaller;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
@@ -44,6 +53,7 @@ import java.nio.ByteBuffer;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -582,5 +592,35 @@ public final class Util {
    public static int getNormalizedHash(Object key, Hash hashFct) {
       // more efficient impl
       return hashFct.hash(key) & Integer.MAX_VALUE; // make sure no negative numbers are involved.
+   }
+
+   /**
+    * //TODO
+    */
+   public static Set<Object> getAffectedKeys(Collection<WriteCommand> modifications, DataContainer dataContainer) {
+      if (modifications == null) {
+         return Collections.emptySet();
+      }
+      Set<Object> set = new HashSet<Object>(modifications.size());
+      for (WriteCommand wc: modifications) {
+         switch (wc.getCommandId()) {
+            case ClearCommand.COMMAND_ID:
+               set.addAll(dataContainer.keySet());
+            case PutKeyValueCommand.COMMAND_ID:
+            case RemoveCommand.COMMAND_ID:
+            case ReplaceCommand.COMMAND_ID:
+               set.add(((DataWriteCommand) wc).getKey());
+               break;
+            case PutMapCommand.COMMAND_ID:
+               set.addAll(wc.getAffectedKeys());
+               break;
+            case ApplyDeltaCommand.COMMAND_ID:
+               ApplyDeltaCommand command = (ApplyDeltaCommand) wc;
+                  Object[] compositeKeys = command.getCompositeKeys();
+                  set.addAll(Arrays.asList(compositeKeys));
+               break;
+         }
+      }
+      return set;
    }
 }

@@ -77,7 +77,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    }
 
    @Override
-   public final void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction) {
+   public void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction) {
       localTransactionMap.put(globalTransaction, localTransaction);
    }
 

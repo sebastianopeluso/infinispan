@@ -210,13 +210,8 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
          super(1);
       }
 
-      private void initKeysNeededValidationIfNeeded() {
-         if (keysMissingValidation == null) {
-            keysMissingValidation = new HashSet<Object>();
-            for (WriteCommand wc : modifications) {
-               keysMissingValidation.addAll(wc.getAffectedKeys());
-            }
-         }
+      private synchronized void init(Collection<Object> affectedKeys) {
+         keysMissingValidation = new HashSet<Object>(affectedKeys);
       }
    }
 
@@ -271,7 +266,6 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
          if (prepareResult.modificationsApplied) {
             return; //already prepared
          }
-         prepareResult.initKeysNeededValidationIfNeeded();         
          prepareResult.keysMissingValidation.removeAll(keysValidated);
          if (local) {
             prepareResult.localPrepared = true;
@@ -285,15 +279,19 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
          if (prepareResult.modificationsApplied) {
             return; //already prepared
          }
-         
+
          prepareResult.result = exception;
          prepareResult.exception = true;
          prepareResult.keysMissingValidation = Collections.emptySet();
-         
+
          if (local) {
             prepareResult.localPrepared = true;
          }
          checkIfPrepared();
       }
+   }
+
+   public final void initToCollectAcks(Collection<Object> affectedKeys) {
+      prepareResult.init(affectedKeys);
    }
 }
