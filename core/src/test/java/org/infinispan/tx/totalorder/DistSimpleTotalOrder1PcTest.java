@@ -22,9 +22,4 @@ public class DistSimpleTotalOrder1PcTest extends SimpleTotalOrder1PcTest {
       createCluster(dcc, clusterSize);
       waitForClusterToForm();
    }
-
-   @Override
-   public void testClear() {
-      //TODO: this test is still failing. Need to think in a way to deal with the ClearCommand :(
-   }
 }
