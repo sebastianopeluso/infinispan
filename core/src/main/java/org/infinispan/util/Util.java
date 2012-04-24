@@ -606,6 +606,7 @@ public final class Util {
          switch (wc.getCommandId()) {
             case ClearCommand.COMMAND_ID:
                set.addAll(dataContainer.keySet());
+               break;
             case PutKeyValueCommand.COMMAND_ID:
             case RemoveCommand.COMMAND_ID:
             case ReplaceCommand.COMMAND_ID:

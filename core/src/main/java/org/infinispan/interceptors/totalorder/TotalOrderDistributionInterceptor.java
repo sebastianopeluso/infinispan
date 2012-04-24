@@ -1,7 +1,6 @@
 package org.infinispan.interceptors.totalorder;
 
 import org.infinispan.commands.tx.PrepareCommand;
-import org.infinispan.container.DataContainer;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.DistributionInterceptor;
@@ -21,12 +20,10 @@ import java.util.Collection;
 public class TotalOrderDistributionInterceptor extends DistributionInterceptor {
 
    private TotalOrderManager totalOrderManager;
-   private DataContainer dataContainer;
 
    @Inject
-   public void injectDependencies(TotalOrderManager totalOrderManager, DataContainer dataContainer) {
+   public void injectDependencies(TotalOrderManager totalOrderManager) {
       this.totalOrderManager = totalOrderManager;
-      this.dataContainer = dataContainer;
    }
 
    @Override

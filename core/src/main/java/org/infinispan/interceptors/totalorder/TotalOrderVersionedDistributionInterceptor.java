@@ -7,9 +7,11 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.VersionedDistributionInterceptor;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
+import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.Arrays;
 import java.util.Collection;
 
 import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepareCommand;
@@ -35,7 +37,7 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-      ctx.addAllAffectedKeys(command.getAffectedKeys());
+      ctx.addAllAffectedKeys(Util.getAffectedKeys(Arrays.asList(command.getModifications()), dataContainer));
 
       Object result = super.visitPrepareCommand(ctx, command);
 
