@@ -259,13 +259,22 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       prepareResult.countDown();
    }
 
+   /**
+    * unblocks the thread if enough conditions are ok to mark the transaction as prepared
+    */
    private void checkIfPrepared() {
+      //the condition is: the transaction was delivered locally and all keys are validated (or an exception)
       if (prepareResult.localPrepared && prepareResult.keysMissingValidation.isEmpty()) {
          prepareResult.modificationsApplied = true;
          prepareResult.countDown();
       }
    }
 
+   /**
+    * add a collection of keys successful validated (write skew check)
+    * @param keysValidated the keys validated
+    * @param local         if it is originated locally or remotely
+    */
    public final void addKeysValidated(Collection<Object> keysValidated, boolean local) {
       synchronized (prepareResult) {
          if (prepareResult.modificationsApplied) {
@@ -279,6 +288,11 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       }
    }
 
+   /**
+    * add an exception (write skew check fails)
+    * @param exception  the exception
+    * @param local      if it is originated locally or remotely
+    */
    public final void addException(Exception exception, boolean local) {
       synchronized (prepareResult) {
          if (prepareResult.modificationsApplied) {
@@ -296,6 +310,10 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       }
    }
 
+   /**
+    * invoked before send the prepare command to init the collection of keys that needs validation
+    * @param affectedKeys  the collection of keys wrote by the transaction
+    */
    public final void initToCollectAcks(Collection<Object> affectedKeys) {
       prepareResult.init(affectedKeys);
    }

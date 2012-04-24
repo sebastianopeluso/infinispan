@@ -7,17 +7,22 @@ import org.infinispan.interceptors.DistributionInterceptor;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.util.Util;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.Arrays;
 import java.util.Collection;
 
 /**
- * // TODO: Document this
+ * This interceptor handles distribution of entries across a cluster, as well as transparent lookup, when the
+ * total order based protocol is enabled
  *
  * @author Pedro Ruivo
  * @since 5.2
  */
 public class TotalOrderDistributionInterceptor extends DistributionInterceptor {
+
+   private static final Log log = LogFactory.getLog(TotalOrderDistributionInterceptor.class);
 
    private TotalOrderManager totalOrderManager;
 
@@ -28,6 +33,8 @@ public class TotalOrderDistributionInterceptor extends DistributionInterceptor {
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
+      //this map is only populated after locks are acquired. However, no locks are acquired when total order is enabled
+      //so we need to populate it here
       ctx.addAllAffectedKeys(Util.getAffectedKeys(Arrays.asList(command.getModifications()), dataContainer));
       Object result = super.visitPrepareCommand(ctx, command);
       if (shouldInvokeRemoteTxCommand(ctx)) {
@@ -41,6 +48,9 @@ public class TotalOrderDistributionInterceptor extends DistributionInterceptor {
 
    @Override
    protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command, Collection<Address> recipients, boolean sync) {
+      if(log.isTraceEnabled()) {
+         log.tracef("Total Order Anycast transaction %s with Total Order", command.getGlobalTransaction().prettyPrint());
+      }
       rpcManager.invokeRemotely(recipients, command, false, false, true);
    }
 }

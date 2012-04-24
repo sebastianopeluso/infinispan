@@ -374,8 +374,8 @@ public interface CommandsFactory {
    ApplyDeltaCommand buildApplyDeltaCommand(Object deltaAwareValueKey, Delta delta, Collection keys);
 
    /**
-    * Builds a PrepareResponseCommand used to send back the new versions of the keys validated by
-    * the keys owners
+    * Builds a PrepareResponseCommand used to send back a collection of keys validated by
+    * the keys owners or an exception (i.e. the outcome of the write skew check)
     * 
     * @param globalTransaction the transaction associated 
     * @return instance

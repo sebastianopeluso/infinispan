@@ -1,12 +1,10 @@
 package org.infinispan.tx.totalorder;
 
-import org.infinispan.configuration.cache.CacheMode;
-import org.infinispan.configuration.cache.ConfigurationBuilder;
-import org.infinispan.transaction.TransactionProtocol;
 import org.testng.annotations.Test;
 
 /**
- * // TODO: Document this
+ * A simple test with the cache operations for total order based protocol in distributed mode, but with more cache
+ * managers
  *
  * @author Pedro Ruivo
  * @since 5.2

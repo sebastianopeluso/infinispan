@@ -8,10 +8,10 @@ import org.infinispan.util.concurrent.IsolationLevel;
 import org.testng.annotations.Test;
 
 /**
- * // TODO: Document this
+ * A simple single node test for total order based protocol in distributed mode
  *
  * @author Pedro Ruivo
- * @since 4.0
+ * @since 5.2
  */
 @Test(groups = "functional", testName = "tx.totalorder.DistSingleNodeInClusteredCacheTest")
 public class DistSingleNodeInClusteredCacheTest extends SingleNodeInClusteredCacheTest {

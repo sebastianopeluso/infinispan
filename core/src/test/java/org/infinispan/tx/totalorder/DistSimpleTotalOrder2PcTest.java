@@ -5,11 +5,11 @@ import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.infinispan.configuration.cache.VersioningScheme;
 import org.infinispan.transaction.TransactionProtocol;
 import org.infinispan.util.concurrent.IsolationLevel;
-import org.infinispan.util.logging.LogFactory;
 import org.testng.annotations.Test;
 
 /**
- * // TODO: Document this
+ * A simple test with the cache operations for total order based protocol in distributed mode, when two phases are
+ * needed
  *
  * @author Pedro Ruivo
  * @since 5.2
