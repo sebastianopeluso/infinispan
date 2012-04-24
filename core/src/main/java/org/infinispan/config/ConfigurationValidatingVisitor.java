@@ -179,7 +179,7 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
             return;
          }
 
-         //for now, only supports full replication
+         //total order only supports replicated and distributed mode
          if (!cfg.getCacheMode().isReplicated() && !cfg.getCacheMode().isDistributed()) {
             log.cacheModeNotSupportedByTOProtocol(cfg.getCacheModeString());
             bean.transactionProtocol(TransactionProtocol.TWO_PHASE_COMMIT);

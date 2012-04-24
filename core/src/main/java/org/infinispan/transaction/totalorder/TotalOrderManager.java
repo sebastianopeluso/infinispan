@@ -8,8 +8,6 @@ import org.infinispan.statetransfer.StateTransferInProgressException;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
-import java.util.Set;
-
 /**
  * This class is responsible to validate transactions in the total order based protocol. It ensures the delivered order
  * and will validate multiple transactions in parallel if they are non conflicting transaction.
@@ -53,9 +51,19 @@ public interface TotalOrderManager {
     */
    void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction);
 
+   /**
+    * this method block the thread until the enough condition is enough to consider a transaction prepared (and later
+    * to ack the transaction manager)
+    * @param context the invocation context
+    */
    void waitForPrepareToSucceed(TxInvocationContext context);
 
    void notifyStateTransferInProgress(GlobalTransaction globalTransaction, StateTransferInProgressException e);
 
+   /**
+    * return the local transaction associated to the global transaction
+    * @param globalTransaction   the global transaction
+    * @return the local transaction associated to the global transaction
+    */
    LocalTransaction getLocalTransaction(GlobalTransaction globalTransaction);
 }

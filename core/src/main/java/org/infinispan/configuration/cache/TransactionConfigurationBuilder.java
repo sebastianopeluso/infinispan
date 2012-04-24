@@ -268,7 +268,7 @@ public class TransactionConfigurationBuilder extends AbstractConfigurationChildB
          return ;
       }
 
-      //for now, only supports full replication
+      //total order only supports replicated and distributed mode
       if(!clustering().cacheMode().isReplicated() && !clustering().cacheMode().isDistributed()) {
          log.cacheModeNotSupportedByTOProtocol(clustering().cacheMode().friendlyCacheModeString());
          transactionProtocol = TransactionProtocol.TWO_PHASE_COMMIT;

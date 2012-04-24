@@ -13,10 +13,10 @@ import javax.transaction.Transaction;
 import static org.testng.Assert.assertEquals;
 
 /**
- * // TODO: Document this
+ * A simple write skew check test for total order based protocol in distributed mode and with L1 cache enabled
  *
  * @author Pedro Ruivo
- * @since 4.0
+ * @since 5.2
  */
 @Test(groups = "functional", testName = "tx.totalorder.DistTotalOrderL1WriteSkewTest")
 @CleanupAfterMethod

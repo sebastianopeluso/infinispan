@@ -37,8 +37,9 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
+      //this map is only populated after locks are acquired. However, no locks are acquired when total order is enabled
+      //so we need to populate it here
       ctx.addAllAffectedKeys(Util.getAffectedKeys(Arrays.asList(command.getModifications()), dataContainer));
-
       Object result = super.visitPrepareCommand(ctx, command);
 
       if (shouldInvokeRemoteTxCommand(ctx)) {
@@ -54,10 +55,7 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
    @Override
    protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command,
                                          Collection<Address> recipients, boolean sync) {
-
-      boolean trace = log.isTraceEnabled();
-
-      if(trace) {
+      if(log.isTraceEnabled()) {
          log.tracef("Total Order Anycast transaction %s with Total Order", command.getGlobalTransaction().prettyPrint());
       }
 

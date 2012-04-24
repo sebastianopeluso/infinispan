@@ -92,6 +92,16 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
       }
    }
 
+   /**
+    * constructs a new thread to be passed to the thread pool. this is overridden in distributed mode that has a different
+    * behavior
+    *
+    * @param prepareCommand      the prepare command
+    * @param txInvocationContext the context
+    * @param invoker             the next interceptor
+    * @param remoteTransaction   the remote transaction
+    * @return a new thread
+    */
    protected ParallelPrepareProcessor constructParallelPrepareProcessor(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
                                                                         CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
       return new ParallelPrepareProcessor(prepareCommand, txInvocationContext, invoker, remoteTransaction);

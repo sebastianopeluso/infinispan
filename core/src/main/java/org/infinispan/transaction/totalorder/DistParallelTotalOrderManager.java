@@ -4,11 +4,11 @@ import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.PrepareResponseCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.write.WriteCommand;
-import org.infinispan.container.DataContainer;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.distribution.DistributionManager;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
@@ -22,9 +22,15 @@ import java.util.Iterator;
 import java.util.Set;
 
 /**
+ * The total order manager implementation the handles the distributed mode, namely the send of the write skew outcome
+ * to the transaction originator
+ *
+ * This implementation uses a thread pool to validate transaction
+ *
  * @author Pedro Ruivo
  * @since 5.2
  */
+@MBean(objectName = "TotalOrderManager", description = "Concurrent total order management for distributed mode")
 public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
 
    private static final Log log = LogFactory.getLog(DistParallelTotalOrderManager.class);
@@ -32,15 +38,12 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
    private CommandsFactory commandsFactory;
    private DistributionManager distributionManager;
    private RpcManager rpcManager;
-   private DataContainer dataContainer;
 
    @Inject
-   public void inject(CommandsFactory commandsFactory, DistributionManager distributionManager, RpcManager rpcManager,
-                      DataContainer dataContainer) {
+   public void inject(CommandsFactory commandsFactory, DistributionManager distributionManager, RpcManager rpcManager) {
       this.commandsFactory = commandsFactory;
       this.distributionManager = distributionManager;
       this.rpcManager = rpcManager;
-      this.dataContainer = dataContainer;
    }
 
    @Override
@@ -88,6 +91,7 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
          }
 
          if (localTransaction != null) {
+            //transaction is local, so add directly
             if (exception) {
                localTransaction.addException((Exception) result, true);
             } else {
@@ -118,10 +122,7 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
 
    @Override
    protected Set<Object> getModifiedKeyFromModifications(Collection<WriteCommand> modifications) {
-      if (modifications == null) {
-         return null;
-      }
-      Set<Object> localKeys = Util.getAffectedKeys(modifications, dataContainer);
+      Set<Object> localKeys = super.getModifiedKeyFromModifications(modifications);
 
       for (Iterator<Object> iterator = localKeys.iterator(); iterator.hasNext(); ) {
          if (!distributionManager.getLocality(iterator.next()).isLocal()) {

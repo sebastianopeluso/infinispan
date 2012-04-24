@@ -3,6 +3,7 @@ package org.infinispan.transaction.totalorder;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.configuration.cache.Configuration;
+import org.infinispan.container.DataContainer;
 import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.impl.TxInvocationContext;
@@ -16,6 +17,7 @@ import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.TxDependencyLatch;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 import org.rhq.helpers.pluginAnnotations.agent.DisplayType;
@@ -23,7 +25,7 @@ import org.rhq.helpers.pluginAnnotations.agent.Metric;
 import org.rhq.helpers.pluginAnnotations.agent.Units;
 
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -43,6 +45,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    protected InvocationContextContainer invocationContextContainer;
 
    protected TransactionTable transactionTable;
+   protected DataContainer dataContainer;
 
    protected final AtomicLong processingDuration = new AtomicLong(0);
    protected final AtomicInteger numberOfTxValidated = new AtomicInteger(0);
@@ -63,10 +66,11 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
 
    @Inject
    public void inject(Configuration configuration, InvocationContextContainer invocationContextContainer,
-                      TransactionTable transactionTable) {
+                      TransactionTable transactionTable, DataContainer dataContainer) {
       this.configuration = configuration;
       this.invocationContextContainer = invocationContextContainer;
       this.transactionTable = transactionTable;
+      this.dataContainer = dataContainer;
    }
 
    @Start
@@ -121,11 +125,11 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       if (trace) log.tracef("transaction %s is finished", gtx.prettyPrint());
 
       TotalOrderRemoteTransaction remoteTransaction = (TotalOrderRemoteTransaction) transactionTable.removeRemoteTransaction(gtx);
-      
+
       if (remoteTransaction == null) {
          remoteTransaction = transaction;
       }
-      
+
       if (remoteTransaction != null) {
          finishTransaction(remoteTransaction);
       } else if (!ignoreNullTxInfo) {
@@ -145,7 +149,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       try {
          needsToProcessCommand = remoteTransaction.waitPrepared(commit, newVersions);
          if (trace) log.tracef("Transaction %s successfully finishes the waiting time until prepared. " +
-                                     "%s command will be processed? %s", gtx.prettyPrint(), 
+                                     "%s command will be processed? %s", gtx.prettyPrint(),
                                commit ? "Commit" : "Rollback", needsToProcessCommand ? "yes" : "no");
       } catch (InterruptedException e) {
          log.timeoutWaitingUntilTransactionPrepared(gtx.prettyPrint());
@@ -154,11 +158,11 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       return needsToProcessCommand;
    }
 
-    /**
+   /**
     * Remove the keys from the map (if their didn't change) and release the count down latch, unblocking the next
     * transaction
-     * @param remoteTransaction the remote transaction
-     */
+    * @param remoteTransaction the remote transaction
+    */
    protected void finishTransaction(TotalOrderRemoteTransaction remoteTransaction) {
       TxDependencyLatch latch = remoteTransaction.getLatch();
       if (trace) log.tracef("Releasing resources for transaction %s", remoteTransaction);
@@ -193,7 +197,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
       this.statisticsEnabled = statisticsEnabled;
    }
 
-   protected final void updateLocalTransaction(Object result, boolean exception, GlobalTransaction gtx) {      
+   protected final void updateLocalTransaction(Object result, boolean exception, GlobalTransaction gtx) {
       LocalTransaction localTransaction = localTransactionMap.get(gtx);
 
       if (localTransaction != null) {
@@ -221,20 +225,24 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
 
       if (ctx.isOriginLocal()) throw new IllegalArgumentException("Local invocation not allowed!");
    }
-   
+
    protected final void removeLocalTransaction(GlobalTransaction globalTransaction) {
       localTransactionMap.remove(globalTransaction);
    }
-   
+
    public final LocalTransaction getLocalTransaction(GlobalTransaction globalTransaction) {
       return localTransactionMap.get(globalTransaction);
    }
-      
+
+   /**
+    * calculates the keys affected by the list of modification. This method should return only the key own by this node
+    * @param modifications the list of modifications
+    * @return a set of local keys
+    */
    protected Set<Object> getModifiedKeyFromModifications(Collection<WriteCommand> modifications) {
-      Set<Object> keys = new HashSet<Object>(modifications.size());
-      for (WriteCommand wc : modifications) {
-         keys.addAll(wc.getAffectedKeys());
+      if (modifications == null) {
+         return Collections.emptySet();
       }
-      return keys;
+      return Util.getAffectedKeys(modifications, dataContainer);
    }
 }

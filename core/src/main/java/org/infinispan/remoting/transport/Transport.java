@@ -86,7 +86,7 @@ public interface Transport extends Lifecycle {
     *                         implementations.
     * @param responseFilter   a response filter with which to filter out failed/unwanted/invalid responses.
     * @param totalOrder       the command will be send with total order properties
-    * @param distribution     indicates if the command is sent from a cache in distribution mode
+    * @param distribution     indicates if the command is sent from a cache in distributed mode
     * @return a map of responses from each member contacted.
     * @throws Exception in the event of problems.
     */

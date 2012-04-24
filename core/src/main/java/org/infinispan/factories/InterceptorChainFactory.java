@@ -38,6 +38,7 @@ import org.infinispan.loaders.CacheLoaderConfig;
 import org.infinispan.loaders.CacheStoreConfig;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.util.Util;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -117,8 +118,13 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       // load the state transfer lock interceptor
       // the state transfer lock ensures that the cache member list is up-to-date
       // so it's necessary even if state transfer is disabled
-      if (configuration.getCacheMode().isDistributed() || configuration.getCacheMode().isReplicated())
-         interceptorChain.appendInterceptor(createInterceptor(new StateTransferLockInterceptor(), StateTransferLockInterceptor.class), false);
+      if (configuration.getCacheMode().isDistributed() || configuration.getCacheMode().isReplicated()) {
+         if (configuration.isTotalOrder()) {
+            interceptorChain.appendInterceptor(createInterceptor(new TotalOrderStateTransferLockInterceptor(), TotalOrderStateTransferLockInterceptor.class), false);
+         } else {
+            interceptorChain.appendInterceptor(createInterceptor(new StateTransferLockInterceptor(), StateTransferLockInterceptor.class), false);
+         }
+      }
 
       //load total order interceptor
       if (configuration.isTotalOrder()) {
@@ -148,7 +154,8 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
                interceptorChain.appendInterceptor(createInterceptor(new OptimisticLockingInterceptor(), OptimisticLockingInterceptor.class), false);
             }
          } else {
-            interceptorChain.appendInterceptor(createInterceptor(new NonTransactionalLockingInterceptor(), NonTransactionalLockingInterceptor.class), false);
+            if (configuration.getIsolationLevel() != IsolationLevel.NONE)
+               interceptorChain.appendInterceptor(createInterceptor(new NonTransactionalLockingInterceptor(), NonTransactionalLockingInterceptor.class), false);
          }
       }
 
