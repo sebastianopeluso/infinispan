@@ -34,7 +34,6 @@ import org.infinispan.remoting.transport.Transport;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.synchronization.SyncLocalTransaction;
-import org.infinispan.transaction.totalorder.TotalOrderRecoveryAwareRemoteTx;
 import org.infinispan.transaction.totalorder.TotalOrderRemoteTransactionImpl;
 import org.infinispan.transaction.xa.recovery.RecoveryAwareDldGlobalTransaction;
 import org.infinispan.transaction.xa.recovery.RecoveryAwareGlobalTransaction;
@@ -270,7 +269,7 @@ public class TransactionFactory {
        */
       protected RemoteTransaction createRecoveryRemoteTransaction(GlobalTransaction tx, int viewId, boolean totalOrder) {
          if (totalOrder) {
-            return new TotalOrderRecoveryAwareRemoteTx(tx, viewId);
+            throw new IllegalStateException("Recovery not supported with Total Order");
          } else {
             return new RecoveryAwareRemoteTransaction(tx, viewId);
          }
