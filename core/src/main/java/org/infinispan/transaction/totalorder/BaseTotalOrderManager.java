@@ -10,7 +10,6 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
 import org.infinispan.remoting.RpcException;
-import org.infinispan.statetransfer.StateTransferInProgressException;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.TxDependencyLatch;
@@ -102,7 +101,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    }
 
    @Override
-   public void notifyStateTransferInProgress(GlobalTransaction globalTransaction, StateTransferInProgressException e) {
+   public void notifyStateTransferInProgress(GlobalTransaction globalTransaction, Throwable e) {
       LocalTransaction localTransaction = localTransactionMap.get(globalTransaction);
       if (localTransaction != null) {
          localTransaction.addPrepareResult(e, true);

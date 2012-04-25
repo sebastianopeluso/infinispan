@@ -41,8 +41,7 @@ public class TotalOrderVersionedReplicationInterceptor extends VersionedReplicat
 
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
       //broadcast the command
-      boolean sync = configuration.isTransactionRecoveryEnabled();
-      rpcManager.broadcastRpcCommand(command, sync, true);
+      rpcManager.broadcastRpcCommand(command, false, false);
       if (shouldInvokeRemoteTxCommand(ctx)) {
          //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication
          //not to take place, e.g. in the case there are no changes in the context. And this is the place where we know

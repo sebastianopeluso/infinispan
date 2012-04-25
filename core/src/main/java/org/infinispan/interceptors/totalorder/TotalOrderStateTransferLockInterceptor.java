@@ -23,18 +23,19 @@ public class TotalOrderStateTransferLockInterceptor extends StateTransferLockInt
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-      boolean release = true;
-      if (!stateTransferLock.acquireForCommand(ctx, command)) {
-         try {
-            signalStateTransferInProgress(ctx);
-         } catch (StateTransferInProgressException e) {
-            if (!ctx.isOriginLocal())
-               tom.notifyStateTransferInProgress(command.getGlobalTransaction(), e);
-            throw e;
-         } finally {
-            release = false;
-         }
+      try {
+         super.visitPrepareCommand(ctx, command);
+      } catch (Throwable throwable) {
+         if (!ctx.isOriginLocal())
+            tom.notifyStateTransferInProgress(command.getGlobalTransaction(), throwable);
+         throw throwable;
       }
+
+      if (!stateTransferLock.acquireForCommand(ctx, command)) {
+         signalStateTransferInProgress(ctx);
+      }
+
+      boolean release = true;
       try {
          return handleWithRetries(ctx, command, rpcTimeout);
       } catch (StateTransferLockReacquisitionException e) {
