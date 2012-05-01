@@ -60,8 +60,8 @@ import java.util.concurrent.TimeoutException;
  */
 public class ReplicationInterceptor extends BaseRpcInterceptor {
 
-   private StateTransferLock stateTransferLock;
-   CommandsFactory cf;
+   protected StateTransferLock stateTransferLock;
+   protected CommandsFactory cf;
 
    private static final Log log = LogFactory.getLog(ReplicationInterceptor.class);
 

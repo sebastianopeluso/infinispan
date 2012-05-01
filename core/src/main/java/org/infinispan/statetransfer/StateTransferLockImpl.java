@@ -36,6 +36,7 @@ import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
+import org.infinispan.remoting.transport.Transport;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -80,6 +81,7 @@ public class StateTransferLockImpl implements StateTransferLock {
    private boolean pessimisticLocking;
    private long lockTimeout;
    private boolean isSync;
+   private boolean isTotalOrder;
 
    public StateTransferLockImpl() {
    }
@@ -87,6 +89,7 @@ public class StateTransferLockImpl implements StateTransferLock {
    @Inject
    public void injectDependencies(Configuration config) {
       pessimisticLocking =  config.getTransactionLockingMode() == LockingMode.PESSIMISTIC;
+      isTotalOrder = config.getTransactionProtocol().isTotalOrder();
       isSync = config.getCacheMode().isSynchronous();
       lockTimeout = config.getCacheMode().isDistributed() ? config.getRehashWaitTime() : config.getStateRetrievalTimeout();
    }
@@ -294,10 +297,14 @@ public class StateTransferLockImpl implements StateTransferLock {
       // In order to allow the rehashing thread on the origin to obtain the tx lock for write on the
       // origin, we never wait for the state transfer lock on remote nodes.
       // The originator should wait for the state transfer to end and retry the command,
-      // unless we are async, in which case we can't retry
-      if (!ctx.isOriginLocal() && isSync) {
-         log.trace("Couldn't acquire state transfer lock for remote sync call.");
-         return false;
+      // unless we are async, in which case we can't retry.
+
+      // When total order is enabled, prepare commands are always async, regardless of how the cache is configured.
+      if (!ctx.isOriginLocal()) {
+         if (isSync && !isTotalOrder) {
+            log.trace("Couldn't acquire state transfer lock for remote sync call.");
+            return false;
+         }
       }
 
       // A state transfer is in progress, wait for it to end
