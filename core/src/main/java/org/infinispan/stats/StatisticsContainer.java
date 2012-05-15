@@ -1,10 +1,10 @@
 package org.infinispan.stats;
 
 /**
- * Author: Diego Didona
- * Email: didona@gsd.inesc-id.pt
  * Websiste: www.cloudtm.eu
  * Date: 01/05/12
+ * @author Diego Didona <didona@gsd.inesc-id.pt>
+ * @since 5.2
  */
 public interface StatisticsContainer {
 

@@ -1,72 +1,64 @@
 package org.infinispan.stats;
+
 import org.infinispan.stats.translations.ExposedStatistics.IspnStats;
-import org.infinispan.stats.translations.LocalRemoteStatistics;
 import org.infinispan.stats.translations.LocalStatistics;
 
 /**
- * Author: Diego Didona
- * Email: didona@gsd.inesc-id.pt
  * Websiste: www.cloudtm.eu
  * Date: 20/04/12
+ * @author Diego Didona <didona@gsd.inesc-id.pt>
+ * @author Pedro Ruivo
+ * @since 5.2
  */
 public class LocalTransactionStatistics extends TransactionStatistics {
-
-
 
    private boolean stillLocalExecution;
 
    public LocalTransactionStatistics(){
-      super();
+      super(LocalStatistics.getSize());
       this.stillLocalExecution = true;
-      this.statisticsContainer = new StatisticsContainerImpl(LocalStatistics.NUM_STATS);
    }
 
-
-
-   public void terminateLocalExecution(){
+   public final void terminateLocalExecution(){
       this.stillLocalExecution = false;
       this.addValue(IspnStats.WR_TX_LOCAL_EXECUTION_TIME,System.nanoTime() - this.initTime);
       this.incrementValue(IspnStats.NUM_PREPARES);
    }
 
-   public boolean isStillLocalExecution(){
+   public final boolean isStillLocalExecution(){
       return this.stillLocalExecution;
    }
 
-   protected int getIndex(IspnStats stat) throws NoIspnStatException{
-      int ret = super.getCommonIndex(stat);
-      if(ret!=NON_COMMON_STAT)
-         return ret;
-
-      switch (stat){
-         case LOCAL_CONTENTION_PROBABILITY:
-            return LocalStatistics.LOCAL_CONTENTION_PROBABILITY;
-         case WR_TX_LOCAL_EXECUTION_TIME:
-            return LocalStatistics.WR_TX_LOCAL_EXECUTION_TIME;
-         case WR_TX_SUCCESSFUL_EXECUTION_TIME:
-            return LocalStatistics.WR_TX_SUCCESSFUL_LOCAL_EXECUTION_TIME;
-         case PUTS_PER_LOCAL_TX:
-            return LocalStatistics.PUTS_PER_LOCAL_TX;
-         case PREPARE_COMMAND_SIZE:
-            return LocalStatistics.PREPARE_COMMAND_SIZE;
-         case NUM_NODES_IN_PREPARE:
-            return LocalStatistics.NUM_NODES_IN_PREPARE;
-         case NUM_PREPARES:
-            return LocalStatistics.NUM_PREPARE;
-         case RTT:
-            return LocalStatistics.RTT;
-         case NUM_SUCCESSFUL_RTTS:
-            return LocalStatistics.NUM_RTTS;
-
-
-         default:
-            throw new NoIspnStatException("IspnStats "+stat+" not found!");
+   @Override
+   protected final void terminate() {
+      if (!isReadOnly() && isCommit()) {
+         long numPuts = this.getValue(IspnStats.NUM_PUTS);
+         this.addValue(IspnStats.NUM_SUCCESSFUL_PUTS,numPuts);
+         this.addValue(IspnStats.NUM_HELD_LOCKS_SUCCESS_TX, getValue(IspnStats.NUM_HELD_LOCKS));
+         if(isCommit()){
+            long localLockAcquisitionTime = getValue(IspnStats.LOCK_WAITING_TIME);
+            long totalLocalDuration =  getValue(IspnStats.WR_TX_LOCAL_EXECUTION_TIME);
+            this.addValue(IspnStats.LOCAL_EXEC_NO_CONT, (totalLocalDuration-localLockAcquisitionTime));
+         }
       }
    }
 
+   protected final void onPrepareCommand(){
+      this.terminateLocalExecution();
+   }
 
+   protected final int getIndex(IspnStats stat) throws NoIspnStatException{
+      int ret = LocalStatistics.getIndex(stat);
+      if (ret == LocalStatistics.NOT_FOUND) {
+         throw new NoIspnStatException("IspnStats "+stat+" not found!");
+      }
+      return ret;
+   }
 
-
-
-
+   @Override
+   public final String toString() {
+      return "LocalTransactionStatistics{" +
+            "stillLocalExecution=" + stillLocalExecution +
+            ", " + super.toString();
+   }
 }

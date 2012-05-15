@@ -1,4 +1,4 @@
-package org.infinispan.stats;
+package org.infinispan.stats.topK;
 
 import com.clearspring.analytics.stream.Counter;
 import com.clearspring.analytics.stream.StreamSummary;
@@ -50,6 +50,7 @@ public class StreamLibContainer {
       }
 
       clearAll();
+      setActive(false);
    }
 
    public static StreamLibContainer getInstance() {
@@ -110,19 +111,19 @@ public class StreamLibContainer {
       return getTopKFrom(stat, capacity);
    }
 
-   public Map<Object, Long> getTopKFrom(Stat stat, int topk) {
+   public Map<Object, Long> getTopKFrom(Stat stat, int topK) {
       try {
          lockMap.get(stat).lock();
-         return getStatsFrom(streamSummaryEnumMap.get(stat), topk);
+         return getStatsFrom(streamSummaryEnumMap.get(stat), topK);
       } finally {
          lockMap.get(stat).unlock();
       }
 
    }
 
-   private Map<Object, Long> getStatsFrom(StreamSummary<Object> ss, int topk) {
-      List<Counter<Object>> counters = ss.topK(topk <= 0 ? 1 : topk);
-      Map<Object, Long> results = new HashMap<Object, Long>(topk);
+   private Map<Object, Long> getStatsFrom(StreamSummary<Object> ss, int topK) {
+      List<Counter<Object>> counters = ss.topK(topK <= 0 ? 1 : topK);
+      Map<Object, Long> results = new HashMap<Object, Long>(topK);
 
       for(Counter<Object> c : counters) {
          results.put(c.getItem(), c.getCount());
