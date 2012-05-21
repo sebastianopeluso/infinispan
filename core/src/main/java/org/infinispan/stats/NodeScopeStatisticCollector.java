@@ -1,5 +1,6 @@
 package org.infinispan.stats;
 
+import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.stats.percentiles.PercentileStats;
 import org.infinispan.stats.percentiles.PercentileStatsFactory;
 import org.infinispan.stats.translations.ExposedStatistics.IspnStats;
@@ -25,12 +26,13 @@ public class NodeScopeStatisticCollector {
    private PercentileStats localTransactionRoExecutionTime;
    private PercentileStats remoteTransactionRoExecutionTime;
 
+   private Configuration configuration;
    private long lastResetTime;
 
    public final synchronized void reset(){
       log.tracef("Resetting Node Scope Statistics");
-      this.localTransactionStatistics = new LocalTransactionStatistics();
-      this.remoteTransactionStatistics = new RemoteTransactionStatistics();
+      this.localTransactionStatistics = new LocalTransactionStatistics(this.configuration);
+      this.remoteTransactionStatistics = new RemoteTransactionStatistics(this.configuration);
 
       this.localTransactionRoExecutionTime = PercentileStatsFactory.createNewPercentileStats();
       this.localTransactionWrExecutionTime = PercentileStatsFactory.createNewPercentileStats();
@@ -40,7 +42,8 @@ public class NodeScopeStatisticCollector {
       this.lastResetTime = System.nanoTime();
    }
 
-   public NodeScopeStatisticCollector(){
+   public NodeScopeStatisticCollector(Configuration configuration){
+      this.configuration = configuration;
       reset();
    }
 
@@ -177,7 +180,6 @@ public class NodeScopeStatisticCollector {
             return new Double(0);
          }
          case LOCK_CONTENTION_PROBABILITY:{
-            System.out.println("CALLED LOCK_CONT_PROB");
             long numLocalPuts = localTransactionStatistics.getValue(IspnStats.NUM_PUTS);
             long numRemotePuts = remoteTransactionStatistics.getValue(IspnStats.NUM_PUTS);
             long totalPuts = numLocalPuts + numRemotePuts;
@@ -253,6 +255,16 @@ public class NodeScopeStatisticCollector {
             }
             return new Double(0);
          }
+         case NUM_SUCCESSFUL_GETS_RO_TX:
+            return avgLocal(IspnStats.NUM_COMMITTED_RO_TX,IspnStats.NUM_SUCCESSFUL_GETS_RO_TX);
+         case NUM_SUCCESSFUL_GETS_WR_TX:
+            return avgLocal(IspnStats.NUM_COMMITTED_WR_TX,IspnStats.NUM_SUCCESSFUL_GETS_WR_TX);
+         case NUM_SUCCESSFUL_REMOTE_GETS_RO_TX:
+            return avgLocal(IspnStats.NUM_COMMITTED_RO_TX,IspnStats.NUM_SUCCESSFUL_REMOTE_GETS_RO_TX);
+         case NUM_SUCCESSFUL_REMOTE_GETS_WR_TX:
+            return avgLocal(IspnStats.NUM_COMMITTED_WR_TX,IspnStats.NUM_SUCCESSFUL_REMOTE_GETS_WR_TX);
+         case REMOTE_GET_EXECUTION:
+             return microAvgLocal(IspnStats.NUM_REMOTE_GET, IspnStats.REMOTE_GET_EXECUTION);
          case NUM_LOCK_FAILED_DEADLOCK:
          case NUM_LOCK_FAILED_TIMEOUT:
             return new Long(localTransactionStatistics.getValue(param));
@@ -313,9 +325,9 @@ public class NodeScopeStatisticCollector {
                   localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_WR_TX);
             return new Long((long) (totalBornTx / convertNanosToSeconds(System.nanoTime() - this.lastResetTime)));
          case LOCK_HOLD_TIME_LOCAL:
-            return microAvgLocal(IspnStats.LOCK_HOLD_TIME, IspnStats.NUM_HELD_LOCKS);
+            return microAvgLocal(IspnStats.NUM_HELD_LOCKS,IspnStats.LOCK_HOLD_TIME);
          case LOCK_HOLD_TIME_REMOTE:
-            return microAvgRemote(IspnStats.LOCK_HOLD_TIME, IspnStats.NUM_HELD_LOCKS);
+            return microAvgRemote(IspnStats.NUM_HELD_LOCKS,IspnStats.LOCK_HOLD_TIME);
          default:
             throw new NoIspnStatException("Invalid statistic "+param);
       }
@@ -379,14 +391,12 @@ public class NodeScopeStatisticCollector {
       return nanos / 1000000000;
    }
 
-   private Long microAvgLocal(IspnStats duration, IspnStats counters){
-      return convertNanosToMicro(avgLocal(duration,counters));
+   private Long microAvgLocal(IspnStats counter, IspnStats duration){
+      return convertNanosToMicro(avgLocal(counter,duration));
    }
 
-   private Long microAvgRemote(IspnStats duration, IspnStats counters){
-      return convertNanosToMicro(avgRemote(duration, counters));
+   private Long microAvgRemote(IspnStats counter, IspnStats duration){
+      return convertNanosToMicro(avgRemote(counter, duration));
    }
-
-
 
 }

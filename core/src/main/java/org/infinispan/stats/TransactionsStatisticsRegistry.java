@@ -1,7 +1,7 @@
 package org.infinispan.stats;
 
+import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.context.impl.TxInvocationContext;
-import org.infinispan.stats.translations.ExposedStatistics;
 import org.infinispan.stats.translations.ExposedStatistics.IspnStats;
 import org.infinispan.stats.translations.ExposedStatistics.TransactionalClasses;
 import org.infinispan.transaction.xa.GlobalTransaction;
@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentMap;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class TransactionsStatisticsRegistry {
+public final class TransactionsStatisticsRegistry {
 
    private static final Log log = LogFactory.getLog(TransactionsStatisticsRegistry.class);
 
@@ -31,22 +31,34 @@ public class TransactionsStatisticsRegistry {
    private static final ConcurrentMap<GlobalTransaction, RemoteTransactionStatistics> remoteTransactionStatistics =
          new ConcurrentHashMap<GlobalTransaction, RemoteTransactionStatistics>();
 
+   private static Configuration configuration;
+
    //Comment for reviewers: do we really need threadLocal? If I have the global id of the transaction, I can
    //retrieve the transactionStatistics
    private static final ThreadLocal<TransactionStatistics> thread = new ThreadLocal<TransactionStatistics>();
 
-   public static void init(){
+   public static void init(Configuration configuration){
       log.tracef("Initializing transactionalClassesMap");
-      transactionalClassesStatsMap.put(TransactionalClasses.DEFAULT_CLASS, new NodeScopeStatisticCollector());
+      TransactionsStatisticsRegistry.configuration = configuration;
+      transactionalClassesStatsMap.put(TransactionalClasses.DEFAULT_CLASS, new NodeScopeStatisticCollector(configuration));
    }
 
    public static void addValue(IspnStats param, double value) {
       TransactionStatistics txs = thread.get();
+      if (txs == null) {
+         log.info("Trying to add value " + value + " to parameter " + param +
+                        " but no transaction is associated to the thread");
+         return;
+      }
       txs.addValue(param, value);
    }
 
    public static void incrementValue(IspnStats param) {
       TransactionStatistics txs = thread.get();
+      if (txs == null) {
+         log.info("Trying to increment to parameter " + param + " but no transaction is associated to the thread");
+         return;
+      }
       txs.addValue(param, 1D);
    }
 
@@ -72,16 +84,29 @@ public class TransactionsStatisticsRegistry {
       //NB: If I want to give up using the InboundInvocationHandler, I can create the remote transaction
       //here, just overriding the handlePrepareCommand
       TransactionStatistics txs = thread.get();
+      if (txs == null) {
+         log.info("Trying to invoke onPrepareCommand() but no transaction is associated to the thread");
+         return;
+      }
       txs.onPrepareCommand();
    }
 
    public static void setTransactionOutcome(boolean commit) {
       TransactionStatistics txs = thread.get();
+      if (txs == null) {
+         log.info("Trying to set outcome to " + (commit ? "Commit" : "Rollback") +
+                        " but no transaction is associated to the thread");
+         return;
+      }
       txs.setCommit(commit);
    }
 
    public static void terminateTransaction() {
       TransactionStatistics txs = thread.get();
+      if (txs == null) {
+         log.info("Trying to invoke terminate() but no transaction is associated to the thread");
+         return;
+      }
       txs.terminateTransaction();
 
       NodeScopeStatisticCollector dest = transactionalClassesStatsMap.get(txs.getTransactionalClass());
@@ -100,12 +125,20 @@ public class TransactionsStatisticsRegistry {
 
    public static void addTakenLock(Object lock) {
       TransactionStatistics txs = thread.get();
+      if (txs == null) {
+         log.info("Trying to add lock [" + lock + "] but no transaction is associated to the thread");
+         return;
+      }
       txs.addTakenLock(lock);
    }
 
 
    public static void setUpdateTransaction() {
       TransactionStatistics txs = thread.get();
+      if (txs == null) {
+         log.info("Trying to invoke setUpdateTransaction() but no transaction is associated to the thread");
+         return;
+      }
       txs.setUpdateTransaction();
    }
 
@@ -122,7 +155,7 @@ public class TransactionsStatisticsRegistry {
       RemoteTransactionStatistics rts = remoteTransactionStatistics.get(globalTransaction);
       if (rts == null && createIfAbsent) {
          log.tracef("Create a new remote transaction statistic for transaction %s", globalTransaction);
-         rts = new RemoteTransactionStatistics();
+         rts = new RemoteTransactionStatistics(configuration);
          remoteTransactionStatistics.put(globalTransaction, rts);
       } else {
          log.tracef("Using the remote transaction statistic %s for transaction %s", rts, globalTransaction);
@@ -160,7 +193,7 @@ public class TransactionsStatisticsRegistry {
       TransactionStatistics lts = thread.get();
       if (lts == null) {
          log.tracef("Init a new local transaction statistics");
-         thread.set(new LocalTransactionStatistics());
+         thread.set(new LocalTransactionStatistics(configuration));
       } else {
          log.tracef("Local transaction statistic is already initialized: %s", lts);
       }

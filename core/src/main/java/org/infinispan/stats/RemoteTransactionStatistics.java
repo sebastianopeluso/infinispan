@@ -1,5 +1,6 @@
 package org.infinispan.stats;
 
+import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.stats.translations.ExposedStatistics;
 import org.infinispan.stats.translations.RemoteStatistics;
 
@@ -11,8 +12,8 @@ import org.infinispan.stats.translations.RemoteStatistics;
  */
 public class RemoteTransactionStatistics extends TransactionStatistics{
 
-   public RemoteTransactionStatistics(){
-      super(RemoteStatistics.getSize());
+   public RemoteTransactionStatistics(Configuration configuration){
+      super(RemoteStatistics.getSize(),configuration);
    }
 
    protected final void onPrepareCommand(){

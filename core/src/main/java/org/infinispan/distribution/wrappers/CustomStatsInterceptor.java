@@ -5,6 +5,7 @@ import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.write.PutKeyValueCommand;
+import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.container.EntryFactory;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
@@ -51,17 +52,19 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
    private final Log log = LogFactory.getLog(getClass());
 
    private TransactionTable transactionTable;
+   private Configuration configuration;
 
    @Inject
-   public void inject(TransactionTable transactionTable) {
+   public void inject(TransactionTable transactionTable, Configuration config) {
       this.transactionTable = transactionTable;
+      this.configuration = config;
    }
 
    @Start
    public void start(){
       replace();
       log.warn("Initializing the TransactionStatisticsRegistry");
-      TransactionsStatisticsRegistry.init();
+      TransactionsStatisticsRegistry.init(this.configuration);
    }
 
    @Override
@@ -116,6 +119,8 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
             TransactionsStatisticsRegistry.incrementValue(IspnStats.NUM_REMOTE_GET);
             TransactionsStatisticsRegistry.addValue(IspnStats.REMOTE_GET_EXECUTION, System.nanoTime() - currTime);
          }
+
+         TransactionsStatisticsRegistry.incrementValue(IspnStats.NUM_GET);
       }
       else{
          ret = invokeNextInterceptor(ctx,command);
@@ -522,13 +527,13 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
    @ManagedAttribute(description = "Average time it takes to execute the rollback command locally")
    @Metric(displayName = "Average Local Rollback Execution Time")
    public long getAvgLocalRollbackTime(){
-      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.LOCAL_COMMIT_EXECUTION_TIME);
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.LOCAL_ROLLBACK_EXECUTION_TIME);
    }
 
    @ManagedAttribute(description = "Average time it takes to execute the rollback command remotely")
    @Metric(displayName = "Average Remote Rollback Execution Time")
    public long getAvgRemoteRollbackTime(){
-      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.REMOTE_COMMIT_EXECUTION_TIME);
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.REMOTE_ROLLBACK_EXECUTION_TIME);
    }
 
    @ManagedAttribute(description = "Average time it takes to execute the rollback command remotely")
@@ -547,6 +552,36 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
    @Metric(displayName = "Throughput")
    public long getThroughput(){
       return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.THROUGHPUT);
+   }
+
+   @ManagedAttribute(description = "Average number of get operations per (local) read-only transaction")
+   @Operation(displayName = "Average number of get operations per (local) read-only transaction")
+   public long getAvgGetsPerROTransaction(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.NUM_SUCCESSFUL_GETS_RO_TX);
+   }
+
+   @ManagedAttribute(description = "Average number of get operations per (local) read-write transaction")
+   @Operation(displayName = "Average number of get operations per (local) read-write transaction")
+   public long getAvgGetsPerWrTransaction(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.NUM_SUCCESSFUL_GETS_WR_TX);
+   }
+
+   @ManagedAttribute(description = "Average number of remote get operations per (local) read-write transaction")
+   @Operation(displayName = "Average number of remote get operations per (local) read-write transaction")
+   public long getAvgRemoteGetsPerWrTransaction(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.NUM_SUCCESSFUL_REMOTE_GETS_WR_TX);
+   }
+
+   @ManagedAttribute(description = "Average number of remote get operations per (local) read-only transaction")
+   @Operation(displayName = "Average number of remote get operations per (local) read-only transaction")
+   public long getAvgRemoteGetsPerROTransaction(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.NUM_SUCCESSFUL_REMOTE_GETS_RO_TX);
+   }
+
+   @ManagedAttribute(description = "Average cost of a remote get")
+   @Operation(displayName = "Remote get cost")
+   public long getRemoteGetExecutionTime(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.REMOTE_GET_EXECUTION);
    }
 
    @ManagedOperation(description = "K-th percentile of local read-only transactions execution time")
@@ -578,6 +613,5 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
    public void resetStatistics(){
       TransactionsStatisticsRegistry.reset();
    }
-
 
 }

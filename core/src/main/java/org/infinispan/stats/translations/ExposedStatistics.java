@@ -9,8 +9,6 @@ package org.infinispan.stats.translations;
  */
 
 public class ExposedStatistics {
-   public static final int NUM_STATS = IspnStats.values().length;
-   public static final int NUM_TX_CLASSES = TransactionalClasses.values().length;
 
    public static enum TransactionalClasses {
       DEFAULT_CLASS
@@ -43,6 +41,11 @@ public class ExposedStatistics {
       PUTS_PER_LOCAL_TX(false, false), // ONLY FOR QUERY, derived on the fly
       NUM_WAITED_FOR_LOCKS(true, true),   // C      
       NUM_REMOTE_GET(true, true),         // C
+      NUM_GET(true,true),                  //C
+      NUM_SUCCESSFUL_GETS_RO_TX(true,true),   //C
+      NUM_SUCCESSFUL_GETS_WR_TX(true,true), //C
+      NUM_SUCCESSFUL_REMOTE_GETS_WR_TX(true,true), //C
+      NUM_SUCCESSFUL_REMOTE_GETS_RO_TX(true,true),//C
       REMOTE_GET_EXECUTION(true, true),   // C
       REMOTE_PUT_EXECUTION(true, true),   // C
       NUM_REMOTE_PUT(true, true),         // C
