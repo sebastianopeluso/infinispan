@@ -276,7 +276,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       entryVersionList.add(txInvocationContext.getTransactionVersion());
 
       if (log.isTraceEnabled()) {
-         log.tracef("Keys read in this command: %s", txInvocationContext.getKeysReadInCommand());
+         log.tracef("[%s] Keys read in this command: %s", txInvocationContext.getGlobalTransaction().globalId(),
+                    txInvocationContext.getKeysReadInCommand());
       }
 
       for (InternalGMUCacheEntry internalGMUCacheEntry : txInvocationContext.getKeysReadInCommand().values()) {

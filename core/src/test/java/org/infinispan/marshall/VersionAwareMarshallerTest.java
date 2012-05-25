@@ -136,6 +136,8 @@ public class VersionAwareMarshallerTest extends AbstractInfinispanTest {
    public void testGlobalTransactionMarshalling() throws Exception {
       JGroupsAddress jGroupsAddress = new JGroupsAddress(new IpAddress(12345));
       GlobalTransaction gtx = gtf.newGlobalTransaction(jGroupsAddress, false);
+      gtx.setProtocolId("2PC");
+      gtx.setEpochId(0);
       marshallAndAssertEquality(gtx);
    }
 
@@ -145,6 +147,8 @@ public class VersionAwareMarshallerTest extends AbstractInfinispanTest {
       for (int i = 0; i < 10; i++) {
          JGroupsAddress jGroupsAddress = new JGroupsAddress(new IpAddress(1000 * i));
          GlobalTransaction gtx = gtf.newGlobalTransaction(jGroupsAddress, false);
+         gtx.setProtocolId("2PC");
+         gtx.setEpochId(0);
          l1.add(gtx);
          l2.add(gtx);
       }
@@ -160,6 +164,8 @@ public class VersionAwareMarshallerTest extends AbstractInfinispanTest {
       for (int i = 0; i < 10; i++) {
          JGroupsAddress jGroupsAddress = new JGroupsAddress(new IpAddress(1000 * i));
          GlobalTransaction gtx = gtf.newGlobalTransaction(jGroupsAddress, false);
+         gtx.setProtocolId("2PC");
+         gtx.setEpochId(0);
          m1.put(1000 * i, gtx);
          m2.put(1000 * i, gtx);
          m4.put(1000 * i, gtx);
@@ -214,6 +220,8 @@ public class VersionAwareMarshallerTest extends AbstractInfinispanTest {
 
    public void testSingletonListMarshalling() throws Exception {
       GlobalTransaction gtx = gtf.newGlobalTransaction(new JGroupsAddress(new IpAddress(12345)), false);
+      gtx.setProtocolId("2PC");
+      gtx.setEpochId(0);
       List l = Collections.singletonList(gtx);
       marshallAndAssertEquality(l);
    }
@@ -267,6 +275,8 @@ public class VersionAwareMarshallerTest extends AbstractInfinispanTest {
       Map m1 = new HashMap();
       for (int i = 0; i < 10; i++) {
          GlobalTransaction gtx = gtf.newGlobalTransaction(new JGroupsAddress(new IpAddress(1000 * i)), false);
+         gtx.setProtocolId("2PC");
+         gtx.setEpochId(0);
          m1.put(1000 * i, gtx);
       }
       PutMapCommand c10 = new PutMapCommand(m1, null, 0, 0, Collections.<Flag>emptySet());
@@ -274,6 +284,8 @@ public class VersionAwareMarshallerTest extends AbstractInfinispanTest {
 
       Address local = new JGroupsAddress(new IpAddress(12345));
       GlobalTransaction gtx = gtf.newGlobalTransaction(local, false);
+      gtx.setProtocolId("2PC");
+      gtx.setEpochId(0);
       PrepareCommand c11 = new PrepareCommand(cacheName, gtx, true, c5, c6, c8, c10);
       marshallAndAssertEquality(c11);
 

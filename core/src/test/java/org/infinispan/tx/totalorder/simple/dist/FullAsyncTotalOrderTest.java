@@ -28,6 +28,7 @@ import org.infinispan.interceptors.locking.OptimisticLockingInterceptor;
 import org.infinispan.interceptors.locking.PessimisticLockingInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderDistributionInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderInterceptor;
+import org.infinispan.reconfigurableprotocol.protocol.TotalOrderCommitProtocol;
 import org.infinispan.test.MultipleCacheManagersTest;
 import org.infinispan.transaction.TransactionProtocol;
 import org.infinispan.util.concurrent.IsolationLevel;
@@ -75,10 +76,10 @@ public class FullAsyncTotalOrderTest extends MultipleCacheManagersTest {
 
    public void testInterceptorChain() {
       InterceptorChain ic = advancedCache(0).getComponentRegistry().getComponent(InterceptorChain.class);
-      assertTrue(ic.containsInterceptorType(TotalOrderInterceptor.class));
-      assertTrue(ic.containsInterceptorType(TotalOrderDistributionInterceptor.class));
-      assertFalse(ic.containsInterceptorType(OptimisticLockingInterceptor.class));
-      assertFalse(ic.containsInterceptorType(PessimisticLockingInterceptor.class));
+      assertTrue(ic.containsInterceptorType(TotalOrderInterceptor.class, TotalOrderCommitProtocol.UID));
+      assertTrue(ic.containsInterceptorType(TotalOrderDistributionInterceptor.class, TotalOrderCommitProtocol.UID));
+      assertFalse(ic.containsInterceptorType(OptimisticLockingInterceptor.class, TotalOrderCommitProtocol.UID));
+      assertFalse(ic.containsInterceptorType(PessimisticLockingInterceptor.class, TotalOrderCommitProtocol.UID));
    }
 
    public void testToCacheIsTransactional() {

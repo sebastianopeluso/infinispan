@@ -36,10 +36,12 @@ import org.infinispan.commands.read.ReduceCommand;
 import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.commands.remote.ConfigurationStateCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.GarbageCollectorControlCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
+import org.infinispan.commands.remote.ReconfigurableProtocolCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
@@ -88,6 +90,7 @@ import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.InterceptorChain;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.statetransfer.StateProvider;
 import org.infinispan.statetransfer.StateConsumer;
 import org.infinispan.statetransfer.StateRequestCommand;
@@ -137,7 +140,6 @@ public class CommandsFactoryImpl implements CommandsFactory {
    private CacheNotifier notifier;
    private Cache<Object, Object> cache;
    private String cacheName;
-   private boolean totalOrderProtocol;
 
    // some stateless commands can be reused so that they aren't constructed again all the time.
    private SizeCommand cachedSizeCommand;
@@ -159,6 +161,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
    private BackupSender backupSender;
    private CancellationService cancellationService;
    private DataPlacementManager dataPlacementManager;
+   private ReconfigurableReplicationManager reconfigurableReplicationManager;
 
    private Map<Byte, ModuleCommandInitializer> moduleCommandInitializers;
    private CommitLog commitLog;
@@ -175,7 +178,8 @@ public class CommandsFactoryImpl implements CommandsFactory {
                                  LockManager lockManager, InternalEntryFactory entryFactory, MapReduceManager mapReduceManager,
                                  StateTransferManager stm, BackupSender backupSender, CancellationService cancellationService,
                                  DataPlacementManager dataPlacementManager, CommitLog commitLog, VersionGenerator versionGenerator,
-                                 GarbageCollectorManager garbageCollectorManager, TransactionCommitManager transactionCommitManager) {
+                                 GarbageCollectorManager garbageCollectorManager, TransactionCommitManager transactionCommitManager,
+                                 ReconfigurableReplicationManager reconfigurableReplicationManager) {
       this.dataContainer = container;
       this.notifier = notifier;
       this.cache = cache;
@@ -199,13 +203,13 @@ public class CommandsFactoryImpl implements CommandsFactory {
       this.versionGenerator = versionGenerator;
       this.garbageCollectorManager = garbageCollectorManager;
       this.transactionCommitManager = transactionCommitManager;
+      this.reconfigurableReplicationManager = reconfigurableReplicationManager;
    }
 
    @Start(priority = 1)
    // needs to happen early on
    public void start() {
       cacheName = cache.getName();
-      this.totalOrderProtocol = configuration.transaction().transactionProtocol().isTotalOrder();
    }
 
    @Override
@@ -307,31 +311,37 @@ public class CommandsFactoryImpl implements CommandsFactory {
 
    @Override
    public PrepareCommand buildPrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications, boolean onePhaseCommit) {
-      return totalOrderProtocol ? new TotalOrderNonVersionedPrepareCommand(cacheName, gtx, modifications) :
+      return gtx.getReconfigurableProtocol().useTotalOrder() ?
+            new TotalOrderNonVersionedPrepareCommand(cacheName, gtx, modifications) :
             new PrepareCommand(cacheName, gtx, modifications, onePhaseCommit);
    }
 
    @Override
    public VersionedPrepareCommand buildVersionedPrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications, boolean onePhase) {
-      return totalOrderProtocol ? new TotalOrderVersionedPrepareCommand(cacheName, gtx, modifications, onePhase) :
+      return gtx.getReconfigurableProtocol().useTotalOrder() ?
+            new TotalOrderVersionedPrepareCommand(cacheName, gtx, modifications, onePhase) :
             new VersionedPrepareCommand(cacheName, gtx, modifications, onePhase);
    }
 
    @Override
    public CommitCommand buildCommitCommand(GlobalTransaction gtx) {
-      return totalOrderProtocol ? new TotalOrderCommitCommand(cacheName, gtx) :
+      return gtx.getReconfigurableProtocol().useTotalOrder() ?
+            new TotalOrderCommitCommand(cacheName, gtx) :
             new CommitCommand(cacheName, gtx);
    }
 
    @Override
    public VersionedCommitCommand buildVersionedCommitCommand(GlobalTransaction gtx) {
-      return totalOrderProtocol ? new TotalOrderVersionedCommitCommand(cacheName, gtx) :
+      return gtx.getReconfigurableProtocol().useTotalOrder() ?
+            new TotalOrderVersionedCommitCommand(cacheName, gtx) :
             new VersionedCommitCommand(cacheName, gtx);
    }
 
    @Override
    public RollbackCommand buildRollbackCommand(GlobalTransaction gtx) {
-      return totalOrderProtocol ? new TotalOrderRollbackCommand(cacheName, gtx) : new RollbackCommand(cacheName, gtx);
+      return gtx.getReconfigurableProtocol().useTotalOrder() ?
+            new TotalOrderRollbackCommand(cacheName, gtx) :
+            new RollbackCommand(cacheName, gtx);
    }
 
    @Override
@@ -399,7 +409,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
          case TotalOrderVersionedPrepareCommand.COMMAND_ID:
          case TotalOrderGMUPrepareCommand.COMMAND_ID:
             PrepareCommand pc = (PrepareCommand) c;
-            pc.init(interceptorChain, icc, txTable);
+            pc.init(interceptorChain, icc, txTable, reconfigurableReplicationManager);
             pc.initialize(notifier, recoveryManager);
             if (pc.getModifications() != null)
                for (ReplicableCommand nested : pc.getModifications())  {
@@ -420,13 +430,13 @@ public class CommandsFactoryImpl implements CommandsFactory {
          case TotalOrderCommitCommand.COMMAND_ID:
          case TotalOrderVersionedCommitCommand.COMMAND_ID:
             CommitCommand commitCommand = (CommitCommand) c;
-            commitCommand.init(interceptorChain, icc, txTable);
+            commitCommand.init(interceptorChain, icc, txTable, reconfigurableReplicationManager);
             commitCommand.markTransactionAsRemote(isRemote);
             break;
          case RollbackCommand.COMMAND_ID:
          case TotalOrderRollbackCommand.COMMAND_ID:
             RollbackCommand rollbackCommand = (RollbackCommand) c;
-            rollbackCommand.init(interceptorChain, icc, txTable);
+            rollbackCommand.init(interceptorChain, icc, txTable, reconfigurableReplicationManager);
             rollbackCommand.markTransactionAsRemote(isRemote);
             break;
          case ClearCommand.COMMAND_ID:
@@ -438,11 +448,12 @@ public class CommandsFactoryImpl implements CommandsFactory {
             gmuClusteredGetCommand.initializeGMUComponents(commitLog, versionGenerator);
          case ClusteredGetCommand.COMMAND_ID:
             ClusteredGetCommand clusteredGetCommand = (ClusteredGetCommand) c;
-            clusteredGetCommand.initialize(icc, this, entryFactory, interceptorChain, distributionManager, txTable);
+            clusteredGetCommand.initialize(icc, this, entryFactory, interceptorChain, distributionManager, txTable,
+                                           reconfigurableReplicationManager);
             break;
          case LockControlCommand.COMMAND_ID:
             LockControlCommand lcc = (LockControlCommand) c;
-            lcc.init(interceptorChain, icc, txTable);
+            lcc.init(interceptorChain, icc, txTable, reconfigurableReplicationManager);
             lcc.markTransactionAsRemote(isRemote);
             if (configuration.deadlockDetection().enabled() && isRemote) {
                DldGlobalTransaction gtx = (DldGlobalTransaction) lcc.getGlobalTransaction();
@@ -512,9 +523,17 @@ public class CommandsFactoryImpl implements CommandsFactory {
             DataPlacementCommand dataPlacementRequestCommand = (DataPlacementCommand)c;
             dataPlacementRequestCommand.initialize(dataPlacementManager);
             break;
+         case ReconfigurableProtocolCommand.COMMAND_ID:
+            ReconfigurableProtocolCommand rpc = (ReconfigurableProtocolCommand) c;
+            rpc.init(reconfigurableReplicationManager);
+            break;
          case GarbageCollectorControlCommand.COMMAND_ID:
             GarbageCollectorControlCommand gccc = (GarbageCollectorControlCommand) c;
             gccc.init(garbageCollectorManager);
+            break;
+         case ConfigurationStateCommand.COMMAND_ID:
+            ConfigurationStateCommand csc = (ConfigurationStateCommand) c;
+            csc.initialize(reconfigurableReplicationManager);
             break;
          default:
             ModuleCommandInitializer mci = moduleCommandInitializers.get(c.getCommandId());
@@ -632,13 +651,16 @@ public class CommandsFactoryImpl implements CommandsFactory {
    @Override
    public GMUPrepareCommand buildGMUPrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications,
                                                    boolean onePhaseCommit) {
-      return totalOrderProtocol ? new TotalOrderGMUPrepareCommand(cacheName, gtx, modifications, onePhaseCommit) :
+      return gtx.getReconfigurableProtocol().useTotalOrder() ?
+            new TotalOrderGMUPrepareCommand(cacheName, gtx, modifications, onePhaseCommit) :
             new GMUPrepareCommand(cacheName, gtx, modifications, onePhaseCommit);
    }
 
    @Override
    public GMUCommitCommand buildGMUCommitCommand(GlobalTransaction gtx) {
-      return totalOrderProtocol ? new TotalOrderGMUCommitCommand(cacheName, gtx) : new GMUCommitCommand(cacheName, gtx);
+      return gtx.getReconfigurableProtocol().useTotalOrder() ?
+            new TotalOrderGMUCommitCommand(cacheName, gtx) :
+            new GMUCommitCommand(cacheName, gtx);
    }
 
    @Override
@@ -652,5 +674,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
    public GarbageCollectorControlCommand buildGarbageCollectorControlCommand(GarbageCollectorControlCommand.Type type,
                                                                              int minimumVisibleViewId) {
       return new GarbageCollectorControlCommand(cacheName, type, minimumVisibleViewId);
+   }
+
+   @Override
+   public ReconfigurableProtocolCommand buildReconfigurableProtocolCommand(ReconfigurableProtocolCommand.Type type, String protocolId) {
+      return new ReconfigurableProtocolCommand(cacheName, type, protocolId);
    }
 }

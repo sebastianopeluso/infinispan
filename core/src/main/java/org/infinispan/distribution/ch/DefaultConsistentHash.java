@@ -246,9 +246,9 @@ public class DefaultConsistentHash implements ConsistentHash {
       if (numSegments != dch2.getNumSegments()) {
          throw new IllegalArgumentException("The consistent hash objects must have the same number of segments");
       }
-      if (numOwners != dch2.getNumOwners()) {
-         throw new IllegalArgumentException("The consistent hash objects must have the same number of owners");
-      }
+      //if (numOwners != dch2.getNumOwners()) {
+      //   throw new IllegalArgumentException("The consistent hash objects must have the same number of owners");
+      //}
 
       List<Address> unionMembers = new ArrayList<Address>(this.members);
       mergeLists(unionMembers, dch2.getMembers());
@@ -259,7 +259,7 @@ public class DefaultConsistentHash implements ConsistentHash {
          mergeLists(unionSegmentOwners[i], dch2.locateOwnersForSegment(i));
       }
 
-      return new DefaultConsistentHash(hashFunction, numOwners, numSegments, unionMembers, unionSegmentOwners);
+      return new DefaultConsistentHash(hashFunction, dch2.numOwners, numSegments, unionMembers, unionSegmentOwners);
    }
 
    /**

@@ -27,6 +27,7 @@ import org.infinispan.commands.CancellableCommand;
 import org.infinispan.commands.CancellationService;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.CacheRpcCommand;
+import org.infinispan.commands.remote.ConfigurationStateCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.tx.GMUCommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
@@ -93,7 +94,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       ComponentRegistry cr = gcr.getNamedComponentRegistry(cacheName);
 
       if (cr == null) {
-         if (!globalConfiguration.transport().strictPeerToPeer()) {
+         if (!globalConfiguration.transport().strictPeerToPeer() || cmd instanceof ConfigurationStateCommand) {
             if (trace) log.tracef("Strict peer to peer off, so silently ignoring that %s cache is not defined", cacheName);
             reply(response, null);
             return;

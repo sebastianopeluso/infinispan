@@ -30,6 +30,7 @@ import org.infinispan.interceptors.totalorder.TotalOrderDistributionInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderVersionedDistributionInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderVersionedEntryWrappingInterceptor;
+import org.infinispan.reconfigurableprotocol.protocol.TotalOrderCommitProtocol;
 import org.infinispan.test.MultipleCacheManagersTest;
 import org.infinispan.transaction.TransactionProtocol;
 import org.infinispan.util.concurrent.IsolationLevel;
@@ -72,15 +73,15 @@ public class SingleNodeOnePhaseTotalOrderTest extends MultipleCacheManagersTest 
    public void testInteceptorChain() {
       InterceptorChain ic = advancedCache(0).getComponentRegistry().getComponent(InterceptorChain.class);
       if (onePhaseTotalOrder) {
-         assertTrue(ic.containsInterceptorType(TotalOrderInterceptor.class));
-         assertTrue(ic.containsInterceptorType(TotalOrderDistributionInterceptor.class));
+         assertTrue(ic.containsInterceptorType(TotalOrderInterceptor.class, TotalOrderCommitProtocol.UID));
+         assertTrue(ic.containsInterceptorType(TotalOrderDistributionInterceptor.class, TotalOrderCommitProtocol.UID));
       } else {
-         assertTrue(ic.containsInterceptorType(TotalOrderInterceptor.class));
-         assertTrue(ic.containsInterceptorType(TotalOrderVersionedDistributionInterceptor.class));
-         assertTrue(ic.containsInterceptorType(TotalOrderVersionedEntryWrappingInterceptor.class));
+         assertTrue(ic.containsInterceptorType(TotalOrderInterceptor.class, TotalOrderCommitProtocol.UID));
+         assertTrue(ic.containsInterceptorType(TotalOrderVersionedDistributionInterceptor.class, TotalOrderCommitProtocol.UID));
+         assertTrue(ic.containsInterceptorType(TotalOrderVersionedEntryWrappingInterceptor.class, TotalOrderCommitProtocol.UID));
       }
-      assertFalse(ic.containsInterceptorType(OptimisticLockingInterceptor.class));
-      assertFalse(ic.containsInterceptorType(PessimisticLockingInterceptor.class));
+      assertFalse(ic.containsInterceptorType(OptimisticLockingInterceptor.class, TotalOrderCommitProtocol.UID));
+      assertFalse(ic.containsInterceptorType(PessimisticLockingInterceptor.class, TotalOrderCommitProtocol.UID));
    }
 
    public void testToCacheIsTransactional() {

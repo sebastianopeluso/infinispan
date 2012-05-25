@@ -48,6 +48,8 @@ import org.infinispan.loaders.CacheLoaderManager;
 import org.infinispan.loaders.CacheLoaderManagerImpl;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
+import org.infinispan.reconfigurableprotocol.ProtocolTable;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
 import org.infinispan.transaction.TransactionCoordinator;
@@ -85,7 +87,8 @@ import static org.infinispan.util.Util.getInstance;
                               ClusteringDependentLogic.class, LockContainer.class,
                               L1Manager.class, TransactionFactory.class, BackupSender.class,
                               TotalOrderManager.class, DataPlacementManager.class, L1GMUContainer.class, CommitLog.class,
-                              TransactionCommitManager.class, GarbageCollectorManager.class})
+                              TransactionCommitManager.class, GarbageCollectorManager.class, ReconfigurableReplicationManager.class,
+                              ProtocolTable.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -165,6 +168,10 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
                   (T) new L1ManagerImpl();
          } else if (componentType.equals(GarbageCollectorManager.class)) {
             return (T) new GarbageCollectorManager();
+         } else if (componentType.equals(ReconfigurableReplicationManager.class)) {
+            return (T) new ReconfigurableReplicationManager();
+         } else if (componentType.equals(ProtocolTable.class)) {
+            return (T) new ProtocolTable();
          }
       }
 

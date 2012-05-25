@@ -46,6 +46,7 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -129,6 +130,7 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       if (hasModifications()) {
          remoteTransaction.setModifications(Arrays.asList(modifications));
       }
+      reconfigurableReplicationManager.notifyRemoteTransaction(getGlobalTransaction(), getAffectedKeysToLock(false));
 
       // 2. then set it on the invocation context
       RemoteTxInvocationContext ctx = icc.createRemoteTxInvocationContext(remoteTransaction, getOrigin());
@@ -251,10 +253,29 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
     * @return  an array of keys
     */
    public Object[] getAffectedKeysToLock(boolean sort) {
+      return getAffectedKeysToLock(sort, modifications);
+   }
+
+   public boolean wasInvoked() {
+      return wasInvoked;
+   }
+
+   public void setWasInvoked(boolean wasInvoked) {
+      this.wasInvoked = wasInvoked;
+   }
+
+   public static Object[] getAffectedKeysToLock(boolean sort, WriteCommand... modifications) {
+      if (modifications == null || modifications.length == 0) {
+         return EMPTY_ARRAY;
+      }
+      return getAffectedKeysToLock(sort, Arrays.asList(modifications));
+   }
+
+   public static Object[] getAffectedKeysToLock(boolean sort, Collection<WriteCommand> modifications) {
       if (modifications == null) {
          return EMPTY_ARRAY;
       }
-      Set<Object> set = new HashSet<Object>(modifications.length);
+      Set<Object> set = new HashSet<Object>(modifications.size());
       for (WriteCommand wc : modifications) {
          switch (wc.getCommandId()) {
             case ClearCommand.COMMAND_ID:
@@ -279,13 +300,5 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
          TimSort.sort(sorted, KEY_COMPARATOR);
       }
       return sorted;
-   }
-
-   public boolean wasInvoked() {
-      return wasInvoked;
-   }
-
-   public void setWasInvoked(boolean wasInvoked) {
-      this.wasInvoked = wasInvoked;
    }
 }

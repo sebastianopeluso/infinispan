@@ -33,6 +33,9 @@ import org.infinispan.factories.components.ComponentMetadataRepo;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.interceptors.base.ReconfigurableProtocolAwareWrapperInterceptor;
+import org.infinispan.reconfigurableprotocol.ReconfigurableProtocol;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.util.InfinispanCollections;
 import org.infinispan.util.ReflectionUtil;
 import org.infinispan.util.logging.Log;
@@ -40,8 +43,10 @@ import org.infinispan.util.logging.LogFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -56,6 +61,21 @@ public class InterceptorChain {
 
    private static final Log log = LogFactory.getLog(InterceptorChain.class);
 
+   public static enum InterceptorType {
+      STATE_TRANSFER,
+      CUSTOM_INTERCEPTOR_BEFORE_TX_INTERCEPTOR,
+      CUSTOM_INTERCEPTOR_AFTER_TX_INTERCEPTOR,
+      LOCKING,
+      WRAPPER,
+      DEADLOCK,
+      CLUSTER
+   }
+
+   private final Map<InterceptorType, ReconfigurableProtocolAwareWrapperInterceptor> wrappers =
+         new EnumMap<InterceptorType, ReconfigurableProtocolAwareWrapperInterceptor>(InterceptorType.class);
+
+   private ReconfigurableReplicationManager manager;
+
    /**
     * reference to the first interceptor in the chain
     */
@@ -69,6 +89,15 @@ public class InterceptorChain {
     */
    public InterceptorChain(ComponentMetadataRepo componentMetadataRepo) {
       this.componentMetadataRepo = componentMetadataRepo;
+      for (InterceptorType type : InterceptorType.values()) {
+         wrappers.put(type, new ReconfigurableProtocolAwareWrapperInterceptor(type));
+      }
+   }
+
+
+   @Inject
+   public void inject(ReconfigurableReplicationManager manager) {
+      this.manager = manager;
    }
 
    @Start
@@ -77,6 +106,10 @@ public class InterceptorChain {
          log.debugf("Interceptor chain size: %d", size());
          log.debugf("Interceptor chain is: %s", toString());
       }
+   }
+
+   public void setFirst(CommandInterceptor commandInterceptor) {
+      this.firstInChain = commandInterceptor;
    }
 
    private void validateCustomInterceptor(Class<? extends CommandInterceptor> i) {
@@ -238,7 +271,7 @@ public class InterceptorChain {
          validateCustomInterceptor(interceptorClass);
          CommandInterceptor it = firstInChain;
          while (it != null) {
-            if (it.getClass().equals(afterInterceptor)) {
+            if (isSameClass(it, afterInterceptor, false, null)) {
                toAdd.setNext(it.getNext());
                it.setNext(toAdd);
                return true;
@@ -271,7 +304,7 @@ public class InterceptorChain {
          }
          CommandInterceptor it = firstInChain;
          while (it.getNext() != null) {
-            if (it.getNext().getClass().equals(beforeInterceptor)) {
+            if (isSameClass(it.getNext(), beforeInterceptor, false, null)) {
                toAdd.setNext(it.getNext());
                it.setNext(toAdd);
                return true;
@@ -340,6 +373,7 @@ public class InterceptorChain {
     */
    public Object invoke(InvocationContext ctx, VisitableCommand command) {
       try {
+         ctx.setProtocolId(manager.getCurrentProtocolId());
          return command.acceptVisitor(ctx, firstInChain);
       } catch (CacheException e) {
          if (e.getCause() instanceof InterruptedException)
@@ -392,7 +426,7 @@ public class InterceptorChain {
       CommandInterceptor iterator = firstInChain;
       List<CommandInterceptor> result = new ArrayList<CommandInterceptor>(2);
       while (iterator != null) {
-         if (iterator.getClass() == clazz) result.add(iterator);
+         addInterceptorsWithClass(result, iterator, clazz);
          iterator = iterator.getNext();
       }
       return result;
@@ -404,6 +438,9 @@ public class InterceptorChain {
       while (i != null) {
          sb.append("\n\t>> ");
          sb.append(i.getClass().getName());
+         if (i instanceof ReconfigurableProtocolAwareWrapperInterceptor) {
+            sb.append(((ReconfigurableProtocolAwareWrapperInterceptor) i).routeTableToString());
+         }
          i = i.getNext();
       }
       return sb.toString();
@@ -422,20 +459,48 @@ public class InterceptorChain {
    }
 
    public boolean containsInterceptorType(Class<? extends CommandInterceptor> interceptorType) {
-      return containsInterceptorType(interceptorType, false);
+      return containsInterceptorType(interceptorType, null, false);
    }
 
-   public boolean containsInterceptorType(Class<? extends CommandInterceptor> interceptorType, boolean alsoMatchSubClasses) {
+   public boolean containsInterceptorType(Class<? extends CommandInterceptor> interceptorType, String protocolId) {
+      return containsInterceptorType(interceptorType, protocolId, false);
+   }
+
+   public boolean containsInterceptorType(Class<? extends CommandInterceptor> interceptorType, String protocolId,
+                                          boolean alsoMatchSubClasses) {
       // Called when building interceptor chain and so concurrent start calls are protected already
       CommandInterceptor it = firstInChain;
       while (it != null) {
-         if (alsoMatchSubClasses) {
-            if (interceptorType.isAssignableFrom(it.getClass())) return true;
-         } else {
-            if (it.getClass().equals(interceptorType)) return true;
-         }
+         if (isSameClass(it, interceptorType, alsoMatchSubClasses, protocolId)) return true;
          it = it.getNext();
       }
       return false;
+   }
+
+   public void appendWrapper(InterceptorType type) {
+      appendInterceptor(wrappers.get(type), false);
+   }
+
+   public void registerNewProtocol(ReconfigurableProtocol protocol) {
+      EnumMap<InterceptorType, CommandInterceptor> newInterceptors = protocol.buildInterceptorChain();
+      for (Map.Entry<InterceptorType, CommandInterceptor> entry : newInterceptors.entrySet()) {
+         wrappers.get(entry.getKey()).setProtocolDependentInterceptor(protocol.getUniqueProtocolName(), entry.getValue());
+      }
+   }
+
+   public final boolean isSameClass(CommandInterceptor interceptor, Class<?> clazz, boolean matchSubclass, String protocolId) {
+      if (interceptor instanceof ReconfigurableProtocolAwareWrapperInterceptor) {
+         return ((ReconfigurableProtocolAwareWrapperInterceptor) interceptor).isSameClass(clazz, matchSubclass, protocolId, this);
+      } else {
+         return matchSubclass ? clazz.isAssignableFrom(interceptor.getClass()) : interceptor.getClass().equals(clazz);
+      }
+   }
+
+   public final void addInterceptorsWithClass(List<CommandInterceptor> list, CommandInterceptor ci, Class clazz) {
+      if (ci.getClass().equals(clazz)) {
+         list.add(ci);
+      } else if (ci instanceof ReconfigurableProtocolAwareWrapperInterceptor) {
+         ((ReconfigurableProtocolAwareWrapperInterceptor) ci).addInterceptorsWithClass(list, clazz, this);
+      }
    }
 }

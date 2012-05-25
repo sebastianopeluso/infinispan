@@ -27,6 +27,8 @@ import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.impl.RemoteTxInvocationContext;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.lifecycle.ComponentStatus;
+import org.infinispan.reconfigurableprotocol.exception.NoSuchReconfigurableProtocolException;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.remoting.transport.Address;
@@ -53,15 +55,19 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    protected TransactionTable txTable;
    private Address origin;
    private int topologyId = -1;
+   protected ReconfigurableReplicationManager reconfigurableReplicationManager;
 
    public AbstractTransactionBoundaryCommand(String cacheName) {
       this.cacheName = cacheName;
    }
 
-   public void init(InterceptorChain chain, InvocationContextContainer icc, TransactionTable txTable) {
+   public void init(InterceptorChain chain, InvocationContextContainer icc, TransactionTable txTable,
+                    ReconfigurableReplicationManager reconfigurableReplicationManager) {
       this.invoker = chain;
       this.icc = icc;
       this.txTable = txTable;
+      this.reconfigurableReplicationManager = reconfigurableReplicationManager;
+      reconfigurableReplicationManager.initGlobalTransactionIfNeeded(globalTx);
    }
 
    @Override
@@ -118,8 +124,9 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
       return invoker.invoke(ctxt, this);
    }
 
-   protected void visitRemoteTransaction(RemoteTransaction tx) {
-      // to be overridden
+   protected void visitRemoteTransaction(RemoteTransaction tx) throws NoSuchReconfigurableProtocolException, InterruptedException {
+      tx.getGlobalTransaction().update(globalTx);
+      reconfigurableReplicationManager.notifyRemoteTransaction(tx.getGlobalTransaction(), null);
    }
 
    protected RemoteTransaction getRemoteTransaction() {
@@ -183,5 +190,9 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    @Override
    public boolean isReturnValueExpected() {
       return true;
+   }
+
+   protected final boolean isTotalOrder() {
+      return globalTx.getReconfigurableProtocol().useTotalOrder();
    }
 }

@@ -35,6 +35,8 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
 import org.infinispan.interceptors.InterceptorChain;
+import org.infinispan.reconfigurableprotocol.ProtocolTable;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
@@ -69,14 +71,21 @@ public class TransactionCoordinator {
 
    boolean trace;
 
+   private ReconfigurableReplicationManager manager;
+   private ProtocolTable protocolTable;
+
    @Inject
    public void init(CommandsFactory commandsFactory, InvocationContextContainer icc, InterceptorChain invoker,
-                    TransactionTable txTable, Configuration configuration) {
+                    TransactionTable txTable, Configuration configuration,
+                    ReconfigurableReplicationManager reconfigurableReplicationManager,
+                    ProtocolTable protocolTable) {
       this.commandsFactory = commandsFactory;
       this.icc = icc;
       this.invoker = invoker;
       this.txTable = txTable;
       this.configuration = configuration;
+      this.manager = reconfigurableReplicationManager;
+      this.protocolTable = protocolTable;
       trace = log.isTraceEnabled();
    }
 
@@ -139,13 +148,23 @@ public class TransactionCoordinator {
    public final int prepare(LocalTransaction localTransaction, boolean replayEntryWrapping) throws XAException {
       validateNotMarkedForRollback(localTransaction);
 
-      if (Configurations.isOnePhaseCommit(configuration) || is1PcForAutoCommitTransaction(localTransaction) ||
-            Configurations.isOnePhaseTotalOrderCommit(configuration) || Configurations.isOnePhasePassiveReplication(configuration)) {
+      GlobalTransaction globalTransaction = localTransaction.getGlobalTransaction();
+      Transaction transaction = localTransaction.getTransaction();
+      List<WriteCommand> modificationsList = localTransaction.getModifications();
+      try {
+         manager.notifyLocalTransaction(globalTransaction, PrepareCommand.getAffectedKeysToLock(false, modificationsList),
+                                        protocolTable.getProtocolId(transaction), transaction);
+      } catch (InterruptedException e) {
+         rollback(localTransaction);
+         throw new XAException(XAException.XA_RBROLLBACK);
+      }
+
+      if (globalTransaction.getReconfigurableProtocol().use1PC(localTransaction)) {
          if (trace) log.tracef("Received prepare for tx: %s. Skipping call as 1PC will be used.", localTransaction);
          return XA_OK;
       }
 
-      PrepareCommand prepareCommand = commandCreator.createPrepareCommand(localTransaction.getGlobalTransaction(), localTransaction.getModifications(), false);
+      PrepareCommand prepareCommand = commandCreator.createPrepareCommand(localTransaction.getGlobalTransaction(), modificationsList, false);
       if (trace) log.tracef("Sending prepare command through the chain: %s", prepareCommand);
 
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();
@@ -180,8 +199,20 @@ public class TransactionCoordinator {
       if (trace) log.tracef("Committing transaction %s", localTransaction.getGlobalTransaction());
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();
       ctx.setLocalTransaction(localTransaction);
-      if (Configurations.isOnePhaseCommit(configuration) || isOnePhase || is1PcForAutoCommitTransaction(localTransaction) ||
-            Configurations.isOnePhaseTotalOrderCommit(configuration) || Configurations.isOnePhasePassiveReplication(configuration)) {
+
+
+      GlobalTransaction globalTransaction = localTransaction.getGlobalTransaction();
+      List<WriteCommand> modificationsList = localTransaction.getModifications();
+      try {
+         manager.notifyLocalTransaction(globalTransaction, PrepareCommand.getAffectedKeysToLock(false, modificationsList),
+                                        protocolTable.getProtocolId(localTransaction.getTransaction()),
+                                        localTransaction.getTransaction());
+      } catch (InterruptedException e) {
+         rollback(localTransaction);
+         throw new XAException(XAException.XA_RBROLLBACK);
+      }
+
+      if (globalTransaction.getReconfigurableProtocol().use1PC(localTransaction) || isOnePhase) {
          validateNotMarkedForRollback(localTransaction);
 
          if (trace) log.trace("Doing an 1PC prepare call on the interceptor chain");
@@ -189,7 +220,17 @@ public class TransactionCoordinator {
          try {
             invoker.invoke(ctx, command);
          } catch (Throwable e) {
-            handleCommitFailure(e, localTransaction, true);
+            //in total order and 1PC, the rollback command is not needed
+            boolean totalOrder = localTransaction.getGlobalTransaction().getReconfigurableProtocol().useTotalOrder();
+            boolean onePhase = localTransaction.getGlobalTransaction().getReconfigurableProtocol().use1PC(localTransaction);
+            if (!(totalOrder && onePhase)) {
+               handleCommitFailure(e, localTransaction, true);
+            } else {
+               txTable.removeLocalTransaction(localTransaction);
+            }
+            throw new XAException(XAException.XA_HEURRB); //this is a heuristic rollback
+         } finally {
+            protocolTable.remove(localTransaction.getTransaction());
          }
       } else {
          CommitCommand commitCommand = commandCreator.createCommitCommand(localTransaction.getGlobalTransaction());
@@ -198,6 +239,8 @@ public class TransactionCoordinator {
             txTable.removeLocalTransaction(localTransaction);
          } catch (Throwable e) {
             handleCommitFailure(e, localTransaction, false);
+         } finally {
+            protocolTable.remove(localTransaction.getTransaction());
          }
       }
    }
@@ -217,6 +260,8 @@ public class TransactionCoordinator {
             txTable.failureCompletingTransaction(transaction);
          }
          throw new XAException(XAException.XAER_RMERR);
+      }  finally {
+         protocolTable.remove(localTransaction.getTransaction());
       }
    }
 
@@ -246,6 +291,7 @@ public class TransactionCoordinator {
 
    private void rollbackInternal(LocalTransaction localTransaction) throws Throwable {
       if (trace) log.tracef("rollback transaction %s ", localTransaction.getGlobalTransaction());
+      manager.notifyLocalTransactionForRollback(localTransaction, protocolTable.getThreadProtocolId());
       RollbackCommand rollbackCommand = commandsFactory.buildRollbackCommand(localTransaction.getGlobalTransaction());
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();
       ctx.setLocalTransaction(localTransaction);
@@ -259,10 +305,6 @@ public class TransactionCoordinator {
          rollback(localTransaction);
          throw new XAException(XAException.XA_RBROLLBACK);
       }
-   }
-
-   private boolean is1PcForAutoCommitTransaction(LocalTransaction localTransaction) {
-      return configuration.transaction().use1PcForAutoCommitTransactions() && localTransaction.isImplicitTransaction();
    }
 
    private static interface CommandCreator {

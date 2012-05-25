@@ -320,7 +320,7 @@ public interface ClusteringDependentLogic {
 
       @Override
       public void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand) {
-         if (rpcManager.getTransport().isCoordinator()) {
+         if (stateTransferManager.getCacheTopology().getReadConsistentHash().getMembers().get(0).equals(rpcManager.getAddress())) {
             GMUHelper.performReadSetValidation(prepareCommand, dataContainer, this);
          }
       }
@@ -352,7 +352,7 @@ public interface ClusteringDependentLogic {
 
       @Override
       public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand) {
-         if (configuration.transaction().transactionProtocol().isTotalOrder()) {
+         if (prepareCommand.getGlobalTransaction().getReconfigurableProtocol().useTotalOrder()) {
             return totalOrderCreateNewVersionsAndCheckForWriteSkews(context, prepareCommand, keySpecificLogic);
          } else {
             return super.createNewVersionsAndCheckForWriteSkews(versionGenerator, context, prepareCommand);
@@ -470,7 +470,7 @@ public interface ClusteringDependentLogic {
 
       @Override
       public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand) {
-         if (configuration.transaction().transactionProtocol().isTotalOrder()) {
+         if (prepareCommand.getGlobalTransaction().getReconfigurableProtocol().useTotalOrder()) {
             return totalOrderCreateNewVersionsAndCheckForWriteSkews(context, prepareCommand, keySpecificLogic);
          }
          // Perform a write skew check on mapped entries.

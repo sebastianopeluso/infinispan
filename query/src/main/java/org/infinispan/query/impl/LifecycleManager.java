@@ -220,7 +220,7 @@ public class LifecycleManager extends AbstractModuleLifecycle {
 
    private boolean verifyChainContainsQueryInterceptor(ComponentRegistry cr) {
       InterceptorChain interceptorChain = cr.getComponent(InterceptorChain.class);
-      return interceptorChain.containsInterceptorType(QueryInterceptor.class, true);
+      return interceptorChain.containsInterceptorType(QueryInterceptor.class, null, true);
    }
 
    private SearchFactoryIntegrator getSearchFactory(Properties indexingProperties, ComponentRegistry cr) {

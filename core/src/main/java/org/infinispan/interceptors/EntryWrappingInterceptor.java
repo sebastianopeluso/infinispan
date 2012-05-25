@@ -409,7 +409,7 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
     * @return true if the modification should be committed, false otherwise
     */
    protected boolean shouldCommitDuringPrepare(PrepareCommand command, TxInvocationContext ctx) {
-      boolean isTotalOrder = cacheConfiguration.transaction().transactionProtocol().isTotalOrder();
+      boolean isTotalOrder = command.getGlobalTransaction().getReconfigurableProtocol().useTotalOrder();
       return isTotalOrder ? command.isOnePhaseCommit() && (!ctx.isOriginLocal() || !command.hasModifications()) :
             command.isOnePhaseCommit();
    }
