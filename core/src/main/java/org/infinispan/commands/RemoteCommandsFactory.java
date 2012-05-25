@@ -36,6 +36,7 @@ import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
+import org.infinispan.commands.remote.ReconfigurableProtocolCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
@@ -235,6 +236,9 @@ public class RemoteCommandsFactory {
                break;
             case GMUClusteredGetCommand.COMMAND_ID:
                command = new GMUClusteredGetCommand(cacheName);
+               break;
+            case ReconfigurableProtocolCommand.COMMAND_ID:
+               command = new ReconfigurableProtocolCommand(cacheName);
                break;
             default:
                throw new CacheException("Unknown command id " + id + "!");

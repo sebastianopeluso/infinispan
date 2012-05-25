@@ -31,6 +31,7 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.loaders.CacheStore;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.statetransfer.totalorder.TotalOrderDistributedStateTransferTask;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -49,6 +50,7 @@ import static org.infinispan.context.Flag.SKIP_LOCKING;
  * @author Bela Ban
  * @author Dan Berindei &lt;dan@infinispan.org&gt;
  * @author Zhongmiao Li
+ * @author Pedro Ruivo
  * @since 4.0
  */
 @MBean(objectName = "DistributedStateTransferManager", description = "Component that handles state transfer in distributed mode")
@@ -74,8 +76,15 @@ public class DistributedStateTransferManagerImpl extends BaseStateTransferManage
 
    @Override
    protected BaseStateTransferTask createStateTransferTask(int viewId, List<Address> members, boolean initialView) {
-      return new DistributedStateTransferTask(rpcManager, configuration, dataContainer,
-                                              this, dm, stateTransferLock, cacheNotifier, viewId, members, chOld, chNew, initialView, transactionTable);
+      if (isTotalOrder()) {
+         return new TotalOrderDistributedStateTransferTask(rpcManager, configuration, dataContainer,
+                                                           this, dm, stateTransferLock, cacheNotifier, viewId, members,
+                                                           chOld, chNew, initialView, transactionTable, totalOrderManager);
+      } else {
+         return new DistributedStateTransferTask(rpcManager, configuration, dataContainer,
+                                                 this, dm, stateTransferLock, cacheNotifier, viewId, members, chOld,
+                                                 chNew, initialView, transactionTable);
+      }
    }
 
    @Override

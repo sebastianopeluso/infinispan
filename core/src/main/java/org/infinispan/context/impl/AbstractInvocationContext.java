@@ -61,7 +61,7 @@ public abstract class AbstractInvocationContext implements InvocationContext {
    private Map<Object, InternalGMUCacheEntry> keysRead = null;
 
    private EntryVersion versionToRead;
-   
+
    private boolean alreadyReadOnThisNode;
 
    // if this or any context subclass ever needs to store a boolean, always use a context flag instead.  This is far
@@ -77,6 +77,8 @@ public abstract class AbstractInvocationContext implements InvocationContext {
          this.mask = (byte) mask;
       }
    }
+
+   private String protocolId;
 
    /**
     * Tests whether a context flag is set.
@@ -147,12 +149,12 @@ public abstract class AbstractInvocationContext implements InvocationContext {
       else
          this.flags.addAll(flags);
    }
-   
+
    @Override
    public Address getOrigin() {
 	   return origin;
    }
-   
+
    public void setOrigin(Address origin) {
 	   this.origin = origin;
    }
@@ -210,7 +212,7 @@ public abstract class AbstractInvocationContext implements InvocationContext {
             "flags=" + flags +
             '}';
    }
-   
+
    public void addKeyReadInCommand(Object key, InternalGMUCacheEntry entry) {
       if (keysRead == null) {
          keysRead = new HashMap<Object, InternalGMUCacheEntry>();
@@ -246,5 +248,15 @@ public abstract class AbstractInvocationContext implements InvocationContext {
    @Override
    public void setAlreadyReadOnThisNode(boolean value) {
       alreadyReadOnThisNode = value;
+   }
+
+   @Override
+   public void setProtocolId(String protocolId) {
+      this.protocolId = protocolId;
+   }
+
+   @Override
+   public String getProtocolId() {
+      return protocolId;
    }
 }

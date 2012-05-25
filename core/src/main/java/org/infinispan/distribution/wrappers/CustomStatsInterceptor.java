@@ -6,7 +6,6 @@ import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.write.PutKeyValueCommand;
 import org.infinispan.configuration.cache.Configuration;
-import org.infinispan.container.EntryFactory;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.ComponentRegistry;
@@ -65,14 +64,16 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
       // we want that this method is the last to be invoked, otherwise the start method is not invoked
       // in the real components
       replace();
-      log.warn("Initializing the TransactionStatisticsRegistry");
+      log.info("Initializing the TransactionStatisticsRegistry");
       TransactionsStatisticsRegistry.init(this.configuration);
    }
 
    @Override
    public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
-      log.tracef("Visit Put Key Value command %s. Is it in transaction scope? %s. Is it local? %s", command,
-                 ctx.isInTxScope(), ctx.isOriginLocal());
+      if (log.isTraceEnabled()) {
+         log.tracef("Visit Put Key Value command %s. Is it in transaction scope? %s. Is it local? %s", command,
+                    ctx.isInTxScope(), ctx.isOriginLocal());
+      }
       Object ret;
       if(ctx.isInTxScope()){
          this.initStatsIfNecessary(ctx);
@@ -109,8 +110,10 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
 
    @Override
    public Object visitGetKeyValueCommand(InvocationContext ctx, GetKeyValueCommand command) throws Throwable{
-      log.tracef("Visit Get Key Value command %s. Is it in transaction scope? %s. Is it local? %s", command,
-                 ctx.isInTxScope(), ctx.isOriginLocal());
+      if (log.isTraceEnabled()) {
+         log.tracef("Visit Get Key Value command %s. Is it in transaction scope? %s. Is it local? %s", command,
+                    ctx.isInTxScope(), ctx.isOriginLocal());
+      }
       boolean isTx = ctx.isInTxScope();
       Object ret;
       if(isTx){
@@ -141,8 +144,10 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
 
    @Override
    public Object visitCommitCommand(TxInvocationContext ctx, CommitCommand command) throws Throwable {
-      log.tracef("Visit Commit command %s. Is it local?. Transaction is %s", command,
-                 ctx.isOriginLocal(), command.getGlobalTransaction());
+      if (log.isTraceEnabled()) {
+         log.tracef("Visit Commit command %s. Is it local?. Transaction is %s", command,
+                    ctx.isOriginLocal(), command.getGlobalTransaction().prettyPrint());
+      }
       this.initStatsIfNecessary(ctx);
       long currTime = System.nanoTime();
       Object ret = invokeNextInterceptor(ctx,command);
@@ -156,8 +161,10 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-      log.tracef("Visit Prepare command %s. Is it local?. Transaction is %s", command,
-                 ctx.isOriginLocal(), command.getGlobalTransaction());
+      if (log.isTraceEnabled()) {
+         log.tracef("Visit Prepare command %s. Is it local?. Transaction is %s", command,
+                    ctx.isOriginLocal(), command.getGlobalTransaction().prettyPrint());
+      }
       this.initStatsIfNecessary(ctx);
       TransactionsStatisticsRegistry.onPrepareCommand();
       if (command.hasModifications()) {
@@ -199,8 +206,10 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
 
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable{
-      log.tracef("Visit Rollback command %s. Is it local?. Transaction is %s", command,
-                 ctx.isOriginLocal(), command.getGlobalTransaction());
+      if (log.isTraceEnabled()) {
+         log.tracef("Visit Rollback command %s. Is it local?. Transaction is %s", command,
+                    ctx.isOriginLocal(), command.getGlobalTransaction().prettyPrint());
+      }
       this.initStatsIfNecessary(ctx);
       long initRollbackTime = System.nanoTime();
       Object ret = invokeNextInterceptor(ctx,command);
@@ -213,7 +222,7 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
    }
 
    private void replace(){
-      log.infof("CustomStatsInterceptor Enabled!");
+      log.info("CustomStatsInterceptor Enabled!");
       ComponentRegistry componentRegistry = cache.getAdvancedCache().getComponentRegistry();
 
       GlobalComponentRegistry globalComponentRegistry = componentRegistry.getGlobalComponentRegistry();
@@ -224,7 +233,6 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
 
       replaceRpcManager(componentRegistry);
       replaceLockManager(componentRegistry);
-      replaceEntryFactoryWrapper(componentRegistry);
       componentRegistry.rewire();
 
       this.wireConfiguration();
@@ -254,12 +262,6 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
                                                                                                      transactionTable);
       globalComponentRegistry.registerComponent(invocationHandlerWrapper, InboundInvocationHandler.class);
       return invocationHandlerWrapper;
-   }
-
-   private void replaceEntryFactoryWrapper(ComponentRegistry componentRegistry) {
-      EntryFactory entryFactory = componentRegistry.getComponent(EntryFactory.class);
-      EntryFactoryWrapper entryFactoryWrapper = new EntryFactoryWrapper(entryFactory);
-      componentRegistry.registerComponent(entryFactoryWrapper, EntryFactory.class);
    }
 
    private void replaceLockManager(ComponentRegistry componentRegistry) {

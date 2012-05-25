@@ -19,6 +19,7 @@ public class DistSimpleTotalOrder1PcTest extends SimpleTotalOrder1PcTest {
       ConfigurationBuilder dcc = getDefaultClusteredCacheConfig(CacheMode.DIST_SYNC, true);
       dcc.transaction().transactionProtocol(TransactionProtocol.TOTAL_ORDER);
       dcc.clustering().hash().numOwners(2);
+      dcc.clustering().l1().disable();
       createCluster(dcc, clusterSize);
       waitForClusterToForm();
    }

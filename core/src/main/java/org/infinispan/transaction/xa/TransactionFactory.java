@@ -34,8 +34,6 @@ import org.infinispan.remoting.transport.Transport;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.synchronization.SyncLocalTransaction;
-import org.infinispan.transaction.totalorder.TotalOrderRecoveryAwareRemoteTx;
-import org.infinispan.transaction.totalorder.TotalOrderRemoteTransactionImpl;
 import org.infinispan.transaction.xa.recovery.RecoveryAwareDldGlobalTransaction;
 import org.infinispan.transaction.xa.recovery.RecoveryAwareGlobalTransaction;
 import org.infinispan.transaction.xa.recovery.RecoveryAwareLocalTransaction;
@@ -91,8 +89,8 @@ public class TransactionFactory {
          }
 
          @Override
-         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId, boolean totalOrder) {
-            return createRecoveryRemoteTransaction(tx, viewId, totalOrder);
+         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId) {
+            return new RecoveryAwareRemoteTransaction(tx, viewId);
          }
       },
 
@@ -118,8 +116,8 @@ public class TransactionFactory {
          }
 
          @Override
-         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId, boolean totalOrder) {
-            return createRemoteTransaction(tx, viewId, totalOrder);
+         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId) {
+            return new RemoteTransaction(tx, viewId);
          }
       },
 
@@ -145,8 +143,8 @@ public class TransactionFactory {
          }
 
          @Override
-         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId, boolean totalOrder) {
-            return createRemoteTransaction(tx, viewId, totalOrder);
+         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId) {
+            return new RemoteTransaction(tx, viewId);
          }
       },
       NODLD_RECOVERY_XA {
@@ -173,8 +171,8 @@ public class TransactionFactory {
          }
 
          @Override
-         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId, boolean totalOrder) {
-            return createRecoveryRemoteTransaction(tx, viewId, totalOrder);
+         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId) {
+            return new RemoteTransaction(tx, viewId);
          }
       },
       NODLD_NORECOVERY_XA {
@@ -199,8 +197,8 @@ public class TransactionFactory {
          }
 
          @Override
-         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId, boolean totalOrder) {
-            return createRemoteTransaction(tx, viewId, totalOrder);
+         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId) {
+            return new RemoteTransaction(tx, viewId);
          }
       },
       NODLD_NORECOVERY_NOXA {
@@ -225,8 +223,8 @@ public class TransactionFactory {
          }
 
          @Override
-         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId, boolean totalOrder) {
-            return createRemoteTransaction(tx, viewId, totalOrder);
+         public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId) {
+            return new RemoteTransaction(tx, viewId);
          }
       };
 
@@ -245,45 +243,13 @@ public class TransactionFactory {
       }
 
       /**
-       * constructs a normal remote transaction or a total order remote transaction
-       *
-       * @param tx the global transaction
-       * @param viewId the view id
-       * @param totalOrder if the remote transaction must be a total order remote transaction
-       * @return the remote transaction
-       */
-      protected RemoteTransaction createRemoteTransaction(GlobalTransaction tx, int viewId, boolean totalOrder) {
-         if (totalOrder) {
-            return new TotalOrderRemoteTransactionImpl(tx, viewId);
-         } else {
-            return new RemoteTransaction(tx, viewId);
-         }
-      }
-
-      /**
-       * constructs a normal remote transaction or a total order remote transaction with recovery aware
-       *
-       * @param tx the global transaction
-       * @param viewId the view id
-       * @param totalOrder if the remote transaction must be a total order remote transaction
-       * @return the remote transaction
-       */
-      protected RemoteTransaction createRecoveryRemoteTransaction(GlobalTransaction tx, int viewId, boolean totalOrder) {
-         if (totalOrder) {
-            return new TotalOrderRecoveryAwareRemoteTx(tx, viewId);
-         } else {
-            return new RecoveryAwareRemoteTransaction(tx, viewId);
-         }
-      }
-
-      /**
        * this class is internally synchronized, so it can be shared between instances
        */
       private final Random rnd = new Random();
 
       public abstract RemoteTransaction newRemoteTransaction(WriteCommand[] modifications, GlobalTransaction tx, int viewId);
 
-      public abstract RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId, boolean totalOrder);
+      public abstract RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId);
    }
 
 
@@ -304,7 +270,7 @@ public class TransactionFactory {
    }
 
    public RemoteTransaction newRemoteTransaction(GlobalTransaction tx, int viewId) {
-      return txFactoryEnum.newRemoteTransaction(tx, viewId, configuration.isTotalOrder());
+      return txFactoryEnum.newRemoteTransaction(tx, viewId);
    }
 
    @Inject

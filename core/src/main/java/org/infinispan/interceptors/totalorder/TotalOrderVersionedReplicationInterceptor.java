@@ -45,7 +45,7 @@ public class TotalOrderVersionedReplicationInterceptor extends VersionedReplicat
 
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
       boolean waitOnlySelfDeliver =!configuration.isSyncCommitPhase();
-      totalOrderBroadcastPrepare(command, waitOnlySelfDeliver, null, null, rpcManager,
-                                 configuration.getSyncReplTimeout());
+      totalOrderBroadcastPrepare(command, null, null, rpcManager, waitOnlySelfDeliver,
+                                 configuration.isSyncCommitPhase(), configuration.getSyncReplTimeout());
    }
 }

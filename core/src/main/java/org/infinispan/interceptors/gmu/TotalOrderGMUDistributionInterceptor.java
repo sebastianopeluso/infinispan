@@ -38,8 +38,8 @@ public class TotalOrderGMUDistributionInterceptor extends GMUDistributionInterce
       if(log.isTraceEnabled()) {
          log.tracef("Total Order Anycast transaction %s with Total Order", command.getGlobalTransaction().prettyPrint());
       }
-      Collection<Response> responses = totalOrderBroadcastPrepare(command, false, recipients,
-                                                                  getAffectedKeys(command, null), rpcManager,
+      Collection<Response> responses = totalOrderBroadcastPrepare(command, recipients, getAffectedKeys(command, null),
+                                                                  rpcManager, false, configuration.isSyncCommitPhase(),
                                                                   configuration.getSyncReplTimeout());
       joinAndSetTransactionVersion(responses, ctx, versionGenerator);
    }

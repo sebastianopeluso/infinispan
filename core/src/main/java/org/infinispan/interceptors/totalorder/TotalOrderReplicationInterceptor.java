@@ -25,7 +25,7 @@ public class TotalOrderReplicationInterceptor extends ReplicationInterceptor imp
    @Override
    protected void broadcastPrepare(TxInvocationContext context, PrepareCommand command) {
       boolean waitOnlySelfDeliver =!configuration.isSyncCommitPhase();
-      totalOrderBroadcastPrepare(command, waitOnlySelfDeliver, null, null, rpcManager,
-                                 configuration.getSyncReplTimeout());
+      totalOrderBroadcastPrepare(command, null, null, rpcManager, waitOnlySelfDeliver,
+                                 configuration.isSyncCommitPhase(), configuration.getSyncReplTimeout());
    }
 }

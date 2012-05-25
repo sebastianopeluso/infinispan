@@ -13,6 +13,7 @@ import org.infinispan.interceptors.locking.ClusteringDependentLogic;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
 import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.TxDependencyLatch;
 import org.infinispan.transaction.xa.GlobalTransaction;
@@ -81,10 +82,10 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    }
 
    @Override
-   public final void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo, TotalOrderRemoteTransaction transaction) {
+   public final void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo, RemoteTransaction transaction) {
       if (trace) log.tracef("transaction %s is finished", gtx.prettyPrint());
 
-      TotalOrderRemoteTransaction remoteTransaction = (TotalOrderRemoteTransaction) transactionTable.removeRemoteTransaction(gtx);
+      RemoteTransaction remoteTransaction = transactionTable.removeRemoteTransaction(gtx);
 
       if (remoteTransaction == null) {
          remoteTransaction = transaction;
@@ -98,7 +99,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    }
 
    @Override
-   public final boolean waitForTxPrepared(TotalOrderRemoteTransaction remoteTransaction, boolean commit,
+   public final boolean waitForTxPrepared(RemoteTransaction remoteTransaction, boolean commit,
                                           EntryVersionsMap newVersions) {
       GlobalTransaction gtx = remoteTransaction.getGlobalTransaction();
       if (trace)
@@ -160,8 +161,8 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
     * transaction
     * @param remoteTransaction the remote transaction
     */
-   protected void finishTransaction(TotalOrderRemoteTransaction remoteTransaction) {
-      TxDependencyLatch latch = remoteTransaction.getLatch();
+   protected void finishTransaction(RemoteTransaction remoteTransaction) {
+      TxDependencyLatch latch = remoteTransaction.getDependencyLatch();
       if (trace) log.tracef("Releasing resources for transaction %s", remoteTransaction);
       latch.countDown();
    }

@@ -62,6 +62,20 @@ public class WriteSkewHelper {
       command.setVersionsSeen(vs);
    }
 
+   public static void setNewVersionsOnPrepareCommand(VersionedPrepareCommand command, TxInvocationContext context) {
+      // Build a map of keys to versions as they were seen by the transaction originator's transaction context
+      EntryVersionsMap vs = new EntryVersionsMap();
+      EntryVersionsMap newVersions = context.getCacheTransaction().getUpdatedEntryVersions();
+      for (WriteCommand wc : command.getModifications()) {
+         for (Object k : wc.getAffectedKeys()) {
+            vs.put(k, newVersions.get(k));
+         }
+      }
+
+      // Make sure this version map is attached to the prepare command so that owners can apply the correct version
+      command.setVersionsSeen(vs);
+   }
+
    public static void readVersionsFromResponse(Response r, CacheTransaction ct) {
       if (r != null && r.isSuccessful()) {
          SuccessfulResponse sr = (SuccessfulResponse) r;
@@ -112,10 +126,7 @@ public class WriteSkewHelper {
          keysChecked.addAll(writeCommand.getAffectedKeys());
       }
 
-      EntryVersionsMap uv = context.getCacheTransaction().getUpdatedEntryVersions();
-      if (uv == null) {
-         uv = new EntryVersionsMap();
-      }
+      EntryVersionsMap uv = context.getCacheTransaction().getUpdatedEntryVersions();      
 
       for (Map.Entry<Object, CacheEntry> entry : context.getLookedUpEntries().entrySet()) {
          if (keysChecked.contains(entry.getKey()) || !entry.getValue().isChanged()) {
@@ -126,6 +137,9 @@ public class WriteSkewHelper {
             version = versionGenerator.generateNew();
          } else {
             version = versionGenerator.increment(version);
+         }
+         if (uv == null) {
+            uv = new EntryVersionsMap();
          }
          uv.put(entry.getKey(), version);
       }

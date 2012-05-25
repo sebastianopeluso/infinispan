@@ -4,8 +4,8 @@ import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.interceptors.base.CommandInterceptor;
-import org.infinispan.statetransfer.StateTransferInProgressException;
 import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TxDependencyLatch;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
@@ -32,7 +32,7 @@ public interface TotalOrderManager {
     * This will mark a global transaction as finished. It will be invoked in the processing of the commit command in
     * repeatable read with write skew (not implemented yet!)
     */
-   void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo, TotalOrderRemoteTransaction transaction);
+   void finishTransaction(GlobalTransaction gtx, boolean ignoreNullTxInfo, RemoteTransaction transaction);
 
    /**
     * This ensures the order between the commit/rollback commands and the prepare command.
@@ -48,7 +48,7 @@ public interface TotalOrderManager {
     * @param commit            true if it is a commit command, false if it is a rollback command
     * @return true if the command needs to be processed, false otherwise
     */
-   boolean waitForTxPrepared(TotalOrderRemoteTransaction remoteTransaction, boolean commit, EntryVersionsMap newVersions);
+   boolean waitForTxPrepared(RemoteTransaction remoteTransaction, boolean commit, EntryVersionsMap newVersions);
 
    /**
     * Adds a local transaction to the map. Later, it will be notified when the modifications are applied in the data

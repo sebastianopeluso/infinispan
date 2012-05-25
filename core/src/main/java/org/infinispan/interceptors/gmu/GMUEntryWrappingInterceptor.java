@@ -13,7 +13,6 @@ import org.infinispan.commands.write.RemoveCommand;
 import org.infinispan.commands.write.ReplaceCommand;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.DataContainer;
-import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
@@ -39,7 +38,7 @@ import static org.infinispan.transaction.gmu.GMUHelper.*;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implements TransactionCommitManager.CommitInstance {
+public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
 
    private static final Log log = LogFactory.getLog(GMUEntryWrappingInterceptor.class);
 
@@ -78,7 +77,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
       }
 
       if (command.isOnePhaseCommit()) {
-         commitContextEntries(ctx);
+         commitContextEntries.commitContextEntries(ctx);
       }
 
       return retVal;
@@ -151,20 +150,6 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
       return retVal;
    }
 
-   @Override
-   public void commitTransaction(TxInvocationContext ctx) {
-      commitContextEntries(ctx);
-   }
-
-   @Override
-   protected void commitContextEntry(CacheEntry entry, InvocationContext ctx, boolean skipOwnershipCheck) {
-      if (ctx.isInTxScope()) {
-         cll.commitEntry(entry, ((TxInvocationContext)ctx).getTransactionVersion(), skipOwnershipCheck);
-      } else {
-         cll.commitEntry(entry, entry.getVersion(), skipOwnershipCheck);
-      }
-   }
-
    /**
     * validates the read set and returns the prepare version from the commit queue
     *
@@ -224,10 +209,18 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
       entryVersionList.add(txInvocationContext.getTransactionVersion());
 
       if (log.isTraceEnabled()) {
-         log.tracef("Keys read in this command: %s", txInvocationContext.getKeysReadInCommand());
+         log.tracef("[%s] Keys read in this command: %s", txInvocationContext.getGlobalTransaction().prettyPrint(),
+                    txInvocationContext.getKeysReadInCommand());
       }
 
       for (InternalGMUCacheEntry internalGMUCacheEntry : txInvocationContext.getKeysReadInCommand().values()) {
+         Object key = internalGMUCacheEntry.getKey();
+         boolean local = cll.localNodeIsOwner(key);
+         if (log.isTraceEnabled()) {
+            log.tracef("[%s] Analyze entry [%s]: local?=%s",
+                       txInvocationContext.getGlobalTransaction().prettyPrint(),
+                       internalGMUCacheEntry, local);
+         }
          if (txInvocationContext.hasModifications() && !internalGMUCacheEntry.isMostRecent()) {
             throw new CacheException("Read-Write transaction read an old value and should rollback");
          }
@@ -235,8 +228,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
          if (internalGMUCacheEntry.getMaximumTransactionVersion() != null) {
             entryVersionList.add(internalGMUCacheEntry.getMaximumTransactionVersion());
          }
-         txInvocationContext.getCacheTransaction().addReadKey(internalGMUCacheEntry.getKey());
-         if (cll.localNodeIsOwner(internalGMUCacheEntry.getKey())) {
+         txInvocationContext.getCacheTransaction().addReadKey(key);
+         if (local) {
             txInvocationContext.setAlreadyReadOnThisNode(true);
             txInvocationContext.addReadFrom(cll.getAddress());
          }

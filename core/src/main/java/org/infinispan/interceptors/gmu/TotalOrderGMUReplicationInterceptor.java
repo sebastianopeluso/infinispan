@@ -3,8 +3,6 @@ package org.infinispan.interceptors.gmu;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.remoting.responses.Response;
-import org.infinispan.util.logging.Log;
-import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
 
@@ -32,7 +30,8 @@ public class TotalOrderGMUReplicationInterceptor extends GMUReplicationIntercept
    @Override
    protected void broadcastPrepare(TxInvocationContext context, PrepareCommand command) {
       boolean waitOnlySelfDeliver =!configuration.isSyncCommitPhase();
-      Collection<Response> responses = totalOrderBroadcastPrepare(command, waitOnlySelfDeliver, null, null, rpcManager,
+      Collection<Response> responses = totalOrderBroadcastPrepare(command, null, null, rpcManager, waitOnlySelfDeliver,
+                                                                  configuration.isSyncCommitPhase(),
                                                                   configuration.getSyncReplTimeout());
       joinAndSetTransactionVersion(responses, context, versionGenerator);
    }

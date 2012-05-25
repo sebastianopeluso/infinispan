@@ -1,4 +1,4 @@
-/* 
+/*
  * JBoss, Home of Professional Open Source
  * Copyright 2011 Red Hat Inc. and/or its affiliates and other contributors
  * as indicated by the @authors tag. All rights reserved.
@@ -36,15 +36,15 @@ import java.util.Set;
 /**
  * This context is a non-context for operations such as eviction which are not related
  * to the method invocation which caused them.
- * 
+ *
  * @author Sanne Grinovero <sanne@infinispan.org> (C) 2011 Red Hat Inc.
  * @author Pedro Ruivo
  * @author Sebastiano Peluso
  */
 public final class ImmutableContext implements InvocationContext {
-   
+
    public static final ImmutableContext INSTANCE = new ImmutableContext();
-   
+
    private ImmutableContext() {
       //don't create multiple instances
    }
@@ -207,5 +207,15 @@ public final class ImmutableContext implements InvocationContext {
    @Override
    public void setAlreadyReadOnThisNode(boolean value) {
       //no-op
+   }
+
+   @Override
+   public void setProtocolId(String protocolId) {
+      throw newUnsupportedMethod();
+   }
+
+   @Override
+   public String getProtocolId() {
+      throw newUnsupportedMethod();
    }
 }

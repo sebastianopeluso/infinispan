@@ -15,5 +15,6 @@ public class DistTotalOrderVersionedStateTransferTest extends VersionedDistState
    @Override
    protected void amendConfig(ConfigurationBuilder dcc) {
       dcc.transaction().transactionProtocol(TransactionProtocol.TOTAL_ORDER);
+      dcc.clustering().l1().disable();
    }
 }

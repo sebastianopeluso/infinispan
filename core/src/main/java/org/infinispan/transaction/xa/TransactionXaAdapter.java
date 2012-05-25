@@ -127,7 +127,7 @@ public class TransactionXaAdapter extends AbstractEnlistmentAdapter implements X
 
    /**
     * Same comment as for {@link #prepare(javax.transaction.xa.Xid)} applies for commit.
-    */   
+    */
    @Override
    public void rollback(Xid externalXid) throws XAException {
       Xid xid = convertXid(externalXid);
@@ -153,6 +153,9 @@ public class TransactionXaAdapter extends AbstractEnlistmentAdapter implements X
 
    @Override
    public void forget(Xid externalXid) throws XAException {
+      if (!recoveryEnabled) {
+         return;
+      }
       Xid xid = convertXid(externalXid);
       if (trace) log.tracef("forget called for xid %s", xid);
       try {

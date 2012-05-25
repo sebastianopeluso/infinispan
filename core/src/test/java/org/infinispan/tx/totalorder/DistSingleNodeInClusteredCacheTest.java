@@ -21,6 +21,7 @@ public class DistSingleNodeInClusteredCacheTest extends SingleNodeInClusteredCac
       dcc.transaction().transactionProtocol(TransactionProtocol.TOTAL_ORDER);
       dcc.locking().isolationLevel(IsolationLevel.REPEATABLE_READ).writeSkewCheck(true)
             .versioning().enable().scheme(VersioningScheme.SIMPLE);
+      dcc.clustering().l1().disable();
       createCluster(dcc, 1);
       waitForClusterToForm();
    }

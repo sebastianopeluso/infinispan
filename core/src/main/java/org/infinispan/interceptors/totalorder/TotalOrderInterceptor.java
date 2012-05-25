@@ -11,8 +11,8 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
-import org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -83,11 +83,11 @@ public class TotalOrderInterceptor extends CommandInterceptor {
       if (trace)  log.tracef("Visit Rollback Command. Transaction is %s", gtx.prettyPrint());
 
       boolean processCommand = true;
-      TotalOrderRemoteTransaction remoteTransaction = null;
+      RemoteTransaction remoteTransaction = null;
 
       try {
          if (!ctx.isOriginLocal()) {
-            remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
+            remoteTransaction = (RemoteTransaction) ctx.getCacheTransaction();
             processCommand = totalOrderManager.waitForTxPrepared(remoteTransaction, false, null);
             if (!processCommand) {
                return null;
@@ -117,13 +117,13 @@ public class TotalOrderInterceptor extends CommandInterceptor {
       if (trace) log.tracef("Visit Commit Command. Transaction is %s", gtx.prettyPrint());
 
       boolean processCommand = true;
-      TotalOrderRemoteTransaction remoteTransaction = null;
+      RemoteTransaction remoteTransaction = null;
 
       try {
          if (!ctx.isOriginLocal()) {
             EntryVersionsMap newVersions =
                   command instanceof VersionedCommitCommand ? ((VersionedCommitCommand) command).getUpdatedVersions() : null;
-            remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
+            remoteTransaction = (RemoteTransaction) ctx.getCacheTransaction();
             processCommand = totalOrderManager.waitForTxPrepared(remoteTransaction, true, newVersions);
             if (!processCommand) {
                return null;

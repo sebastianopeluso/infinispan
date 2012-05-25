@@ -7,6 +7,8 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -16,16 +18,17 @@ import java.util.HashMap;
  */
 public abstract class TransactionStatistics implements InfinispanStat {
 
+   private final Log log = LogFactory.getLog(getClass());
+
    //Here the elements which are common for local and remote transactions
    protected long initTime;
    private boolean isReadOnly;
    private boolean isCommit;
    private TransactionalClasses transactionalClass;
-   private HashMap<Object, Long> takenLocks = new HashMap<Object, Long>();
+   private Map<Object, Long> takenLocks = new ConcurrentHashMap<Object, Long>();
 
    private final StatisticsContainer statisticsContainer;
 
-   private final Log log = LogFactory.getLog(getClass());
    protected Configuration configuration;
 
 
@@ -36,8 +39,10 @@ public abstract class TransactionStatistics implements InfinispanStat {
       this.transactionalClass = TransactionalClasses.DEFAULT_CLASS;
       this.statisticsContainer = new StatisticsContainerImpl(size);
       this.configuration = configuration;
-      log.tracef("Created transaction statistics. Class is %s. Start time is %s",
-                 transactionalClass, initTime);
+      if (log.isTraceEnabled()) {
+         log.tracef("Created transaction statistics. Class is %s. Start time is %s",
+                    transactionalClass, initTime);
+      }
    }
 
    public final TransactionalClasses getTransactionalClass(){
@@ -69,7 +74,9 @@ public abstract class TransactionStatistics implements InfinispanStat {
       try{
          int index = this.getIndex(param);
          this.statisticsContainer.addValue(index,value);
-         log.tracef("Add %s to %s", value, param);
+         if (log.isTraceEnabled()) {
+            log.tracef("Add %s to %s", value, param);
+         }
       } catch(NoIspnStatException e){
          log.warnf(e, "Exception caught when trying to add the value %s to %s.", value, param);
       }
@@ -78,7 +85,9 @@ public abstract class TransactionStatistics implements InfinispanStat {
    public final long getValue(IspnStats param){
       int index = this.getIndex(param);
       long value = this.statisticsContainer.getValue(index);
-      log.tracef("Value of %s is %s", param, value);
+      if (log.isTraceEnabled()) {
+         log.tracef("Value of %s is %s", param, value);
+      }
       return value;
    }
 
@@ -87,7 +96,9 @@ public abstract class TransactionStatistics implements InfinispanStat {
    }
 
    public final void terminateTransaction() {
-      log.tracef("Terminating transaction. Is read only? %s. Is commit? %s", isReadOnly, isCommit);
+      if (log.isTraceEnabled()) {
+         log.tracef("Terminating transaction. Is read only? %s. Is commit? %s", isReadOnly, isCommit);
+      }
       long now = System.nanoTime();
       double execTime = now - this.initTime;
       if(this.isReadOnly){
@@ -123,7 +134,9 @@ public abstract class TransactionStatistics implements InfinispanStat {
    }
 
    public final void flush(TransactionStatistics ts){
-      log.tracef("Flush this [%s] to %s", this, ts);
+      if (log.isTraceEnabled()) {
+         log.tracef("Flush this [%s] to %s", this, ts);
+      }
       this.statisticsContainer.mergeTo(ts.statisticsContainer);
    }
 

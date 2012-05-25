@@ -42,10 +42,10 @@ import java.util.Set;
  * @since 5.0
  */
 public class InvocationContextFlagsOverride implements InvocationContext {
-   
+
    private final InvocationContext delegate;
    private final Set<Flag> flags;
-   
+
    /**
     * Wraps an existing {@link InvocationContext} without changing the context directly
     * but making sure the specified flags are considered enabled.
@@ -160,12 +160,12 @@ public class InvocationContextFlagsOverride implements InvocationContext {
    public Set<Object> getLockedKeys() {
       return delegate.getLockedKeys();
    }
-   
+
    @Override
    public Address getOrigin() {
       return delegate.getOrigin();
    }
-   
+
    @Override
    public InvocationContextFlagsOverride clone() {
       return new InvocationContextFlagsOverride(delegate, flags);
@@ -224,5 +224,15 @@ public class InvocationContextFlagsOverride implements InvocationContext {
    @Override
    public void setAlreadyReadOnThisNode(boolean value) {
       delegate.setAlreadyReadOnThisNode(value);
+   }
+
+   @Override
+   public void setProtocolId(String protocolId) {
+      delegate.setProtocolId(protocolId);
+   }
+
+   @Override
+   public String getProtocolId() {
+      return delegate.getProtocolId();
    }
 }

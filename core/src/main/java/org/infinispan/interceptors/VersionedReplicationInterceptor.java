@@ -30,8 +30,7 @@ import org.infinispan.util.logging.LogFactory;
 
 import java.util.Map;
 
-import static org.infinispan.transaction.WriteSkewHelper.readVersionsFromResponse;
-import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepareCommand;
+import static org.infinispan.transaction.WriteSkewHelper.*;
 
 /**
  * A form of the {@link ReplicationInterceptor} that adds additional logic to how prepares are handled.
@@ -72,7 +71,7 @@ public class VersionedReplicationInterceptor extends ReplicationInterceptor {
          readVersionsFromResponse(r, context.getCacheTransaction());
       } else {
          if (command.isOnePhaseCommit()) {
-            setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, context);
+            setNewVersionsOnPrepareCommand((VersionedPrepareCommand) command, context);
          }
          super.broadcastPrepare(context, command);
       }

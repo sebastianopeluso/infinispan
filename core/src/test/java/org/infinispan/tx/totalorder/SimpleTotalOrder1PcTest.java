@@ -37,6 +37,7 @@ public class SimpleTotalOrder1PcTest extends MultipleCacheManagersTest {
       waitForClusterToForm();
    }
 
+   @Test(enabled = false)
    public void testInteceptorChain() {
       InterceptorChain ic = advancedCache(0).getComponentRegistry().getComponent(InterceptorChain.class);
       assertTrue(ic.containsInterceptorType(TotalOrderInterceptor.class));

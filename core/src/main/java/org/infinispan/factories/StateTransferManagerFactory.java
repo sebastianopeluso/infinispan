@@ -27,8 +27,6 @@ import org.infinispan.statetransfer.DistributedStateTransferManagerImpl;
 import org.infinispan.statetransfer.DummyInvalidationStateTransferManagerImpl;
 import org.infinispan.statetransfer.ReplicatedStateTransferManagerImpl;
 import org.infinispan.statetransfer.StateTransferManager;
-import org.infinispan.statetransfer.totalorder.TotalOrderDistributedStateTransferManagerImpl;
-import org.infinispan.statetransfer.totalorder.TotalOrderReplicatedStateTransferManagerImpl;
 
 /**
  * Constructs {@link org.infinispan.statetransfer.StateTransferManager} instances.
@@ -46,17 +44,9 @@ public class StateTransferManagerFactory extends AbstractNamedCacheComponentFact
          return null;
 
       if (configuration.getCacheMode().isDistributed()) {
-         if (configuration.getTransactionProtocol().isTotalOrder()) {
-            return componentType.cast(new TotalOrderDistributedStateTransferManagerImpl());
-         } else {
-            return componentType.cast(new DistributedStateTransferManagerImpl());
-         }
+         return componentType.cast(new DistributedStateTransferManagerImpl());
       }else if (configuration.getCacheMode().isReplicated()) {
-         if (configuration.getTransactionProtocol().isTotalOrder()) {
-            return componentType.cast(new TotalOrderReplicatedStateTransferManagerImpl());
-         } else {
-            return componentType.cast(new ReplicatedStateTransferManagerImpl());
-         }
+         return componentType.cast(new ReplicatedStateTransferManagerImpl());
       } else if (configuration.getCacheMode().isInvalidation())
          return componentType.cast(new DummyInvalidationStateTransferManagerImpl());
       else

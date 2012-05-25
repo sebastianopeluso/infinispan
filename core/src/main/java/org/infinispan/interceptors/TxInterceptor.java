@@ -196,7 +196,7 @@ public class TxInterceptor extends CommandInterceptor {
       if (!ctx.isOriginLocal()) {
          RemoteTransaction remoteTransaction = (RemoteTransaction) ctx.getCacheTransaction();
          //its return true if the prepare was received before
-         boolean shouldRemove = remoteTransaction.waitPrepared(false);
+         boolean shouldRemove = remoteTransaction.waitPrepared(false, null);
          if (shouldRemove || !command.wasPrepareSent()) {
             txTable.remoteTransactionRollback(command.getGlobalTransaction());
          }
@@ -302,7 +302,7 @@ public class TxInterceptor extends CommandInterceptor {
       if (transaction == null) throw new IllegalStateException("This should only be called in an tx scope");
       int status = transaction.getStatus();
       if (isNotValid(status)) throw new IllegalStateException("Transaction " + transaction +
-            " is not in a valid state to be invoking cache operations on.");
+                                                                    " is not in a valid state to be invoking cache operations on.");
       LocalTransaction localTransaction = txTable.getOrCreateLocalTransaction(transaction, ctx);
       txTable.enlist(transaction, localTransaction);
       return localTransaction;

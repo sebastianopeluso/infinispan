@@ -23,6 +23,7 @@ public class DistTotalOrderStateTransfer1PcTest extends StateTransferFunctionalT
       dcc.transaction().transactionProtocol(TransactionProtocol.TOTAL_ORDER);
       dcc.locking().isolationLevel(IsolationLevel.REPEATABLE_READ).writeSkewCheck(false);
       dcc.clustering().stateTransfer().fetchInMemoryState(true);
+      dcc.clustering().l1().disable();
    }
 
    protected EmbeddedCacheManager createCacheManager() {

@@ -23,6 +23,7 @@ public class DistSimpleTotalOrder2PcTest extends DistSimpleTotalOrder1PcTest {
       dcc.locking().isolationLevel(IsolationLevel.REPEATABLE_READ).writeSkewCheck(true)
             .versioning().enable().scheme(VersioningScheme.SIMPLE);
       dcc.clustering().hash().numOwners(2);
+      dcc.clustering().l1().disable();
       createCluster(dcc, 2);
       waitForClusterToForm();
    }

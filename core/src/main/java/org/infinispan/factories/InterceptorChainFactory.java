@@ -30,28 +30,10 @@ import org.infinispan.config.CustomInterceptorConfig;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.interceptors.*;
 import org.infinispan.interceptors.base.CommandInterceptor;
-import org.infinispan.interceptors.gmu.GMUDistributionInterceptor;
-import org.infinispan.interceptors.gmu.GMUEntryWrappingInterceptor;
-import org.infinispan.interceptors.gmu.GMUReplicationInterceptor;
-import org.infinispan.interceptors.gmu.TotalOrderGMUDistributionInterceptor;
-import org.infinispan.interceptors.gmu.TotalOrderGMUEntryWrappingInterceptor;
-import org.infinispan.interceptors.gmu.TotalOrderGMUReplicationInterceptor;
-import org.infinispan.interceptors.locking.NonTransactionalLockingInterceptor;
-import org.infinispan.interceptors.locking.OptimisticLockingInterceptor;
-import org.infinispan.interceptors.locking.OptimisticReadWriteLockingInterceptor;
-import org.infinispan.interceptors.locking.PessimisticLockingInterceptor;
-import org.infinispan.interceptors.totalorder.TotalOrderDistributionInterceptor;
-import org.infinispan.interceptors.totalorder.TotalOrderInterceptor;
-import org.infinispan.interceptors.totalorder.TotalOrderReplicationInterceptor;
-import org.infinispan.interceptors.totalorder.TotalOrderStateTransferLockInterceptor;
-import org.infinispan.interceptors.totalorder.TotalOrderVersionedDistributionInterceptor;
-import org.infinispan.interceptors.totalorder.TotalOrderVersionedEntryWrappingInterceptor;
-import org.infinispan.interceptors.totalorder.TotalOrderVersionedReplicationInterceptor;
 import org.infinispan.loaders.CacheLoaderConfig;
 import org.infinispan.loaders.CacheStoreConfig;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.util.Util;
-import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -98,23 +80,21 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
    }
 
    public InterceptorChain buildInterceptorChain() {
-      boolean needsVersionAwareComponents = configuration.isRequireVersioning();
-
-      boolean invocationBatching = configuration.isInvocationBatchingEnabled();
-      boolean serializability = configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE;
-      // load the icInterceptor first
-
-      CommandInterceptor first;
-      if (invocationBatching) {
-         first = createInterceptor(new BatchingInterceptor(), BatchingInterceptor.class);
-      } else {
-         first = createInterceptor(new InvocationContextInterceptor(), InvocationContextInterceptor.class);
-      }
-
-      InterceptorChain interceptorChain = new InterceptorChain(first);
+      InterceptorChain interceptorChain = new InterceptorChain();
 
       // add the interceptor chain to the registry first, since some interceptors may ask for it.
+      // we need to register it first, because the invocation context interceptor needs it
       componentRegistry.registerComponent(interceptorChain, InterceptorChain.class);
+
+      boolean invocationBatching = configuration.isInvocationBatchingEnabled();
+      // load the icInterceptor first
+
+      if (invocationBatching) {
+         interceptorChain.setFirst(createInterceptor(new BatchingInterceptor(), BatchingInterceptor.class));
+      } else {
+         interceptorChain.setFirst(createInterceptor(new InvocationContextInterceptor(), InvocationContextInterceptor.class));
+      }
+
 
       // add marshallable check interceptor for situations where we want to figure out before marshalling
       if (isUsingMarshalledValues(configuration) || configuration.isUseAsyncMarshalling()
@@ -130,31 +110,15 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          interceptorChain.appendInterceptor(createInterceptor(new CacheMgmtInterceptor(), CacheMgmtInterceptor.class), false);
       }
 
-      // load the state transfer lock interceptor
-      // the state transfer lock ensures that the cache member list is up-to-date
-      // so it's necessary even if state transfer is disabled
-      if (configuration.getCacheMode().isDistributed() || configuration.getCacheMode().isReplicated()) {
-         if (configuration.isTotalOrder()) {
-            interceptorChain.appendInterceptor(createInterceptor(new TotalOrderStateTransferLockInterceptor(), TotalOrderStateTransferLockInterceptor.class), false);
-         } else {
-            interceptorChain.appendInterceptor(createInterceptor(new StateTransferLockInterceptor(), StateTransferLockInterceptor.class), false);
-         }
-      }
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.STATE_TRANSFER);
 
-      //load total order interceptor
-      if (configuration.isTotalOrder()) {
-         interceptorChain.appendInterceptor(createInterceptor(new TotalOrderInterceptor(), TotalOrderInterceptor.class),
-                                            false);
-      }
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.CUSTOM_INTERCEPTOR_BEFORE_TX_INTERCEPTOR);
 
       // load the tx interceptor
       if (configuration.isTransactionalCache())
          interceptorChain.appendInterceptor(createInterceptor(new TxInterceptor(), TxInterceptor.class), false);
 
-      if (configuration.isPassiveReplication()) {
-         interceptorChain.appendInterceptor(createInterceptor(new PassiveReplicationInterceptor(),
-                                                              PassiveReplicationInterceptor.class), false);
-      }
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.CUSTOM_INTERCEPTOR_AFTER_TX_INTERCEPTOR);
 
       if (isUsingMarshalledValues(configuration))
          interceptorChain.appendInterceptor(createInterceptor(new MarshalledValueInterceptor(), MarshalledValueInterceptor.class), false);
@@ -165,42 +129,9 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          configuration.fluent().transaction().lockingMode(LockingMode.PESSIMISTIC);
       }
 
-      //the total order protocol doesn't need locks
-      if (!configuration.isTotalOrder()) {
-         if (configuration.isTransactionalCache()) {
-            if (serializability) {
-               interceptorChain.appendInterceptor(createInterceptor(new OptimisticReadWriteLockingInterceptor(),
-                                                                    OptimisticReadWriteLockingInterceptor.class), false);
-            }  else if (configuration.getTransactionLockingMode() == LockingMode.PESSIMISTIC) {
-               interceptorChain.appendInterceptor(createInterceptor(new PessimisticLockingInterceptor(), PessimisticLockingInterceptor.class), false);
-            } else {
-               interceptorChain.appendInterceptor(createInterceptor(new OptimisticLockingInterceptor(), OptimisticLockingInterceptor.class), false);
-            }
-         } else {
-            if (configuration.getIsolationLevel() != IsolationLevel.NONE)
-               interceptorChain.appendInterceptor(createInterceptor(new NonTransactionalLockingInterceptor(), NonTransactionalLockingInterceptor.class), false);
-         }
-      }
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.LOCKING);
 
-      if (serializability) {
-         if (configuration.isTotalOrder()) {
-            interceptorChain.appendInterceptor(createInterceptor(new TotalOrderGMUEntryWrappingInterceptor(),
-                                                                 TotalOrderGMUEntryWrappingInterceptor.class), false);
-         } else {
-            interceptorChain.appendInterceptor(createInterceptor(new GMUEntryWrappingInterceptor(),
-                                                                 GMUEntryWrappingInterceptor.class), false);
-         }
-      } else if (needsVersionAwareComponents && configuration.getCacheMode().isClustered()) {
-         //added custom entry wrapping interceptor for total order protocol
-         if (configuration.isTotalOrder()) {
-            interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedEntryWrappingInterceptor(),
-                                                                 TotalOrderVersionedEntryWrappingInterceptor.class), false);
-         } else {
-            interceptorChain.appendInterceptor(createInterceptor(new VersionedEntryWrappingInterceptor(), VersionedEntryWrappingInterceptor.class), false);
-         }
-      } else {
-         interceptorChain.appendInterceptor(createInterceptor(new EntryWrappingInterceptor(), EntryWrappingInterceptor.class), false);
-      }
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.WRAPPER);
 
       if (configuration.isUsingCacheLoaders()) {
          if (configuration.getCacheLoaderManagerConfig().isPassivation()) {
@@ -226,70 +157,9 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          }
       }
 
-      //total order protocol has no locks, then it has no deadlocks
-      if (configuration.isEnableDeadlockDetection() && !configuration.isTotalOrder()) {
-         interceptorChain.appendInterceptor(createInterceptor(new DeadlockDetectingInterceptor(), DeadlockDetectingInterceptor.class), false);
-      }
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.DEADLOCK);
 
-      switch (configuration.getCacheMode()) {
-         case REPL_SYNC:
-            if (serializability) {
-               if (configuration.isTotalOrder()) {
-                  interceptorChain.appendInterceptor(createInterceptor(new TotalOrderGMUReplicationInterceptor(),
-                                                                       TotalOrderGMUReplicationInterceptor.class), false);
-               } else {
-                  interceptorChain.appendInterceptor(createInterceptor(new GMUReplicationInterceptor(),
-                                                                       GMUReplicationInterceptor.class), false);
-               }
-               break;
-            } else if (needsVersionAwareComponents) {
-               //added custom interceptor to replace the original
-               if (configuration.isTotalOrder()) {
-                  interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedReplicationInterceptor(),
-                                                                       TotalOrderVersionedReplicationInterceptor.class), false);
-               } else {
-                  interceptorChain.appendInterceptor(createInterceptor(new VersionedReplicationInterceptor(), VersionedReplicationInterceptor.class), false);
-               }
-               break;
-            } else if (configuration.isTotalOrder()) {
-               interceptorChain.appendInterceptor(createInterceptor(new TotalOrderReplicationInterceptor(), TotalOrderReplicationInterceptor.class), false);
-               break;
-            }
-         case REPL_ASYNC:
-            interceptorChain.appendInterceptor(createInterceptor(new ReplicationInterceptor(), ReplicationInterceptor.class), false);
-            break;
-         case INVALIDATION_SYNC:
-         case INVALIDATION_ASYNC:
-            interceptorChain.appendInterceptor(createInterceptor(new InvalidationInterceptor(), InvalidationInterceptor.class), false);
-            break;
-         case DIST_SYNC:
-            if(serializability) {
-               if (configuration.isTotalOrder()) {
-                  interceptorChain.appendInterceptor(createInterceptor(new TotalOrderGMUDistributionInterceptor(),
-                                                                       TotalOrderGMUDistributionInterceptor.class), false);
-               } else {
-                  interceptorChain.appendInterceptor(createInterceptor(new GMUDistributionInterceptor(),
-                                                                       GMUDistributionInterceptor.class), false);
-               }
-               break;
-            } else if (needsVersionAwareComponents) {
-               if (configuration.isTotalOrder()) {
-                  interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedDistributionInterceptor(),
-                                                                       TotalOrderVersionedDistributionInterceptor.class), false);
-               } else {
-                  interceptorChain.appendInterceptor(createInterceptor(new VersionedDistributionInterceptor(), VersionedDistributionInterceptor.class), false);
-               }
-               break;
-            } else if (configuration.isTotalOrder()) {
-               interceptorChain.appendInterceptor(createInterceptor(new TotalOrderDistributionInterceptor(), TotalOrderDistributionInterceptor.class), false);
-               break;
-            }
-         case DIST_ASYNC:
-            interceptorChain.appendInterceptor(createInterceptor(new DistributionInterceptor(), DistributionInterceptor.class), false);
-            break;
-         case LOCAL:
-            //Nothing...
-      }
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.CLUSTER);
 
       CommandInterceptor callInterceptor = createInterceptor(new CallInterceptor(), CallInterceptor.class);
       interceptorChain.appendInterceptor(callInterceptor, false);

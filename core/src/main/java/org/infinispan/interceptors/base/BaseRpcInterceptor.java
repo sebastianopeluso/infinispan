@@ -112,7 +112,8 @@ public abstract class BaseRpcInterceptor extends CommandInterceptor {
    protected final boolean shouldInvokeRemoteRollbackCommand(TxInvocationContext ctx, RollbackCommand command) {
       CacheTransaction cacheTransaction = ctx.getCacheTransaction();
       command.setPrepareSent(cacheTransaction.wasPrepareSent());
+      boolean totalOrder = command.getGlobalTransaction().getReconfigurableProtocol().useTotalOrder();
       return cacheTransaction.wasPrepareSent() ||
-            (!configuration.isTotalOrder() && configuration.getTransactionLockingMode() == LockingMode.PESSIMISTIC);
+            (!totalOrder && configuration.getTransactionLockingMode() == LockingMode.PESSIMISTIC);
    }
 }

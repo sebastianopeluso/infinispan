@@ -25,24 +25,18 @@ import org.infinispan.commands.read.GetKeyValueCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.write.*;
+import org.infinispan.container.CommitContextEntries;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.EntryFactory;
-import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.MVCCEntry;
-import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
-import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.interceptors.locking.ClusteringDependentLogic;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
-
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Interceptor in charge with wrapping entries and add them in caller's context.
@@ -56,6 +50,7 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
    protected EntryFactory entryFactory;
    protected DataContainer dataContainer;
    protected ClusteringDependentLogic cll;
+   protected CommitContextEntries commitContextEntries;
    protected final EntryWrappingVisitor entryWrappingVisitor = new EntryWrappingVisitor();
 
    private static final Log log = LogFactory.getLog(EntryWrappingInterceptor.class);
@@ -66,10 +61,12 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
    }
 
    @Inject
-   public void init(EntryFactory entryFactory, DataContainer dataContainer, ClusteringDependentLogic cll) {
+   public void init(EntryFactory entryFactory, DataContainer dataContainer, ClusteringDependentLogic cll,
+                    CommitContextEntries commitContextEntries) {
       this.entryFactory =  entryFactory;
       this.dataContainer = dataContainer;
       this.cll = cll;
+      this.commitContextEntries = commitContextEntries;
    }
 
    @Override
@@ -78,7 +75,7 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
       Object result = invokeNextInterceptor(ctx, command);
       //new commit conditions for total order
       if (shouldCommitEntries(command, ctx)) {
-         commitContextEntries(ctx);
+         commitContextEntries.commitContextEntries(ctx);
       }
       return result;
    }
@@ -88,7 +85,7 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
       try {
          return invokeNextInterceptor(ctx, command);
       } finally {
-         commitContextEntries(ctx);
+         commitContextEntries.commitContextEntries(ctx);
       }
    }
 
@@ -99,7 +96,7 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
          return invokeNextInterceptor(ctx, command);
       } finally {
          //needed because entries might be added in L1
-         if (!ctx.isInTxScope()) commitContextEntries(ctx);
+         if (!ctx.isInTxScope()) commitContextEntries.commitContextEntries(ctx);
       }
    }
 
@@ -132,10 +129,10 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
       entryFactory.wrapEntryForPut(ctx, command.getKey(), null, !command.isPutIfAbsent());
       return invokeNextAndApplyChanges(ctx, command);
    }
-   
+
    @Override
-   public Object visitApplyDeltaCommand(InvocationContext ctx, ApplyDeltaCommand command) throws Throwable {      
-      entryFactory.wrapEntryForDelta(ctx, command.getDeltaAwareKey(), command.getDelta());  
+   public Object visitApplyDeltaCommand(InvocationContext ctx, ApplyDeltaCommand command) throws Throwable {
+      entryFactory.wrapEntryForDelta(ctx, command.getDeltaAwareKey(), command.getDelta());
       return invokeNextInterceptor(ctx, command);
    }
 
@@ -164,45 +161,15 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
       return visitRemoveCommand(ctx, command);
    }
 
-   protected void commitContextEntries(final InvocationContext ctx) {
-      final boolean trace = log.isTraceEnabled();
-      boolean skipOwnershipCheck = ctx.hasFlag(Flag.SKIP_OWNERSHIP_CHECK);
-
-      if (ctx instanceof SingleKeyNonTxInvocationContext) {
-         CacheEntry entry = ((SingleKeyNonTxInvocationContext)ctx).getCacheEntry();
-         commitEntryIfNeeded(ctx, skipOwnershipCheck, entry);
-      } else {
-         Set<Map.Entry<Object, CacheEntry>> entries = ctx.getLookedUpEntries().entrySet();
-         Iterator<Map.Entry<Object, CacheEntry>> it = entries.iterator();
-         final Log log = getLog();
-         while (it.hasNext()) {
-            Map.Entry<Object, CacheEntry> e = it.next();
-            CacheEntry entry = e.getValue();
-            if (!commitEntryIfNeeded(ctx, skipOwnershipCheck, entry)) {
-               if (trace) {
-                  if (entry==null)
-                     log.tracef("Entry for key %s is null : not calling commitUpdate", e.getKey());
-                  else
-                     log.tracef("Entry for key %s is not changed(%s): not calling commitUpdate", e.getKey(), entry);
-               }
-            }
-         }
-      }
-   }
-
    protected final void wrapEntriesForPrepare(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       if (!ctx.isOriginLocal() || command.isReplayEntryWrapping()) {
          for (WriteCommand c : command.getModifications()) c.acceptVisitor(ctx, entryWrappingVisitor);
       }
    }
 
-   protected void commitContextEntry(CacheEntry entry, InvocationContext ctx, boolean skipOwnershipCheck) {
-      cll.commitEntry(entry, null, skipOwnershipCheck);
-   }
-
    private Object invokeNextAndApplyChanges(InvocationContext ctx, VisitableCommand command) throws Throwable {
       final Object result = invokeNextInterceptor(ctx, command);
-      if (!ctx.isInTxScope()) commitContextEntries(ctx);
+      if (!ctx.isInTxScope()) commitContextEntries.commitContextEntries(ctx);
       return result;
    }
 
@@ -287,15 +254,6 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
       }
    }
 
-   private boolean commitEntryIfNeeded(InvocationContext ctx, boolean skipOwnershipCheck, CacheEntry entry) {
-      if (entry != null && entry.isChanged()) {
-         commitContextEntry(entry, ctx, skipOwnershipCheck);
-         log.tracef("Committed entry %s", entry);
-         return true;
-      }
-      return false;
-   }
-
    /**
     * total order condition: only commits when it is remote context and the prepare has the flag 1PC set
     * 2PC condition: only commits if the prepare has the flag 1PC set
@@ -306,8 +264,10 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
     */
    protected boolean shouldCommitEntries(PrepareCommand command, TxInvocationContext ctx) {
       //one phase commit in remote context in total order or it has no modifications (local commands)
-      return (configuration.isTotalOrder() && command.isOnePhaseCommit() && (!ctx.isOriginLocal() || !ctx.hasModifications())) ||
+      boolean totalOrder = command.getGlobalTransaction().getReconfigurableProtocol().useTotalOrder();
+      return (totalOrder && command.isOnePhaseCommit() &&
+                    (!ctx.isOriginLocal() || !ctx.hasModifications())) ||
             //original condition: one phase commit
-            (!configuration.isTotalOrder() && command.isOnePhaseCommit());
+            (!totalOrder && command.isOnePhaseCommit());
    }
 }

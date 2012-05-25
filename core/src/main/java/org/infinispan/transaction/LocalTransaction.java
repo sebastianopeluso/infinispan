@@ -34,7 +34,6 @@ import org.infinispan.util.logging.LogFactory;
 import javax.transaction.Transaction;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -124,8 +123,10 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    public void putLookedUpEntry(Object key, CacheEntry e) {
       if (isMarkedForRollback()) {
          throw new CacheException("This transaction is marked for rollback and cannot acquire locks!");
+      } else if (e == null) {
+         return; //null not allowed in concurrent hash map
       }
-      if (lookedUpEntries == null) lookedUpEntries = new HashMap<Object, CacheEntry>(4);
+      if (lookedUpEntries == null) lookedUpEntries = createMapEntries(4);
       lookedUpEntries.put(key, e);
    }
 
@@ -135,7 +136,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
          throw new CacheException("This transaction is marked for rollback and cannot acquire locks!");
       }
       if (lookedUpEntries == null) {
-         lookedUpEntries = new HashMap<Object, CacheEntry>(entries);
+         lookedUpEntries = createMapEntries(entries);
       } else {
          lookedUpEntries.putAll(entries);
       }

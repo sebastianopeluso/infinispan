@@ -57,13 +57,15 @@ public class TotalOrderHelper {
       }
    }
 
-   public static Collection<Response> totalOrderBroadcastPrepare(PrepareCommand prepareCommand, boolean waitOnlySelfDeliver,
-                                                                 Collection<Address> target, Collection<Object> keysToValidate,
-                                                                 RpcManager rpcManager, long timeout) {
+   public static Collection<Response> totalOrderBroadcastPrepare(PrepareCommand prepareCommand,
+                                                                 Collection<Address> target,
+                                                                 Collection<Object> keysToValidate,
+                                                                 RpcManager rpcManager, boolean waitOnlySelfDeliver,
+                                                                 boolean syncCommitPhase, long timeout) {
       ResponseFilter filter;
       if (waitOnlySelfDeliver) {
          filter = new SelfDeliverFilter(rpcManager.getAddress());
-      } else if (keysToValidate != null) {
+      } else if (keysToValidate != null && !syncCommitPhase) {
          filter = new KeyValidationFilter(keysToValidate, rpcManager.getAddress());
       } else {
          filter = new AllResponsesFilter();

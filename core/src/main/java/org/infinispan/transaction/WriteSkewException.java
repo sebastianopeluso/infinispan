@@ -33,22 +33,8 @@ public class WriteSkewException extends CacheException {
 
    private final Object key;
 
-   public WriteSkewException() {
-      this.key = null;
-   }
-
-   public WriteSkewException(Throwable cause, Object key) {
-      super(cause);
-      this.key = key;
-   }
-
    public WriteSkewException(String msg, Object key) {
       super(msg);
-      this.key = key;
-   }
-
-   public WriteSkewException(String msg, Throwable cause, Object key) {
-      super(msg, cause);
       this.key = key;
    }
 
@@ -58,7 +44,7 @@ public class WriteSkewException extends CacheException {
 
    public static WriteSkewException createException(Object key, CacheEntry actualEntry, CacheEntry txEntry, GlobalTransaction gtx) {
       return new WriteSkewException("Write skew detected on key " + key +" for transaction " + gtx.prettyPrint() +
-                                          ". Actual{value=" + actualEntry.getValue() + ", version=" + actualEntry.getVersion() + "}." +
-                                          " Transaction{value=" + txEntry.getValue() + ", version=" + txEntry.getVersion() + "}",key);
+                                          ". Actual{version=" + (actualEntry == null ? "N/A" : actualEntry.getVersion()) + "}." +
+                                          " Transaction{version=" + (txEntry == null ? "N/A" : txEntry.getVersion()) + "}",key);
    }
 }

@@ -40,11 +40,14 @@ import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.loaders.CacheLoaderManager;
 import org.infinispan.loaders.CacheStore;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
+import org.infinispan.reconfigurableprotocol.ProtocolTable;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
+import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.util.concurrent.NotifyingNotifiableFuture;
 import org.infinispan.util.concurrent.ReclosableLatch;
 import org.infinispan.util.concurrent.locks.containers.LockContainer;
@@ -95,6 +98,10 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
    private LockContainer<?> lockContainer;
    private VersionGenerator versionGenerator;
 
+   protected TotalOrderManager totalOrderManager;
+   private ProtocolTable protocolTable;
+   private ReconfigurableReplicationManager manager;
+
    public BaseStateTransferManagerImpl() {
    }
 
@@ -103,7 +110,8 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
                     DataContainer dataContainer, InterceptorChain interceptorChain, InvocationContextContainer icc,
                     CacheLoaderManager cacheLoaderManager, CacheNotifier cacheNotifier, StateTransferLock stateTransferLock,
                     CacheViewsManager cacheViewsManager, TransactionTable transactionTable, LockContainer<?> lockContainer,
-                    VersionGenerator versionGenerator) {
+                    VersionGenerator versionGenerator, TotalOrderManager totalOrderManager, ProtocolTable protocolTable,
+                    ReconfigurableReplicationManager manager) {
       this.cacheLoaderManager = cacheLoaderManager;
       this.configuration = configuration;
       this.rpcManager = rpcManager;
@@ -117,6 +125,9 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
       this.transactionTable = transactionTable;
       this.lockContainer = lockContainer;
       this.versionGenerator = versionGenerator;
+      this.totalOrderManager = totalOrderManager;
+      this.protocolTable = protocolTable;
+      this.manager = manager;
    }
 
    // needs to be AFTER the DistributionManager and *after* the cache loader manager (if any) inits and preloads
@@ -417,6 +428,10 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
    protected abstract long getTimeout();
 
    protected boolean usePriorityQueue() {
-      return false;
+      return isTotalOrder();
+   }
+
+   protected final boolean isTotalOrder() {
+      return manager.isTotalOrderBasedProtocol(protocolTable.getThreadProtocolId());
    }
 }

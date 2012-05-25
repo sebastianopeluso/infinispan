@@ -39,7 +39,7 @@ public class TotalOrderDistributionInterceptor extends DistributionInterceptor i
       if(log.isTraceEnabled()) {
          log.tracef("Total Order Anycast transaction %s with Total Order", command.getGlobalTransaction().prettyPrint());
       }
-      totalOrderBroadcastPrepare(command, false, recipients, getAffectedKeys(command, null), rpcManager,
-                                 configuration.getSyncReplTimeout());
+      totalOrderBroadcastPrepare(command, recipients, getAffectedKeys(command, null), rpcManager, false,
+                                 configuration.isSyncCommitPhase(), configuration.getSyncReplTimeout());
    }
 }

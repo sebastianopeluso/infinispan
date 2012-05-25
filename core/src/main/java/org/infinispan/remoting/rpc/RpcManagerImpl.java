@@ -112,10 +112,7 @@ public class RpcManagerImpl implements RpcManager {
    private void start() {
       stateTransferEnabled = configuration.isStateTransferEnabled();
       statisticsEnabled = configuration.isExposeJmxStatistics();
-
-      if (configuration.isTotalOrder()) {
-         t.checkTotalOrderSupported(configuration.getCacheMode().isDistributed());
-      }
+      t.checkTotalOrderSupported(configuration.getCacheMode().isDistributed());
    }
 
    @ManagedAttribute(description = "Retrieves the committed view.")
@@ -322,7 +319,7 @@ public class RpcManagerImpl implements RpcManager {
          }
       }
    }
-   
+
    // -------------------------------------------- JMX information -----------------------------------------------
 
    @ManagedOperation(description = "Resets statistics gathered by this component")

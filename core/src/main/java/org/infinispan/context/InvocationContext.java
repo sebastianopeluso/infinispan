@@ -46,7 +46,7 @@ public interface InvocationContext extends EntryLookup, FlagContainer, Cloneable
     * Returns true if the call was originated locally, false if it is the result of a remote rpc.
     */
    boolean isOriginLocal();
-   
+
    /**
     * Get the origin of the command, or null if the command originated locally
     * @return
@@ -123,6 +123,7 @@ public interface InvocationContext extends EntryLookup, FlagContainer, Cloneable
    boolean hasLockedKey(Object key);
 
    /**
+    <<<<<<< HEAD
     * add the key to a map between key and {@link InternalGMUCacheEntry}. This entry has all the information needed to calculate
     * the new transaction version. This is a temporary map and should be clear before (or after) each command
     *
@@ -142,7 +143,7 @@ public interface InvocationContext extends EntryLookup, FlagContainer, Cloneable
 
    /**
     * @param versionGenerator the version generator
-    * @return  the maximum {@link EntryVersion} to read     
+    * @return  the maximum {@link EntryVersion} to read
     */
    EntryVersion calculateVersionToRead(VersionGenerator versionGenerator);
 
@@ -153,13 +154,27 @@ public interface InvocationContext extends EntryLookup, FlagContainer, Cloneable
     */
    void setVersionToRead(EntryVersion entryVersion);
 
-   /**    
+   /**
     * @return true if it has already read from this node
     */
    boolean hasAlreadyReadOnThisNode();
 
-   /**    
+   /**
     * @param value   true or false if it has already read from this node
     */
    void setAlreadyReadOnThisNode(boolean value);
+
+   /**
+    * sets the replication protocol to be used by the command
+    *
+    * @param protocolId the protocol ID
+    */
+   void setProtocolId(String protocolId);
+
+   /**
+    * returns the protocol ID to be used by the command
+    *
+    * @return  the protocol ID to be used by the command
+    */
+   String getProtocolId();
 }

@@ -59,7 +59,7 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
       }
 
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
-      totalOrderBroadcastPrepare(command, false, recipients, getAffectedKeys(command, null), rpcManager,
-                                 configuration.getSyncReplTimeout());
+      totalOrderBroadcastPrepare(command, recipients, getAffectedKeys(command, null), rpcManager, false,
+                                 configuration.isSyncCommitPhase(), configuration.getSyncReplTimeout());
    }
 }

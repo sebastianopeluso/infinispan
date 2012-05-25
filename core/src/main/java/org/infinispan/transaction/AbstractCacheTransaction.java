@@ -32,14 +32,14 @@ import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.concurrent.ConcurrentHashSet;
+import org.infinispan.util.concurrent.ConcurrentMapFactory;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -65,7 +65,7 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
    private static final int INITIAL_LOCK_CAPACITY = 4;
 
    protected List<WriteCommand> modifications;
-   protected HashMap<Object, CacheEntry> lookedUpEntries;
+   protected Map<Object, CacheEntry> lookedUpEntries;
    protected Set<Object> affectedKeys = null;
    protected Set<Object> lockedKeys;
    protected Set<Object> backupKeyLocks = null;
@@ -166,12 +166,12 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
 
    @Override
    public void addBackupLockForKey(Object key) {
-      if (backupKeyLocks == null) backupKeyLocks = new HashSet<Object>(INITIAL_LOCK_CAPACITY);
+      if (backupKeyLocks == null) backupKeyLocks = createSet(INITIAL_LOCK_CAPACITY);
       backupKeyLocks.add(key);
    }
 
    public void registerLockedKey(Object key) {
-      if (lockedKeys == null) lockedKeys = new HashSet<Object>(INITIAL_LOCK_CAPACITY);
+      if (lockedKeys == null) lockedKeys = createSet(INITIAL_LOCK_CAPACITY);
       if (trace) log.tracef("Registering locked key: %s", key);
       lockedKeys.add(key);
    }
@@ -202,11 +202,13 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
 
    public void addAllAffectedKeys(Collection<Object> keys) {
       initAffectedKeys();
-      affectedKeys.addAll(keys);
+      for (Object key : keys) {
+         affectedKeys.add(key);
+      }
    }
 
    private void initAffectedKeys() {
-      if (affectedKeys == null) affectedKeys = new HashSet<Object>(INITIAL_LOCK_CAPACITY);
+      if (affectedKeys == null) affectedKeys = createSet(INITIAL_LOCK_CAPACITY);
    }
 
    @Override
@@ -284,5 +286,19 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
    @Override
    public void setAlreadyReadOnThisNode(boolean value) {
       //no-op
+   }
+
+   protected final Map<Object, CacheEntry> createMapEntries(int size) {
+      return ConcurrentMapFactory.makeConcurrentMap(size);
+   }
+
+   protected final Map<Object, CacheEntry> createMapEntries(Map<Object, CacheEntry> map) {
+      Map<Object, CacheEntry> newMap = ConcurrentMapFactory.makeConcurrentMap(map.size());
+      newMap.putAll(map);
+      return newMap;
+   }
+
+   protected final Set<Object> createSet(int size) {
+      return new ConcurrentHashSet<Object>(size);
    }
 }

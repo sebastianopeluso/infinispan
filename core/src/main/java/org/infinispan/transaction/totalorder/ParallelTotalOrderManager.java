@@ -11,6 +11,7 @@ import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
+import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TxDependencyLatch;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -56,12 +57,12 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
    @Override
    public final Object processTransactionFromSequencer(PrepareCommand prepareCommand, TxInvocationContext ctx,
-                                                     CommandInterceptor invoker) {
+                                                       CommandInterceptor invoker) {
       logAndCheckContext(prepareCommand, ctx);
 
       copyLookedUpEntriesToRemoteContext(ctx);
 
-      TotalOrderRemoteTransaction remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
+      RemoteTransaction remoteTransaction = (RemoteTransaction) ctx.getCacheTransaction();
 
       ParallelPrepareProcessor ppp = constructParallelPrepareProcessor(prepareCommand, ctx, invoker, remoteTransaction);
       Set<TxDependencyLatch> previousTxs = new HashSet<TxDependencyLatch>();
@@ -69,7 +70,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
       //this will collect all the count down latch corresponding to the previous transactions in the queue
       for (Object key : keysModified) {
-         TxDependencyLatch prevTx = keysLocked.put(key, remoteTransaction.getLatch());
+         TxDependencyLatch prevTx = keysLocked.put(key, remoteTransaction.getDependencyLatch());
          if (prevTx != null) {
             previousTxs.add(prevTx);
          }
@@ -78,17 +79,17 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
       ppp.setPreviousTransactions(previousTxs);
 
       if (trace)
-         log.tracef("Transaction [%s] write set is %s", remoteTransaction.getLatch(), keysModified);
+         log.tracef("Transaction [%s] write set is %s", remoteTransaction.getDependencyLatch(), keysModified);
 
       validationExecutorService.execute(ppp);
       return RequestHandler.DO_NOT_REPLY;
    }
 
    @Override
-   public final void finishTransaction(TotalOrderRemoteTransaction remoteTransaction) {
+   public final void finishTransaction(RemoteTransaction remoteTransaction) {
       super.finishTransaction(remoteTransaction);
       for (Object key : getModifiedKeyFromModifications(remoteTransaction.getModifications())) {
-         this.keysLocked.remove(key, remoteTransaction.getLatch());
+         this.keysLocked.remove(key, remoteTransaction.getDependencyLatch());
       }
    }
 
@@ -216,7 +217,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
     * @return a new thread
     */
    private ParallelPrepareProcessor constructParallelPrepareProcessor(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
-                                                                        CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
+                                                                      CommandInterceptor invoker, RemoteTransaction remoteTransaction) {
       return new ParallelPrepareProcessor(prepareCommand, txInvocationContext, invoker, remoteTransaction);
    }
 
@@ -244,7 +245,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
     */
    protected class ParallelPrepareProcessor implements Runnable {
 
-      protected final TotalOrderRemoteTransaction remoteTransaction;
+      protected final RemoteTransaction remoteTransaction;
       protected final PrepareCommand prepareCommand;
       //the set of others transaction's count down latch (it will be unblocked when the transaction finishes)
       private final Set<TxDependencyLatch> previousTransactions;
@@ -255,7 +256,7 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
       private long initializationEndTime = -1;
 
       protected ParallelPrepareProcessor(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
-                                       CommandInterceptor invoker, TotalOrderRemoteTransaction remoteTransaction) {
+                                         CommandInterceptor invoker, RemoteTransaction remoteTransaction) {
          if (prepareCommand == null || txInvocationContext == null || invoker == null) {
             throw new IllegalArgumentException("Arguments must not be null");
          }
@@ -329,8 +330,8 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
 
          boolean isResend = prepareCommand.isOnePhaseCommit();
          if (isResend) {
-            previousTransactions.remove(remoteTransaction.getLatch());
-         } else if (previousTransactions.contains(remoteTransaction.getLatch())) {
+            previousTransactions.remove(remoteTransaction.getDependencyLatch());
+         } else if (previousTransactions.contains(remoteTransaction.getDependencyLatch())) {
             throw new IllegalStateException("Dependency transaction must not contains myself in the set");
          }
 
