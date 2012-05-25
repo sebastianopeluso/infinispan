@@ -46,7 +46,7 @@ public final class TransactionsStatisticsRegistry {
    public static void addValue(IspnStats param, double value) {
       TransactionStatistics txs = thread.get();
       if (txs == null) {
-         log.info("Trying to add value " + value + " to parameter " + param +
+         log.debug("Trying to add value " + value + " to parameter " + param +
                         " but no transaction is associated to the thread");
          return;
       }
@@ -56,7 +56,7 @@ public final class TransactionsStatisticsRegistry {
    public static void incrementValue(IspnStats param) {
       TransactionStatistics txs = thread.get();
       if (txs == null) {
-         log.info("Trying to increment to parameter " + param + " but no transaction is associated to the thread");
+         log.debug("Trying to increment to parameter " + param + " but no transaction is associated to the thread");
          return;
       }
       txs.addValue(param, 1D);
@@ -85,7 +85,7 @@ public final class TransactionsStatisticsRegistry {
       //here, just overriding the handlePrepareCommand
       TransactionStatistics txs = thread.get();
       if (txs == null) {
-         log.info("Trying to invoke onPrepareCommand() but no transaction is associated to the thread");
+         log.debug("Trying to invoke onPrepareCommand() but no transaction is associated to the thread");
          return;
       }
       txs.onPrepareCommand();
@@ -94,7 +94,7 @@ public final class TransactionsStatisticsRegistry {
    public static void setTransactionOutcome(boolean commit) {
       TransactionStatistics txs = thread.get();
       if (txs == null) {
-         log.info("Trying to set outcome to " + (commit ? "Commit" : "Rollback") +
+         log.debug("Trying to set outcome to " + (commit ? "Commit" : "Rollback") +
                         " but no transaction is associated to the thread");
          return;
       }
@@ -126,7 +126,7 @@ public final class TransactionsStatisticsRegistry {
    public static void addTakenLock(Object lock) {
       TransactionStatistics txs = thread.get();
       if (txs == null) {
-         log.info("Trying to add lock [" + lock + "] but no transaction is associated to the thread");
+         log.debug("Trying to add lock [" + lock + "] but no transaction is associated to the thread");
          return;
       }
       txs.addTakenLock(lock);
@@ -136,7 +136,7 @@ public final class TransactionsStatisticsRegistry {
    public static void setUpdateTransaction() {
       TransactionStatistics txs = thread.get();
       if (txs == null) {
-         log.info("Trying to invoke setUpdateTransaction() but no transaction is associated to the thread");
+         log.debug("Trying to invoke setUpdateTransaction() but no transaction is associated to the thread");
          return;
       }
       txs.setUpdateTransaction();

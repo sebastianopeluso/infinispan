@@ -39,8 +39,8 @@ public class LockManagerWrapper implements LockManager {
             } else {
                TransactionsStatisticsRegistry.incrementValue(IspnStats.LOCK_CONTENTION_TO_LOCAL);
             }
+            return true;
          }
-         return true;
       }
       return false;
    }
@@ -117,10 +117,21 @@ public class LockManagerWrapper implements LockManager {
          experiencedContention = this.updateContentionStats(key,(TxInvocationContext)ctx);
          lockingTime = System.nanoTime();
       }
+      
+      boolean locked;            
+      try{
+         locked = actual.acquireLock(ctx, key, timeoutMillis, skipLocking);  //this returns false if you already have acquired the lock previously
+      } catch(TimeoutException e){
+         StreamLibContainer.getInstance().addLockInformation(key, experiencedContention, true);
+         throw e;
+      } catch(InterruptedException e){
+         StreamLibContainer.getInstance().addLockInformation(key, experiencedContention, true);
+         throw e;
+      }
 
-      boolean locked = actual.acquireLock(ctx, key, timeoutMillis, skipLocking);
+      StreamLibContainer.getInstance().addLockInformation(key, experiencedContention, false);
 
-      if(txScope && experiencedContention){
+      if(txScope && experiencedContention && locked){
          lockingTime = System.nanoTime() - lockingTime;
          TransactionsStatisticsRegistry.addValue(IspnStats.LOCK_WAITING_TIME,lockingTime);
          TransactionsStatisticsRegistry.incrementValue(IspnStats.NUM_WAITED_FOR_LOCKS);
@@ -129,7 +140,7 @@ public class LockManagerWrapper implements LockManager {
          TransactionsStatisticsRegistry.addTakenLock(key); //Idempotent
       }
 
-      StreamLibContainer.getInstance().addLockInformation(key, experiencedContention, !locked);
+
       return locked;
    }
 

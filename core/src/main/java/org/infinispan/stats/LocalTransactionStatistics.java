@@ -24,7 +24,10 @@ public class LocalTransactionStatistics extends TransactionStatistics {
 
    public final void terminateLocalExecution() {
       this.stillLocalExecution = false;
-      this.addValue(IspnStats.WR_TX_LOCAL_EXECUTION_TIME, System.nanoTime() - this.initTime);
+
+      if (!isReadOnly()) {
+         this.addValue(IspnStats.WR_TX_LOCAL_EXECUTION_TIME, System.nanoTime() - this.initTime);
+      }
       this.incrementValue(IspnStats.NUM_PREPARES);
    }
 
@@ -35,7 +38,7 @@ public class LocalTransactionStatistics extends TransactionStatistics {
    @Override
    protected final void terminate() {
       if (!isReadOnly() && isCommit()) {
-         long numPuts = this.getValue(IspnStats.NUM_PUTS);
+         long numPuts = this.getValue(IspnStats.NUM_PUT);
          this.addValue(IspnStats.NUM_SUCCESSFUL_PUTS, numPuts);
          this.addValue(IspnStats.NUM_HELD_LOCKS_SUCCESS_TX, getValue(IspnStats.NUM_HELD_LOCKS));
          if (isCommit()) {
@@ -47,7 +50,6 @@ public class LocalTransactionStatistics extends TransactionStatistics {
                this.addValue(IspnStats.LOCAL_EXEC_NO_CONT, (totalLocalDuration - localLockAcquisitionTime));
             }
          }
-
       }
    }
 
@@ -66,7 +68,7 @@ public class LocalTransactionStatistics extends TransactionStatistics {
    @Override
    public final String toString() {
       return "LocalTransactionStatistics{" +
-              "stillLocalExecution=" + stillLocalExecution +
-              ", " + super.toString();
+            "stillLocalExecution=" + stillLocalExecution +
+            ", " + super.toString();
    }
 }
