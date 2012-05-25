@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author mircea.markus@jboss.com
+ * @author Pedro Ruivo
  * @since 5.2.0
  */
 public abstract class BaseTotalOrderManager implements TotalOrderManager {
@@ -86,8 +87,9 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
    }
 
    @Override
-   public final void waitForPrepareToSucceed(TxInvocationContext ctx) {
+   public final boolean waitForPrepareToSucceed(TxInvocationContext ctx) {
       if (!ctx.isOriginLocal()) throw new IllegalStateException();
+      boolean shouldBeRetransmitted = false;
 
       if (isSync) {
 
@@ -99,6 +101,7 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
          LocalTransaction localTransaction = (LocalTransaction) ctx.getCacheTransaction();
          try {
             localTransaction.awaitUntilModificationsApplied();
+            shouldBeRetransmitted = localTransaction.isMarkedToRetransmit();
             if (trace)
                log.tracef("Prepare succeeded on time for transaction %s, waking up..", ctx.getGlobalTransaction().prettyPrint());
          } catch (Throwable th) {
@@ -107,9 +110,12 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
             throw new RpcException(th);
          } finally {
             //the transaction is no longer needed
-            localTransactionMap.remove(ctx.getGlobalTransaction());
+            if (!shouldBeRetransmitted) {
+               localTransactionMap.remove(ctx.getGlobalTransaction());
+            }
          }
       }
+      return shouldBeRetransmitted;
    }
 
    @Override
@@ -244,5 +250,10 @@ public abstract class BaseTotalOrderManager implements TotalOrderManager {
          return Collections.emptySet();
       }
       return Util.getAffectedKeys(modifications, dataContainer);
+   }
+
+   @Override
+   public Set<TxDependencyLatch> getPendingCommittingTransaction() {
+      return Collections.emptySet();
    }
 }

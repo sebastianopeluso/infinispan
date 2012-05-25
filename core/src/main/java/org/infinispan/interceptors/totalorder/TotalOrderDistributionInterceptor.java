@@ -36,13 +36,22 @@ public class TotalOrderDistributionInterceptor extends DistributionInterceptor {
       //this map is only populated after locks are acquired. However, no locks are acquired when total order is enabled
       //so we need to populate it here
       ctx.addAllAffectedKeys(Util.getAffectedKeys(Arrays.asList(command.getModifications()), dataContainer));
-      Object result = super.visitPrepareCommand(ctx, command);
-      if (shouldInvokeRemoteTxCommand(ctx)) {
-         //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication
-         //not to take place, e.g. in the case there are no changes in the context. And this is the place where we know
-         // if the replication occurred.
-         totalOrderManager.waitForPrepareToSucceed(ctx);
-      }
+
+      boolean shouldRetransmit;
+      Object result;
+
+      do {
+         result = super.visitPrepareCommand(ctx, command);
+         shouldRetransmit = false;
+         if (shouldInvokeRemoteTxCommand(ctx)) {
+            //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication
+            //not to take place, e.g. in the case there are no changes in the context. And this is the place where we know
+            // if the replication occurred.
+            shouldRetransmit = totalOrderManager.waitForPrepareToSucceed(ctx);
+         }
+
+
+      } while (shouldRetransmit);
       return result;
    }
 
@@ -51,6 +60,7 @@ public class TotalOrderDistributionInterceptor extends DistributionInterceptor {
       if(log.isTraceEnabled()) {
          log.tracef("Total Order Anycast transaction %s with Total Order", command.getGlobalTransaction().prettyPrint());
       }
-      rpcManager.invokeRemotely(recipients, command, false, false, true);
+      boolean reallySync = command.isOnePhaseCommit() && configuration.isSyncCommitPhase();
+      rpcManager.invokeRemotely(recipients, command, reallySync, false, true);
    }
 }

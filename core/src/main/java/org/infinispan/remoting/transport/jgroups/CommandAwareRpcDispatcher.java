@@ -56,8 +56,10 @@ import org.jgroups.util.RspList;
 import java.io.NotSerializableException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -125,7 +127,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             @Override
             public RspList<Object> call() throws Exception {
                return processCalls(command, recipients == null, timeout, filter, recipients, mode,
-                     req_marshaller, CommandAwareRpcDispatcher.this, oob, anycasting, totalOrder, distribution);
+                                   req_marshaller, CommandAwareRpcDispatcher.this, oob, anycasting, totalOrder, distribution);
             }
          });
          return null; // don't wait for a response!
@@ -133,7 +135,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          RspList<Object> response;
          try {
             response = processCalls(command, recipients == null, timeout, filter, recipients, mode,
-                  req_marshaller, this, oob, anycasting, totalOrder, distribution);
+                                    req_marshaller, this, oob, anycasting, totalOrder, distribution);
          } catch (InterruptedException e) {
             throw e;
          } catch (SuspectedException e) {
@@ -183,7 +185,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
                                                   boolean anycasting, boolean oob, RspFilter filter,
                                                   boolean asyncMarshalling, boolean totalOrder, boolean distribution) throws InterruptedException {
       return invokeRemoteCommands(null, command, mode, timeout, anycasting, oob, filter, asyncMarshalling,
-            totalOrder, distribution);
+                                  totalOrder, distribution);
    }
 
    private boolean containsOnlyNulls(RspList<Object> l) {
@@ -301,7 +303,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
 
    private static RspList<Object> processCalls(ReplicableCommand command, boolean broadcast, long timeout,
                                                RspFilter filter, List<Address> dests, ResponseMode mode,
-                                               Marshaller marshaller, CommandAwareRpcDispatcher card, boolean oob, boolean anycasting, 
+                                               Marshaller marshaller, CommandAwareRpcDispatcher card, boolean oob, boolean anycasting,
                                                boolean totalOrder, boolean distribution) throws Exception {
       if (trace) log.tracef("Replication task sending %s to addresses %s", command, dests);
 
@@ -321,10 +323,12 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             address.addAll(dests);
             address.add(card.local_addr);
          }
-         
+
+
+
          message.setDest(address);
 
-         retval = card.castMessage(dests, message, new RequestOptions(mode, timeout, false, filter));
+         retval = card.castMessage(address.getAddresses(), message, new RequestOptions(mode, timeout, false, filter));
       } else if (broadcast || FORCE_MCAST || totalOrder) {
          buf = marshallCall(marshaller, command);
          RequestOptions opts = new RequestOptions(mode, timeout, false, filter);
@@ -333,6 +337,16 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          //For correctness, ispn doesn't need their own message, so add own address to exclusion list
          if(!totalOrder) {
             opts.setExclusionList(card.getChannel().getAddress());
+         } else {
+            oob = false;
+            if (dests != null) {
+               Set<Address> membersToExclude = new HashSet<Address>(card.members);
+               membersToExclude.removeAll(dests);
+               dests = null;
+               Address[] array = new Address[membersToExclude.size()];
+               membersToExclude.toArray(array);
+               opts.setExclusionList(array);
+            }
          }
 
          retval = card.castMessage(dests, constructMessage(buf, null, oob, mode, rsvp, totalOrder),opts);

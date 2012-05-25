@@ -132,7 +132,8 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
    }
 
    protected void broadcastPrepare(TxInvocationContext context, PrepareCommand command) {
-      boolean syncPrepare =  configuration.getCacheMode().isSynchronous() && !configuration.isTotalOrder();
+      boolean syncPrepare =  configuration.getCacheMode().isSynchronous() ||
+            (command.isOnePhaseCommit() && configuration.isSyncCommitPhase());
       rpcManager.broadcastRpcCommand(command, syncPrepare, false, configuration.isTotalOrder());
    }
 

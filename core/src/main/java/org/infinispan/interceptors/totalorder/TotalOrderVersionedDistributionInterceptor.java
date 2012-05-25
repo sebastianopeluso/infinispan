@@ -20,7 +20,7 @@ import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepar
  * This interceptor is used in total order in distributed mode when the write skew check is enabled.
  * After sending the prepare through TOA (Total Order Anycast), it blocks the execution thread until the transaction 
  * outcome is know (i.e., the write skew check passes in all keys owners)
- *  
+ *
  * @author Pedro Ruivo
  * @since 5.2
  */
@@ -40,14 +40,21 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
       //this map is only populated after locks are acquired. However, no locks are acquired when total order is enabled
       //so we need to populate it here
       ctx.addAllAffectedKeys(Util.getAffectedKeys(Arrays.asList(command.getModifications()), dataContainer));
-      Object result = super.visitPrepareCommand(ctx, command);
 
-      if (shouldInvokeRemoteTxCommand(ctx)) {
-         //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication
-         //not to take place, e.g. in the case there are no changes in the context. And this is the place where we know
-         // if the replication occurred.
-         totalOrderManager.waitForPrepareToSucceed(ctx);
-      }
+      Object result;
+      boolean shouldRetransmit;
+
+      do{
+         result = super.visitPrepareCommand(ctx, command);
+         shouldRetransmit = false;
+
+         if (shouldInvokeRemoteTxCommand(ctx)) {
+            //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication
+            //not to take place, e.g. in the case there are no changes in the context. And this is the place where we know
+            // if the replication occurred.
+            shouldRetransmit = totalOrderManager.waitForPrepareToSucceed(ctx);
+         }
+      } while (shouldRetransmit);
 
       return result;
    }

@@ -504,6 +504,8 @@ public class LegacyConfigurationAdaptor {
       builder.transaction().recovery().enabled(legacy.isTransactionRecoveryEnabled());
         
       builder.unsafe().unreliableReturnValues(legacy.isUnsafeUnreliableReturnValues());
+
+      builder.versioning().enabled(legacy.isEnableVersioning()).scheme(legacy.getVersioningScheme());
       
       return builder.build();
    }

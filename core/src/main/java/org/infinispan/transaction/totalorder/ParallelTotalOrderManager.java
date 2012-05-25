@@ -237,8 +237,12 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
       protected void finalizeProcessing(Object result, boolean exception) {
          remoteTransaction.markPreparedAndNotify();
          updateLocalTransaction(result, exception, prepareCommand.getGlobalTransaction());
-         if (prepareCommand.isOnePhaseCommit() || exception) {
+         if (prepareCommand.isOnePhaseCommit()) {
             markTxCompleted();
+         } else if (exception) {
+            finishTransaction(remoteTransaction);
+            //Note: I cannot remove from the remote table, otherwise, when the rollback arrives, it will create a
+            // new remote transaction!
          }
       }
 
@@ -265,6 +269,11 @@ public class ParallelTotalOrderManager extends BaseTotalOrderManager {
          processingDuration.addAndGet(validationEndTime - initializationEndTime);
          numberOfTxValidated.incrementAndGet();
       }
+   }
+
+   @Override
+   public Set<TxDependencyLatch> getPendingCommittingTransaction() {
+      return new HashSet<TxDependencyLatch>(keysLocked.values());
    }
 
    @ManagedOperation(description = "Resets the statistics")
