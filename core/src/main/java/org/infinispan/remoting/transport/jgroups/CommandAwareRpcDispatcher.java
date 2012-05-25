@@ -56,8 +56,10 @@ import org.jgroups.util.RspList;
 import java.io.NotSerializableException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -323,7 +325,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          
          message.setDest(address);
 
-         retval = card.castMessage(dests, message, new RequestOptions(mode, timeout, false, filter));
+         retval = card.castMessage(address.getAddresses(), message, new RequestOptions(mode, timeout, false, filter));
       } else if (broadcast || FORCE_MCAST || totalOrder) {
          buf = marshallCall(marshaller, command);
          RequestOptions opts = new RequestOptions(mode, timeout, false, filter);
@@ -332,6 +334,16 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          //For correctness, ispn doesn't need their own message, so add own address to exclusion list
          if(!totalOrder) {
             opts.setExclusionList(card.getChannel().getAddress());
+         } else {
+            oob = false;
+            if (dests != null) {
+               Set<Address> membersToExclude = new HashSet<Address>(card.members);
+               membersToExclude.removeAll(dests);
+               dests = null;
+               Address[] array = new Address[membersToExclude.size()];
+               membersToExclude.toArray(array);
+               opts.setExclusionList(array);
+            }
          }
 
          retval = card.castMessage(dests, constructMessage(buf, null, oob, mode, rsvp, totalOrder),opts);

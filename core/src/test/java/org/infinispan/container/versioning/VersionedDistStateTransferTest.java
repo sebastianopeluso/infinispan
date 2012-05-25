@@ -58,8 +58,13 @@ public class VersionedDistStateTransferTest extends MultipleCacheManagersTest {
                .lockingMode(LockingMode.OPTIMISTIC)
                .syncCommitPhase(true);
 
+      amendConfig(builder);
+
       createCluster(builder, 4);
       waitForClusterToForm();
+   }
+
+   protected void amendConfig(ConfigurationBuilder builder) {
    }
 
    public void testStateTransfer() throws Exception {

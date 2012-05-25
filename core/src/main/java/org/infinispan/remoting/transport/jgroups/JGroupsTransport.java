@@ -95,6 +95,7 @@ import static org.infinispan.factories.KnownComponentNames.GLOBAL_MARSHALLER;
  *
  * @author Manik Surtani
  * @author Galder Zamarreño
+ * @author Pedro Ruivo
  * @since 4.0
  */
 public class JGroupsTransport extends AbstractTransport implements MembershipListener {
@@ -468,39 +469,42 @@ public class JGroupsTransport extends AbstractTransport implements MembershipLis
       List<org.jgroups.Address> jgAddressList = toJGroupsAddressListExcludingSelf(recipients);
       int membersSize = members.size();
       boolean broadcast = jgAddressList == null || recipients.size() == membersSize;
-      if (!totalOrder && (membersSize < 3 || (jgAddressList != null && jgAddressList.size() < 2))) broadcast = false;
+      if (membersSize < 3 || (jgAddressList != null && jgAddressList.size() < 2)) broadcast = false;
       RspList<Object> rsps = null;
       Response singleResponse = null;
       org.jgroups.Address singleJGAddress = null;
 
-      if (broadcast) {
+      if (broadcast || (totalOrder && !distribution)) {
          rsps = dispatcher.broadcastRemoteCommands(rpcCommand, toJGroupsMode(mode), timeout, recipients != null,
                                                    usePriorityQueue, toJGroupsFilter(responseFilter),
                asyncMarshalling, totalOrder, distribution);
-      } else {
-         if (jgAddressList == null || !jgAddressList.isEmpty()) {
-            boolean singleRecipient = !ignoreLeavers && jgAddressList != null && jgAddressList.size() == 1;
-            boolean skipRpc = false;
-            if (jgAddressList == null) {
-               ArrayList<Address> others = new ArrayList<Address>(members);
-               others.remove(self);
-               skipRpc = others.isEmpty();
-               singleRecipient = !ignoreLeavers && others.size() == 1;
-               if (singleRecipient) singleJGAddress = toJGroupsAddress(others.get(0));
-            }
-            if (!skipRpc) {
-               if (singleRecipient && !totalOrder) {
-                  if (singleJGAddress == null) singleJGAddress = jgAddressList.get(0);
-                  singleResponse = dispatcher.invokeRemoteCommand(singleJGAddress, rpcCommand, toJGroupsMode(mode), timeout,
-                                                                  usePriorityQueue, asyncMarshalling);
-               } else {
-                  rsps = dispatcher.invokeRemoteCommands(jgAddressList, rpcCommand, toJGroupsMode(mode), timeout,
-                                                         recipients != null, usePriorityQueue, toJGroupsFilter(responseFilter),
+      } else if (totalOrder && distribution) {
+         rsps = dispatcher.invokeRemoteCommands(jgAddressList, rpcCommand, toJGroupsMode(mode), timeout,
+                                                recipients != null, usePriorityQueue, toJGroupsFilter(responseFilter),
+                                                asyncMarshalling, totalOrder, distribution);
+      } else if (jgAddressList == null || !jgAddressList.isEmpty()) {
+         boolean singleRecipient = jgAddressList != null && jgAddressList.size() == 1;
+         boolean skipRpc = false;
+         if (jgAddressList == null) {
+            ArrayList<Address> others = new ArrayList<Address>(members);
+            others.remove(self);
+            skipRpc = others.isEmpty();
+            singleRecipient = others.size() == 1;
+            if (singleRecipient) singleJGAddress = toJGroupsAddress(others.get(0));
+         }
+         if (!skipRpc) {
+            if (singleRecipient && !totalOrder) {
+               if (singleJGAddress == null) singleJGAddress = jgAddressList.get(0);
+               singleResponse = dispatcher.invokeRemoteCommand(singleJGAddress, rpcCommand, toJGroupsMode(mode), timeout,
+                                                               usePriorityQueue, asyncMarshalling);
+            } else {
+               rsps = dispatcher.invokeRemoteCommands(jgAddressList, rpcCommand, toJGroupsMode(mode), timeout,
+                                                      recipients != null, usePriorityQueue, toJGroupsFilter(responseFilter),
                         asyncMarshalling, totalOrder, distribution);
-               }
             }
          }
       }
+
 
       if (mode.isAsynchronous())
          return Collections.emptyMap();// async case

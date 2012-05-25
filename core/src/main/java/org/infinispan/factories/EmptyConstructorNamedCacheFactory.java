@@ -42,6 +42,7 @@ import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
+import org.infinispan.statetransfer.totalorder.TotalOrderStateTransferLockImpl;
 import org.infinispan.transaction.totalorder.DistParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.ParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.SequentialTotalOrderManager;
@@ -108,7 +109,11 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
       } else if (componentType.equals(RecoveryAdminOperations.class)) {
          return (T) new RecoveryAdminOperations();
       } else if (componentType.equals(StateTransferLock.class)) {
-         return (T) new StateTransferLockImpl();
+         if (configuration.getTransactionProtocol().isTotalOrder()) {
+            return (T) new TotalOrderStateTransferLockImpl();
+         } else {
+            return (T) new StateTransferLockImpl();
+         }
       } else if (componentType.equals(EvictionManager.class)) {
          return (T) new EvictionManagerImpl();
       } else if (componentType.equals(LockContainer.class)) {
@@ -123,8 +128,8 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
 
          return needsMultiThreadValidation ?
                (configuration.getCacheMode().isDistributed() ?
-                     (T) new DistParallelTotalOrderManager() :
-                     (T) new ParallelTotalOrderManager())
+                      (T) new DistParallelTotalOrderManager() :
+                      (T) new ParallelTotalOrderManager())
                : (T) new SequentialTotalOrderManager();
       }
 
