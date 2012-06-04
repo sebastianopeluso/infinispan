@@ -25,6 +25,8 @@ package org.infinispan.config;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.mvcc.InternalMVCCEntry;
+import org.infinispan.mvcc.VersionVC;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,6 +35,12 @@ import java.util.Set;
 
 import static java.util.Collections.synchronizedCollection;
 
+/**
+ * Original author are missing...
+ * 
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
+ */
 public class QueryableDataContainer implements DataContainer {
 	
 	private static DataContainer delegate;
@@ -127,4 +135,75 @@ public class QueryableDataContainer implements DataContainer {
 	   return loggedOperations;
    }
 
+   @Override
+   public InternalMVCCEntry get(Object k, VersionVC max, boolean firstTimeOnNode) {
+      loggedOperations.add("get(" + k + ", " + max + ")");
+      return delegate.get(k, max, firstTimeOnNode);
+   }
+
+   @Override
+   public InternalMVCCEntry peek(Object k, VersionVC max, boolean firstTimeOnNode) {
+      loggedOperations.add("peek(" + k + ", " + max + ")");
+      return delegate.peek(k, max, firstTimeOnNode);
+   }
+
+   @Override
+   public void put(Object k, Object v, long lifespan, long maxIdle, VersionVC version) {
+      loggedOperations.add("put(" + k + ", " + v + ", " + lifespan + ", " + maxIdle + ", " + version + ")");
+      delegate.put(k, v, lifespan, maxIdle, version);
+   }
+
+   @Override
+   public boolean containsKey(Object k, VersionVC max, boolean firstTimeOnNode) {
+      loggedOperations.add("containsKey(" + k + ", " + max + ")" );
+      return delegate.containsKey(k,max, firstTimeOnNode);
+   }
+
+   @Override
+   public InternalCacheEntry remove(Object k, VersionVC version) {
+      loggedOperations.add("remove(" + k + ", " + version + ")" );
+      return delegate.remove(k, version);
+   }
+
+   @Override
+   public int size(VersionVC max, boolean firstTimeOnNode) {
+      loggedOperations.add("size(" + max + ")" );
+      return delegate.size(max, firstTimeOnNode);
+   }
+
+   @Override
+   public void clear(VersionVC version) {
+      loggedOperations.add("clear(" + version + ")" );
+      delegate.clear(version);
+   }
+
+   @Override
+   public Set<Object> keySet(VersionVC max, boolean firstTimeOnNode) {
+      loggedOperations.add("keySet(" + max + ")" );
+      return delegate.keySet(max, firstTimeOnNode);
+   }
+
+   @Override
+   public Collection<Object> values(VersionVC max, boolean firstTimeOnNode) {
+      loggedOperations.add("values(" + max + ")" );
+      return delegate.values(max, firstTimeOnNode);
+   }
+
+   @Override
+   public Set<InternalCacheEntry> entrySet(VersionVC max) {
+      loggedOperations.add("entrySet(" + max + ")" );
+      return delegate.entrySet(max);
+   }
+
+   @Override
+   public void purgeExpired(VersionVC version, boolean firstTimeOnNode) {
+      loggedOperations.add("purgeExpired(" + version + ")" );
+      delegate.purgeExpired(version, firstTimeOnNode);
+   }
+
+   @Override
+   public boolean validateKey(Object key, VersionVC version) {
+      loggedOperations.add("validateKey(" + key + "," + version + ")" );
+      return delegate.validateKey(key, version);
+   }
 }

@@ -23,24 +23,52 @@
 package org.infinispan.factories;
 
 import org.infinispan.factories.annotations.DefaultFactoryFor;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.concurrent.locks.DeadlockDetectingLockManager;
 import org.infinispan.util.concurrent.locks.LockManager;
 import org.infinispan.util.concurrent.locks.LockManagerImpl;
+import org.infinispan.util.concurrent.locks.readwritelock.DeadlockDetectingReadWriteLockManager;
+import org.infinispan.util.concurrent.locks.readwritelock.ReadWriteLockManager;
+import org.infinispan.util.concurrent.locks.readwritelock.ReadWriteLockManagerImpl;
 
 /**
  * Factory class that creates instances of {@link LockManager}.
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
-@DefaultFactoryFor(classes = LockManager.class)
+@DefaultFactoryFor(classes = {LockManager.class, ReadWriteLockManager.class})
 public class LockManagerFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
+
+   private DeadlockDetectingReadWriteLockManager deadlockDetectingReadWriteLockManager;
+   private ReadWriteLockManager readWriteLockManager;
+
    @Override
    public <T> T construct(Class<T> componentType) {
-      if (configuration.isEnableDeadlockDetection()) {
-         return (T) new DeadlockDetectingLockManager();
+      if(configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE || componentType.equals(ReadWriteLockManager.class)) {
+         return (T) constructOrReturnExisting(configuration.isDeadlockDetectionEnabled());
       } else {
-         return (T) new LockManagerImpl();
+         if (configuration.isEnableDeadlockDetection()) {
+            return (T) new DeadlockDetectingLockManager();
+         } else {
+            return (T) new LockManagerImpl();
+         }
+      }
+   }
+
+   private synchronized ReadWriteLockManager constructOrReturnExisting(boolean isDeadLockEnable) {
+      if (isDeadLockEnable) {
+         if (deadlockDetectingReadWriteLockManager == null) {
+            deadlockDetectingReadWriteLockManager = new DeadlockDetectingReadWriteLockManager();
+         }
+         return deadlockDetectingReadWriteLockManager;
+      } else {
+         if (readWriteLockManager == null) {
+            readWriteLockManager = new ReadWriteLockManagerImpl();
+         }
+         return readWriteLockManager;
       }
    }
 }

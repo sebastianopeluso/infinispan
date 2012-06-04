@@ -27,6 +27,9 @@ import org.infinispan.CacheException;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.versioning.EntryVersionsMap;
+import org.infinispan.mvcc.InternalMVCCEntry;
+import org.infinispan.mvcc.ReadSetEntry;
+import org.infinispan.mvcc.VersionVC;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.concurrent.TimeoutException;
@@ -38,6 +41,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +52,7 @@ import java.util.Set;
  *
  * @author Mircea.Markus@jboss.com
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.0
  */
 public abstract class LocalTransaction extends AbstractCacheTransaction {
@@ -70,6 +75,8 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    // prepare commands
    private final PrepareResult prepareResult = new PrepareResult();
 
+   private VersionVC commitVersion;
+
    public LocalTransaction(Transaction transaction, GlobalTransaction tx, boolean implicitTransaction, int viewId) {
       super(tx, viewId);
       this.transaction = transaction;
@@ -84,6 +91,13 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       modifications.add(mod);
    }
 
+   public boolean hasRemoteLocksAcquired(Collection<Address> leavers) {
+      if (trace) {
+         log.tracef("My remote locks: %s, leavers are: %s", remoteLockedNodes, leavers);
+      }
+      return (remoteLockedNodes != null) && !Collections.disjoint(remoteLockedNodes, leavers);
+   }
+
    public void locksAcquired(Collection<Address> nodes) {
       log.tracef("Adding remote locks on %s. Remote locks are %s", nodes, remoteLockedNodes);
       if (remoteLockedNodes == null)
@@ -95,6 +109,15 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    public Collection<Address> getRemoteLocksAcquired() {
       if (remoteLockedNodes == null) return Collections.emptySet();
       return remoteLockedNodes;
+   }
+
+   public void filterRemoteLocksAcquire(Collection<Address> existingMembers) {
+      Iterator<Address> it = getRemoteLocksAcquired().iterator();
+      while (it.hasNext()) {
+         Address next = it.next();
+         if (!existingMembers.contains(next))
+            it.remove();
+      }
    }
 
    public void clearRemoteLocksAcquired() {
@@ -356,5 +379,72 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    @Override
    public final boolean wasPrepareSent() {
       return prepareSent;
+   }
+   
+   public void addLocalReadKey(Object key, InternalMVCCEntry ime) {
+      if(localReadSet == null) {
+         localReadSet = new LinkedList<ReadSetEntry>();
+      }
+      localReadSet.addLast(new ReadSetEntry(key, ime));
+   }
+
+   @Override
+   public void removeLocalReadKey(Object key) {
+      if(localReadSet != null){
+         Iterator<ReadSetEntry> itr = localReadSet.descendingIterator();
+         while(itr.hasNext()){
+            ReadSetEntry entry = itr.next();
+
+            if(entry.getKey() != null && entry.getKey().equals(key)){
+               itr.remove();
+               break;
+            }
+         }
+      }
+   }
+
+   @Override
+   public void removeRemoteReadKey(Object key){
+
+      if(remoteReadSet != null){
+         Iterator<ReadSetEntry> itr = remoteReadSet.descendingIterator();
+         while(itr.hasNext()){
+            ReadSetEntry entry = itr.next();
+
+            if(entry.getKey() != null && entry.getKey().equals(key)){
+               itr.remove();
+               break;
+            }
+         }
+      }
+   }
+
+   @Override
+   public void addRemoteReadKey(Object key, InternalMVCCEntry ime) {
+      if(remoteReadSet == null) {
+         remoteReadSet = new LinkedList<ReadSetEntry>();
+      }
+      remoteReadSet.addLast(new ReadSetEntry(key, ime));
+   }
+
+
+   public void setLastReadKey(CacheEntry entry){
+      this.lastReadKey = entry;
+   }
+
+   public CacheEntry getLastReadKey(){
+      return this.lastReadKey;
+   }
+
+   public void clearLastReadKey(){
+      this.lastReadKey = null;
+   }
+
+   public void setCommitVersion(VersionVC version) {
+      this.commitVersion = version;
+   }
+
+   public VersionVC getCommitVersion() {
+      return commitVersion;
    }
 }

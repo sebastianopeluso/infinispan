@@ -48,6 +48,8 @@ import org.infinispan.util.logging.LogFactory;
  * {@link EntryFactory} implementation to be used for optimistic locking scheme.
  *
  * @author Mircea Markus
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.1
  */
 public class EntryFactoryImpl implements EntryFactory {
@@ -56,7 +58,7 @@ public class EntryFactoryImpl implements EntryFactory {
    private final boolean trace = log.isTraceEnabled();
    
    protected boolean useRepeatableRead;
-   private DataContainer container;
+   protected DataContainer container;
    protected boolean localModeWriteSkewCheck;
    private Configuration configuration;
    private CacheNotifier notifier;
@@ -75,7 +77,7 @@ public class EntryFactoryImpl implements EntryFactory {
    }
 
    @Override
-   public final CacheEntry wrapEntryForReading(InvocationContext ctx, Object key) throws InterruptedException {
+   public CacheEntry wrapEntryForReading(InvocationContext ctx, Object key) throws InterruptedException {
       CacheEntry cacheEntry = getFromContext(ctx, key);
       if (cacheEntry == null) {
          cacheEntry = getFromContainer(key);
@@ -195,13 +197,13 @@ public class EntryFactoryImpl implements EntryFactory {
 
    }
 
-   private CacheEntry getFromContext(InvocationContext ctx, Object key) {
+   protected CacheEntry getFromContext(InvocationContext ctx, Object key) {
       final CacheEntry cacheEntry = ctx.lookupEntry(key);
       if (trace) log.tracef("Exists in context? %s ", cacheEntry);
       return cacheEntry;
    }
 
-   private InternalCacheEntry getFromContainer(Object key) {
+   protected InternalCacheEntry getFromContainer(Object key) {
       final InternalCacheEntry ice = container.get(key);
       if (trace) log.tracef("Retrieved from container %s", ice);
       return ice;

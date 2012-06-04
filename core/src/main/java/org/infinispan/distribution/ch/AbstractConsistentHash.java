@@ -23,6 +23,7 @@
 package org.infinispan.distribution.ch;
 
 import org.infinispan.distribution.group.GroupManager;
+import org.infinispan.mvcc.ReplicationGroup;
 import org.infinispan.remoting.transport.Address;
 
 import java.util.Collection;
@@ -40,6 +41,8 @@ import java.util.Map;
  * <p />
  * @author Manik Surtani
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public abstract class AbstractConsistentHash implements ConsistentHash {
@@ -103,4 +106,8 @@ public abstract class AbstractConsistentHash implements ConsistentHash {
        return group != null ? group : key;
    }
    
+   @Override
+   public ReplicationGroup getGroupFor(Object key, int replicationCount) {
+      throw new UnsupportedOperationException();
+   }
 }

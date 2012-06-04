@@ -30,6 +30,8 @@ import org.infinispan.eviction.EvictionStrategy;
 import org.infinispan.eviction.EvictionThreadPolicy;
 import org.infinispan.eviction.PassivationManager;
 import org.infinispan.factories.annotations.Inject;
+import org.infinispan.mvcc.InternalMVCCEntry;
+import org.infinispan.mvcc.VersionVC;
 import org.infinispan.util.Immutables;
 import org.infinispan.util.concurrent.BoundedConcurrentHashMap;
 import org.infinispan.util.concurrent.BoundedConcurrentHashMap.Eviction;
@@ -53,7 +55,8 @@ import java.util.concurrent.ConcurrentMap;
  * @author Galder Zamarreño
  * @author Vladimir Blagojevic
  * @author <a href="http://gleamynode.net/">Trustin Lee</a>
- *
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @ThreadSafe
@@ -325,5 +328,69 @@ public class DefaultDataContainer implements DataContainer {
       public Object next() {
          return currentIterator.next().getValue();
       }
+   }
+
+   /*
+   * ============ added by Pedro ================
+   */
+
+   @Override
+   public InternalMVCCEntry get(Object k, VersionVC ma, boolean firstTimeOnNode) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public InternalMVCCEntry peek(Object k, VersionVC max, boolean firstTimeOnNode) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public void put(Object k, Object v, long lifespan, long maxIdle, VersionVC version) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public boolean containsKey(Object k, VersionVC max, boolean firstTimeOnNode) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public InternalCacheEntry remove(Object k, VersionVC version) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public int size(VersionVC max, boolean firstTimeOnNode) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public void clear(VersionVC version) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public Set<Object> keySet(VersionVC max, boolean firstTimeOnNode) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public Collection<Object> values(VersionVC max, boolean firstTimeOnNode) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public Set<InternalCacheEntry> entrySet(VersionVC max) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public void purgeExpired(VersionVC version, boolean firstTimeOnNode) {
+      throw new UnsupportedOperationException("bla?");
+   }
+
+   @Override
+   public boolean validateKey(Object key, VersionVC version) {
+      throw new UnsupportedOperationException("bla?");
    }
 }

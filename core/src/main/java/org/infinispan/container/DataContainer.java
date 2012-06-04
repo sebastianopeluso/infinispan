@@ -30,6 +30,8 @@ import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.factories.annotations.Stop;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
+import org.infinispan.mvcc.InternalMVCCEntry;
+import org.infinispan.mvcc.VersionVC;
 
 /**
  * The main internal data structure which stores entries
@@ -37,6 +39,8 @@ import org.infinispan.factories.scopes.Scopes;
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
  * @author Galder Zamarreño
  * @author Vladimir Blagojevic
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @Scope(Scopes.NAMED_CACHE)
@@ -129,4 +133,101 @@ public interface DataContainer extends Iterable<InternalCacheEntry> {
     * Purges entries that have passed their expiry time
     */
    void purgeExpired();
+
+   /**
+    * retrieves the most recent cache entry with version less or equals than *max*
+    * @param k key under which entry is stored
+    * @param max the maximum version to read
+    * @return entry, if it exists and has not expired, or null if not exists
+    */
+   InternalMVCCEntry get(Object k, VersionVC max, boolean firstTimeOnNode);
+
+   /**
+    * see {@link #peek(Object k)}
+    * The difference is the version to read
+    * @param k key under which entry is stored
+    * @param max the maximum version to read
+    * @return entry, if it exists, or null if not
+    */
+   InternalMVCCEntry peek(Object k, VersionVC max, boolean firstTimeOnNode);
+
+   /**
+    * Puts an entry in the cache along with a lifespan and a maxIdle time
+    * @param k key under which to store entry
+    * @param v value to store
+    * @param lifespan lifespan in milliseconds.  -1 means immortal.
+    * @param maxIdle max idle time for which to store entry.  -1 means forever.
+    * @param version the new version of this value
+    */
+   void put(Object k, Object v, long lifespan, long maxIdle, VersionVC version);
+
+   /**
+    * Tests whether an entry exists in the container
+    * @param k key to test
+    * @param max the maximum version to read
+    * @return true if entry exists and has not expired; false otherwise
+    */
+   boolean containsKey(Object k, VersionVC max, boolean firstTimeOnNode);
+
+   /**
+    * Removes an entry from the cache
+    *
+    * @param k key to remove
+    * @param version the new version of this value
+    * @return entry removed, or null if it didn't exist or had expired
+    */
+   InternalCacheEntry remove(Object k, VersionVC version);
+
+   /**
+    * return the number of entries in the data container which has a version less or equals to max
+    * @param max the maximum version
+    * @return count of the number of entries in the container
+    */
+   int size(VersionVC max, boolean firstTimeOnNode);
+
+   /**
+    * see {@link #clear()}
+    * Note: with the mvcc, it puts a new empty value with the version *version*
+    * @param version the new version of the values deleted
+    */
+   void clear(VersionVC version);
+
+   /**
+    * see {@link #keySet()}
+    * Note: the returned keys has value with version less or equals than *max*
+    * @param max the maximum version
+    * @return a set of keys
+    */
+   Set<Object> keySet(VersionVC max, boolean firstTimeOnNode);
+
+   /**
+    * see {@link #values()}
+    * Note: the returned values has the most recent version less or equals than *max*
+    * @param max the maximum version
+    * @return a set of values contained in the container
+    */
+   Collection<Object> values(VersionVC max, boolean firstTimeOnNode);
+
+   /**
+    * see {@link #entrySet()}
+    * Note: the returned pairs has the most recent version less or equals than *max*
+    * @param max the maximum version
+    * @return a set of immutable cache entries
+    */
+   Set<InternalCacheEntry> entrySet(VersionVC max);
+
+   /**
+    * see {@link #values()}
+    * Note: with the mvcc, it puts a new empty value with the version *version*
+    * @param version the new version of the values deleted
+    */
+   void purgeExpired(VersionVC version, boolean firstTimeOnNode);
+
+   /**
+    * 
+    * @param key
+    * @param version    
+    * @return
+    */
+   boolean validateKey(Object key, VersionVC version);
 }

@@ -25,6 +25,7 @@ package org.infinispan.context;
 
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.context.impl.AbstractInvocationContext;
+import org.infinispan.mvcc.InternalMVCCEntry;
 
 import java.util.Collections;
 import java.util.Map;
@@ -32,6 +33,8 @@ import java.util.Set;
 
 /**
  * @author Mircea Markus
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.1
  */
 public class SingleKeyNonTxInvocationContext extends AbstractInvocationContext {
@@ -46,6 +49,8 @@ public class SingleKeyNonTxInvocationContext extends AbstractInvocationContext {
    private boolean isLocked;
 
    private CacheEntry cacheEntry;
+
+   private CacheEntry lastReadKey;
 
    public SingleKeyNonTxInvocationContext(boolean originLocal) {
       isOriginLocal = originLocal;
@@ -82,6 +87,61 @@ public class SingleKeyNonTxInvocationContext extends AbstractInvocationContext {
       if (cacheEntry != null && !key.equals(this.key))
          throw illegalStateException();
       isLocked = true;
+   }
+
+   @Override
+   public void addRemoteReadKey(Object key, InternalMVCCEntry ime) {
+      //no-op
+   }
+
+   @Override
+   public void addLocalReadKey(Object key, InternalMVCCEntry ime) {
+      //no-op
+   }
+
+   @Override
+   public void removeLocalReadKey(Object key) {
+      //no-op
+   }
+
+   @Override
+   public void removeRemoteReadKey(Object key) {
+      //no-op
+   }
+
+   @Override
+   public InternalMVCCEntry getLocalReadKey(Object Key) {
+      return null;  //no-op
+   }
+
+   @Override
+   public InternalMVCCEntry getRemoteReadKey(Object Key) {
+      return null;  //no-op
+   }
+
+   @Override
+   public void setAlreadyReadOnNode(boolean alreadyRead) {
+      //no-op
+   }
+
+   @Override
+   public boolean getAlreadyReadOnNode() {
+      return false; //no-op
+   }
+
+   @Override
+   public void setLastReadKey(CacheEntry entry) {
+      lastReadKey = entry;
+   }
+
+   @Override
+   public CacheEntry getLastReadKey() {
+      return lastReadKey;
+   }
+
+   @Override
+   public void clearLastReadKey() {
+      lastReadKey = null;
    }
 
    private IllegalStateException illegalStateException() {

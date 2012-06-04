@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
@@ -40,6 +41,8 @@ import static java.util.Collections.emptySet;
  * This class is used when deadlock detection is enabled.
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  */
 public class DldGlobalTransaction extends GlobalTransaction {
 
@@ -54,8 +57,12 @@ public class DldGlobalTransaction extends GlobalTransaction {
    protected transient volatile Object localLockIntention;
 
    protected volatile Collection<Object> remoteLockIntention = emptySet();
+   //the same above, but to readSet in serializable isolation level
+   protected volatile Collection<Object> remoteReadLockIntention = emptySet();
 
    protected volatile Set<Object> locksAtOrigin = emptySet();
+   //the same above, but to readSet in serializable isolation level
+   protected volatile Set<Object> readLocksAtOrigin = emptySet();
 
    public DldGlobalTransaction() {
    }
@@ -107,6 +114,14 @@ public class DldGlobalTransaction extends GlobalTransaction {
             "} " + super.toString();
    }
 
+   public boolean isMarkedForRollback() {
+      return isMarkedForRollback;
+   }
+
+   public void setMarkedForRollback(boolean markedForRollback) {
+      isMarkedForRollback = markedForRollback;
+   }
+
    /**
     * Returns the key this transaction intends to lock. 
     */
@@ -121,6 +136,12 @@ public class DldGlobalTransaction extends GlobalTransaction {
 
    public boolean wouldLose(DldGlobalTransaction other) {
       return this.coinToss < other.coinToss;
+   }
+
+   public boolean isAcquiringRemoteLock(Object key, Address address) {
+      boolean contains = remoteLockIntention.contains(key);
+      if (trace) log.tracef("Intention check: does %s contain %s? %b", remoteLockIntention, key, contains);
+      return contains; //this works for replication
    }
 
    public void setRemoteLockIntention(Collection<Object> remoteLockIntention) {
@@ -154,6 +175,33 @@ public class DldGlobalTransaction extends GlobalTransaction {
       return this.locksAtOrigin;
    }
 
+   public void setReadLocksHeldAtOrigin(Set<Object> readLocksAtOrigin) {
+      if (trace) {
+         log.tracef("Setting *read* locks at origin for (%s) to %s", this, locksAtOrigin);
+      }
+      this.readLocksAtOrigin = readLocksAtOrigin;
+   }
+
+   public void setRemoteReadLockIntention(Set<Object> remoteReadLockIntention) {
+      if (trace) {
+         log.tracef("Setting the remote read lock intention for (%s) to %s", this, remoteReadLockIntention);
+      }
+      this.remoteReadLockIntention = remoteReadLockIntention;
+   }
+
+   public boolean hasLockAtOrigin(DldGlobalTransaction other) {
+      Set<Object> conflictingLocks = new HashSet<Object>(locksAtOrigin);
+      conflictingLocks.addAll(readLocksAtOrigin);
+      conflictingLocks.retainAll(other.remoteLockIntention);
+      conflictingLocks.retainAll(other.remoteReadLockIntention);
+      for(Object lock : conflictingLocks) {
+         if(locksAtOrigin.contains(lock) || other.remoteLockIntention.contains(lock)) {
+            return true; //conflict and one of them it is a write lock
+         }
+      }
+      return false;
+   }
+
    public static class Externalizer extends GlobalTransaction.AbstractGlobalTxExternalizer<DldGlobalTransaction> {
 
       @Override
@@ -170,6 +218,11 @@ public class DldGlobalTransaction extends GlobalTransaction {
          } else {
             output.writeObject(ddGt.locksAtOrigin);
          }
+         if(ddGt.readLocksAtOrigin.isEmpty()) {
+            output.writeObject(null);
+         } else {
+            output.writeObject(ddGt.readLocksAtOrigin);
+         }
       }
 
       @Override
@@ -178,10 +231,16 @@ public class DldGlobalTransaction extends GlobalTransaction {
          DldGlobalTransaction ddGt = super.readObject(input);
          ddGt.setCoinToss(input.readLong());
          Object locksAtOriginObj = input.readObject();
+         Object readLockAtOriginObj = input.readObject();
          if (locksAtOriginObj == null) {
             ddGt.setLocksHeldAtOrigin(emptySet());
          } else {
             ddGt.setLocksHeldAtOrigin((Set<Object>) locksAtOriginObj);
+         }
+         if(readLockAtOriginObj == null) {
+            ddGt.setReadLocksHeldAtOrigin(emptySet());
+         } else {
+            ddGt.setReadLocksHeldAtOrigin((Set<Object>) readLockAtOriginObj);
          }
          return ddGt;
       }

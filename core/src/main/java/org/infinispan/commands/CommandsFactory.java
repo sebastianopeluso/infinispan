@@ -43,6 +43,8 @@ import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
+import org.infinispan.commands.tx.SerializableCommitCommand;
+import org.infinispan.commands.tx.SerializablePrepareCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.commands.write.*;
@@ -72,6 +74,8 @@ import java.util.concurrent.Callable;
  * @author Manik Surtani
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @Scope(Scopes.NAMED_CACHE)
@@ -381,4 +385,21 @@ public interface CommandsFactory {
     * @return instance
     */
    PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction);
+
+   /**
+    * 
+    * @param gtx
+    * @param modifications
+    * @param onePhaseCommit
+    * @return
+    */
+   SerializablePrepareCommand buildSerializablePrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications,                                      
+                                      boolean onePhaseCommit);
+
+   /**
+    * 
+    * @param gtx
+    * @return
+    */
+   SerializableCommitCommand buildSerializableCommitCommand(GlobalTransaction gtx);
 }

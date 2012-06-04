@@ -78,6 +78,7 @@ import java.util.concurrent.TimeoutException;
  * @author Mircea.Markus@jboss.com
  * @author Pete Muir
  * @author Dan Berindei <dan@infinispan.org>
+ * @author Pedro Ruivo 
  * @since 4.0
  */
 public class DistributionInterceptor extends BaseRpcInterceptor {
@@ -362,7 +363,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
       }
    }
 
-   private void sendCommitCommand(TxInvocationContext ctx, CommitCommand command, Collection<Address> preparedOn)
+   protected void sendCommitCommand(TxInvocationContext ctx, CommitCommand command, Collection<Address> preparedOn)
          throws TimeoutException, InterruptedException {
       // we only send the commit command to the nodes that
       Collection<Address> recipients = dm.getAffectedNodes(ctx.getAffectedKeys());

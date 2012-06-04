@@ -43,6 +43,8 @@ import static java.util.Collections.emptySet;
  * enabled.
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.0
  */
 public class RecoveryAwareDldGlobalTransaction extends DldGlobalTransaction implements RecoverableTransactionIdentifier {
@@ -104,10 +106,16 @@ public class RecoveryAwareDldGlobalTransaction extends DldGlobalTransaction impl
          RecoveryAwareDldGlobalTransaction globalTransaction = super.readObject(input);
          globalTransaction.setCoinToss(input.readLong());
          Object locksAtOriginObj = input.readObject();
+         Object readLockAtOriginObj = input.readObject();
          if (locksAtOriginObj == null) {
             globalTransaction.setLocksHeldAtOrigin(emptySet());
          } else {
             globalTransaction.setLocksHeldAtOrigin((Set<Object>) locksAtOriginObj);
+         }
+         if(readLockAtOriginObj == null) {
+            globalTransaction.setReadLocksHeldAtOrigin(emptySet());
+         } else {
+            globalTransaction.setReadLocksHeldAtOrigin((Set<Object>) readLockAtOriginObj);
          }
 
          Xid xid = (Xid) input.readObject();

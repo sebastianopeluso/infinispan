@@ -38,6 +38,7 @@ import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.interceptors.locking.ClusteringDependentLogic;
 import org.infinispan.loaders.CacheLoaderManager;
 import org.infinispan.loaders.CacheLoaderManagerImpl;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
 import org.infinispan.statetransfer.StateTransferLock;
@@ -55,6 +56,11 @@ import org.infinispan.util.concurrent.locks.containers.OwnableReentrantPerEntryL
 import org.infinispan.util.concurrent.locks.containers.OwnableReentrantStripedLockContainer;
 import org.infinispan.util.concurrent.locks.containers.ReentrantPerEntryLockContainer;
 import org.infinispan.util.concurrent.locks.containers.ReentrantStripedLockContainer;
+import org.infinispan.util.concurrent.locks.containers.readwritelock.OwnableReentrantPerEntryReadWriteLockContainer;
+import org.infinispan.util.concurrent.locks.containers.readwritelock.OwnableReentrantStripedReadWriteLockContainer;
+import org.infinispan.util.concurrent.locks.containers.readwritelock.ReadWriteLockContainer;
+import org.infinispan.util.concurrent.locks.containers.readwritelock.ReentrantPerEntryReadWriteLockContainer;
+import org.infinispan.util.concurrent.locks.containers.readwritelock.ReentrantStripedReadWriteLockContainer;
 
 import static org.infinispan.util.Util.getInstance;
 
@@ -63,13 +69,15 @@ import static org.infinispan.util.Util.getInstance;
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @DefaultFactoryFor(classes = {CacheNotifier.class, CommandsFactory.class,
                               CacheLoaderManager.class, InvocationContextContainer.class, PassivationManager.class,
                               BatchContainer.class, EvictionManager.class,
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
-                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class})
+                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class, VersionVCFactory.class,
+                              ReadWriteLockContainer.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -131,6 +139,16 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
                      (T) new DistParallelTotalOrderManager() :
                      (T) new ParallelTotalOrderManager())
                : (T) new SequentialTotalOrderManager();
+      } else if (componentType.equals(VersionVCFactory.class)) {
+         return (T) new VersionVCFactory(configuration.getCacheMode().isDistributed());
+      } else if (componentType.equals(ReadWriteLockContainer.class)) {
+         boolean  notTransactional = !configuration.isTransactionalCache();
+         LockContainer<?> lockContainer = configuration.isUseLockStriping() ?
+               notTransactional ? new ReentrantStripedReadWriteLockContainer(configuration.getConcurrencyLevel()) : 
+                     new OwnableReentrantStripedReadWriteLockContainer(configuration.getConcurrencyLevel()) :
+               notTransactional ? new ReentrantPerEntryReadWriteLockContainer(configuration.getConcurrencyLevel()) : 
+                     new OwnableReentrantPerEntryReadWriteLockContainer(configuration.getConcurrencyLevel());
+         return (T) lockContainer;
       }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());

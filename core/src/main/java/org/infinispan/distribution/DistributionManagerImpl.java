@@ -29,6 +29,7 @@ import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.InternalCacheValue;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.context.impl.LocalTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.distribution.ch.ConsistentHashHelper;
@@ -36,6 +37,10 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.jmx.annotations.ManagedOperation;
+import org.infinispan.mvcc.InternalMVCCEntry;
+import org.infinispan.mvcc.ReplicationGroup;
+import org.infinispan.mvcc.VersionVC;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.remoting.responses.ClusteredGetResponseValidityFilter;
 import org.infinispan.remoting.responses.Response;
@@ -47,11 +52,13 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.StateTransferManager;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.Immutables;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 import org.rhq.helpers.pluginAnnotations.agent.Operation;
 import org.rhq.helpers.pluginAnnotations.agent.Parameter;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -68,6 +75,8 @@ import java.util.Set;
  * @author Mircea.Markus@jboss.com
  * @author Bela Ban
  * @author Dan Berindei <dan@infinispan.org>
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @MBean(objectName = "DistributionManager", description = "Component that handles distribution of content across a cluster")
@@ -81,6 +90,7 @@ public class DistributionManagerImpl implements DistributionManager {
    private CommandsFactory cf;
    private CacheNotifier cacheNotifier;
    private StateTransferManager stateTransferManager;
+   private VersionVCFactory versionVCFactory;
 
    private volatile ConsistentHash consistentHash;
 
@@ -92,12 +102,13 @@ public class DistributionManagerImpl implements DistributionManager {
 
    @Inject
    public void init(Configuration configuration, RpcManager rpcManager, CommandsFactory cf, CacheNotifier cacheNotifier,
-                    StateTransferManager stateTransferManager) {
+                    StateTransferManager stateTransferManager, VersionVCFactory versionVCFactory) {
       this.configuration = configuration;
       this.rpcManager = rpcManager;
       this.cf = cf;
       this.cacheNotifier = cacheNotifier;
       this.stateTransferManager = stateTransferManager;
+      this.versionVCFactory = versionVCFactory;
    }
 
    // The DMI is cache-scoped, so it will always start after the RMI, which is global-scoped
@@ -173,15 +184,98 @@ public class DistributionManagerImpl implements DistributionManager {
       List<Address> targets = locate(key);
       // if any of the recipients has left the cluster since the command was issued, just don't wait for its response
       targets.retainAll(rpcManager.getTransport().getMembers());
-      ResponseFilter filter = new ClusteredGetResponseValidityFilter(targets, getAddress());
+
+      VersionVC maxToRead;
+      VersionVC minVersion;
+
+      Set<Integer> toReadFrom = new HashSet<Integer>();
+
+      if(ctx.isInTxScope()) {
+         for(Address addr : targets) {
+            toReadFrom.add(getAddressID(addr));
+         }
+
+         maxToRead = ctx.calculateVersionToRead(this.versionVCFactory);
+         minVersion = ((LocalTxInvocationContext)ctx).getMinVersion();
+
+         get.setMaxVersion(maxToRead);
+         get.setMinVersion(minVersion);
+         get.setAlreadyReadMask(((LocalTxInvocationContext)ctx).getReadFrom());
+
+         if(log.isDebugEnabled()) {
+            log.debugf("Perform a remote get for transaction %s. Key: %s, min version: %s, max version: %s",
+                       ((LocalTxInvocationContext) ctx).getGlobalTransaction().prettyPrint(),
+                       key, minVersion, maxToRead);
+         }
+      } else {
+         if(log.isDebugEnabled()) {
+            log.debugf("Perform a remote get in non-transactional context. key is %s", key);
+         }
+      }
+
+      ResponseFilter filter = new ClusteredGetResponseValidityFilter(targets, getAddress(),
+                                                                     configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE);
       Map<Address, Response> responses = rpcManager.invokeRemotely(targets, get, ResponseMode.WAIT_FOR_VALID_RESPONSE,
                                                                    configuration.getSyncReplTimeout(), true, filter, false);
 
+      if(ctx.isInTxScope()) {
+         if(log.isDebugEnabled()) {
+            log.debugf("Remote get done for transaction %s [key:%s]. response are: %s",
+                       ((LocalTxInvocationContext) ctx).getGlobalTransaction().prettyPrint(),
+                       key, responses);
+         }
+      } else {
+         if(log.isDebugEnabled()) {
+            log.debugf("Remote get done for non-transaction context [key:%s]. response are: %s", key, responses);
+         }
+      }
+
       if (!responses.isEmpty()) {
-         for (Response r : responses.values()) {
+         for (Map.Entry<Address,Response> entry : responses.entrySet()) {
+            Response r = entry.getValue();
+            if (r == null) {
+               continue;
+            }
             if (r instanceof SuccessfulResponse) {
-               InternalCacheValue cacheValue = (InternalCacheValue) ((SuccessfulResponse) r).getResponseValue();
-               return cacheValue.toInternalCacheEntry(key);
+               if(configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
+                  if(ctx.isInTxScope()) {
+                     InternalMVCCEntry ime = (InternalMVCCEntry) ((SuccessfulResponse) r).getResponseValue();
+                     int pos = getAddressID(entry.getKey());
+
+
+                     ctx.addRemoteReadKey(key, ime);
+                     ctx.removeLocalReadKey(key);
+
+
+                     ((LocalTxInvocationContext) ctx).markReadFrom(versionVCFactory.translate(pos)); //To remember that this transaction has effectively read on this node
+
+
+
+                     VersionVC v = ime.getVersion();
+
+                     if(this.versionVCFactory.translateAndGet(v,pos) == VersionVC.EMPTY_POSITION) {
+                        this.versionVCFactory.translateAndSet(v,pos,0);
+                     }
+
+
+
+                     if(log.isDebugEnabled()) {
+                        log.debugf("Remote Get successful for transaction %s and key %s. Return value is %s",
+                                   ((LocalTxInvocationContext) ctx).getGlobalTransaction().prettyPrint(), key, ime);
+                     }
+                     return ime.getValue();
+                  } else {
+                     InternalCacheValue cacheValue = (InternalCacheValue) ((SuccessfulResponse) r).getResponseValue();
+                     if(log.isDebugEnabled()) {
+                        log.debugf("Remote Get successful for non-transactional context and key %s. " +
+                                         "Return value is %s", key, cacheValue);
+                     }
+                     return cacheValue.toInternalCacheEntry(key);
+                  }
+               } else {
+                  InternalCacheValue cacheValue = (InternalCacheValue) ((SuccessfulResponse) r).getResponseValue();
+                  return cacheValue.toInternalCacheEntry(key);
+               }
             }
          }
       }
@@ -237,6 +331,72 @@ public class DistributionManagerImpl implements DistributionManager {
       Set<Address> an = new HashSet<Address>();
       for (List<Address> addresses : locateAll(affectedKeys).values()) an.addAll(addresses);
       return Immutables.immutableListConvert(an);
+   }
+
+   @Override
+   public ReplicationGroup locateGroup(Object key) {
+      return getConsistentHash().getGroupFor(key, getReplCount());
+   }
+
+   @Override
+   public Set<Integer> locateGroupIds(){
+
+      Integer myId = getSelfID();
+      Set<Address> allCaches = getConsistentHash().getCaches();
+      Set<Integer> result = getBackupsIdsForNode(getAddress(), getReplCount());
+      Set<Integer> backupIds;
+
+      for(Address a: allCaches){
+         backupIds = getBackupsIdsForNode(a, getReplCount());
+         if(backupIds.contains(myId)){
+            result.add(getAddressID(a));
+         }
+      }
+      return result;
+   }
+
+   private Set<Integer> getBackupsIdsForNode(Address node, int replicationCount){
+      Set<Integer> result = new HashSet<Integer>();
+      List<Address> backups = getConsistentHash().getBackupsForNode(node, replicationCount);
+      for(Address a: backups){
+
+         result.add(getAddressID(a));
+      }
+
+      return result;
+   }
+
+   @Override
+   public int getAddressID(Address address) {
+      return getConsistentHash().getHashIds(address).get(0);
+   }
+
+   @Override
+   public int getSelfID() {
+      return getAddressID(getAddress());
+   }
+
+   public List<Address> getAffectedNodesAndOwners(Collection<Object> affectedKeysForNodes, Collection<Object> affectedKeysForOwners) {
+      if ((affectedKeysForNodes == null || affectedKeysForNodes.isEmpty()) && (affectedKeysForOwners == null || affectedKeysForOwners.isEmpty())) {
+         if (trace) log.trace("affected keys are empty");
+         return Collections.emptyList();
+      }
+
+      Set<Address> an = new HashSet<Address>();
+
+      if(affectedKeysForNodes != null && !affectedKeysForNodes.isEmpty()){
+         for (List<Address> addresses : locateAll(affectedKeysForNodes).values()){
+            an.addAll(addresses);
+         }
+      }
+
+      if(affectedKeysForOwners != null && !affectedKeysForOwners.isEmpty()){
+         for (List<Address> addresses : locateAll(affectedKeysForOwners).values()){
+            an.add(addresses.get(0));
+         }
+      }
+
+      return new ArrayList<Address>(an);
    }
 
    @ManagedOperation(description = "Tells you whether a given key is local to this instance of the cache.  Only works with String keys.")

@@ -29,6 +29,8 @@ import java.util.Set;
 
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.mvcc.VersionVC;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.remoting.transport.Address;
 
 /**
@@ -36,6 +38,8 @@ import org.infinispan.remoting.transport.Address;
  *
  * @author Manik Surtani
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public abstract class AbstractInvocationContext implements InvocationContext {
@@ -194,5 +198,30 @@ public abstract class AbstractInvocationContext implements InvocationContext {
       return getClass().getSimpleName() + "{" +
             "flags=" + flags +
             '}';
+   }
+
+   @Override
+   public boolean readBasedOnVersion() {
+      return false;
+   }
+
+   @Override
+   public VersionVC calculateVersionToRead(VersionVCFactory versionVCFactory) {
+      return null;
+   }
+
+   @Override
+   public VersionVC getPrepareVersion() {
+      return null;
+   }
+
+   @Override
+   public void setVersionToRead(VersionVC version) {
+      //no-op by default
+   }
+
+   @Override
+   public void setReadBasedOnVersion(boolean value) {
+      //no-op by default
    }
 }

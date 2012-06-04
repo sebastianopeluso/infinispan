@@ -25,9 +25,13 @@ package org.infinispan.context.impl;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.transaction.xa.CacheTransaction;
+import org.infinispan.mvcc.VersionVC;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
 import javax.transaction.Transaction;
+
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -36,6 +40,8 @@ import java.util.Set;
  * Interface defining additional functionality for invocation contexts that propagate within a transaction's scope.
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public interface TxInvocationContext extends InvocationContext {
@@ -92,4 +98,50 @@ public interface TxInvocationContext extends InvocationContext {
    boolean isImplicitTransaction();
 
    CacheTransaction getCacheTransaction();
+
+   /**
+    * 
+    * @param idx
+    */
+   void markReadFrom(int idx);
+
+   /**
+    * 
+    * @return
+    */
+   BitSet getReadFrom();
+
+   /**
+    * 
+    * @param other
+    */
+   void updateVectorClock(VersionVC other);
+
+   /**
+    * 
+    * @param versionVCFactory
+    * @param idx
+    * @return
+    */
+   long getVectorClockValueIn(VersionVCFactory versionVCFactory, int idx);
+
+   /**
+    * 
+    * @param versionVCFactory
+    * @param pos
+    * @param value
+    */
+   void setVectorClockValueIn(VersionVCFactory versionVCFactory, int pos, long value);
+
+   /**
+    * 
+    * @return
+    */
+   VersionVC getMinVersion();
+
+   /**
+    * 
+    * @param version
+    */
+   void setCommitVersion(VersionVC version);
 }

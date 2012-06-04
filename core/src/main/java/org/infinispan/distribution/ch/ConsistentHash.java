@@ -22,6 +22,7 @@
  */
 package org.infinispan.distribution.ch;
 
+import org.infinispan.mvcc.ReplicationGroup;
 import org.infinispan.remoting.transport.Address;
 
 import java.util.Collection;
@@ -35,6 +36,8 @@ import java.util.Set;
  *
  * @author Manik Surtani
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public interface ConsistentHash {
@@ -133,4 +136,12 @@ public interface ConsistentHash {
     * @return
     */
    Address primaryLocation(Object key);
+
+   /**
+    *
+    * @param key
+    * @param replicationCount
+    * @return
+    */
+   ReplicationGroup getGroupFor(Object key, int replicationCount);
 }

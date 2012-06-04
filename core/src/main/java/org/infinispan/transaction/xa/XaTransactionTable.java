@@ -25,6 +25,7 @@ package org.infinispan.transaction.xa;
 import org.infinispan.CacheException;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.xa.recovery.RecoveryManager;
@@ -41,6 +42,8 @@ import java.util.concurrent.ConcurrentMap;
  * {@link TransactionTable} to be used with {@link TransactionXaAdapter}.
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.0
  */
 public class XaTransactionTable extends TransactionTable {
@@ -50,9 +53,13 @@ public class XaTransactionTable extends TransactionTable {
    protected ConcurrentMap<Xid, LocalXaTransaction> xid2LocalTx;
    private RecoveryManager recoveryManager;
 
+   //added by Sebastiano
+   private VersionVCFactory versionVCFactory;
+
    @Inject
-   public void init(RecoveryManager recoveryManager) {
+   public void init(RecoveryManager recoveryManager, VersionVCFactory versionVCFactory) {
       this.recoveryManager = recoveryManager;
+      this.versionVCFactory=versionVCFactory;
    }
 
    @Start
@@ -113,6 +120,8 @@ public class XaTransactionTable extends TransactionTable {
             log.error("Failed to enlist TransactionXaAdapter to transaction", e);
             throw new CacheException(e);
          }
+         //initiates the vector clock for serializability
+         localTransaction.initVectorClock(this.versionVCFactory, commitLog.getActualVersion());
       }
    }
 

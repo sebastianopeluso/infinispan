@@ -24,11 +24,16 @@ package org.infinispan.context.impl;
 
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
+import org.infinispan.mvcc.InternalMVCCEntry;
+import org.infinispan.mvcc.VersionVC;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.transaction.AbstractCacheTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
 import javax.transaction.Transaction;
+
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +43,8 @@ import java.util.Set;
  *
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public class RemoteTxInvocationContext extends AbstractTxInvocationContext {
@@ -147,5 +154,101 @@ public class RemoteTxInvocationContext extends AbstractTxInvocationContext {
    @Override
    public void addLockedKey(Object key) {
       remoteTransaction.registerLockedKey(key);
+   }
+
+   @Override
+   public void markReadFrom(int idx) {
+      //no-op
+   }
+
+   @Override
+   public BitSet getReadFrom() {
+      //no-op
+      return null;
+   }
+
+   @Override
+   public void setAlreadyReadOnNode(boolean alreadyRead){
+      //no-op
+   }
+
+   @Override
+   public boolean getAlreadyReadOnNode(){
+      return false;
+   }
+
+   @Override
+   public InternalMVCCEntry getRemoteReadKey(Object Key) {
+      return null; //no-op
+   }
+
+   @Override
+   public InternalMVCCEntry getLocalReadKey(Object Key) {
+      return null; //no-op
+   }
+
+   @Override
+   public VersionVC calculateVersionToRead(VersionVCFactory versionVCFactory) {
+      return null; //no-op
+   }
+
+   @Override
+   public void updateVectorClock(VersionVC other) {
+      //no-op
+   }
+
+   @Override
+   public long getVectorClockValueIn(VersionVCFactory versionVCFactory, int idx) {
+      return VersionVC.EMPTY_POSITION;
+   }
+
+   @Override
+   public void setVectorClockValueIn(VersionVCFactory versionVCFactory, int idx, long value) {
+      //no-op
+   }
+
+   @Override
+   public VersionVC getMinVersion() {
+      return null;
+   }
+
+   @Override
+   public void setCommitVersion(VersionVC version) {
+      //no-op
+   }
+
+   @Override
+   public void addRemoteReadKey(Object key, InternalMVCCEntry ime) {
+      // no-op
+   }
+
+   @Override
+   public void addLocalReadKey(Object key, InternalMVCCEntry ime) {
+      // no-op
+   }
+
+   @Override
+   public void removeLocalReadKey(Object key) {
+      // no-op
+   }
+
+   @Override
+   public void removeRemoteReadKey(Object key) {
+      // no-op
+   }
+
+   @Override
+   public void setLastReadKey(CacheEntry entry){
+      //no-op
+   }
+
+   @Override
+   public CacheEntry getLastReadKey(){
+      return null;
+   }
+
+   @Override
+   public void clearLastReadKey(){
+      //no-op
    }
 }

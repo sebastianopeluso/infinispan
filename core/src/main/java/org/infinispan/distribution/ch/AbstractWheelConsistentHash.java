@@ -37,6 +37,7 @@ import java.util.TreeMap;
 
 import org.infinispan.commons.hash.Hash;
 import org.infinispan.marshall.AbstractExternalizer;
+import org.infinispan.mvcc.ReplicationGroup;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
@@ -64,6 +65,8 @@ import static java.lang.String.format;
  * @author Mircea.Markus@jboss.com
  * @author Pete Muir
  * @author Dan Berindei <dberinde@redhat.com>
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.2
  */
 public abstract class AbstractWheelConsistentHash extends AbstractConsistentHash {
@@ -299,6 +302,14 @@ public abstract class AbstractWheelConsistentHash extends AbstractConsistentHash
          instance.setCaches(caches);
          return instance;
       }
+   }
+
+   @Override
+   public ReplicationGroup getGroupFor(Object key, int replicationCount) {
+      List<Address> addresses = locate(key, replicationCount);
+      List<Address> candidates = Arrays.asList(positionValues);
+      int id = candidates.indexOf(addresses.get(0));
+      return new ReplicationGroup(id, addresses);
    }
 }
 

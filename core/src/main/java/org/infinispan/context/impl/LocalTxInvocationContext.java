@@ -24,6 +24,9 @@ package org.infinispan.context.impl;
 
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
+import org.infinispan.mvcc.InternalMVCCEntry;
+import org.infinispan.mvcc.VersionVC;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.AbstractCacheTransaction;
 import org.infinispan.transaction.LocalTransaction;
@@ -32,6 +35,7 @@ import org.infinispan.transaction.xa.GlobalTransaction;
 import javax.transaction.Status;
 import javax.transaction.SystemException;
 import javax.transaction.Transaction;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,6 +48,8 @@ import java.util.Set;
  *
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public class LocalTxInvocationContext extends AbstractTxInvocationContext {
@@ -152,5 +158,112 @@ public class LocalTxInvocationContext extends AbstractTxInvocationContext {
    public Transaction getTransaction() {
       Transaction tx = super.getTransaction();
       return tx == null ? localTransaction.getTransaction() : tx;
+   }
+   
+   public Object[] getLocalReadSet(){
+      return this.localTransaction.getLocalReadSet();
+   }
+
+   public Object[] getRemoteReadSet(){
+      return this.localTransaction.getRemoteReadSet();
+   }
+
+   @Override
+   public VersionVC calculateVersionToRead(VersionVCFactory versionVCFactory) {
+      return localTransaction.calculateVectorClockToRead(versionVCFactory);
+   }
+
+   @Override
+   public VersionVC getPrepareVersion() {
+      return localTransaction.getPrepareVectorClock();
+   }
+
+   @Override
+   public void updateVectorClock(VersionVC other) {
+      localTransaction.updateVectorClock(other);
+   }
+
+   @Override
+   public long getVectorClockValueIn(VersionVCFactory versionVCFactory, int idx) {
+      return localTransaction.getValueFrom(versionVCFactory, idx);
+   }
+
+   @Override
+   public void setVectorClockValueIn(VersionVCFactory versionVCFactory, int pos, long value){
+      localTransaction.setVectorClockValueIn(versionVCFactory, pos, value);
+   }
+
+   public VersionVC getMinVersion() {
+      return localTransaction.getMinVersion();
+   }
+
+   @Override
+   public void addLocalReadKey(Object key, InternalMVCCEntry ime) {
+      localTransaction.addLocalReadKey(key, ime);
+   }
+
+   @Override
+   public void removeLocalReadKey(Object key) {
+      localTransaction.removeLocalReadKey(key);
+   }
+
+   @Override
+   public void removeRemoteReadKey(Object key) {
+      localTransaction.removeRemoteReadKey(key);
+   }
+
+   @Override
+   public void addRemoteReadKey(Object key, InternalMVCCEntry ime) {
+      localTransaction.addRemoteReadKey(key, ime);
+   }
+
+   @Override
+   public void markReadFrom(int idx) {
+      localTransaction.setAlreadyRead(idx);
+   }
+
+   @Override
+   public BitSet getReadFrom(){
+      return (localTransaction == null)?null:localTransaction.getAlreadyRead();
+   }
+
+   @Override
+   public void setAlreadyReadOnNode(boolean alreadyRead){
+      this.localTransaction.setAlreadyReadOnNode(alreadyRead);
+   }
+
+   @Override
+   public boolean getAlreadyReadOnNode(){
+      return this.localTransaction.getAlreadyReadOnNode();
+   }
+
+   @Override
+   public InternalMVCCEntry getLocalReadKey(Object Key) {
+      return localTransaction.getLocalReadKey(Key);
+   }
+
+   @Override
+   public InternalMVCCEntry getRemoteReadKey(Object Key) {
+      return localTransaction.getRemoteReadKey(Key);
+   }
+
+   @Override
+   public void setCommitVersion(VersionVC version) {
+      localTransaction.setCommitVersion(version);
+   }
+
+   @Override
+   public void setLastReadKey(CacheEntry entry){
+      localTransaction.setLastReadKey(entry);
+   }
+
+   @Override
+   public CacheEntry getLastReadKey(){
+      return localTransaction.getLastReadKey();
+   }
+
+   @Override
+   public void clearLastReadKey(){
+      localTransaction.clearLastReadKey();
    }
 }

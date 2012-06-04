@@ -23,6 +23,7 @@
 
 package org.infinispan.context;
 
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -31,6 +32,9 @@ import javax.transaction.Transaction;
 
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.context.impl.TxInvocationContext;
+import org.infinispan.mvcc.InternalMVCCEntry;
+import org.infinispan.mvcc.VersionVC;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
@@ -40,6 +44,8 @@ import org.infinispan.transaction.xa.GlobalTransaction;
  * @see InvocationContextFlagsOverride
  * 
  * @author Sanne Grinovero <sanne@hibernate.org> (C) 2011 Red Hat Inc.
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.0
  */
 public class TransactionalInvocationContextFlagsOverride extends InvocationContextFlagsOverride implements TxInvocationContext {
@@ -104,5 +110,70 @@ public class TransactionalInvocationContextFlagsOverride extends InvocationConte
    @Override
    public void addAffectedKey(Object key) {
       delegate.addAffectedKey(key);
+   }
+
+   @Override
+   public void addRemoteReadKey(Object key, InternalMVCCEntry ime) {
+      delegate.addRemoteReadKey(key,ime);
+   }
+
+   @Override
+   public void addLocalReadKey(Object key, InternalMVCCEntry ime) {
+      delegate.addLocalReadKey(key,ime);
+   }
+
+   @Override
+   public void markReadFrom(int idx) {
+      delegate.markReadFrom(idx);
+   }
+
+   @Override
+   public InternalMVCCEntry getLocalReadKey(Object Key) {
+      return delegate.getLocalReadKey(Key);
+   }
+
+   @Override
+   public InternalMVCCEntry getRemoteReadKey(Object Key) {
+      return delegate.getRemoteReadKey(Key);
+   }
+
+   @Override
+   public VersionVC calculateVersionToRead(VersionVCFactory versionVCFactory) {
+      return delegate.calculateVersionToRead(versionVCFactory);
+   }
+
+   @Override
+   public void updateVectorClock(VersionVC other) {
+      delegate.updateVectorClock(other);
+   }
+
+   @Override
+   public long getVectorClockValueIn(VersionVCFactory versionVCFactory, int idx) {
+      return delegate.getVectorClockValueIn(versionVCFactory,idx);
+   }
+
+   @Override
+   public void setVectorClockValueIn(VersionVCFactory versionVCFactory, int idx, long value) {
+      delegate.setVectorClockValueIn(versionVCFactory,idx, value);
+   }
+
+   @Override
+   public VersionVC getMinVersion() {
+      return delegate.getMinVersion();
+   }
+
+   @Override
+   public void setCommitVersion(VersionVC version) {
+      delegate.setCommitVersion(version);
+   }
+
+   @Override
+   public void setAlreadyReadOnNode(boolean alreadyRead){
+      delegate.setAlreadyReadOnNode(alreadyRead);
+   }
+
+   @Override
+   public BitSet getReadFrom() {
+      return delegate.getReadFrom();
    }
 }

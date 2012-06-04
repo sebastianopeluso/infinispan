@@ -36,6 +36,8 @@ import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
+import org.infinispan.commands.tx.SerializableCommitCommand;
+import org.infinispan.commands.tx.SerializablePrepareCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.factories.ComponentRegistry;
@@ -87,7 +89,7 @@ public final class CacheRpcCommandExternalizer extends AbstractExternalizer<Cach
             TxCompletionNotificationCommand.class, GetInDoubtTransactionsCommand.class,
             GetInDoubtTxInfoCommand.class, CompleteTransactionCommand.class,
             CacheViewControlCommand.class, VersionedPrepareCommand.class, VersionedCommitCommand.class,
-            PrepareResponseCommand.class);
+            PrepareResponseCommand.class, SerializablePrepareCommand.class, SerializableCommitCommand.class);
       // Only interested in cache specific replicable commands
       coreCommands.addAll(gcr.getModuleProperties().moduleCacheRpcCommands());
       return coreCommands;

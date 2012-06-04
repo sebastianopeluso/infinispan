@@ -26,26 +26,34 @@ import org.infinispan.config.ConfigurationException;
 import org.infinispan.config.parsing.XmlConfigHelper;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.DefaultDataContainer;
+import org.infinispan.container.MultiVersionDataContainer;
 import org.infinispan.eviction.EvictionStrategy;
 import org.infinispan.eviction.EvictionThreadPolicy;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.util.Util;
+import org.infinispan.util.concurrent.IsolationLevel;
 
 /**
  * Constructs the data container
- * 
+ *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
  * @author Vladimir Blagojevic
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
-@DefaultFactoryFor(classes = DataContainer.class)
+@DefaultFactoryFor(classes = {DataContainer.class, MultiVersionDataContainer.class})
 public class DataContainerFactory extends AbstractNamedCacheComponentFactory implements
          AutoInstantiableFactory {
+   private MultiVersionDataContainer multiVersionDataContainer;
 
    @Override
    @SuppressWarnings("unchecked")
    public <T> T construct(Class<T> componentType) {
-      if (configuration.getDataContainer() != null) {
+      if (configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE ||
+            componentType.equals(MultiVersionDataContainer.class)) {
+         return (T) constructMultiversionDataContainer(configuration.getConcurrencyLevel());
+      } else if (configuration.getDataContainer() != null) {
          return (T) configuration.getDataContainer();
       } else if (DefaultDataContainer.class.getName().equals(configuration.getDataContainerClass())) {
          EvictionStrategy st = configuration.getEvictionStrategy();
@@ -74,5 +82,12 @@ public class DataContainerFactory extends AbstractNamedCacheComponentFactory imp
          XmlConfigHelper.setValues(dataContainer, configuration.getDataContainerProperties(), false, true);
          return (T) dataContainer;
       }
+   }
+
+   private synchronized MultiVersionDataContainer constructMultiversionDataContainer(int concurrencyLevel) {
+      if (multiVersionDataContainer == null) {
+         multiVersionDataContainer = new MultiVersionDataContainer(concurrencyLevel);
+      }
+      return multiVersionDataContainer;
    }
 }

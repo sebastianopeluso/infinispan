@@ -28,11 +28,13 @@ import org.infinispan.context.InvocationContext;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
+import org.infinispan.mvcc.ReplicationGroup;
 import org.infinispan.remoting.transport.Address;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A component that manages the distribution of elements across a cache cluster
@@ -40,6 +42,8 @@ import java.util.Map;
  * @author Manik Surtani
  * @author Mircea.Markus@jboss.com
  * @author Vladimir Blagojevic
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @Scope(Scopes.NAMED_CACHE)
@@ -159,5 +163,40 @@ public interface DistributionManager {
     * @return a list of addresses which represent a combined set of all addresses affected by the set of keys.
     */
    Collection<Address> getAffectedNodes(Collection<Object> affectedKeys);
+
+   /**
+    * 
+    * @param key
+    * @return
+    */
+   ReplicationGroup locateGroup(Object key);
+
+   /**
+    *
+    * @param address
+    * @return
+    * @deprecated it does not works with virtual nodes!
+    */
+   int getAddressID(Address address);
+
+   /**
+    * 
+    * @return
+    */
+   int getSelfID();
+
+   /**
+    * 
+    * @return
+    */
+   Set<Integer> locateGroupIds();
+
+   /**
+    * 
+    * @param affectedKeysForNodes
+    * @param affectedKeysForOwners
+    * @return
+    */
+   List<Address> getAffectedNodesAndOwners(Collection<Object> affectedKeysForNodes, Collection<Object> affectedKeysForOwners);
 }
 

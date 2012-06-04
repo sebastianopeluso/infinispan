@@ -34,6 +34,8 @@ import java.util.HashSet;
  * JGroups calls our handler while holding a lock, so we don't need any synchronization.
  *
  * @author Manik Surtani
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public class ClusteredGetResponseValidityFilter implements ResponseFilter {
@@ -41,6 +43,19 @@ public class ClusteredGetResponseValidityFilter implements ResponseFilter {
    private Collection<Address> targets;
    private int validResponses;
    private int missingResponses;
+
+   //TODO: what is this!?
+   private boolean serializability;
+
+   public ClusteredGetResponseValidityFilter(Collection<Address> targets, Address self, boolean serializability) {
+      this.targets = new HashSet<Address>(targets);
+      this.validResponses = 0;
+      this.missingResponses = targets.size();
+      if (this.targets.contains(self)) {
+         this.missingResponses--;
+      }
+      this.serializability = serializability;
+   }
 
    public ClusteredGetResponseValidityFilter(Collection<Address> targets, Address self) {
       this.targets = new HashSet<Address>(targets);
@@ -56,6 +71,10 @@ public class ClusteredGetResponseValidityFilter implements ResponseFilter {
       if (targets.contains(address)) {
          missingResponses--;
          if (response instanceof SuccessfulResponse) validResponses++;
+      }
+
+      if(response == null && serializability) {
+         return true;
       }
 
       // always return true to make sure a response is logged by the JGroups RpcDispatcher.

@@ -34,6 +34,7 @@ import org.infinispan.commands.read.KeySetCommand;
 import org.infinispan.commands.read.MapReduceCommand;
 import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
+import org.infinispan.commands.read.serializable.SerialGetKeyValueCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.PrepareResponseCommand;
@@ -45,6 +46,8 @@ import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
+import org.infinispan.commands.tx.SerializableCommitCommand;
+import org.infinispan.commands.tx.SerializablePrepareCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.commands.write.ApplyDeltaCommand;
@@ -73,6 +76,8 @@ import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.InterceptorChain;
+import org.infinispan.mvcc.CommitLog;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.LockInfo;
@@ -83,6 +88,7 @@ import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.transaction.xa.DldGlobalTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.transaction.xa.recovery.RecoveryManager;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.concurrent.locks.LockManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -98,6 +104,8 @@ import java.util.concurrent.Callable;
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
  * @author Sanne Grinovero <sanne@hibernate.org> (C) 2011 Red Hat Inc.
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso 
  * @since 4.0
  */
 public class CommandsFactoryImpl implements CommandsFactory {
@@ -128,6 +136,8 @@ public class CommandsFactoryImpl implements CommandsFactory {
    private TotalOrderManager totalOrderManager;
 
    private Map<Byte, ModuleCommandInitializer> moduleCommandInitializers;
+   private CommitLog commitLog;
+   private VersionVCFactory versionVCFactory;
 
    @Inject
    public void setupDependencies(DataContainer container, CacheNotifier notifier, Cache<Object, Object> cache,
@@ -135,7 +145,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
                                  InvocationContextContainer icc, TransactionTable txTable, Configuration configuration,
                                  @ComponentName(KnownComponentNames.MODULE_COMMAND_INITIALIZERS) Map<Byte, ModuleCommandInitializer> moduleCommandInitializers,
                                  RecoveryManager recoveryManager, StateTransferManager stateTransferManager, LockManager lockManager,
-                                 InternalEntryFactory entryFactory, TotalOrderManager totalOrderManager) {
+                                 InternalEntryFactory entryFactory, TotalOrderManager totalOrderManager, CommitLog commitLog, VersionVCFactory versionVCFactory) {
       this.dataContainer = container;
       this.notifier = notifier;
       this.cache = cache;
@@ -150,6 +160,8 @@ public class CommandsFactoryImpl implements CommandsFactory {
       this.lockManager = lockManager;
       this.entryFactory = entryFactory;
       this.totalOrderManager = totalOrderManager;
+      this.commitLog = commitLog;
+      this.versionVCFactory=versionVCFactory;
    }
 
    @Start(priority = 1)
@@ -232,7 +244,12 @@ public class CommandsFactoryImpl implements CommandsFactory {
 
    @Override
    public GetKeyValueCommand buildGetKeyValueCommand(Object key, Set<Flag> flags) {
-      return new GetKeyValueCommand(key, notifier, flags);
+      if(configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE){
+         return new SerialGetKeyValueCommand(key, notifier, flags);
+      }
+      else{
+         return new GetKeyValueCommand(key, notifier, flags);
+      }
    }
 
    @Override
@@ -348,6 +365,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
             break;
          case CommitCommand.COMMAND_ID:
          case VersionedCommitCommand.COMMAND_ID:
+         case SerializableCommitCommand.COMMAND_ID:               
             CommitCommand commitCommand = (CommitCommand) c;
             commitCommand.init(interceptorChain, icc, txTable, configuration);
             commitCommand.markTransactionAsRemote(isRemote);
@@ -363,7 +381,8 @@ public class CommandsFactoryImpl implements CommandsFactory {
             break;
          case ClusteredGetCommand.COMMAND_ID:
             ClusteredGetCommand clusteredGetCommand = (ClusteredGetCommand) c;
-            clusteredGetCommand.initialize(icc, this, entryFactory, interceptorChain, distributionManager, txTable);
+            clusteredGetCommand.initialize(icc, this, entryFactory, interceptorChain, distributionManager, txTable, 
+                                           commitLog, versionVCFactory,configuration.newConfiguration());
             break;
          case LockControlCommand.COMMAND_ID:
             LockControlCommand lcc = (LockControlCommand) c;
@@ -419,6 +438,25 @@ public class CommandsFactoryImpl implements CommandsFactory {
          case PrepareResponseCommand.COMMAND_ID:
             PrepareResponseCommand prc = (PrepareResponseCommand) c;
             prc.initialize(totalOrderManager);
+            break;
+         case SerializablePrepareCommand.COMMAND_ID:
+            SerializablePrepareCommand spc = (SerializablePrepareCommand) c;
+            spc.init(interceptorChain, icc, txTable, configuration);
+            spc.initialize(notifier, recoveryManager, this.versionVCFactory);
+            if (spc.getModifications() != null)
+               for (ReplicableCommand nested : spc.getModifications())  {
+                  initializeReplicableCommand(nested, false);
+               }
+            spc.markTransactionAsRemote(isRemote);
+            if (configuration.isEnableDeadlockDetection() && isRemote) {
+               DldGlobalTransaction transaction = (DldGlobalTransaction) spc.getGlobalTransaction();
+               transaction.setLocksHeldAtOrigin(spc.getAffectedKeys());
+               /*
+               if(configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
+                   transaction.setReadLocksHeldAtOrigin(pc.getReadSet());
+               }               
+               */
+            }
             break;
          default:
             ModuleCommandInitializer mci = moduleCommandInitializers.get(c.getCommandId());
@@ -506,4 +544,16 @@ public class CommandsFactoryImpl implements CommandsFactory {
    public PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction) {
       return new PrepareResponseCommand(cacheName, globalTransaction);
    }
+
+   @Override
+   public SerializablePrepareCommand buildSerializablePrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications,
+                                                                     boolean onePhaseCommit) {
+      return new SerializablePrepareCommand(cacheName, gtx, modifications, onePhaseCommit);
+   }
+
+   @Override
+   public SerializableCommitCommand buildSerializableCommitCommand(GlobalTransaction gtx) {
+      return new SerializableCommitCommand(cacheName, gtx);
+   }
+
 }

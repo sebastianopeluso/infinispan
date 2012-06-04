@@ -25,6 +25,7 @@ package org.infinispan.distribution.ch;
 import org.infinispan.CacheException;
 import org.infinispan.marshall.AbstractExternalizer;
 import org.infinispan.marshall.Ids;
+import org.infinispan.mvcc.ReplicationGroup;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.Immutables;
 import org.infinispan.util.Util;
@@ -34,6 +35,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -42,6 +44,8 @@ import java.util.Set;
  * implementations it delegates to.
  *
  * @author Manik Surtani
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public class UnionConsistentHash extends AbstractConsistentHash {
@@ -84,6 +88,15 @@ public class UnionConsistentHash extends AbstractConsistentHash {
 
    public ConsistentHash getOldConsistentHash() {
       return oldCH;
+   }
+
+   @Override
+   public ReplicationGroup getGroupFor(Object key, int replicationCount) {
+      List<Address> addresses = locate(key, replicationCount);
+      List<Address> candidates = new LinkedList<Address>(oldCH.getCaches());
+      candidates.addAll(newCH.getCaches());
+      int id = candidates.indexOf(addresses.get(0));
+      return new ReplicationGroup(id, addresses);
    }
 
    public static class Externalizer extends AbstractExternalizer<UnionConsistentHash> {

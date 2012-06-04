@@ -31,6 +31,7 @@ import org.infinispan.commands.module.ModuleCommandFactory;
 import org.infinispan.commands.read.DistributedExecuteCommand;
 import org.infinispan.commands.read.GetKeyValueCommand;
 import org.infinispan.commands.read.MapReduceCommand;
+import org.infinispan.commands.read.serializable.SerialGetKeyValueCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
@@ -43,6 +44,8 @@ import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
+import org.infinispan.commands.tx.SerializableCommitCommand;
+import org.infinispan.commands.tx.SerializablePrepareCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.commands.write.ApplyDeltaCommand;
@@ -61,6 +64,7 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.manager.EmbeddedCacheManager;
+import org.infinispan.util.concurrent.IsolationLevel;
 
 import java.util.Map;
 
@@ -75,6 +79,8 @@ import java.util.Map;
  * @see CommandsFactory#initializeReplicableCommand(ReplicableCommand,boolean)
  * @author Manik Surtani
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @Scope(Scopes.GLOBAL)
@@ -124,7 +130,12 @@ public class RemoteCommandsFactory {
                command = new ReplaceCommand();
                break;
             case GetKeyValueCommand.COMMAND_ID:
-               command = new GetKeyValueCommand();
+               if(cacheManager.getDefaultConfiguration().getIsolationLevel() == IsolationLevel.SERIALIZABLE){
+                  command = new SerialGetKeyValueCommand();
+               }
+               else{
+                  command = new GetKeyValueCommand();
+               }
                break;
             case ClearCommand.COMMAND_ID:
                command = new ClearCommand();
@@ -221,7 +232,13 @@ public class RemoteCommandsFactory {
                break;                      
             case PrepareResponseCommand.COMMAND_ID:
                command = new PrepareResponseCommand(cacheName);
-               break;                      
+               break;
+            case SerializablePrepareCommand.COMMAND_ID:
+               command = new SerializablePrepareCommand(cacheName);
+               break;
+            case SerializableCommitCommand.COMMAND_ID:
+               command = new SerializableCommitCommand(cacheName);
+               break;
             default:
                throw new CacheException("Unknown command id " + id + "!");
          }

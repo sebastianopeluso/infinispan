@@ -37,14 +37,15 @@ import java.util.Set;
  * {@link org.infinispan.Cache#containsKey(Object)} operations
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
+ * @author Pedro Ruivo
  * @since 4.0
  */
 public class GetKeyValueCommand extends AbstractDataCommand {
    public static final byte COMMAND_ID = 4;
    private static final Log log = LogFactory.getLog(GetKeyValueCommand.class);
    private static final boolean trace = log.isTraceEnabled();
-   private CacheNotifier notifier;
-   private boolean returnCacheEntry;
+   protected CacheNotifier notifier;
+   protected boolean returnCacheEntry;
 
    public GetKeyValueCommand(Object key, CacheNotifier notifier, Set<Flag> flags) {
       this.key = key;

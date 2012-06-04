@@ -24,6 +24,10 @@ package org.infinispan.context;
 
 import java.util.Set;
 
+import org.infinispan.container.entries.CacheEntry;
+import org.infinispan.mvcc.InternalMVCCEntry;
+import org.infinispan.mvcc.VersionVC;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.remoting.transport.Address;
 
 /**
@@ -32,6 +36,8 @@ import org.infinispan.remoting.transport.Address;
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public interface InvocationContext extends EntryLookup, FlagContainer, Cloneable {
@@ -115,4 +121,104 @@ public interface InvocationContext extends EntryLookup, FlagContainer, Cloneable
     * @param key lock to test
     */
    boolean hasLockedKey(Object key);
+
+   /**
+    * 
+    * @return
+    */
+   boolean readBasedOnVersion();
+
+   /**
+    * 
+    * @param value
+    */
+   void setReadBasedOnVersion(boolean value);
+
+   /**
+    * 
+    * @param key
+    * @param ime
+    */
+   void addRemoteReadKey(Object key, InternalMVCCEntry ime);
+
+   /**
+    * 
+    * @param key
+    * @param ime
+    */
+   void addLocalReadKey(Object key, InternalMVCCEntry ime);
+
+   /**
+    * 
+    * @param key
+    */
+   void removeLocalReadKey(Object key);
+
+   /**
+    * 
+    * @param key
+    */
+   void removeRemoteReadKey(Object key);
+
+   /**
+    * 
+    * @param Key
+    * @return
+    */
+   InternalMVCCEntry getLocalReadKey(Object Key);
+
+   /**
+    * 
+    * @param Key
+    * @return
+    */
+   InternalMVCCEntry getRemoteReadKey(Object Key);
+
+   /**
+    * 
+    * @param versionVCFactory
+    * @return
+    */
+   VersionVC calculateVersionToRead(VersionVCFactory versionVCFactory);
+
+   /**
+    * 
+    * @return
+    */
+   VersionVC getPrepareVersion();
+
+   /**
+    * 
+    * @param version
+    */
+   void setVersionToRead(VersionVC version);
+
+   /**
+    * 
+    * @param alreadyRead
+    */
+   void setAlreadyReadOnNode(boolean alreadyRead);
+
+   /**
+    * 
+    * @return
+    */
+   boolean getAlreadyReadOnNode();
+
+   /**
+    * 
+    * @param entry
+    */
+   void setLastReadKey(CacheEntry entry);
+
+   /**
+    * 
+    * @return
+    */
+   CacheEntry getLastReadKey();
+
+   /**
+    * 
+    */
+   void clearLastReadKey();
 }

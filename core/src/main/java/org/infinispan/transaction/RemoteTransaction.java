@@ -24,6 +24,7 @@ package org.infinispan.transaction;
 
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
+import org.infinispan.mvcc.InternalMVCCEntry;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.transaction.xa.InvalidTransactionException;
 import org.infinispan.util.logging.Log;
@@ -41,6 +42,8 @@ import java.util.Map;
  * Defines the state of a remotely originated transaction.
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public class RemoteTransaction extends AbstractCacheTransaction implements Cloneable {
@@ -217,5 +220,25 @@ public class RemoteTransaction extends AbstractCacheTransaction implements Clone
          result = false;
       }
       return result;
+   }   
+
+   @Override
+   public void addLocalReadKey(Object key, InternalMVCCEntry ime) {
+      //no-op
+   }
+
+   @Override
+   public void removeLocalReadKey(Object key) {
+      //no-op
+   }
+
+   @Override
+   public void removeRemoteReadKey(Object key){
+      //no-op
+   }
+
+   @Override
+   public void addRemoteReadKey(Object key, InternalMVCCEntry ime) {
+      //no-op
    }
 }

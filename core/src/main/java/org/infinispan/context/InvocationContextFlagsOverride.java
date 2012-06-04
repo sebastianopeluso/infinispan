@@ -26,6 +26,9 @@ package org.infinispan.context;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.remoting.transport.Address;
 
+import org.infinispan.mvcc.InternalMVCCEntry;
+import org.infinispan.mvcc.VersionVC;
+import org.infinispan.mvcc.VersionVCFactory;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Map;
@@ -36,6 +39,8 @@ import java.util.Set;
  * Wraps an existing {@link InvocationContext} without changing the context directly
  * but making sure the specified flags are considered enabled.
  * @author Sanne Grinovero <sanne@hibernate.org> (C) 2011 Red Hat Inc.
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso   
  * @since 5.0
  */
 public class InvocationContextFlagsOverride implements InvocationContext {
@@ -186,5 +191,85 @@ public class InvocationContextFlagsOverride implements InvocationContext {
    @Override
    public void clearLockedKeys() {
       delegate.clearLockedKeys();
+   }
+
+   @Override
+   public boolean readBasedOnVersion() {
+      return delegate.readBasedOnVersion();
+   }
+
+   @Override
+   public void setReadBasedOnVersion(boolean value) {
+      delegate.setReadBasedOnVersion(value);
+   }
+
+   @Override
+   public void addLocalReadKey(Object key, InternalMVCCEntry ime) {
+      delegate.addLocalReadKey(key, ime);
+   }
+
+   @Override
+   public void removeLocalReadKey(Object key) {
+      delegate.removeLocalReadKey(key);
+   }
+
+   @Override
+   public void removeRemoteReadKey(Object key) {
+      delegate.removeRemoteReadKey(key);
+   }
+
+   @Override
+   public void addRemoteReadKey(Object key, InternalMVCCEntry ime) {
+      delegate.addRemoteReadKey(key, ime);
+   }
+
+   @Override
+   public InternalMVCCEntry getLocalReadKey(Object Key) {
+      return delegate.getLocalReadKey(Key);
+   }
+
+   @Override
+   public InternalMVCCEntry getRemoteReadKey(Object Key) {
+      return delegate.getRemoteReadKey(Key);
+   }
+
+   @Override
+   public VersionVC calculateVersionToRead(VersionVCFactory versionVCFactory) {
+      return delegate.calculateVersionToRead(versionVCFactory);
+   }
+
+   @Override
+   public VersionVC getPrepareVersion() {
+      return delegate.getPrepareVersion();
+   }
+
+   @Override
+   public void setVersionToRead(VersionVC version) {
+      delegate.setVersionToRead(version);
+   }
+
+   @Override
+   public void setAlreadyReadOnNode(boolean alreadyRead){
+      delegate.setAlreadyReadOnNode(alreadyRead);
+   }
+
+   @Override
+   public boolean getAlreadyReadOnNode(){
+      return delegate.getAlreadyReadOnNode();
+   }
+
+   @Override
+   public void setLastReadKey(CacheEntry entry){
+      delegate.setLastReadKey(entry);
+   }
+
+   @Override
+   public CacheEntry getLastReadKey(){
+      return delegate.getLastReadKey();
+   }
+
+   @Override
+   public void clearLastReadKey(){
+      delegate.clearLastReadKey();
    }
 }

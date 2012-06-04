@@ -37,6 +37,8 @@ import org.infinispan.factories.annotations.Stop;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.interceptors.locking.ClusteringDependentLogic;
 import org.infinispan.manager.EmbeddedCacheManager;
+import org.infinispan.mvcc.CommitLog;
+import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.notifications.Listener;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachemanagerlistener.annotation.ViewChanged;
@@ -73,6 +75,7 @@ import static org.infinispan.util.Util.currentMillisFromNanotime;
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @Listener(sync = false)
@@ -108,12 +111,16 @@ public class TransactionTable {
    private volatile int minTxViewId = CACHE_STOPPED_VIEW_ID;
    private volatile int currentViewId = CACHE_STOPPED_VIEW_ID;
 
+   protected CommitLog commitLog;   
+   private VersionVCFactory versionVCFactory;
+
    @Inject
    public void initialize(RpcManager rpcManager, Configuration configuration,
                           InvocationContextContainer icc, InterceptorChain invoker, CacheNotifier notifier,
                           TransactionFactory gtf, EmbeddedCacheManager cm, TransactionCoordinator txCoordinator,
                           TransactionSynchronizationRegistry transactionSynchronizationRegistry,
-                          CommandsFactory commandsFactory, ClusteringDependentLogic clusteringDependentLogic) {
+                          CommandsFactory commandsFactory, ClusteringDependentLogic clusteringDependentLogic,
+                          CommitLog commitLog, VersionVCFactory versionVCFactory) {
       this.rpcManager = rpcManager;
       this.configuration = configuration;
       this.icc = icc;
@@ -125,6 +132,8 @@ public class TransactionTable {
       this.transactionSynchronizationRegistry = transactionSynchronizationRegistry;
       this.commandsFactory = commandsFactory;
       this.clusteringLogic = clusteringDependentLogic;
+      this.commitLog = commitLog;
+      this.versionVCFactory=versionVCFactory;
    }
 
    @Start
@@ -194,6 +203,8 @@ public class TransactionTable {
                throw new CacheException(e);
             }
          }
+         //init the transaction vector clock. it is only used for Serializability
+         localTransaction.initVectorClock(this.versionVCFactory, commitLog.getActualVersion());
          ((SyncLocalTransaction) localTransaction).setEnlisted(true);
       }
    }
