@@ -34,9 +34,9 @@ import java.util.concurrent.TimeoutException;
  * @since 5.2
  */
 @MBean(objectName = "DistributionInterceptor", description = "Handles distribution of entries across a cluster, as well as transparent lookup.")
-public class SerializableDistributionManager extends DistributionInterceptor {
+public class SerializableDistributionInterceptor extends DistributionInterceptor {
 
-   private static final Log log = LogFactory.getLog(SerializableDistributionManager.class);
+   private static final Log log = LogFactory.getLog(SerializableDistributionInterceptor.class);
 
    private VersionVCFactory versionVCFactory;
    private CommandsFactory commandsFactory;

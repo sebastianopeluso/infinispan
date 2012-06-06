@@ -77,6 +77,7 @@ import org.infinispan.marshall.exts.MapExternalizer;
 import org.infinispan.marshall.exts.ReplicableCommandExternalizer;
 import org.infinispan.marshall.exts.SetExternalizer;
 import org.infinispan.marshall.exts.SingletonListExternalizer;
+import org.infinispan.mvcc.InternalMVCCEntry;
 import org.infinispan.remoting.responses.ExceptionResponse;
 import org.infinispan.remoting.responses.SuccessfulResponse;
 import org.infinispan.remoting.responses.UnsuccessfulResponse;
@@ -295,6 +296,8 @@ public class ExternalizerTable implements ObjectTable {
 
       addInternalExternalizer(new CacheView.Externalizer());
       addInternalExternalizer(new LockInfo.Externalizer());
+      
+      addInternalExternalizer(new InternalMVCCEntry.Externalizer());
    }
 
    void addInternalExternalizer(AdvancedExternalizer<?> ext) {

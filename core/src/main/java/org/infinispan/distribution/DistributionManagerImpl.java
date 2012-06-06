@@ -368,7 +368,8 @@ public class DistributionManagerImpl implements DistributionManager {
 
    @Override
    public int getAddressID(Address address) {
-      return getConsistentHash().getHashIds(address).get(0);
+      List<Integer> hashIds = getConsistentHash().getHashIds(address);
+      return hashIds == null || hashIds.isEmpty() ? -1 : hashIds.get(0);
    }
 
    @Override

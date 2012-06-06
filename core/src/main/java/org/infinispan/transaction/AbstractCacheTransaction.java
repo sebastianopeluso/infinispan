@@ -257,7 +257,6 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
    }
 
    public Object[] getRemoteReadSet() {
-
       return filterKeys(remoteReadSet);
    }
 
@@ -343,7 +342,9 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
    }
 
    private Object[] filterKeys(Deque<ReadSetEntry> readSetEntries){
-      if(readSetEntries == null || readSetEntries.isEmpty()) return null;
+      if(readSetEntries == null || readSetEntries.isEmpty()) {
+         return new Object[0];
+      }
 
       Object[] result = new Object[readSetEntries.size()];
 

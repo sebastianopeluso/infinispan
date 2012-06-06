@@ -11,7 +11,6 @@ import org.infinispan.notifications.cachelistener.event.TopologyChangedEvent;
 import org.infinispan.notifications.cachemanagerlistener.annotation.Merged;
 import org.infinispan.notifications.cachemanagerlistener.annotation.ViewChanged;
 import org.infinispan.notifications.cachemanagerlistener.event.ViewChangedEvent;
-import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -26,11 +25,20 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Factory for building VersionVC objects
- * 
+ *
  * @author Sebastiano Peluso
  * @since 5.0
  */
 public class VersionVCFactory {
+   /*
+   
+   
+   private Set<Integer> groups was removed by Pedro. 
+   I have check and is is not query inside neither outside this class.
+   
+   if you need it back, check the old version of GMU
+   
+    */
 
    private static final Log log = LogFactory.getLog(VersionVCFactory.class);
 
@@ -38,7 +46,6 @@ public class VersionVCFactory {
    private boolean distribution;
 
    private DistributionManager distributionManager;
-   private RpcManager rpcManager;
    private EmbeddedCacheManager cacheManager;
    private CacheNotifier cacheNotifier;
    private VersionVCFactoryListener listener;
@@ -48,29 +55,20 @@ public class VersionVCFactory {
 
    private int myIndex;
 
-   private Set<Integer> group;
-
    public VersionVCFactory(boolean distribution){
       this.distribution = distribution;
 
-      this.group = new HashSet<Integer>();
-
-      if(distribution){
+      if (distribution) {
          this.listener=new VersionVCFactoryListener(this);
          this.myIndex = -1;
-      }
-      else{
+      } else {
          this.myIndex = 0;
       }
-
    }
 
-
-
    @Inject
-   public void inject(DistributionManager distributionManager, RpcManager rpcManager, EmbeddedCacheManager cacheManager, CacheNotifier cacheNotifier) {
+   public void inject(DistributionManager distributionManager, EmbeddedCacheManager cacheManager, CacheNotifier cacheNotifier) {
       this.distributionManager=distributionManager;
-      this.rpcManager=rpcManager;
       this.cacheManager=cacheManager;
       this.cacheNotifier=cacheNotifier;
    }
@@ -80,16 +78,14 @@ public class VersionVCFactory {
    public void start() {
 
       if(distribution){
-
          this.translationTable=new ConcurrentHashMap<Integer, Integer>();
-
          updateTranslation(this.distributionManager.getConsistentHash().getCaches());
-
 
          if(log.isDebugEnabled()){
             String res="NEW MAPPING"+'\n';
             Iterator<Entry<Integer,Integer>> itrEntry=this.translationTable.entrySet().iterator();
             Entry<Integer,Integer> currentEntry;
+
             while(itrEntry.hasNext()){
                currentEntry=itrEntry.next();
                res+="["+currentEntry.getKey()+"; "+currentEntry.getValue()+"]";
@@ -100,16 +96,15 @@ public class VersionVCFactory {
 
          this.cacheManager.addListener(this.listener);
          this.cacheNotifier.addListener(this.listener);
-
       }
 
    }
 
    public void updateTranslation(Set<Address> addresses){
-
       Iterator<Address> itr=addresses.iterator();
       Address current;
-      TreeSet<Integer> set=new TreeSet();
+      TreeSet<Integer> set=new TreeSet<Integer>();
+
       while(itr.hasNext()){
          current=itr.next();
          set.add(this.distributionManager.getAddressID(current));
@@ -122,43 +117,22 @@ public class VersionVCFactory {
          i++;
       }
 
-
       this.myIndex = this.translationTable.get(this.distributionManager.getSelfID());
-
-
-
-      Set<Integer> groupForDM = this.distributionManager.locateGroupIds();
-
-
-      this.group=new HashSet<Integer>();
-
-      for(Integer dmIndex: groupForDM){
-         this.group.add(this.translationTable.get(dmIndex));
-      }
 
       if(log.isDebugEnabled()){
          log.debug("MyIndex: "+this.myIndex);
-         String res="Group:";
-         for(Integer index: this.group){
-            res+=" "+index;
-         }
-
-         log.debug(res);
       }
-
    }
 
    public VersionVC createVersionVC(){
       if(distribution){
          return new VersionVC(this.translationTable.size());
-      }
-      else{
+      } else {
          return new VersionVC(1);
       }
    }
 
    public VersionVC createEmptyVersionVC(){
-
       return new VersionVC();
    }
 
@@ -170,7 +144,6 @@ public class VersionVCFactory {
          result = createVersionVC();
 
          for(int i=0; i< result.vectorClock.length; i++){
-
             if((version.vectorClock[i] != VersionVC.EMPTY_POSITION) && alreadyRead.get(i)){
                result.vectorClock[i] = version.vectorClock[i];
             }
@@ -181,52 +154,48 @@ public class VersionVCFactory {
    }
 
    public long translateAndGet(VersionVC version, int position){
-      if(this.distribution){
+      if (this.distribution) {
          return version.get(this.translationTable.get(position));
-      }
-      else{
+      } else {
          return version.get(0);
       }
    }
 
    public void translateAndSet(VersionVC version, int position, long value){
-      if(this.distribution){
+      if (this.distribution) {
          version.set(this, this.translationTable.get(position),value);
-      }
-      else{
+      } else {
          version.set(this, 0,value);
       }
    }
 
    public boolean translateAndIsAfterInPosition(VersionVC version1,VersionVC version2,int position){
-      if(this.distribution){
+      if (this.distribution) {
          return version1.isAfterInPosition(version2,this.translationTable.get(position));
-      }
-      else{
+      } else {
          return version1.isAfterInPosition(version2,0);
       }
    }
 
    public boolean translateAndEqualsInPosition(VersionVC version1,VersionVC version2,int position){
-      if(this.distribution){
+      if (this.distribution) {
          return version1.equalsInPosition(version2,this.translationTable.get(position));
-      }
-      else{
+      } else {
          return version1.equalsInPosition(version2,0);
       }
    }
 
    public void translateAndIncrementPosition(VersionVC version, Integer position){
-
       version.incrementPosition(this, this.translationTable.get(position));
    }
 
    public VersionVC translateAndClone(VersionVC version, Set<Integer> positions)throws CloneNotSupportedException{
-      if(this.distribution){
+      if (this.distribution) {
          Set<Integer> translatedPositions=new HashSet<Integer>();
          Iterator<Integer> itr=positions.iterator();
          Integer current;
          Integer translation;
+
          while(itr.hasNext()){
             current=itr.next();
             translation=this.translationTable.get(current);
@@ -236,25 +205,18 @@ public class VersionVCFactory {
          }
 
          return version.clone(translatedPositions);
-      }
-      else{
+      } else {
 
          return version.clone();
       }
    }
 
    public int translate(int nodeId){
-
       return this.translationTable.get(nodeId);
    }
 
    public int getMyIndex(){
-
       return this.myIndex;
-   }
-
-   public Set<Integer> getGroupIndexes(){
-      return this.group;
    }
 
    @Listener
@@ -267,8 +229,8 @@ public class VersionVCFactory {
       }
 
       @Merged @ViewChanged
-      public void newView(ViewChangedEvent e) {
-
+      public void newView(ViewChangedEvent e) {         
+         
          if(log.isDebugEnabled()){
             String res="NEW VIEW: "+e.getViewId()+'\n'+"OLD_MEMBERS:"+'\n';
             Iterator<Address> itr=e.getOldMembers().iterator();

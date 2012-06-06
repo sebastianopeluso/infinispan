@@ -36,7 +36,7 @@ import org.infinispan.interceptors.locking.PessimisticLockingInterceptor;
 import org.infinispan.interceptors.serializable.DistSerializableEntryWrappingInterceptor;
 import org.infinispan.interceptors.serializable.DistSerializableLockingInterceptor;
 import org.infinispan.interceptors.serializable.DistSerializableTxInterceptor;
-import org.infinispan.interceptors.serializable.SerializableDistributionManager;
+import org.infinispan.interceptors.serializable.SerializableDistributionInterceptor;
 import org.infinispan.interceptors.serializable.SerializableEntryWrappingInterceptor;
 import org.infinispan.interceptors.serializable.SerializableLockingInterceptor;
 import org.infinispan.interceptors.serializable.SerializableReplicationInterceptor;
@@ -289,7 +289,7 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             }
          case DIST_ASYNC:
             if(serializability) {
-               interceptorChain.appendInterceptor(createInterceptor(new SerializableDistributionManager(), SerializableDistributionManager.class), false);
+               interceptorChain.appendInterceptor(createInterceptor(new SerializableDistributionInterceptor(), SerializableDistributionInterceptor.class), false);
             } else {
                interceptorChain.appendInterceptor(createInterceptor(new DistributionInterceptor(), DistributionInterceptor.class), false);
             }
