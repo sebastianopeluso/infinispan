@@ -143,11 +143,12 @@ public class SerializablePrepareCommand extends PrepareCommand {
    @Override
    public String toString() {
       return "SerializablePrepareCommand {" +
-            "modifications=" + (modifications == null ? null : Arrays.asList(modifications)) +
-            ", onePhaseCommit=" + onePhaseCommit +
-            ", readSet=" + (readSet == null ? null : Arrays.asList(readSet)) +
+            "version=" + version +            
+            ", onePhaseCommit=" + onePhaseCommit +            
             ", gtx=" + globalTx +
             ", cacheName='" + cacheName + '\'' +
+            ", readSet=" + (readSet == null ? null : Arrays.asList(readSet)) +
+            ", modifications=" + (modifications == null ? null : Arrays.asList(modifications)) +
             '}';
    }
 

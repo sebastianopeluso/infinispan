@@ -4,10 +4,8 @@ import org.infinispan.CacheException;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
-import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.context.impl.LocalTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
-import org.infinispan.distribution.DistributionManager;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.DistributionInterceptor;
 import org.infinispan.jmx.annotations.MBean;
@@ -24,9 +22,7 @@ import org.infinispan.util.logging.LogFactory;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 
 /**
  * @author Pedro Ruivo
@@ -40,13 +36,11 @@ public class SerializableDistributionInterceptor extends DistributionInterceptor
 
    private VersionVCFactory versionVCFactory;
    private CommandsFactory commandsFactory;
-   private DistributionManager distributionManager;
 
    @Inject
-   public void inject(VersionVCFactory versionVCFactory, CommandsFactory commandsFactory, DistributionManager distributionManager){
+   public void inject(VersionVCFactory versionVCFactory, CommandsFactory commandsFactory){
       this.versionVCFactory = versionVCFactory;
       this.commandsFactory = commandsFactory;
-      this.distributionManager = distributionManager;
    }
 
    @Override
@@ -56,37 +50,20 @@ public class SerializableDistributionInterceptor extends DistributionInterceptor
    }
 
    @Override
-   protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command, Collection<Address> recipients, boolean sync) {
-      List<Address> realRecipients = getRealRecipients(ctx);
-      realRecipients.addAll(recipients);
+   public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
+      if (ctx.isOriginLocal()) {
+         ctx.addAllAffectedKeys(Arrays.asList(((LocalTxInvocationContext) ctx).getRemoteReadSet()));
+      }
+      return super.visitPrepareCommand(ctx, command);
+   }
 
+   @Override
+   protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command, Collection<Address> recipients, boolean sync) {
       Map<Address, Response> responses = rpcManager.invokeRemotely(recipients, command, true, false, false);
       log.debugf("prepare command for transaction %s is sent. responses are: %s",
                  command.getGlobalTransaction().prettyPrint(), responses.toString());
 
       joinVersions(responses.values(), ctx);
-   }
-
-   @Override
-   protected void sendCommitCommand(TxInvocationContext ctx, CommitCommand command, Collection<Address> preparedOn) throws TimeoutException, InterruptedException {
-      List<Address> recipients = getRealRecipients(ctx);
-      recipients.addAll(preparedOn);
-      super.sendCommitCommand(ctx, command, recipients);
-   }
-
-   @Override
-   public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
-      if (shouldInvokeRemoteTxCommand(ctx)) {
-         List<Address> recipients = getRealRecipients(ctx);
-         rpcManager.invokeRemotely(recipients, command, configuration.isSyncRollbackPhase(), true, false);
-      }
-
-      return invokeNextInterceptor(ctx, command);
-   }
-
-   private List<Address> getRealRecipients(TxInvocationContext ctx) {
-      return distributionManager.getAffectedNodesAndOwners(ctx.getAffectedKeys(),
-                                                           Arrays.asList(((LocalTxInvocationContext) ctx).getRemoteReadSet()));
    }
 
    private void joinVersions(Collection<Response> responses, TxInvocationContext ctx) {
