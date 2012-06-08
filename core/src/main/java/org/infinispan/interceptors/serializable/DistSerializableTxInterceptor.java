@@ -53,7 +53,7 @@ public class DistSerializableTxInterceptor extends SerializableTxInterceptor {
 
       if(hasLocalKeys(command.getAffectedKeys())) {
          prepareVC = commitQueue.addTransaction(command.getGlobalTransaction(), ctx.calculateVersionToRead(versionVCFactory),
-                                               ctx.clone());
+                                                ctx.clone());
 
          if(info) {
             log.infof("Transaction %s can commit. It was added to commit queue. " +
@@ -73,11 +73,16 @@ public class DistSerializableTxInterceptor extends SerializableTxInterceptor {
       if(ctx.isOriginLocal()) {
          //the retVal has the maximum vector clock of all involved nodes
          //this in only performed in the node that executed the transaction
-         commitVC = ((LocalTransaction)ctx.getCacheTransaction()).getCommitVersion();         
-         commitVC.setToMaximum(prepareVC);
+         commitVC = ((LocalTransaction)ctx.getCacheTransaction()).getCommitVersion();
+         if (commitVC == null) {
+            commitVC = prepareVC;
+            ((LocalTransaction)ctx.getCacheTransaction()).setCommitVersion(commitVC);
+         } else {
+            commitVC.setToMaximum(prepareVC);
+         }
          calculateCommitVC(commitVC, getVCPositions(getWriteSetMembers(command.getAffectedKeys())));
       } else {
-         commitVC = prepareVC;               
+         commitVC = prepareVC;
       }
 
       if(debug) {
@@ -106,7 +111,8 @@ public class DistSerializableTxInterceptor extends SerializableTxInterceptor {
             }
          } else {
             //We have read on a remote node. The key of the read value is found in the remote read set
-            ime = ctx.getRemoteReadKey(key);
+            ime = ctx.getLastRemoteReadKey();
+            ctx.addRemoteReadKey(key, ime);
 
             if((key instanceof ContextAwareKey) && ((ContextAwareKey)key).identifyImmutableValue()){
                //The key identifies an immutable object. We don't need validation for this key.

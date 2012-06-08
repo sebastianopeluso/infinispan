@@ -29,6 +29,7 @@ import java.util.Set;
 
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.mvcc.InternalMVCCEntry;
 import org.infinispan.mvcc.VersionVC;
 import org.infinispan.mvcc.VersionVCFactory;
 import org.infinispan.remoting.transport.Address;
@@ -223,5 +224,15 @@ public abstract class AbstractInvocationContext implements InvocationContext {
    @Override
    public void setReadBasedOnVersion(boolean value) {
       //no-op by default
+   }
+
+   @Override
+   public void setLastRemoteReadKey(InternalMVCCEntry entry) {
+      //no-op
+   }
+
+   @Override
+   public InternalMVCCEntry getLastRemoteReadKey() {
+      return null; //no-op
    }
 }

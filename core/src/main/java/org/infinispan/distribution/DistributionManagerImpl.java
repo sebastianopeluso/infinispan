@@ -242,22 +242,17 @@ public class DistributionManagerImpl implements DistributionManager {
                      InternalMVCCEntry ime = (InternalMVCCEntry) ((SuccessfulResponse) r).getResponseValue();
                      int pos = getAddressID(entry.getKey());
 
-
-                     ctx.addRemoteReadKey(key, ime);
+                     //ctx.addRemoteReadKey(key, ime);
+                     ctx.setLastRemoteReadKey(ime);
                      ctx.removeLocalReadKey(key);
 
-
                      ((LocalTxInvocationContext) ctx).markReadFrom(versionVCFactory.translate(pos)); //To remember that this transaction has effectively read on this node
-
-
 
                      VersionVC v = ime.getVersion();
 
                      if(this.versionVCFactory.translateAndGet(v,pos) == VersionVC.EMPTY_POSITION) {
                         this.versionVCFactory.translateAndSet(v,pos,0);
                      }
-
-
 
                      if(log.isDebugEnabled()) {
                         log.debugf("Remote Get successful for transaction %s and key %s. Return value is %s",

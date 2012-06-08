@@ -254,4 +254,14 @@ public final class ImmutableContext implements InvocationContext {
    public boolean getAlreadyReadOnNode(){
       return false;
    }
+
+   @Override
+   public void setLastRemoteReadKey(InternalMVCCEntry entry) {
+      //no-op
+   }
+
+   @Override
+   public InternalMVCCEntry getLastRemoteReadKey() {
+      return null; //no-op
+   }
 }

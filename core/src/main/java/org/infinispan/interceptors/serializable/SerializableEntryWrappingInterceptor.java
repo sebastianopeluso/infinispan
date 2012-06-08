@@ -17,9 +17,12 @@ import org.infinispan.interceptors.EntryWrappingInterceptor;
 import org.infinispan.mvcc.CommitQueue;
 import org.infinispan.mvcc.VersionVC;
 import org.infinispan.mvcc.exception.ValidationException;
+import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -50,7 +53,7 @@ public class SerializableEntryWrappingInterceptor extends EntryWrappingIntercept
       }
 
       wrapEntriesForPrepare(ctx, command);
-      wrapAndValidateReadSet(ctx, (SerializablePrepareCommand) command);
+      validateReadSet(ctx, (SerializablePrepareCommand) command);
       return invokeNextInterceptor(ctx, command);
    }
 
@@ -126,13 +129,18 @@ public class SerializableEntryWrappingInterceptor extends EntryWrappingIntercept
       return true;
    }
 
-   private void wrapAndValidateReadSet(TxInvocationContext ctx, SerializablePrepareCommand command) throws InterruptedException {
+   private void validateReadSet(TxInvocationContext ctx, SerializablePrepareCommand command) throws InterruptedException {
       VersionVC toCompare = command.getVersion();
-      for (Object key : command.getReadSet()) {
+      Set<Object> readSet = new HashSet<Object>(Arrays.asList(command.getReadSet()));
+      
+      if (ctx.isOriginLocal()) {
+         readSet.addAll(Arrays.asList(((LocalTransaction)ctx.getCacheTransaction()).getLocalReadSet()));
+      }
+      
+      for (Object key : readSet) {
          if(isKeyLocal(key) && !dataContainer.validateKey(key, toCompare)) {
             throw new ValidationException("Validation of key [" + key + "] failed!", key);
-         }
-         entryFactory.wrapEntryForReading(ctx,key);
-      }
+         }         
+      }      
    }
 }

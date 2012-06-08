@@ -53,6 +53,7 @@ public class SerializableDistributionInterceptor extends DistributionInterceptor
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       if (ctx.isOriginLocal()) {
          ctx.addAllAffectedKeys(Arrays.asList(((LocalTxInvocationContext) ctx).getRemoteReadSet()));
+         ctx.addAllAffectedKeys(command.getAffectedKeys());
       }
       return super.visitPrepareCommand(ctx, command);
    }

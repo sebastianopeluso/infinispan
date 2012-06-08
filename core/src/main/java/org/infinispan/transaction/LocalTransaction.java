@@ -76,6 +76,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    private final PrepareResult prepareResult = new PrepareResult();
 
    private VersionVC commitVersion;
+   private InternalMVCCEntry lastRemoteReadKey;
 
    public LocalTransaction(Transaction transaction, GlobalTransaction tx, boolean implicitTransaction, int viewId) {
       super(tx, viewId);
@@ -334,7 +335,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
     * @param exception is it an exception?
     */
    public void addPrepareResult(Object object, boolean exception) {
-      prepareResult.addResultFromPrepare(object, exception);      
+      prepareResult.addResultFromPrepare(object, exception);
    }
 
    /**
@@ -446,5 +447,13 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
 
    public VersionVC getCommitVersion() {
       return commitVersion;
+   }
+
+   public InternalMVCCEntry getLastRemoteReadKey() {
+      return lastRemoteReadKey;
+   }
+
+   public void setLastRemoteReadKey(InternalMVCCEntry lastRemoteReadKey) {
+      this.lastRemoteReadKey = lastRemoteReadKey;
    }
 }

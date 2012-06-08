@@ -272,4 +272,14 @@ public class InvocationContextFlagsOverride implements InvocationContext {
    public void clearLastReadKey(){
       delegate.clearLastReadKey();
    }
+
+   @Override
+   public void setLastRemoteReadKey(InternalMVCCEntry entry) {
+      delegate.setLastRemoteReadKey(entry);
+   }
+
+   @Override
+   public InternalMVCCEntry getLastRemoteReadKey() {
+      return delegate.getLastRemoteReadKey();
+   }
 }

@@ -221,4 +221,16 @@ public interface InvocationContext extends EntryLookup, FlagContainer, Cloneable
     * 
     */
    void clearLastReadKey();
+
+   /**
+    *
+    * @param entry
+    */
+   void setLastRemoteReadKey(InternalMVCCEntry entry);
+
+   /**
+    *
+    * @return
+    */
+   InternalMVCCEntry getLastRemoteReadKey();
 }

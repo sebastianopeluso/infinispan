@@ -266,4 +266,14 @@ public class LocalTxInvocationContext extends AbstractTxInvocationContext {
    public void clearLastReadKey(){
       localTransaction.clearLastReadKey();
    }
+
+   @Override
+   public void setLastRemoteReadKey(InternalMVCCEntry entry) {
+      localTransaction.setLastRemoteReadKey(entry);    // TODO: Customise this generated block
+   }
+
+   @Override
+   public InternalMVCCEntry getLastRemoteReadKey() {
+      return localTransaction.getLastRemoteReadKey();    // TODO: Customise this generated block
+   }
 }
