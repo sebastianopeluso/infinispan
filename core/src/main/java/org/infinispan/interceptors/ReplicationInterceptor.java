@@ -121,6 +121,7 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       Object retVal = invokeNextInterceptor(ctx, command);
       if (shouldInvokeRemoteTxCommand(ctx)) {
+         ctx.getCacheTransaction().markPrepareSent();
          broadcastPrepare(ctx, command);
          ((LocalTxInvocationContext) ctx).remoteLocksAcquired(rpcManager.getTransport().getMembers());
       }
@@ -134,7 +135,7 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
 
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
-      if (shouldInvokeRemoteTxCommand(ctx) && !Configurations.isOnePhaseCommit(cacheConfiguration)) {
+      if (shouldInvokeRemoteTxCommand(ctx) && !Configurations.isOnePhaseCommit(cacheConfiguration) && shouldInvokeRemoteRollbackCommand(ctx, command)) {
          rpcManager.broadcastRpcCommand(command, cacheConfiguration.transaction().syncRollbackPhase(), true, false);
       }
       return invokeNextInterceptor(ctx, command);

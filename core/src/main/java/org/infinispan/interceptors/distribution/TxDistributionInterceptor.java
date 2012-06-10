@@ -191,6 +191,8 @@ public class TxDistributionInterceptor extends BaseDistributionInterceptor {
       if (shouldInvokeRemoteTxCommand(ctx)) {
          if (command.isOnePhaseCommit()) flushL1Caches(ctx); // if we are one-phase, don't block on this future.
 
+         ctx.getCacheTransaction().markPrepareSent();
+         
          boolean affectsAllNodes = ctx.getCacheTransaction().hasModification(ClearCommand.class);
          Collection<Address> recipients = affectsAllNodes ? dm.getWriteConsistentHash().getMembers() : dm.getAffectedNodes(ctx.getAffectedKeys());
          prepareOnAffectedNodes(ctx, command, recipients, defaultSynchronous);
@@ -211,7 +213,7 @@ public class TxDistributionInterceptor extends BaseDistributionInterceptor {
 
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
-      if (shouldInvokeRemoteTxCommand(ctx)) {
+      if (shouldInvokeRemoteTxCommand(ctx) && shouldInvokeRemoteRollbackCommand(ctx, command)) {
          rpcManager.invokeRemotely(getCommitNodes(ctx), command, cacheConfiguration.transaction().syncRollbackPhase(), true,false);
       }
 

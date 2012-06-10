@@ -282,4 +282,14 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
    public boolean keyRead(Object key) {
       return false;
    }
+
+   @Override
+   public void markPrepareSent() {
+      //no-op
+   }
+
+   @Override
+   public boolean wasPrepareSent() {
+      return false;  // no-op
+   }
 }

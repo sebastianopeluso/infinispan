@@ -38,6 +38,8 @@ import org.infinispan.transaction.RemoteTransaction;
 public class RollbackCommand extends AbstractTransactionBoundaryCommand {
    public static final byte COMMAND_ID = 13;
 
+   private boolean prepareSent;
+
    private RollbackCommand() {
       super(null); // For command id uniqueness test
    }
@@ -86,5 +88,13 @@ public class RollbackCommand extends AbstractTransactionBoundaryCommand {
    @Override
    public String toString() {
       return "RollbackCommand {" + super.toString();
+   }
+
+   public final boolean wasPrepareSent() {
+      return prepareSent;
+   }
+
+   public final void setPrepareSent(boolean prepareSent) {
+      this.prepareSent = prepareSent;
    }
 }
