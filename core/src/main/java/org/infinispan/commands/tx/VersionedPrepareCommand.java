@@ -100,10 +100,10 @@ public class VersionedPrepareCommand extends PrepareCommand {
    @Override
    public String toString() {
       return "VersionedPrepareCommand {" +
-            "modifications=" + (modifications == null ? null : Arrays.asList(modifications)) +
+            "modifications=" + getAffectedKeys() +
             ", onePhaseCommit=" + onePhaseCommit +
             ", versionsSeen=" + versionsSeen +
-            ", gtx=" + globalTx +
+            ", gtx=" + globalTx.prettyPrint() +
             ", cacheName='" + cacheName + '\'' +
             '}';
    }

@@ -97,4 +97,15 @@ public class RollbackCommand extends AbstractTransactionBoundaryCommand {
    public final void setPrepareSent(boolean prepareSent) {
       this.prepareSent = prepareSent;
    }
+
+   @Override
+   public Object[] getParameters() {
+      return new Object[] {globalTx, prepareSent};
+   }
+
+   @Override
+   public void setParameters(int commandId, Object[] args) {
+      globalTx = (GlobalTransaction) args[0];
+      prepareSent = (Boolean) args[1];
+   }
 }

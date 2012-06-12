@@ -258,7 +258,7 @@ public class RpcManagerWrapper implements RpcManager {
             return;
       }
       log.tracef("Update stats for command %s. Is sync? %s. Duration stat is %s, counter stats is %s, " +
-                       "recipient size stat is %s", command, durationStat, counterStat, recipientSizeStat);
+                       "recipient size stat is %s", command, sync, durationStat, counterStat, recipientSizeStat);
       TransactionsStatisticsRegistry.addValue(durationStat, System.nanoTime() - init);
       TransactionsStatisticsRegistry.incrementValue(counterStat);
       TransactionsStatisticsRegistry.addValue(recipientSizeStat, recipientListSize(recipients));
