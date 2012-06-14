@@ -47,7 +47,7 @@ public final class TransactionsStatisticsRegistry {
       TransactionStatistics txs = thread.get();
       if (txs == null) {
          log.debug("Trying to add value " + value + " to parameter " + param +
-                        " but no transaction is associated to the thread");
+                         " but no transaction is associated to the thread");
          return;
       }
       txs.addValue(param, value);
@@ -95,7 +95,7 @@ public final class TransactionsStatisticsRegistry {
       TransactionStatistics txs = thread.get();
       if (txs == null) {
          log.debug("Trying to set outcome to " + (commit ? "Commit" : "Rollback") +
-                        " but no transaction is associated to the thread");
+                         " but no transaction is associated to the thread");
          return;
       }
       txs.setCommit(commit);
@@ -104,22 +104,30 @@ public final class TransactionsStatisticsRegistry {
    public static void terminateTransaction() {
       TransactionStatistics txs = thread.get();
       if (txs == null) {
-         log.info("Trying to invoke terminate() but no transaction is associated to the thread");
+         log.debug("Trying to invoke terminate() but no transaction is associated to the thread");
          return;
       }
       txs.terminateTransaction();
 
       NodeScopeStatisticCollector dest = transactionalClassesStatsMap.get(txs.getTransactionalClass());
-      dest.merge(txs);
+      if (dest != null) {
+         dest.merge(txs);
+      }
 
       thread.remove();
    }
 
    public static Object getAttribute(IspnStats param){
+      if (configuration == null) {
+         return null;
+      }
       return transactionalClassesStatsMap.get(TransactionalClasses.DEFAULT_CLASS).getAttribute(param);
    }
 
    public static Object getPercentile(IspnStats param, int percentile){
+      if (configuration == null) {
+         return null;
+      }
       return transactionalClassesStatsMap.get(TransactionalClasses.DEFAULT_CLASS).getPercentile(param, percentile);
    }
 
@@ -153,10 +161,13 @@ public final class TransactionsStatisticsRegistry {
 
    public static void attachRemoteTransactionStatistic(GlobalTransaction globalTransaction, boolean createIfAbsent) {
       RemoteTransactionStatistics rts = remoteTransactionStatistics.get(globalTransaction);
-      if (rts == null && createIfAbsent) {
+      if (rts == null && createIfAbsent && configuration != null) {
          log.tracef("Create a new remote transaction statistic for transaction %s", globalTransaction);
          rts = new RemoteTransactionStatistics(configuration);
          remoteTransactionStatistics.put(globalTransaction, rts);
+      } else if (configuration == null) {
+         log.debugf("Trying to create a remote transaction statistics in a not initialized Transaction Statistics Registry");
+         return;
       } else {
          log.tracef("Using the remote transaction statistic %s for transaction %s", rts, globalTransaction);
       }
@@ -191,9 +202,11 @@ public final class TransactionsStatisticsRegistry {
    private static void initLocalTransaction(){
       //Not overriding the InitialValue method leads me to have "null" at the first invocation of get()
       TransactionStatistics lts = thread.get();
-      if (lts == null) {
+      if (lts == null && configuration != null) {
          log.tracef("Init a new local transaction statistics");
          thread.set(new LocalTransactionStatistics(configuration));
+      } else if (configuration == null ) {
+         log.debugf("Trying to create a local transaction statistics in a not initialized Transaction Statistics Registry");
       } else {
          log.tracef("Local transaction statistic is already initialized: %s", lts);
       }
