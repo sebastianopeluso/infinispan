@@ -48,7 +48,7 @@ public abstract class AbstractLockingInterceptor extends CommandInterceptor {
    LockManager lockManager;
    DataContainer dataContainer;
    EntryFactory entryFactory;
-   ClusteringDependentLogic cdl;
+   protected ClusteringDependentLogic cdl;
 
    @Inject
    public void setDependencies(LockManager lockManager, DataContainer dataContainer, EntryFactory entryFactory, ClusteringDependentLogic cll) {

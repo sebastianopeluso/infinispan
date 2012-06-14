@@ -28,7 +28,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 
-/** 
+/**
  * @author Pedro Ruivo
  * @since 5.2
  */
@@ -44,7 +44,7 @@ public class SerializableLockingInterceptor extends AbstractTxLockingInterceptor
          return (thisVal<anotherVal ? -1 : (thisVal==anotherVal ? 0 : 1));
       }
    };
-   
+
    private final LockAcquisitionVisitor lockAcquisitionVisitor = new LockAcquisitionVisitor();
 
    private ReadWriteLockManager readWriteLockManager;
@@ -137,13 +137,29 @@ public class SerializableLockingInterceptor extends AbstractTxLockingInterceptor
 
    private void acquireWriteLocks(TxInvocationContext ctx, Object[] writeSet) throws InterruptedException {
       for (Object key : writeSet) {
-         readWriteLockManager.acquireLock(ctx, key);
+         acquireWriteLock(ctx, key);
       }
    }
 
    private void acquireReadLocks(TxInvocationContext ctx, Object[] readSet) throws InterruptedException {
       for (Object key : readSet) {
+         acquireReadLock(ctx, key);
+      }
+   }
+
+   private void acquireWriteLock(TxInvocationContext ctx, Object key) throws InterruptedException {
+      if (cdl.localNodeIsPrimaryOwner(key)) {
+         readWriteLockManager.acquireLock(ctx, key);
+      } else if (cdl.localNodeIsOwner(key)) {
+         ctx.getCacheTransaction().addBackupLockForKey(key);
+      }
+   }
+
+   private void acquireReadLock(TxInvocationContext ctx, Object key) throws InterruptedException {
+      if (cdl.localNodeIsPrimaryOwner(key)) {
          readWriteLockManager.acquireSharedLock(ctx, key);
+      } else if (cdl.localNodeIsOwner(key)) {
+         ctx.getCacheTransaction().addBackupLockForKey(key);
       }
    }
 
@@ -152,7 +168,7 @@ public class SerializableLockingInterceptor extends AbstractTxLockingInterceptor
       public Object visitClearCommand(InvocationContext ctx, ClearCommand command) throws Throwable {
          final TxInvocationContext txC = (TxInvocationContext) ctx;
          for (Object key : dataContainer.keySet()) {
-            readWriteLockManager.acquireLock(txC, key);
+            acquireWriteLock(txC, key);
             txC.addAffectedKey(key);
          }
          return null;
@@ -162,7 +178,7 @@ public class SerializableLockingInterceptor extends AbstractTxLockingInterceptor
       public Object visitPutMapCommand(InvocationContext ctx, PutMapCommand command) throws Throwable {
          final TxInvocationContext txC = (TxInvocationContext) ctx;
          for (Object key : command.getMap().keySet()) {
-            readWriteLockManager.acquireLock(txC, key);
+            acquireWriteLock(txC, key);
             txC.addAffectedKey(key);
          }
          return null;
@@ -171,7 +187,7 @@ public class SerializableLockingInterceptor extends AbstractTxLockingInterceptor
       @Override
       public Object visitRemoveCommand(InvocationContext ctx, RemoveCommand command) throws Throwable {
          final TxInvocationContext txC = (TxInvocationContext) ctx;
-         readWriteLockManager.acquireLock(txC, command.getKey());
+         acquireWriteLock(txC, command.getKey());
          txC.addAffectedKey(command.getKey());
          return null;
       }
@@ -179,7 +195,7 @@ public class SerializableLockingInterceptor extends AbstractTxLockingInterceptor
       @Override
       public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
          final TxInvocationContext txC = (TxInvocationContext) ctx;
-         readWriteLockManager.acquireLock(txC, command.getKey());
+         acquireWriteLock(txC, command.getKey());
          txC.addAffectedKey(command.getKey());
          return null;
       }
@@ -190,7 +206,7 @@ public class SerializableLockingInterceptor extends AbstractTxLockingInterceptor
             Object[] compositeKeys = command.getCompositeKeys();
             TxInvocationContext txC = (TxInvocationContext) ctx;
             for (Object key : compositeKeys) {
-               readWriteLockManager.acquireLock(txC, key);
+               acquireWriteLock(txC, key);
             }
          }
          return null;
@@ -199,7 +215,7 @@ public class SerializableLockingInterceptor extends AbstractTxLockingInterceptor
       @Override
       public Object visitReplaceCommand(InvocationContext ctx, ReplaceCommand command) throws Throwable {
          final TxInvocationContext txC = (TxInvocationContext) ctx;
-         readWriteLockManager.acquireLock(txC, command.getKey());
+         acquireWriteLock(txC, command.getKey());
          txC.addAffectedKey(command.getKey());
          return null;
       }

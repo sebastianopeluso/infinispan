@@ -175,8 +175,8 @@ public class ClusteredGetCommand extends BaseRpcCommand implements FlagAffectedC
 
       if(serializable && useMultiVersion) {
          InternalMVCCEntry ime = (InternalMVCCEntry) cacheEntry;
-         if(log.isInfoEnabled()) {
-            log.infof("Receive remote get request [key: %s, min version: %s, max version: %s] and return value is %s",
+         if(log.isDebugEnabled()) {
+            log.debugf("Receive remote get request [key: %s, min version: %s, max version: %s] and return value is %s",
                       key, minVersion, maxVersion, ime);
          }
          return ime;

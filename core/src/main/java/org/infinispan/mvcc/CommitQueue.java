@@ -33,7 +33,7 @@ public class CommitQueue {
    private InvocationContextContainer icc;
    private VersionVCFactory versionVCFactory;
 
-   private boolean trace, debug, info;
+   private boolean trace, debug;
 
    public CommitQueue() {
       commitQueue = new ArrayList<ListEntry>();
@@ -50,15 +50,14 @@ public class CommitQueue {
    @Start(priority = 31)
    public void start() {
       trace = log.isTraceEnabled();
-      debug = log.isDebugEnabled();
-      info = log.isInfoEnabled();
+      debug = log.isDebugEnabled();      
 
       prepareVC = this.versionVCFactory.createEmptyVersionVC();
 
       if(commitInvocationInstance == null) {
          List<CommandInterceptor> all = ic.getInterceptorsWhichExtend(EntryWrappingInterceptor.class);
-         if(log.isInfoEnabled()) {
-            log.infof("Starting Commit Queue Component. Searching interceptors with interface CommitInstance. " +
+         if(debug) {
+            log.debugf("Starting Commit Queue Component. Searching interceptors with interface CommitInstance. " +
                             "Found: %s", all);
          }
          for(CommandInterceptor ci : all) {
@@ -166,7 +165,7 @@ public class CommitQueue {
 
             synchronized (commitQueue) {
                int idx = searchInsertIndexPos(prepared, this.versionVCFactory.getMyIndex());
-               //log.infof("Adding transaction %s [%s] to queue in position %s. queue state is %s", Util.prettyPrintGlobalTransaction(gtx), prepared, idx, commitQueue.toString());
+               //log.debugf("Adding transaction %s [%s] to queue in position %s. queue state is %s", Util.prettyPrintGlobalTransaction(gtx), prepared, idx, commitQueue.toString());
                commitQueue.add(idx, le);
                //commitQueue.notifyAll();
             }
@@ -227,8 +226,8 @@ public class CommitQueue {
          commitQueue.get(0).headStartTs = System.nanoTime();
 
 
-         if(info){
-            log.infof("Update transaction %s position in queue. Final index is %s and commit version is %s",
+         if(debug){
+            log.debugf("Update transaction %s position in queue. Final index is %s and commit version is %s",
                       gtx.prettyPrint(), idx, commitVC);
          }
 
@@ -249,15 +248,15 @@ public class CommitQueue {
             }
 
             if(le.headStartTs != 0) {
-               if(info){
-                  log.infof("Transaction %s has %s nano seconds in the head of the queue",
+               if(debug){
+                  log.debugf("Transaction %s has %s nano seconds in the head of the queue",
                             gtx.prettyPrint(), System.nanoTime() - le.headStartTs);
                }
             }
 
             if(commitCode >= commitQueue.size()) {
-               if(info){
-                  log.infof("The commit code received is higher than the size of commit queue (%s > %s)",
+               if(debug){
+                  log.debugf("The commit code received is higher than the size of commit queue (%s > %s)",
                             commitCode, commitQueue.size());
                }
                commitCode = commitQueue.size() - 1;
@@ -266,8 +265,8 @@ public class CommitQueue {
             toCommit.addAll(commitQueue.subList(0, commitCode + 1));
             break;
          }
-         if(info){
-            log.infof("Transaction %s will apply it write set now. Queue state is %s",
+         if(debug){
+            log.debugf("Transaction %s will apply it write set now. Queue state is %s",
                       le.gtx.prettyPrint(), commitQueue.toString());
          }
 

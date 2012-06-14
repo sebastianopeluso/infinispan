@@ -46,8 +46,7 @@ public class DistSerializableTxInterceptor extends SerializableTxInterceptor {
    }
 
    @Override
-   protected Object afterSuccessfullyPrepared(TxInvocationContext ctx, PrepareCommand command, Object retVal) {
-      boolean info = log.isInfoEnabled();
+   protected Object afterSuccessfullyPrepared(TxInvocationContext ctx, PrepareCommand command, Object retVal) {      
       boolean debug = log.isDebugEnabled();
       VersionVC prepareVC;
 
@@ -55,16 +54,16 @@ public class DistSerializableTxInterceptor extends SerializableTxInterceptor {
          prepareVC = commitQueue.addTransaction(command.getGlobalTransaction(), ctx.calculateVersionToRead(versionVCFactory),
                                                 ctx.clone());
 
-         if(info) {
-            log.infof("Transaction %s can commit. It was added to commit queue. " +
+         if(debug) {
+            log.debugf("Transaction %s can commit. It was added to commit queue. " +
                             "The 'temporary' commit version is %s", command.getGlobalTransaction().prettyPrint(), prepareVC);
          }
       } else {
          //if it is readonly, return the most recent version
          prepareVC = commitLog.getActualVersion();
 
-         if(info) {
-            log.infof("Transaction %s can commit. It is read-only on this node. " +
+         if(debug) {
+            log.debugf("Transaction %s can commit. It is read-only on this node. " +
                             "The 'temporary' commit version is %s", command.getGlobalTransaction().prettyPrint(), prepareVC);
          }
       }
