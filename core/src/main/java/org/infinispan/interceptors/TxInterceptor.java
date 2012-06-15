@@ -132,12 +132,14 @@ public class TxInterceptor extends CommandInterceptor {
          remoteTransaction.markForPreparing();
          shouldInvokeNext = !remoteTransaction.isMarkedForRollback();
       }
+      command.setWasInvoked(shouldInvokeNext);
 
       try {
          if (shouldInvokeNext) {
             try {
                result = invokeNextInterceptor(ctx, command);
-            } finally {
+               result = afterSuccessfullyPrepared(ctx, command, result);
+            } finally {               
                if (!ctx.isOriginLocal()) {
                   ((RemoteTransaction)ctx.getCacheTransaction()).markPreparedAndNotify();
                }
@@ -163,6 +165,10 @@ public class TxInterceptor extends CommandInterceptor {
          }
       }
       return result;
+   }
+
+   protected Object afterSuccessfullyPrepared(TxInvocationContext ctx, PrepareCommand command, Object retVal) {
+      return retVal;
    }
 
    @Override

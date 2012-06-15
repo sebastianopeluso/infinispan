@@ -18,7 +18,7 @@ import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-/** 
+/**
  * @author Pedro Ruivo
  * @since 5.2
  */
@@ -45,9 +45,7 @@ public class SerializableTxInterceptor extends TxInterceptor {
          initializeSerializablePrepareCommand(ctx, (SerializablePrepareCommand) command);
       }
 
-      Object retVal = super.visitPrepareCommand(ctx, command);
-
-      return afterSuccessfullyPrepared(ctx, command, retVal);
+      return super.visitPrepareCommand(ctx, command);      
    }
 
    @Override
@@ -74,9 +72,10 @@ public class SerializableTxInterceptor extends TxInterceptor {
       command.setVersion(ctx.getPrepareVersion());
    }
 
+   @Override
    protected Object afterSuccessfullyPrepared(TxInvocationContext ctx, PrepareCommand command, Object retVal) {
       VersionVC prepareVC = commitQueue.addTransaction(command.getGlobalTransaction(), ctx.calculateVersionToRead(this.versionVCFactory),
-                                                      ctx.clone());
+                                                       ctx.clone());
       VersionVC commitVC;
       if(ctx.isOriginLocal()) {
          commitVC = ((LocalTransaction) ctx.getCacheTransaction()).getCommitVersion();
@@ -88,7 +87,7 @@ public class SerializableTxInterceptor extends TxInterceptor {
       } else {
          commitVC = prepareVC;
       }
-      
+
 
       log.debugf("transaction [%s] commit vector clock is %s",
                  command.getGlobalTransaction().prettyPrint(), commitVC);

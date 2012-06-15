@@ -66,6 +66,8 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
    private transient boolean replayEntryWrapping  = false;
 
    private static final WriteCommand[] EMPTY_WRITE_COMMAND_ARRAY = new WriteCommand[0];
+   
+   private transient boolean wasInvoked;
 
    public void initialize(CacheNotifier notifier, RecoveryManager recoveryManager) {
       this.notifier = notifier;
@@ -248,5 +250,13 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
     */
    public void setOnePhaseCommit(boolean onePhaseCommit) {
       this.onePhaseCommit = onePhaseCommit;
+   }
+
+   public boolean wasInvoked() {
+      return wasInvoked;
+   }
+
+   public void setWasInvoked(boolean wasInvoked) {
+      this.wasInvoked = wasInvoked;
    }
 }

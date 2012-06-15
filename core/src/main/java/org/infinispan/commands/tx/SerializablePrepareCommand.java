@@ -148,7 +148,7 @@ public class SerializablePrepareCommand extends PrepareCommand {
             ", gtx=" + globalTx +
             ", cacheName='" + cacheName + '\'' +
             ", readSet=" + (readSet == null ? null : Arrays.asList(readSet)) +
-            ", modifications=" + (modifications == null ? null : Arrays.asList(modifications)) +
+            ", modifications=" + getAffectedKeys() +
             '}';
    }
 
