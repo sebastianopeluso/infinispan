@@ -7,6 +7,7 @@ import org.infinispan.interceptors.DistributionInterceptor;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.util.Util;
+import org.infinispan.util.concurrent.TimeoutException;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -60,7 +61,14 @@ public class TotalOrderDistributionInterceptor extends DistributionInterceptor {
       if(log.isTraceEnabled()) {
          log.tracef("Total Order Anycast transaction %s with Total Order", command.getGlobalTransaction().prettyPrint());
       }
-      boolean reallySync = command.isOnePhaseCommit() && configuration.isSyncCommitPhase();
-      rpcManager.invokeRemotely(recipients, command, reallySync, false, true);
+      //In total order based protocol, we use synchronous prepare only when the commit phase is synchronous.
+      //It is needed for this case to ensure the semantic of sync commit phase and to ensure that all nodes
+      //   has seen the transaction (remember: the commit can be deliver before without this)
+      boolean reallySync = configuration.isSyncCommitPhase();
+      try {
+         rpcManager.invokeRemotely(recipients, command, reallySync, false, true);
+      } catch (TimeoutException e) {
+         //just ignore. it will be deliver for sure
+      }
    }
 }

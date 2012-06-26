@@ -5,6 +5,7 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.ReplicationInterceptor;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
+import org.infinispan.util.concurrent.TimeoutException;
 
 /**
  * @author mircea.markus@jboss.com
@@ -24,7 +25,12 @@ public class TotalOrderReplicationInterceptor extends ReplicationInterceptor {
       Object result;
       boolean shouldRetransmit;
       do {
-         result = super.visitPrepareCommand(ctx, command);
+         try {
+            result = super.visitPrepareCommand(ctx, command);
+         } catch (TimeoutException e) {
+            //just ignore. it will be deliver for sure
+            result = null;
+         }
          shouldRetransmit = false;
          if (shouldInvokeRemoteTxCommand(ctx)) {
             //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication

@@ -8,6 +8,7 @@ import org.infinispan.interceptors.VersionedDistributionInterceptor;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.util.Util;
+import org.infinispan.util.concurrent.TimeoutException;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -70,7 +71,15 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
          throw new IllegalStateException("Expected a Versioned Prepare Command in version aware component");
       }
 
+      //In total order based protocol, we use synchronous prepare only when the commit phase is synchronous.
+      //It is needed for this case to ensure the semantic of sync commit phase and to ensure that all nodes
+      //   has seen the transaction (remember: the commit can be deliver before without this)
+      boolean reallySync = configuration.isSyncCommitPhase();
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
-      rpcManager.invokeRemotely(recipients, command, false, false, true);
+      try {
+         rpcManager.invokeRemotely(recipients, command, reallySync, false, true);
+      } catch (TimeoutException e) {
+         //just ignore. it will be deliver for sure
+      }
    }
 }
