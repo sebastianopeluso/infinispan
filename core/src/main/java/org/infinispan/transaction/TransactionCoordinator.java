@@ -34,6 +34,7 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
 import org.infinispan.interceptors.InterceptorChain;
+import org.infinispan.reconfigurableprotocol.ReconfigurableReplicationManager;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -67,15 +68,18 @@ public class TransactionCoordinator {
 
    boolean trace;
 
+   private ReconfigurableReplicationManager reconfigurableReplicationManager;
 
    @Inject
    public void init(CommandsFactory commandsFactory, InvocationContextContainer icc, InterceptorChain invoker,
-                    TransactionTable txTable, Configuration configuration) {
+                    TransactionTable txTable, Configuration configuration,
+                    ReconfigurableReplicationManager reconfigurableReplicationManager) {
       this.commandsFactory = commandsFactory;
       this.icc = icc;
       this.invoker = invoker;
       this.txTable = txTable;
       this.configuration = configuration;
+      this.reconfigurableReplicationManager = reconfigurableReplicationManager;
       trace = log.isTraceEnabled();
    }
 
@@ -126,9 +130,13 @@ public class TransactionCoordinator {
 
    public final int prepare(LocalTransaction localTransaction, boolean replayEntryWrapping) throws XAException {
       validateNotMarkedForRollback(localTransaction);
+      
+      GlobalTransaction globalTransaction = localTransaction.getGlobalTransaction();
+      reconfigurableReplicationManager.notifyLocalTransaction(globalTransaction);
 
-      if (configuration.isOnePhaseCommit() || is1PcForAutoCommitTransaction(localTransaction) ||
-            isOnePhaseTotalOrder() || isOnePhasePassiveReplication()) {
+      if (globalTransaction.getReconfigurableProtocol().use1PC(localTransaction)) {
+      //if (configuration.isOnePhaseCommit() || is1PcForAutoCommitTransaction(localTransaction) ||
+      //      isOnePhaseTotalOrder() || isOnePhasePassiveReplication()) {
          if (trace) log.tracef("Received prepare for tx: %s. Skipping call as 1PC will be used.", localTransaction);
          return XA_OK;
       }
@@ -170,8 +178,10 @@ public class TransactionCoordinator {
       if (trace) log.tracef("Committing transaction %s", localTransaction.getGlobalTransaction());
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();
       ctx.setLocalTransaction(localTransaction);
-      if (configuration.isOnePhaseCommit() || isOnePhase || is1PcForAutoCommitTransaction(localTransaction) ||
-            isOnePhaseTotalOrder() || isOnePhasePassiveReplication()) {
+      
+      if (localTransaction.getGlobalTransaction().getReconfigurableProtocol().use1PC(localTransaction) || isOnePhase) {
+      //if (configuration.isOnePhaseCommit() || isOnePhase || is1PcForAutoCommitTransaction(localTransaction) ||
+      //      isOnePhaseTotalOrder() || isOnePhasePassiveReplication()) {
          validateNotMarkedForRollback(localTransaction);
          if (trace) log.trace("Doing an 1PC prepare call on the interceptor chain");
          PrepareCommand command = commandCreator.createPrepareCommand(localTransaction.getGlobalTransaction(), localTransaction.getModifications());

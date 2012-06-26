@@ -27,6 +27,7 @@ import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.control.CacheViewControlCommand;
 import org.infinispan.commands.control.StateTransferControlCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
+import org.infinispan.commands.tx.TransactionBoundaryCommand;
 import org.infinispan.config.GlobalConfiguration;
 import org.infinispan.factories.ComponentRegistry;
 import org.infinispan.factories.GlobalComponentRegistry;
@@ -35,6 +36,7 @@ import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.infinispan.manager.NamedCacheNotFoundException;
+import org.infinispan.reconfigurableprotocol.ReconfigurableReplicationManager;
 import org.infinispan.remoting.responses.ExceptionResponse;
 import org.infinispan.remoting.responses.Response;
 import org.infinispan.remoting.responses.ResponseGenerator;
@@ -60,6 +62,8 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
    private GlobalConfiguration globalConfiguration;
    private Transport transport;
    private CacheViewsManager cacheViewsManager;
+   
+   private ReconfigurableReplicationManager reconfigurableReplicationManager;
 
    /**
     * How to handle an invocation based on the join status of a given cache *
@@ -71,12 +75,14 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
    @Inject
    public void inject(GlobalComponentRegistry gcr,
                       EmbeddedCacheManager embeddedCacheManager, Transport transport,
-                      GlobalConfiguration globalConfiguration, CacheViewsManager cacheViewsManager) {
+                      GlobalConfiguration globalConfiguration, CacheViewsManager cacheViewsManager,
+                      ReconfigurableReplicationManager reconfigurableReplicationManager) {
       this.gcr = gcr;
       this.embeddedCacheManager = embeddedCacheManager;
       this.transport = transport;
       this.globalConfiguration = globalConfiguration;
       this.cacheViewsManager = cacheViewsManager;
+      this.reconfigurableReplicationManager = reconfigurableReplicationManager;
    }
 
    private boolean hasJoinStarted(final ComponentRegistry componentRegistry) throws InterruptedException {
@@ -124,6 +130,11 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       try {
          if (trace) log.tracef("Calling perform() on %s", cmd);
          ResponseGenerator respGen = cr.getResponseGenerator();
+         
+         if (cmd instanceof TransactionBoundaryCommand) {
+            reconfigurableReplicationManager.notifyRemoteTransaction(((TransactionBoundaryCommand) cmd).getGlobalTransaction());
+         }
+         
          Object retval = cmd.perform(null);
          return respGen.getResponse(cmd, retval);
       } catch (Exception e) {

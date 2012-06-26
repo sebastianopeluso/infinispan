@@ -1,9 +1,11 @@
 package org.infinispan.reconfigurableprotocol;
 
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;import org.infinispan.reconfigurableprotocol.exception.NoSuchReconfigurableProtocolException;
 import org.infinispan.reconfigurableprotocol.manager.EpochManager;
 import org.infinispan.reconfigurableprotocol.manager.ProtocolManager;
+import org.infinispan.transaction.xa.GlobalTransaction;
 
 /**
  * // TODO: Document this
@@ -44,40 +46,37 @@ public class ReconfigurableReplicationManager {
          actual.stopProtocol();
          newProtocol.bootProtocol();
       }
+      protocolManager.change(newProtocol);
       epochManager.incrementEpoch();
       //TODO mark switch finished
    }
 
-   public final ProtocolInfo notifyLocalTransactionWantsToFinish(/*some transaction*/) {
+   public final void notifyLocalTransaction(GlobalTransaction globalTransaction) {
       //TODO check switch in progress
       long epoch = epochManager.getEpoch();
       ReconfigurableProtocol actual = protocolManager.getActual();
-      long protocolId = registry.getReconfigurableProtocolById(actual);
+      short protocolId = registry.getReconfigurableProtocolById(actual);
 
-      return new ProtocolInfo(epoch, protocolId, actual);
+      globalTransaction.setEpochId(epoch);
+      globalTransaction.setProtocolId(protocolId);
+      globalTransaction.setReconfigurableProtocol(actual);           
    }
 
-   public static class ProtocolInfo {
-      private final long epoch;
-      private final long protocolId;
-      private final ReconfigurableProtocol actualProtocol;
-
-      public ProtocolInfo(long epoch, long protocolId, ReconfigurableProtocol actualProtocol) {
-         this.epoch = epoch;
-         this.protocolId = protocolId;
-         this.actualProtocol = actualProtocol;
-      }
-
-      public final long getEpoch() {
-         return epoch;
-      }
-
-      public final long getProtocolId() {
-         return protocolId;
-      }
-
-      public final ReconfigurableProtocol getActualProtocol() {
-         return actualProtocol;
-      }
-   }
+   public final void notifyRemoteTransaction(GlobalTransaction globalTransaction) {
+      long txEpoch = globalTransaction.getEpochId();
+      long epoch = epochManager.getEpoch();
+      ReconfigurableProtocol protocol = registry.getReconfigurableProtocol(globalTransaction.getProtocolId());
+      globalTransaction.setReconfigurableProtocol(protocol);
+      
+      if (txEpoch < epoch) {
+         ReconfigurableProtocol actual = protocolManager.getActual();
+         //TODO modifications
+         if (!actual.canProcessTransactionFromPreviousEpoch(globalTransaction, new WriteCommand[0])) {
+            //TODO throw new exception
+         }         
+      } else if (txEpoch > epoch) {
+         //new epoch transaction... block         
+         //TODO block 
+      }            
+   }   
 }

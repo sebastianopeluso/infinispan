@@ -46,6 +46,7 @@ public class ReconfigurableProtocolRegistry {
       }
       idsToProtocol.put(nextProtocolId++, protocol);
       //TODO bootstrap protocol
+      //TODO broadcast to everybody (??)
    }
 
    /**
