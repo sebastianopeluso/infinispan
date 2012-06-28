@@ -23,7 +23,12 @@ public class ReconfigurableProtocolRegistry {
       this.idsToProtocol = new ConcurrentHashMap<String, ReconfigurableProtocol>();
    }
 
-   public void inject(InterceptorChain interceptorChain) {
+   /**
+    * injects the interceptor chain in order to add new replication protocols
+    *
+    * @param interceptorChain the interceptor chain
+    */
+   public final void inject(InterceptorChain interceptorChain) {
       this.interceptorChain = interceptorChain;
    }
 
@@ -51,7 +56,7 @@ public class ReconfigurableProtocolRegistry {
       }
       idsToProtocol.put(protocol.getUniqueProtocolName(), protocol);
       protocol.bootstrapProtocol();
-      interceptorChain.registerNewProtocol(protocol);      
+      interceptorChain.registerNewProtocol(protocol);
    }
 
    /**

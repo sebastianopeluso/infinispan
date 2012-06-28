@@ -1,10 +1,10 @@
 package org.infinispan.reconfigurableprotocol.exception;
 
 /**
- * // TODO: Document this
+ * Exception thrown when you try to change to a non-existent protocol
  *
  * @author Pedro Ruivo
- * @since 4.0
+ * @since 5.2
  */
 public class NoSuchReconfigurableProtocolException extends Exception {
    public NoSuchReconfigurableProtocolException() {

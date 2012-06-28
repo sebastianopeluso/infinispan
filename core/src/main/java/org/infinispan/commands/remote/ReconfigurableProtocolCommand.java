@@ -4,21 +4,21 @@ import org.infinispan.context.InvocationContext;
 import org.infinispan.reconfigurableprotocol.ReconfigurableReplicationManager;
 
 /**
- * // TODO: Document this
+ * Command use when switch between protocol to broadcast data between all members
  *
  * @author Pedro Ruivo
  * @since 5.2
  */
 public class ReconfigurableProtocolCommand extends BaseRpcCommand {
-   
+
    public static final byte COMMAND_ID = 101;
-   
+
    public static final byte SWITCH = 1;
    public static final byte REGISTER = 2;
    public static final byte DATA = 3;
-   
+
    private ReconfigurableReplicationManager reconfigurableReplicationManager;
-   
+
    private byte type;
    private String protocolId;
    private Object data;
@@ -28,17 +28,17 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
       this.type = type;
       this.protocolId = protocolId;
    }
-   
+
    public ReconfigurableProtocolCommand(String cacheName) {
       super(cacheName);
    }
-   
-   public void init(ReconfigurableReplicationManager reconfigurableReplicationManager) {
+
+   public final void init(ReconfigurableReplicationManager reconfigurableReplicationManager) {
       this.reconfigurableReplicationManager = reconfigurableReplicationManager;
    }
 
    @Override
-   public Object perform(InvocationContext ctx) throws Throwable {
+   public final Object perform(InvocationContext ctx) throws Throwable {
       switch (type) {
          case SWITCH:
             reconfigurableReplicationManager.switchTo(protocolId);
@@ -51,17 +51,17 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
             break;
          default:
             break;
-      }      
+      }
       return null;
    }
 
    @Override
-   public byte getCommandId() {
+   public final byte getCommandId() {
       return COMMAND_ID;
    }
 
    @Override
-   public Object[] getParameters() {
+   public final Object[] getParameters() {
       if (type != DATA) {
          return new Object[] {type, protocolId};
       } else {
@@ -70,7 +70,7 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
    }
 
    @Override
-   public void setParameters(int commandId, Object[] parameters) {
+   public final void setParameters(int commandId, Object[] parameters) {
       this.type = (Byte) parameters[0];
       this.protocolId = (String) parameters[1];
       if (type == DATA) {
@@ -79,11 +79,11 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
    }
 
    @Override
-   public boolean isReturnValueExpected() {
+   public final boolean isReturnValueExpected() {
       return false;
    }
 
-   public void setData(Object data) {
+   public final void setData(Object data) {
       this.data = data;
    }
 }

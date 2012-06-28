@@ -11,27 +11,28 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * // TODO: Document this
+ * Interceptor that wraps the protocol dependent interceptors and redirects the transaction boundary commands (prepare,
+ * commit and rollback) to the correct interceptor
  *
  * @author Pedro Ruivo
- * @since 4.0
+ * @since 5.2
  */
 public class ReconfigurableProtocolAwareWrapperInterceptor extends CommandInterceptor {
 
    private final ConcurrentMap<String, CommandInterceptor> protocolDependentInterceptor = new ConcurrentHashMap<String, CommandInterceptor>();
 
    @Override
-   public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
+   public final Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       return handleTxBoundaryCommand(ctx, command);
    }
 
    @Override
-   public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
+   public final Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
       return handleTxBoundaryCommand(ctx, command);
    }
 
    @Override
-   public Object visitCommitCommand(TxInvocationContext ctx, CommitCommand command) throws Throwable {
+   public final Object visitCommitCommand(TxInvocationContext ctx, CommitCommand command) throws Throwable {
       return handleTxBoundaryCommand(ctx, command);
    }
 
@@ -44,15 +45,6 @@ public class ReconfigurableProtocolAwareWrapperInterceptor extends CommandInterc
    public final void setProtocolDependentInterceptor(String protocolId, CommandInterceptor interceptor) {
       protocolDependentInterceptor.put(protocolId, interceptor);
       interceptor.setNext(getNext());
-   }
-
-   /**
-    * initialize the internal interceptor setting their next command interceptor
-    */
-   public final void initializeInternalInterceptors() {
-      for (CommandInterceptor commandInterceptor : protocolDependentInterceptor.values()) {
-         commandInterceptor.setNext(getNext());
-      }
    }
 
    private CommandInterceptor getNext(GlobalTransaction globalTransaction) {

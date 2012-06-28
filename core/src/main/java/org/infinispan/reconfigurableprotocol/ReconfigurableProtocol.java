@@ -50,6 +50,7 @@ public abstract class ReconfigurableProtocol {
       stopAckCollector = new StopAckCollector();
    }
 
+   //sets the dependencies
    public final void initialize(Configuration configuration, ComponentRegistry componentRegistry) {
       this.configuration = configuration;
       this.componentRegistry = componentRegistry;
@@ -183,12 +184,23 @@ public abstract class ReconfigurableProtocol {
       return componentRegistry.getComponent(clazz);
    }
 
+   /**
+    * broadcast the data for all members in the cluster
+    *
+    * @param data       the data
+    * @param totalOrder if the data should be sent in total order
+    */
    protected final void broadcastData(Object data, boolean totalOrder) {
       ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(DATA, getUniqueProtocolName());
       command.setData(data);
       rpcManager.broadcastRpcCommand(command, true, totalOrder);
    }
 
+   /**
+    * builds the default 2PC interceptor chain based on the configuration
+    *
+    * @return  the default 2PC interceptor chain
+    */
    protected final EnumMap<InterceptorType, CommandInterceptor> buildDefaultInterceptorChain() {
       EnumMap<InterceptorType, CommandInterceptor> defaultIC = new EnumMap<InterceptorType, CommandInterceptor>(InterceptorType.class);
       //State transfer
@@ -261,6 +273,12 @@ public abstract class ReconfigurableProtocol {
       return defaultIC;
    }
 
+   /**
+    * performs a global stop the world model, ensuring no local neither remote transaction are committing
+    *
+    * @param totalOrder             if it uses total order
+    * @throws InterruptedException  if interrupted
+    */
    protected final void globalStopProtocol(boolean totalOrder) throws InterruptedException {
       /*
       1) block local transactions (already done by Manager)
@@ -276,10 +294,18 @@ public abstract class ReconfigurableProtocol {
       stopAckCollector.reset();
    }
 
+   /**
+    * returns the actual cache members
+    * @return  the actual cache members
+    */
    protected final Collection<Address> getCacheMembers() {
       return rpcManager.getTransport().getMembers();
    }
-   
+
+   /**
+    * returns true it this node is the coordinator, false otherwise
+    * @return  true it this node is the coordinator, false otherwise
+    */
    protected final boolean isCoordinator() {
       return rpcManager.getTransport().isCoordinator();
    }
@@ -354,6 +380,9 @@ public abstract class ReconfigurableProtocol {
     */
    protected abstract void internalHandleData(Object data, Address from);
 
+   /**
+    * class the collects all the ack from all member, unblocking waiting threads in the end
+    */
    private class StopAckCollector {
       //NOTE: it is assuming that nodes will no leave neither join the cache during the switch
       private final Set<Address> members;
