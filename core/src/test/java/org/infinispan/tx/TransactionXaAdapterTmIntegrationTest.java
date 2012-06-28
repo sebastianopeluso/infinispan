@@ -24,6 +24,7 @@ package org.infinispan.tx;
 
 import org.infinispan.config.Configuration;
 import org.infinispan.interceptors.locking.ClusteringDependentLogic;
+import org.infinispan.reconfigurableprotocol.ReconfigurableReplicationManager;
 import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.tm.DummyTransaction;
 import org.infinispan.transaction.tm.DummyXid;
@@ -66,7 +67,7 @@ public class TransactionXaAdapterTmIntegrationTest {
 
       configuration = new Configuration();
       TransactionCoordinator txCoordinator = new TransactionCoordinator();
-      txCoordinator.init(null, null, null, null, configuration);
+      txCoordinator.init(null, null, null, null, configuration, new ReconfigurableReplicationManager());
       xaAdapter = new TransactionXaAdapter(localTx, txTable, null, txCoordinator, null, null,
                                            new ClusteringDependentLogic.AllNodesLogic(), configuration);
    }
