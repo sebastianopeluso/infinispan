@@ -34,6 +34,7 @@ import org.infinispan.notifications.cachelistener.annotation.TopologyChanged;
 import org.infinispan.notifications.cachelistener.event.TopologyChangedEvent;
 import org.infinispan.notifications.cachemanagerlistener.annotation.ViewChanged;
 import org.infinispan.notifications.cachemanagerlistener.event.ViewChangedEvent;
+import org.infinispan.reconfigurableprotocol.ReconfigurableReplicationManager;
 import org.infinispan.remoting.MembershipArithmetic;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
@@ -67,6 +68,7 @@ public class StaleTransactionCleanupService {
 
    private TransactionTable transactionTable;
    private InterceptorChain invoker;
+   private ReconfigurableReplicationManager reconfigurableReplicationManager;
 
    public StaleTransactionCleanupService(TransactionTable transactionTable) {
       this.transactionTable = transactionTable;
@@ -124,7 +126,7 @@ public class StaleTransactionCleanupService {
             Set<Flag> flags = EnumSet.of(Flag.CACHE_MODE_LOCAL);
             String cacheName = transactionTable.configuration.getName();
             LockControlCommand unlockCmd = new LockControlCommand(keys, cacheName, flags, gtx);
-            unlockCmd.init(invoker, transactionTable.icc, transactionTable, null);
+            unlockCmd.init(invoker, transactionTable.icc, transactionTable, null, null);
             unlockCmd.setUnlock(true);
             try {
                unlockCmd.perform(null);
@@ -137,7 +139,7 @@ public class StaleTransactionCleanupService {
             if (!txHasLocalKeys) {
                log.tracef("Killing remote transaction without any local keys %s", gtx);
                RollbackCommand rc = new RollbackCommand(cacheName, gtx);
-               rc.init(invoker, transactionTable.icc, transactionTable, null);
+               rc.init(invoker, transactionTable.icc, transactionTable, null, reconfigurableReplicationManager);
                try {
                   rc.perform(null);
                   log.tracef("Rollback of transaction %s complete.", gtx);
@@ -170,8 +172,10 @@ public class StaleTransactionCleanupService {
       }
    }
 
-   public void start(final Configuration configuration, final RpcManager rpcManager, InterceptorChain interceptorChain) {
+   public void start(final Configuration configuration, final RpcManager rpcManager, InterceptorChain interceptorChain,
+                     ReconfigurableReplicationManager reconfigurableReplicationManager) {
       this.invoker = interceptorChain;
+      this.reconfigurableReplicationManager = reconfigurableReplicationManager;
       ThreadFactory tf = new ThreadFactory() {
          @Override
          public Thread newThread(Runnable r) {

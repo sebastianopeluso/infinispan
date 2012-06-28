@@ -33,14 +33,18 @@ import org.infinispan.factories.components.ComponentMetadataRepo;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.interceptors.base.ReconfigurableProtocolAwareWrapperInterceptor;
+import org.infinispan.reconfigurableprotocol.ReconfigurableProtocol;
 import org.infinispan.util.ReflectionUtil;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -55,6 +59,19 @@ public class InterceptorChain {
 
    private static final Log log = LogFactory.getLog(InterceptorChain.class);
 
+   public static enum InterceptorType {
+      STATE_TRANSFER,
+      CUSTOM_INTERCEPTOR_BEFORE_TX_INTERCEPTOR,
+      CUSTOM_INTERCEPTOR_AFTER_TX_INTERCEPTOR,
+      LOCKING,
+      WRAPPER,
+      DEADLOCK,
+      CLUSTER
+   }
+   
+   private final Map<InterceptorType, ReconfigurableProtocolAwareWrapperInterceptor> wrappers = 
+         new EnumMap<InterceptorType, ReconfigurableProtocolAwareWrapperInterceptor>(InterceptorType.class);
+
    /**
     * reference to the first interceptor in the chain
     */
@@ -67,6 +84,9 @@ public class InterceptorChain {
     */
    public InterceptorChain(CommandInterceptor first) {
       this.firstInChain = first;
+      for (InterceptorType type : InterceptorType.values()) {
+         wrappers.put(type, new ReconfigurableProtocolAwareWrapperInterceptor());
+      }
    }
 
    @Start
@@ -431,5 +451,16 @@ public class InterceptorChain {
          it = it.getNext();
       }
       return false;
+   }
+   
+   public void appendWrapper(InterceptorType type) {                  
+      appendInterceptor(wrappers.get(type), false);
+   }
+   
+   public void registerNewProtocol(ReconfigurableProtocol protocol) {      
+      EnumMap<InterceptorType, CommandInterceptor> newInterceptors = protocol.buildInterceptorChain();
+      for (Map.Entry<InterceptorType, CommandInterceptor> entry : newInterceptors.entrySet()) {
+         wrappers.get(entry.getKey()).setProtocolDependentInterceptor(protocol.getUniqueProtocolName(), entry.getValue());
+      }      
    }
 }

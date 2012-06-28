@@ -132,7 +132,12 @@ public class TransactionCoordinator {
       validateNotMarkedForRollback(localTransaction);
       
       GlobalTransaction globalTransaction = localTransaction.getGlobalTransaction();
-      reconfigurableReplicationManager.notifyLocalTransaction(globalTransaction);
+      try {
+         reconfigurableReplicationManager.notifyLocalTransaction(globalTransaction);
+      } catch (InterruptedException e) {
+         rollback(localTransaction);
+         throw new XAException(XAException.XA_RBROLLBACK);
+      }
 
       if (globalTransaction.getReconfigurableProtocol().use1PC(localTransaction)) {
       //if (configuration.isOnePhaseCommit() || is1PcForAutoCommitTransaction(localTransaction) ||

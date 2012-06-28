@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentMap;
  */
 public class ReconfigurableProtocolAwareWrapperInterceptor extends CommandInterceptor {
 
-   private final ConcurrentMap<Short, CommandInterceptor> protocolDependentInterceptor = new ConcurrentHashMap<Short, CommandInterceptor>();
+   private final ConcurrentMap<String, CommandInterceptor> protocolDependentInterceptor = new ConcurrentHashMap<String, CommandInterceptor>();
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
@@ -41,7 +41,7 @@ public class ReconfigurableProtocolAwareWrapperInterceptor extends CommandInterc
     * @param protocolId    the transaction protocol identifier
     * @param interceptor   the command interceptor
     */
-   public final void setProtocolDependentInterceptor(short protocolId, CommandInterceptor interceptor) {
+   public final void setProtocolDependentInterceptor(String protocolId, CommandInterceptor interceptor) {
       protocolDependentInterceptor.put(protocolId, interceptor);
       interceptor.setNext(getNext());
    }
@@ -56,7 +56,7 @@ public class ReconfigurableProtocolAwareWrapperInterceptor extends CommandInterc
    }
 
    private CommandInterceptor getNext(GlobalTransaction globalTransaction) {
-      short protocolId = globalTransaction.getProtocolId();
+      String protocolId = globalTransaction.getProtocolId();
       CommandInterceptor next = protocolDependentInterceptor.get(protocolId);
       return next != null ? next : getNext();
    }

@@ -124,28 +124,31 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       // load the state transfer lock interceptor
       // the state transfer lock ensures that the cache member list is up-to-date
       // so it's necessary even if state transfer is disabled
-      if (configuration.getCacheMode().isDistributed() || configuration.getCacheMode().isReplicated()) {
+      /*if (configuration.getCacheMode().isDistributed() || configuration.getCacheMode().isReplicated()) {
          if (configuration.isTotalOrder()) {
             interceptorChain.appendInterceptor(createInterceptor(new TotalOrderStateTransferLockInterceptor(), TotalOrderStateTransferLockInterceptor.class), false);
          } else {
             interceptorChain.appendInterceptor(createInterceptor(new StateTransferLockInterceptor(), StateTransferLockInterceptor.class), false);
          }
-      }
+      }*/
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.STATE_TRANSFER);
 
       //load total order interceptor
-      if (configuration.isTotalOrder()) {
+      /*if (configuration.isTotalOrder()) {
          interceptorChain.appendInterceptor(createInterceptor(new TotalOrderInterceptor(), TotalOrderInterceptor.class),
                                             false);
-      }
+      }*/
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.CUSTOM_INTERCEPTOR_BEFORE_TX_INTERCEPTOR);
       
       // load the tx interceptor
       if (configuration.isTransactionalCache())
          interceptorChain.appendInterceptor(createInterceptor(new TxInterceptor(), TxInterceptor.class), false);      
 
-      if (configuration.isPassiveReplication()) {
+      /*if (configuration.isPassiveReplication()) {
          interceptorChain.appendInterceptor(createInterceptor(new PassiveReplicationInterceptor(),
                                             PassiveReplicationInterceptor.class), false);
-      }
+      }*/
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.CUSTOM_INTERCEPTOR_AFTER_TX_INTERCEPTOR);
 
       if (isUsingMarshalledValues(configuration))
          interceptorChain.appendInterceptor(createInterceptor(new MarshalledValueInterceptor(), MarshalledValueInterceptor.class), false);
@@ -157,7 +160,7 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       }
 
       //the total order protocol doesn't need locks
-      if (!configuration.isTotalOrder()) {
+      /*if (!configuration.isTotalOrder()) {
          if (configuration.isTransactionalCache()) {
             if (configuration.getTransactionLockingMode() == LockingMode.PESSIMISTIC) {
                interceptorChain.appendInterceptor(createInterceptor(new PessimisticLockingInterceptor(), PessimisticLockingInterceptor.class), false);
@@ -168,9 +171,10 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             if (configuration.getIsolationLevel() != IsolationLevel.NONE)
                interceptorChain.appendInterceptor(createInterceptor(new NonTransactionalLockingInterceptor(), NonTransactionalLockingInterceptor.class), false);
          }
-      }
+      }*/
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.LOCKING);
 
-      if (needsVersionAwareComponents && configuration.getCacheMode().isClustered()) {
+      /*if (needsVersionAwareComponents && configuration.getCacheMode().isClustered()) {
          //added custom entry wrapping interceptor for total order protocol
          if (configuration.isTotalOrder()) {
             interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedEntryWrappingInterceptor(),
@@ -180,6 +184,8 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          }
       } else
          interceptorChain.appendInterceptor(createInterceptor(new EntryWrappingInterceptor(), EntryWrappingInterceptor.class), false);
+         */
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.WRAPPER);
 
       if (configuration.isUsingCacheLoaders()) {
          if (configuration.getCacheLoaderManagerConfig().isPassivation()) {
@@ -206,11 +212,12 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       }
 
       //total order protocol has no locks, then it has no deadlocks
-      if (configuration.isEnableDeadlockDetection() && !configuration.isTotalOrder()) {
+      /*if (configuration.isEnableDeadlockDetection() && !configuration.isTotalOrder()) {
          interceptorChain.appendInterceptor(createInterceptor(new DeadlockDetectingInterceptor(), DeadlockDetectingInterceptor.class), false);
-      }
+      }*/
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.DEADLOCK);
 
-      switch (configuration.getCacheMode()) {
+      /*switch (configuration.getCacheMode()) {
          case REPL_SYNC:
             if (needsVersionAwareComponents) {
                //added custom interceptor to replace the original
@@ -250,7 +257,8 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             break;
          case LOCAL:
             //Nothing...
-      }
+      }*/
+      interceptorChain.appendWrapper(InterceptorChain.InterceptorType.CLUSTER);
 
       CommandInterceptor callInterceptor = createInterceptor(new CallInterceptor(), CallInterceptor.class);
       interceptorChain.appendInterceptor(callInterceptor, false);

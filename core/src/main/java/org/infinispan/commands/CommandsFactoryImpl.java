@@ -37,6 +37,7 @@ import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.PrepareResponseCommand;
+import org.infinispan.commands.remote.ReconfigurableProtocolCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
@@ -74,6 +75,7 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
+import org.infinispan.reconfigurableprotocol.ReconfigurableReplicationManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.LockInfo;
 import org.infinispan.statetransfer.StateTransferManager;
@@ -126,6 +128,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
    private LockManager lockManager;
    private InternalEntryFactory entryFactory;
    private TotalOrderManager totalOrderManager;
+   private ReconfigurableReplicationManager reconfigurableReplicationManager;         
 
    private Map<Byte, ModuleCommandInitializer> moduleCommandInitializers;
 
@@ -135,7 +138,8 @@ public class CommandsFactoryImpl implements CommandsFactory {
                                  InvocationContextContainer icc, TransactionTable txTable, Configuration configuration,
                                  @ComponentName(KnownComponentNames.MODULE_COMMAND_INITIALIZERS) Map<Byte, ModuleCommandInitializer> moduleCommandInitializers,
                                  RecoveryManager recoveryManager, StateTransferManager stateTransferManager, LockManager lockManager,
-                                 InternalEntryFactory entryFactory, TotalOrderManager totalOrderManager) {
+                                 InternalEntryFactory entryFactory, TotalOrderManager totalOrderManager,
+                                 ReconfigurableReplicationManager reconfigurableReplicationManager) {
       this.dataContainer = container;
       this.notifier = notifier;
       this.cache = cache;
@@ -150,6 +154,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
       this.lockManager = lockManager;
       this.entryFactory = entryFactory;
       this.totalOrderManager = totalOrderManager;
+      this.reconfigurableReplicationManager = reconfigurableReplicationManager;
    }
 
    @Start(priority = 1)
@@ -333,7 +338,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
          case PrepareCommand.COMMAND_ID:
          case VersionedPrepareCommand.COMMAND_ID:
             PrepareCommand pc = (PrepareCommand) c;
-            pc.init(interceptorChain, icc, txTable, configuration);
+            pc.init(interceptorChain, icc, txTable, configuration, reconfigurableReplicationManager);
             pc.initialize(notifier, recoveryManager);
             if (pc.getModifications() != null)
                for (ReplicableCommand nested : pc.getModifications())  {
@@ -349,12 +354,12 @@ public class CommandsFactoryImpl implements CommandsFactory {
          case CommitCommand.COMMAND_ID:
          case VersionedCommitCommand.COMMAND_ID:
             CommitCommand commitCommand = (CommitCommand) c;
-            commitCommand.init(interceptorChain, icc, txTable, configuration);
+            commitCommand.init(interceptorChain, icc, txTable, configuration, reconfigurableReplicationManager);
             commitCommand.markTransactionAsRemote(isRemote);
             break;
          case RollbackCommand.COMMAND_ID:
             RollbackCommand rollbackCommand = (RollbackCommand) c;
-            rollbackCommand.init(interceptorChain, icc, txTable, configuration);
+            rollbackCommand.init(interceptorChain, icc, txTable, configuration, reconfigurableReplicationManager);
             rollbackCommand.markTransactionAsRemote(isRemote);
             break;
          case ClearCommand.COMMAND_ID:
@@ -367,7 +372,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
             break;
          case LockControlCommand.COMMAND_ID:
             LockControlCommand lcc = (LockControlCommand) c;
-            lcc.init(interceptorChain, icc, txTable, configuration);
+            lcc.init(interceptorChain, icc, txTable, configuration, reconfigurableReplicationManager);
             lcc.markTransactionAsRemote(isRemote);
             if (configuration.isEnableDeadlockDetection() && isRemote &&
                   lcc.getGlobalTransaction() instanceof DldGlobalTransaction) {
@@ -419,6 +424,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
          case PrepareResponseCommand.COMMAND_ID:
             PrepareResponseCommand prc = (PrepareResponseCommand) c;
             prc.initialize(totalOrderManager);
+            break;
+         case ReconfigurableProtocolCommand.COMMAND_ID:
+            ReconfigurableProtocolCommand rpc = (ReconfigurableProtocolCommand) c;
+            rpc.init(reconfigurableReplicationManager);
             break;
          default:
             ModuleCommandInitializer mci = moduleCommandInitializers.get(c.getCommandId());
@@ -505,5 +514,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
    @Override
    public PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction) {
       return new PrepareResponseCommand(cacheName, globalTransaction);
+   }
+
+   @Override
+   public ReconfigurableProtocolCommand buildReconfigurableProtocolCommand(byte type, String protocolId) {
+      return new ReconfigurableProtocolCommand(cacheName, type, protocolId);
    }
 }

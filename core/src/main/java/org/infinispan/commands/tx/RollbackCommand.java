@@ -63,7 +63,8 @@ public class RollbackCommand extends AbstractTransactionBoundaryCommand {
    }
 
    @Override
-   public void visitRemoteTransaction(RemoteTransaction tx) {
+   public void visitRemoteTransaction(RemoteTransaction tx) throws InterruptedException {
+      super.visitRemoteTransaction(tx);
       tx.invalidate();
    }
 

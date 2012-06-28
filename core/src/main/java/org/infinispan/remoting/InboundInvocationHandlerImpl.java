@@ -130,11 +130,6 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       try {
          if (trace) log.tracef("Calling perform() on %s", cmd);
          ResponseGenerator respGen = cr.getResponseGenerator();
-         
-         if (cmd instanceof TransactionBoundaryCommand) {
-            reconfigurableReplicationManager.notifyRemoteTransaction(((TransactionBoundaryCommand) cmd).getGlobalTransaction());
-         }
-         
          Object retval = cmd.perform(null);
          return respGen.getResponse(cmd, retval);
       } catch (Exception e) {

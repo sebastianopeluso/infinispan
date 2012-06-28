@@ -1,7 +1,9 @@
 package org.infinispan.reconfigurableprotocol;
 
+import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.reconfigurableprotocol.exception.AlreadyRegisterProtocolException;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,14 +16,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 5.2
  */
 public class ReconfigurableProtocolRegistry {
-   public static final short UNKNOWN_PROTOCOL = -1;
-
-   private final Map<Short, ReconfigurableProtocol> idsToProtocol;
-   private short nextProtocolId;
+   private final Map<String, ReconfigurableProtocol> idsToProtocol;
+   private InterceptorChain interceptorChain;
 
    public ReconfigurableProtocolRegistry() {
-      this.idsToProtocol = new ConcurrentHashMap<Short, ReconfigurableProtocol>();
-      this.nextProtocolId = 0;
+      this.idsToProtocol = new ConcurrentHashMap<String, ReconfigurableProtocol>();
+   }
+
+   public void inject(InterceptorChain interceptorChain) {
+      this.interceptorChain = interceptorChain;
    }
 
    /**
@@ -29,8 +32,8 @@ public class ReconfigurableProtocolRegistry {
     *
     * @return  the current ids and replication protocols currently register
     */
-   public final Map<Short, ReconfigurableProtocol> getAvailableReconfigurableProtocols() {
-      return Collections.unmodifiableMap(idsToProtocol);
+   public final Collection<ReconfigurableProtocol> getAllAvailableProtocols() {
+      return Collections.unmodifiableCollection(idsToProtocol.values());
    }
 
    /**
@@ -39,14 +42,16 @@ public class ReconfigurableProtocolRegistry {
     * @param protocol                           the new protocol
     * @throws AlreadyRegisterProtocolException  if the protocol is already register
     */
-   public final synchronized void registerNewReconfigurableProtocol(ReconfigurableProtocol protocol)
+   public final synchronized void registerNewProtocol(ReconfigurableProtocol protocol)
          throws AlreadyRegisterProtocolException {
-      if (idsToProtocol.values().contains(protocol)) {
+      if (protocol == null) {
+         throw new NullPointerException("Trying to register a null protocol");
+      } else if (idsToProtocol.containsKey(protocol.getUniqueProtocolName())) {
          throw new AlreadyRegisterProtocolException(protocol);
       }
-      idsToProtocol.put(nextProtocolId++, protocol);
-      //TODO bootstrap protocol
-      //TODO broadcast to everybody (??)
+      idsToProtocol.put(protocol.getUniqueProtocolName(), protocol);
+      protocol.bootstrapProtocol();
+      interceptorChain.registerNewProtocol(protocol);      
    }
 
    /**
@@ -55,25 +60,7 @@ public class ReconfigurableProtocolRegistry {
     * @param protocolId the protocol id
     * @return           the reconfigurable protocol instance or null if the protocol id does not exists
     */
-   public final ReconfigurableProtocol getReconfigurableProtocol(short protocolId) {
+   public final ReconfigurableProtocol getProtocolById(String protocolId) {
       return idsToProtocol.get(protocolId);
-   }
-
-   /**
-    * returns the id of the protocol
-    *
-    * @param protocol   the reconfigurable protocol
-    * @return           the protocol id or UNKNOWN_PROTOCOL if the protocol is not registered
-    */
-   public final short getReconfigurableProtocolById(ReconfigurableProtocol protocol) {
-      if (protocol == null) {
-         return UNKNOWN_PROTOCOL;
-      }
-      for (Map.Entry<Short, ReconfigurableProtocol> entry : idsToProtocol.entrySet()) {
-         if (entry.getValue().equals(protocol)) {
-            return entry.getKey();
-         }
-      }
-      return UNKNOWN_PROTOCOL;
    }
 }

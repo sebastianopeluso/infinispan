@@ -58,7 +58,7 @@ public class GlobalTransaction implements Cloneable {
    private transient int hash_code = -1;  // in the worst case, hashCode() returns 0, then increases, so we're safe here
    private transient boolean remote = false;
 
-   private short protocolId;
+   private String protocolId;
    private long epochId;
    private transient ReconfigurableProtocol reconfigurableProtocol;
 
@@ -158,7 +158,7 @@ public class GlobalTransaction implements Cloneable {
          output.writeObject(gtx.addr);
          output.writeInt(gtx.viewId);
          output.writeLong(gtx.epochId);
-         output.writeShort(gtx.protocolId);
+         output.writeUTF(gtx.protocolId);
       }
 
       /**
@@ -174,7 +174,7 @@ public class GlobalTransaction implements Cloneable {
          gtx.addr = (Address) input.readObject();
          gtx.viewId = input.readInt();
          gtx.epochId = input.readLong();
-         gtx.protocolId = input.readShort();
+         gtx.protocolId = input.readUTF();
          return gtx;
       }
    }
@@ -197,11 +197,11 @@ public class GlobalTransaction implements Cloneable {
       }
    }
 
-   public short getProtocolId() {
+   public String getProtocolId() {
       return protocolId;
    }
 
-   public void setProtocolId(short protocolId) {
+   public void setProtocolId(String protocolId) {
       this.protocolId = protocolId;
    }
 

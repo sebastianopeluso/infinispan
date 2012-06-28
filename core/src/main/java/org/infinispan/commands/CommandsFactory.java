@@ -35,6 +35,7 @@ import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.PrepareResponseCommand;
+import org.infinispan.commands.remote.ReconfigurableProtocolCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
@@ -381,4 +382,6 @@ public interface CommandsFactory {
     * @return instance
     */
    PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction);
+   
+   ReconfigurableProtocolCommand buildReconfigurableProtocolCommand(byte type, String protocolId);
 }

@@ -41,6 +41,7 @@ import org.infinispan.notifications.Listener;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachemanagerlistener.annotation.ViewChanged;
 import org.infinispan.notifications.cachemanagerlistener.event.ViewChangedEvent;
+import org.infinispan.reconfigurableprotocol.ReconfigurableReplicationManager;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.synchronization.SyncLocalTransaction;
@@ -100,6 +101,8 @@ public class TransactionTable {
    protected boolean clustered = false;
    private Lock minViewRecalculationLock;
 
+   private ReconfigurableReplicationManager reconfigurableReplicationManager;
+
    /**
     * minTxViewId is the minimum view ID across all ongoing local and remote transactions. It doesn't update on
     * transaction creation, but only on removal. That's because it is not possible for a newly created transaction to
@@ -113,7 +116,8 @@ public class TransactionTable {
                           InvocationContextContainer icc, InterceptorChain invoker, CacheNotifier notifier,
                           TransactionFactory gtf, EmbeddedCacheManager cm, TransactionCoordinator txCoordinator,
                           TransactionSynchronizationRegistry transactionSynchronizationRegistry,
-                          CommandsFactory commandsFactory, ClusteringDependentLogic clusteringDependentLogic) {
+                          CommandsFactory commandsFactory, ClusteringDependentLogic clusteringDependentLogic,
+                          ReconfigurableReplicationManager reconfigurableReplicationManager) {
       this.rpcManager = rpcManager;
       this.configuration = configuration;
       this.icc = icc;
@@ -125,6 +129,7 @@ public class TransactionTable {
       this.transactionSynchronizationRegistry = transactionSynchronizationRegistry;
       this.commandsFactory = commandsFactory;
       this.clusteringLogic = clusteringDependentLogic;
+      this.reconfigurableReplicationManager = reconfigurableReplicationManager;
    }
 
    @Start
@@ -135,7 +140,7 @@ public class TransactionTable {
          minViewRecalculationLock = new ReentrantLock();
          // Only initialize this if we are clustered.
          remoteTransactions = ConcurrentMapFactory.makeConcurrentMap(concurrencyLevel, 0.75f, concurrencyLevel);
-         cleanupService.start(configuration, rpcManager, invoker);
+         cleanupService.start(configuration, rpcManager, invoker, reconfigurableReplicationManager);
          cm.addListener(cleanupService);
          cm.addListener(this);
          notifier.addListener(cleanupService);
@@ -232,7 +237,7 @@ public class TransactionTable {
       for (GlobalTransaction gtx : toKill) {
          log.tracef("Killing remote transaction originating on leaver %s", gtx);
          RollbackCommand rc = new RollbackCommand(configuration.getName(), gtx);
-         rc.init(invoker, icc, TransactionTable.this, configuration);
+         rc.init(invoker, icc, TransactionTable.this, configuration, reconfigurableReplicationManager);
          try {
             rc.perform(null);
             log.tracef("Rollback of transaction %s complete.", gtx);
@@ -302,6 +307,9 @@ public class TransactionTable {
     * if such an tx exists.
     */
    public boolean removeLocalTransaction(LocalTransaction localTransaction) {
+      if (localTransaction != null) {
+         reconfigurableReplicationManager.notifyLocalTransactionFinished(localTransaction.getGlobalTransaction());
+      }
       return localTransaction != null && (removeLocalTransactionInternal(localTransaction.getTransaction()) != null);
    }
 
@@ -337,6 +345,7 @@ public class TransactionTable {
    }
 
    public final RemoteTransaction removeRemoteTransaction(GlobalTransaction txId) {
+      reconfigurableReplicationManager.notifyRemoteTransactionFinished(txId);
       RemoteTransaction removed;
       removed = remoteTransactions.remove(txId);
       releaseResources(removed);
