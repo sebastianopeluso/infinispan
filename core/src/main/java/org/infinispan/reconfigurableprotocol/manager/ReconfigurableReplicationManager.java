@@ -21,6 +21,8 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.Util;
 import org.infinispan.util.concurrent.ReclosableLatch;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
 import java.util.LinkedList;
@@ -41,9 +43,12 @@ import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.SWITC
       " the transactions and for the switching between them")
 public class ReconfigurableReplicationManager {
 
+   private static final Log log = LogFactory.getLog(ReconfigurableReplicationManager.class);
+
    private final ReconfigurableProtocolRegistry registry;
    private final ProtocolManager protocolManager;
    private final ReclosableLatch switchInProgress;
+   private final CoolDownTimeManager coolDownTimeManager;
 
    private RpcManager rpcManager;
    private CommandsFactory commandsFactory;
@@ -52,6 +57,7 @@ public class ReconfigurableReplicationManager {
       registry = new ReconfigurableProtocolRegistry();
       protocolManager = new ProtocolManager();
       switchInProgress = new ReclosableLatch(true);
+      coolDownTimeManager = new CoolDownTimeManager();
    }
 
    @Inject
@@ -65,19 +71,22 @@ public class ReconfigurableReplicationManager {
       try {
          registry.registerNewProtocol(protocol);
       } catch (AlreadyRegisterProtocolException e) {
-         //ignore
+         log.errorf("Tried to register Two Phase Commit protocol but it is already register. This should not happen");
+         throw new IllegalStateException("this should not happen");
       }
       protocol = new PassiveReplicationCommitProtocol();
       try {
          registry.registerNewProtocol(protocol);
       } catch (AlreadyRegisterProtocolException e) {
-         //ignore
+         log.errorf("Tried to register Passive Replication protocol but it is already register. This should not happen");
+         throw new IllegalStateException("this should not happen");
       }
       protocol = new TotalOrderCommitProtocol();
       try {
          registry.registerNewProtocol(protocol);
       } catch (AlreadyRegisterProtocolException e) {
-         //ignore
+         log.errorf("Tried to register Totoal Order protocol but it is already register. This should not happen");
+         throw new IllegalStateException("this should not happen");
       }
 
       switch (configuration.transaction().transactionProtocol()) {
@@ -90,6 +99,10 @@ public class ReconfigurableReplicationManager {
          case PASSIVE_REPLICATION:
             protocol = registry.getProtocolById(PassiveReplicationCommitProtocol.UID);
             break;
+      }
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Initial replication protocol is %s", protocol.getUniqueProtocolName());
       }
       protocolManager.init(protocol);
    }
@@ -109,16 +122,27 @@ public class ReconfigurableReplicationManager {
    public final void internalSwitchTo(String protocolId) throws NoSuchReconfigurableProtocolException, InterruptedException {
       ReconfigurableProtocol newProtocol = registry.getProtocolById(protocolId);
       if (newProtocol == null) {
-         throw new NoSuchReconfigurableProtocolException("Protocol ID " + protocolId + " not found");
+         log.warnf("Tried to switch the replication protocol to %s but it does not exist", protocolId);
+         throw new NoSuchReconfigurableProtocolException(protocolId);
       } else if (protocolManager.isCurrentProtocol(newProtocol)) {
+         log.warnf("Tried to switch the replication protocol to %s but it is already the current protocol", protocolId);
          return; //nothing to do
       }
 
       switchInProgress.close();
-      ReconfigurableProtocol actual = protocolManager.getCurrent();
-      if (!actual.switchTo(newProtocol)) {
-         actual.stopProtocol();
+      ReconfigurableProtocol currentProtocol = protocolManager.getCurrent();
+      if (!currentProtocol.switchTo(newProtocol)) {
+         if (log.isDebugEnabled()) {
+            log.debugf("Perform switch from %s to %s by stop-the-world model", currentProtocol.getUniqueProtocolName(),
+                       newProtocol.getUniqueProtocolName());
+         }
+         currentProtocol.stopProtocol();
          newProtocol.bootProtocol();
+      } else {
+         if (log.isDebugEnabled()) {
+            log.debugf("Perform switch from %s to %s with the optimized switch", currentProtocol.getUniqueProtocolName(),
+                       newProtocol.getUniqueProtocolName());
+         }
       }
       protocolManager.changeAndIncrementEpoch(newProtocol);
       switchInProgress.open();
@@ -133,7 +157,11 @@ public class ReconfigurableReplicationManager {
     */
    public final void handleProtocolData(String protocolId, Object data, Address from) {
       ReconfigurableProtocol protocol = registry.getProtocolById(protocolId);
-      protocol.handleData(data, from);
+      if (protocol != null) {
+         protocol.handleData(data, from);
+      } else {
+         log.warnf("Received data [%s] for protocol %s from %s but it does not exits", data, protocol, from);
+      }
    }
 
    /**
@@ -146,7 +174,13 @@ public class ReconfigurableReplicationManager {
     */
    public final void notifyLocalTransaction(GlobalTransaction globalTransaction) throws InterruptedException {
       //returns immediately if no switch is in progress
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] local transaction %s wants to commit. check if switch is in progress...",
+                    Thread.currentThread().getName(), globalTransaction.prettyPrint());
+      }
+
       switchInProgress.await();
+
       ProtocolManager.CurrentProtocolAndEpoch currentProtocolAndEpoch = protocolManager.getCurrentProtocolAndEpoch();
       long epoch = currentProtocolAndEpoch.getEpoch();
       ReconfigurableProtocol actual = currentProtocolAndEpoch.getProtocol();
@@ -156,6 +190,11 @@ public class ReconfigurableReplicationManager {
       globalTransaction.setReconfigurableProtocol(actual);
 
       actual.addLocalTransaction(globalTransaction);
+
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] local transaction %s will use %s as commit protocol", Thread.currentThread().getName(),
+                    globalTransaction.prettyPrint(), currentProtocolAndEpoch);
+      }
    }
 
    /**
@@ -167,16 +206,30 @@ public class ReconfigurableReplicationManager {
     * @param globalTransaction      the global transaction
     * @throws InterruptedException  if interrupted while waiting for the new epoch
     */
-   public final void notifyRemoteTransaction(GlobalTransaction globalTransaction) throws InterruptedException {
+   public final void notifyRemoteTransaction(GlobalTransaction globalTransaction) throws InterruptedException,
+                                                                                         NoSuchReconfigurableProtocolException {
       long txEpoch = globalTransaction.getEpochId();
       long epoch = protocolManager.getEpoch();
       ReconfigurableProtocol protocol = registry.getProtocolById(globalTransaction.getProtocolId());
+
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] remote transaction %s received. Epoch is %s (current epoch is %s) and protocol ID is %s",
+                    Thread.currentThread().getName(), globalTransaction.prettyPrint(), txEpoch, epoch,
+                    globalTransaction.getProtocolId());
+      }
+      if (protocol == null) {
+         log.warnf("Protocol ID %s does not exists. Transaction %s will be aborted", globalTransaction.getProtocolId(),
+                   globalTransaction.prettyPrint());
+         throw new NoSuchReconfigurableProtocolException(globalTransaction.getProtocolId());
+      }
+
       globalTransaction.setReconfigurableProtocol(protocol);
 
       if (txEpoch < epoch) {
-         ReconfigurableProtocol actual = protocolManager.getCurrent();
-         if (!actual.canProcessOldTransaction(globalTransaction)) {
-            throw new CacheException("Cannot commit transaction from previous epoch");
+         ReconfigurableProtocol currentProtocol = protocolManager.getCurrent();
+         if (!currentProtocol.canProcessOldTransaction(globalTransaction)) {
+            throw new CacheException("Cannot commit transaction " + globalTransaction.prettyPrint() +
+                                           " from previous epoch");
          }
       }
       protocolManager.ensure(txEpoch);
@@ -190,7 +243,16 @@ public class ReconfigurableReplicationManager {
     */
    public final void notifyLocalTransactionFinished(GlobalTransaction globalTransaction) {
       ReconfigurableProtocol protocol = registry.getProtocolById(globalTransaction.getProtocolId());
-      protocol.removeLocalTransaction(globalTransaction);
+
+      if (protocol != null) {
+         if (log.isTraceEnabled()) {
+            log.tracef("Local transaction %s is finished", globalTransaction.prettyPrint());
+         }
+         protocol.removeLocalTransaction(globalTransaction);
+      } else {
+         log.fatalf("Local transaction %s is finished but the commit protocol %s does not exits",
+                    globalTransaction.prettyPrint(), globalTransaction.getProtocolId());
+      }
    }
 
    /**
@@ -200,7 +262,16 @@ public class ReconfigurableReplicationManager {
     */
    public final void notifyRemoteTransactionFinished(GlobalTransaction globalTransaction) {
       ReconfigurableProtocol protocol = registry.getProtocolById(globalTransaction.getProtocolId());
-      protocol.removeRemoteTransaction(globalTransaction);
+
+      if (protocol != null) {
+         if (log.isTraceEnabled()) {
+            log.tracef("Remote transaction %s is finished", globalTransaction.prettyPrint());
+         }
+         protocol.removeRemoteTransaction(globalTransaction);
+      } else {
+         log.fatalf("Remote transaction %s is finished but the commit protocol %s does not exits",
+                    globalTransaction.prettyPrint(), globalTransaction.getProtocolId());
+      }
    }
 
    /**
@@ -213,6 +284,8 @@ public class ReconfigurableReplicationManager {
    public final void internalRegister(String clazzName) throws Exception {
       Class<?> clazz = Util.loadClass(clazzName, this.getClass().getClassLoader());
       if (!ReconfigurableProtocol.class.isAssignableFrom(clazz)) {
+         log.warnf("Tried to register new replication protocol %s but it does not extends ReconfigurableProtocol",
+                   clazzName);
          throw new Exception("Class " + clazzName + " does not extends ReconfigurableProtocol class");
       }
       ReconfigurableProtocol newProtocol = (ReconfigurableProtocol) clazz.newInstance();
@@ -231,6 +304,33 @@ public class ReconfigurableReplicationManager {
       info[1] = protocol.getClass().getCanonicalName();
       return info;
    }
+   
+   private class CoolDownTimeManager {
+      private long nextSwitchTime; //in milliseconds
+      private long coolDownTimePeriod; //in milliseconds;
+      
+      public CoolDownTimeManager() {
+         nextSwitchTime = System.currentTimeMillis();
+         coolDownTimePeriod = 60000; //1 min
+      }
+      
+      public synchronized boolean checkAndSetToSwitch() {
+         if (nextSwitchTime >= System.currentTimeMillis()) {
+            nextSwitchTime = System.currentTimeMillis() + coolDownTimePeriod;
+            return true;
+         } else {
+            return false;
+         }
+      }
+      
+      public synchronized void setCoolDownTimePeriod(int seconds) {
+         coolDownTimePeriod = seconds * 1000;
+      }
+
+      public synchronized int getCoolDownTimePeriod() {
+         return (int) (coolDownTimePeriod / 1000);
+      }
+   }
 
    @ManagedOperation(description = "Registers a new replication protocol. The new protocol must extend the " +
          "ReconfigurableProtocol")
@@ -247,7 +347,9 @@ public class ReconfigurableReplicationManager {
    @ManagedOperation(description = "Switch the current replication protocol for the new one. It fails if the protocol " +
          "does not exists or it is equals to the current")
    public final void switchTo(String protocolId) throws Exception {
-      //TODO add a time before perform the switch 
+      if (!coolDownTimeManager.checkAndSetToSwitch()) {
+         throw new Exception("You need to wait before perform a new switch");
+      }
       try {
          ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(SWITCH, protocolId);
          rpcManager.broadcastRpcCommand(command, false, false);
@@ -270,7 +372,7 @@ public class ReconfigurableReplicationManager {
 
    @ManagedAttribute(description = "Returns a collection with the information about the replication protocols available, " +
          "namely, the protocol ID and the class name", writable = false)
-   public final Collection<String[]> getAvailableProtocols() {
+   public final Collection<String[]> getAvailableProtocolsInfo() {
       Collection<ReconfigurableProtocol> protocols = registry.getAllAvailableProtocols();
       List<String[]> result = new LinkedList<String[]>();
       for (ReconfigurableProtocol p : protocols) {
@@ -280,13 +382,23 @@ public class ReconfigurableReplicationManager {
    }
 
    @ManagedAttribute(description = "Returns the current replication protocol ID", writable = false)
-   public final String getActualProtocolId() {
+   public final String getCurrentProtocolId() {
       return protocolManager.getCurrent().getUniqueProtocolName();
    }
 
    @ManagedAttribute(description = "Returns the current replication protocol information, namely the protocol ID and " +
          "the class name", writable = false)
-   public final String[] getActualProtocol() {
+   public final String[] getCurrentProtocolInfo() {
       return getProtocolInfo(protocolManager.getCurrent());
+   }
+   
+   @ManagedOperation(description = "Sets the new cool down time period (in seconds) to wait before two consecutive switches")
+   public final void setSwitchCoolDownTime(int seconds) {
+      coolDownTimeManager.setCoolDownTimePeriod(seconds);
+   }
+   
+   @ManagedAttribute(description = "Returns the cool down time period in seconds", writable = false)
+   public final int getSwitchCoolDownTime() {
+      return coolDownTimeManager.getCoolDownTimePeriod();
    }
 }

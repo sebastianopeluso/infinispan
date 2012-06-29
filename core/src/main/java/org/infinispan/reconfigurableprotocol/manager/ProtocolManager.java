@@ -1,6 +1,8 @@
 package org.infinispan.reconfigurableprotocol.manager;
 
 import org.infinispan.reconfigurableprotocol.ReconfigurableProtocol;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 /**
  * Manages the current replication protocol in use and synchronize it with the epoch number
@@ -9,6 +11,8 @@ import org.infinispan.reconfigurableprotocol.ReconfigurableProtocol;
  * @since 5.2
  */
 public class ProtocolManager {
+
+   private static final Log log = LogFactory.getLog(ProtocolManager.class);
 
    private long epoch = 0;
    private ReconfigurableProtocol current;
@@ -40,6 +44,10 @@ public class ProtocolManager {
       current = newProtocol;
       epoch++;
       this.notifyAll();
+      if (log.isTraceEnabled()) {
+         log.tracef("Changed to new protocol. Current protocol is %s and current epoch is %s",
+                    current.getUniqueProtocolName(), epoch);
+      }
    }
 
    /**
@@ -77,8 +85,14 @@ public class ProtocolManager {
     * @throws InterruptedException  if it is interrupted while waiting
     */
    public final synchronized void ensure(long epoch) throws InterruptedException {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] will block until %s >= %s", Thread.currentThread().getName(), epoch, this.epoch);
+      }
       while (this.epoch < epoch) {
          this.wait();
+      }
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] epoch is the desired. Moving on...", Thread.currentThread().getName());
       }
    }
 
@@ -100,6 +114,14 @@ public class ProtocolManager {
 
       public final ReconfigurableProtocol getProtocol() {
          return current;
+      }
+
+      @Override
+      public final String toString() {
+         return "CurrentProtocolAndEpoch{" +
+               "epoch=" + epoch +
+               ", current=" + current +
+               '}';
       }
    }
 }

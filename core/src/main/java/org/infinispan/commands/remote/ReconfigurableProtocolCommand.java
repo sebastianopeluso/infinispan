@@ -86,4 +86,13 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
    public final void setData(Object data) {
       this.data = data;
    }
+
+   @Override
+   public String toString() {
+      return "ReconfigurableProtocolCommand{" +
+            "type=" + type +
+            ", protocolId='" + protocolId + '\'' +
+            ", data=" + data +
+            '}';
+   }
 }

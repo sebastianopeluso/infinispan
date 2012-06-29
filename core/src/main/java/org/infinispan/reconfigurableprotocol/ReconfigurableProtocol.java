@@ -16,6 +16,8 @@ import org.infinispan.transaction.LockingMode;
 import org.infinispan.transaction.TransactionMode;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.concurrent.IsolationLevel;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
 import java.util.EnumMap;
@@ -32,6 +34,9 @@ import static org.infinispan.interceptors.InterceptorChain.InterceptorType;
  * @since 5.2
  */
 public abstract class ReconfigurableProtocol {
+
+   protected final Log log = LogFactory.getLog(getClass());
+
    private static final String LOCAL_STOP_ACK = "___LOCAL_ACK___";
 
    protected Configuration configuration;
@@ -65,6 +70,9 @@ public abstract class ReconfigurableProtocol {
     * @param globalTransaction   the global transaction
     */
    public final void addLocalTransaction(GlobalTransaction globalTransaction) {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] local transaction starts to commit", globalTransaction.prettyPrint());
+      }
       synchronized (localTransactions) {
          localTransactions.add(globalTransaction);
       }
@@ -76,6 +84,9 @@ public abstract class ReconfigurableProtocol {
     * @param globalTransaction   the global transaction
     */
    public final void removeLocalTransaction(GlobalTransaction globalTransaction) {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] local transaction finished the commit", globalTransaction.prettyPrint());
+      }
       synchronized (localTransactions) {
          localTransactions.remove(globalTransaction);
          localTransactions.notifyAll();
@@ -88,6 +99,9 @@ public abstract class ReconfigurableProtocol {
     * @param globalTransaction   the global transaction
     */
    public final void addRemoteTransaction(GlobalTransaction globalTransaction) {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] remote transaction received", globalTransaction.prettyPrint());
+      }
       synchronized (remoteTransactions) {
          remoteTransactions.add(globalTransaction);
       }
@@ -99,6 +113,9 @@ public abstract class ReconfigurableProtocol {
     * @param globalTransaction   the global transaction
     */
    public final void removeRemoteTransaction(GlobalTransaction globalTransaction) {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] remote transaction finished", globalTransaction.prettyPrint());
+      }
       synchronized (remoteTransactions) {
          remoteTransactions.remove(globalTransaction);
          remoteTransactions.notifyAll();
@@ -113,10 +130,21 @@ public abstract class ReconfigurableProtocol {
     */
    public final void handleData(Object data, Address from) {
       if (LOCAL_STOP_ACK.equals(data)) {
+         if (log.isTraceEnabled()) {
+            log.tracef("[%s] Data message received and it is a stop ack", from);
+         }
          stopAckCollector.addAck(from);
       } else {
+         if (log.isTraceEnabled()) {
+            log.tracef("[%s] Data message received. Data is %s", from, data);
+         }
          internalHandleData(data,from);
       }
+   }
+
+   @Override
+   public final String toString() {
+      return "ReconfigurableProtocol{protocolName=" + getUniqueProtocolName() + "}";
    }
 
    /**
@@ -125,10 +153,16 @@ public abstract class ReconfigurableProtocol {
     * @throws InterruptedException  if interrupted
     */
    protected final void awaitUntilLocalTransactionsFinished() throws InterruptedException {
+      if (log.isTraceEnabled()) {
+         log.tracef("[%s] thread will wait until all local transaction are finished", Thread.currentThread().getName());
+      }
       synchronized (localTransactions) {
          while (!localTransactions.isEmpty()) {
             localTransactions.wait();
          }
+      }
+      if (log.isTraceEnabled()) {
+         log.tracef("[%s] all local transaction are finished. Moving on...", Thread.currentThread().getName());
       }
    }
 
@@ -138,10 +172,16 @@ public abstract class ReconfigurableProtocol {
     * @throws InterruptedException  if interrupted
     */
    protected final void awaitUntilRemoteTransactionsFinished() throws InterruptedException {
+      if (log.isTraceEnabled()) {
+         log.tracef("[%s] thread will wait until all remote transaction are finished", Thread.currentThread().getName());
+      }
       synchronized (remoteTransactions) {
          while (!remoteTransactions.isEmpty()) {
             remoteTransactions.wait();
          }
+      }
+      if (log.isTraceEnabled()) {
+         log.tracef("[%s] all remote transaction are finished. Moving on...", Thread.currentThread().getName());
       }
    }
 
@@ -153,6 +193,9 @@ public abstract class ReconfigurableProtocol {
     * @param clazz      type of component
     */
    protected final void registerComponent(Object component, Class<?> clazz) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Register a new component. Object is %s, and class is %s", component, clazz);
+      }
       componentRegistry.registerComponent(component, clazz);
    }
 
@@ -166,6 +209,9 @@ public abstract class ReconfigurableProtocol {
     * @return                 the instance of the interceptor type
     */
    protected final CommandInterceptor createInterceptor(CommandInterceptor interceptor, Class<? extends CommandInterceptor> interceptorType) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Create a new interceptor. Class is %s", interceptorType);
+      }
       CommandInterceptor chainedInterceptor = getComponent(interceptorType);
       if (chainedInterceptor == null) {
          chainedInterceptor = interceptor;
@@ -191,9 +237,12 @@ public abstract class ReconfigurableProtocol {
     * @param totalOrder if the data should be sent in total order
     */
    protected final void broadcastData(Object data, boolean totalOrder) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Broadcast data. Data is %s, Using total order? %s", data, totalOrder);
+      }
       ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(DATA, getUniqueProtocolName());
       command.setData(data);
-      rpcManager.broadcastRpcCommand(command, true, totalOrder);
+      rpcManager.broadcastRpcCommand(command, false, totalOrder);
    }
 
    /**
@@ -204,6 +253,9 @@ public abstract class ReconfigurableProtocol {
    protected final EnumMap<InterceptorType, CommandInterceptor> buildDefaultInterceptorChain() {
       EnumMap<InterceptorType, CommandInterceptor> defaultIC = new EnumMap<InterceptorType, CommandInterceptor>(InterceptorType.class);
       //State transfer
+      // load the state transfer lock interceptor
+      // the state transfer lock ensures that the cache member list is up-to-date
+      // so it's necessary even if state transfer is disabled
       if (configuration.clustering().cacheMode().isDistributed() || configuration.clustering().cacheMode().isReplicated()) {
          defaultIC.put(InterceptorChain.InterceptorType.STATE_TRANSFER,
                        createInterceptor(new StateTransferLockInterceptor(), StateTransferLockInterceptor.class));
@@ -270,6 +322,11 @@ public abstract class ReconfigurableProtocol {
          case LOCAL:
             //Nothing...
       }
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Building default Interceptor Chain: %s", defaultIC);
+      }
+
       return defaultIC;
    }
 
@@ -287,11 +344,19 @@ public abstract class ReconfigurableProtocol {
       4) wait for others members messages
       5) wait until all remote transactions has finished
       */
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] Performing the global stop protocol. Using total order? %s", Thread.currentThread().getName(),
+                    totalOrder);
+      }
       awaitUntilLocalTransactionsFinished();
       broadcastData(LOCAL_STOP_ACK, totalOrder);
       stopAckCollector.awaitAllAck();
       awaitUntilRemoteTransactionsFinished();
       stopAckCollector.reset();
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] Global stop protocol completed. No transaction are committing now",
+                    Thread.currentThread().getName());
+      }
    }
 
    /**
@@ -392,6 +457,9 @@ public abstract class ReconfigurableProtocol {
       }
 
       public synchronized final void addAck(Address from) {
+         if (log.isDebugEnabled()) {
+            log.debugf("Received stop ack from %s", from);
+         }
          members.remove(from);
          if (members.isEmpty()) {
             this.notifyAll();
@@ -399,8 +467,15 @@ public abstract class ReconfigurableProtocol {
       }
 
       public synchronized final void awaitAllAck() throws InterruptedException {
+         //TODO the message is not self deliver!
+         if (log.isDebugEnabled()) {
+            log.debugf("[%s] thread will wait for all acks...", Thread.currentThread().getName());
+         }
          while (!members.isEmpty()) {
             this.wait();
+         }
+         if (log.isDebugEnabled()) {
+            log.debugf("[%s] all acks received. Moving on...", Thread.currentThread().getName());
          }
       }
 

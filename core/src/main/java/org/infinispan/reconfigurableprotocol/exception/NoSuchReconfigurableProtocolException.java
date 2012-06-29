@@ -7,18 +7,8 @@ package org.infinispan.reconfigurableprotocol.exception;
  * @since 5.2
  */
 public class NoSuchReconfigurableProtocolException extends Exception {
-   public NoSuchReconfigurableProtocolException() {
-   }
 
-   public NoSuchReconfigurableProtocolException(String s) {
-      super(s);
-   }
-
-   public NoSuchReconfigurableProtocolException(String s, Throwable throwable) {
-      super(s, throwable);
-   }
-
-   public NoSuchReconfigurableProtocolException(Throwable throwable) {
-      super(throwable);
+   public NoSuchReconfigurableProtocolException(String protocolId) {
+      super("The protocol " + protocolId + " does not exist");
    }
 }

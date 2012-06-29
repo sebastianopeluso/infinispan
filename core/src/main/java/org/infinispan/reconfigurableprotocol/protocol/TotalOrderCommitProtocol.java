@@ -111,6 +111,10 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
             }
       }
 
+      if (log.isTraceEnabled()) {
+         log.tracef("Building interceptor chain for Total Order protocol %s", interceptors);
+      }
+
       return interceptors;
    }
 

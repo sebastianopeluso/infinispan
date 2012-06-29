@@ -2,6 +2,8 @@ package org.infinispan.reconfigurableprotocol;
 
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.reconfigurableprotocol.exception.AlreadyRegisterProtocolException;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -16,6 +18,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 5.2
  */
 public class ReconfigurableProtocolRegistry {
+
+   private static final Log log = LogFactory.getLog(ReconfigurableProtocolRegistry.class);
+
    private final Map<String, ReconfigurableProtocol> idsToProtocol;
    private InterceptorChain interceptorChain;
 
@@ -49,14 +54,23 @@ public class ReconfigurableProtocolRegistry {
     */
    public final synchronized void registerNewProtocol(ReconfigurableProtocol protocol)
          throws AlreadyRegisterProtocolException {
+
       if (protocol == null) {
+         log.warn("Tried to register a new replication protocol, but it is null");
          throw new NullPointerException("Trying to register a null protocol");
       } else if (idsToProtocol.containsKey(protocol.getUniqueProtocolName())) {
+         log.warnf("Tried to register a new replication protocol but it is already register. Protocol is %s",
+                   protocol.getUniqueProtocolName());
          throw new AlreadyRegisterProtocolException(protocol);
       }
+
       idsToProtocol.put(protocol.getUniqueProtocolName(), protocol);
       protocol.bootstrapProtocol();
       interceptorChain.registerNewProtocol(protocol);
+
+      if (log.isDebugEnabled()) {
+         log.debugf("Register successfully the new replication protocol %s", protocol.getUniqueProtocolName());
+      }
    }
 
    /**

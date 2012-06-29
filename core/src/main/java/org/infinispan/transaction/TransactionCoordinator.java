@@ -130,7 +130,7 @@ public class TransactionCoordinator {
 
    public final int prepare(LocalTransaction localTransaction, boolean replayEntryWrapping) throws XAException {
       validateNotMarkedForRollback(localTransaction);
-      
+
       GlobalTransaction globalTransaction = localTransaction.getGlobalTransaction();
       try {
          reconfigurableReplicationManager.notifyLocalTransaction(globalTransaction);
@@ -140,8 +140,6 @@ public class TransactionCoordinator {
       }
 
       if (globalTransaction.getReconfigurableProtocol().use1PC(localTransaction)) {
-      //if (configuration.isOnePhaseCommit() || is1PcForAutoCommitTransaction(localTransaction) ||
-      //      isOnePhaseTotalOrder() || isOnePhasePassiveReplication()) {
          if (trace) log.tracef("Received prepare for tx: %s. Skipping call as 1PC will be used.", localTransaction);
          return XA_OK;
       }
@@ -183,10 +181,8 @@ public class TransactionCoordinator {
       if (trace) log.tracef("Committing transaction %s", localTransaction.getGlobalTransaction());
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();
       ctx.setLocalTransaction(localTransaction);
-      
+
       if (localTransaction.getGlobalTransaction().getReconfigurableProtocol().use1PC(localTransaction) || isOnePhase) {
-      //if (configuration.isOnePhaseCommit() || isOnePhase || is1PcForAutoCommitTransaction(localTransaction) ||
-      //      isOnePhaseTotalOrder() || isOnePhasePassiveReplication()) {
          validateNotMarkedForRollback(localTransaction);
          if (trace) log.trace("Doing an 1PC prepare call on the interceptor chain");
          PrepareCommand command = commandCreator.createPrepareCommand(localTransaction.getGlobalTransaction(), localTransaction.getModifications());
@@ -271,7 +267,7 @@ public class TransactionCoordinator {
    /**
     * a transaction can commit in one phase, in total order protocol, when the write skew is disable or the one phase
     * configuration parameter is set to true.
-    * 
+    *
     * Note: in distribution, the 1PC optimization can't be done with the write skew check
     *
     * @return true if it can use 1PC false otherwise

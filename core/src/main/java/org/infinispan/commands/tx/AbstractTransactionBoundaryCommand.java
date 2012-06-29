@@ -28,10 +28,11 @@ import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.impl.RemoteTxInvocationContext;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.lifecycle.ComponentStatus;
+import org.infinispan.reconfigurableprotocol.exception.NoSuchReconfigurableProtocolException;
 import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
+import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
-import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -56,7 +57,7 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    protected TransactionTable txTable;
    protected Configuration configuration;
    private Address origin;
-   
+
    protected ReconfigurableReplicationManager reconfigurableReplicationManager;
 
    public AbstractTransactionBoundaryCommand(String cacheName) {
@@ -158,7 +159,7 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
       return invoker.invoke(ctxt, this);
    }
 
-   protected void visitRemoteTransaction(RemoteTransaction tx) throws InterruptedException {
+   protected void visitRemoteTransaction(RemoteTransaction tx) throws InterruptedException, NoSuchReconfigurableProtocolException {
       reconfigurableReplicationManager.notifyRemoteTransaction(tx.getGlobalTransaction());
    }
 
@@ -204,15 +205,15 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    private void markGtxAsRemote() {
       globalTx.setRemote(true);
    }
-   
+
    @Override
    public Address getOrigin() {
-	   return origin;
+      return origin;
    }
-   
+
    @Override
    public void setOrigin(Address origin) {
-	   this.origin = origin;
+      this.origin = origin;
    }
 
    @Override

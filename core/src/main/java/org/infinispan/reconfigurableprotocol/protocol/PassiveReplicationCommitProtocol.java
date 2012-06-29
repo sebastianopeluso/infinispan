@@ -37,14 +37,28 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    @Override
    public final void stopProtocol() throws InterruptedException {
       if (isCoordinator()) {
+         if (log.isDebugEnabled()) {
+            log.debugf("[%s] Stop protocol in master for Passive Replication protocol. Wait until all local transactions " +
+                             "are finished", Thread.currentThread().getName());
+         }
          awaitUntilLocalTransactionsFinished();
          broadcastData(MASTER_ACK, false);
+         if (log.isDebugEnabled()) {
+            log.debugf("[%s] Ack sent to the slaves. Starting new epoch", Thread.currentThread().getName());
+         }
       } else {
+         if (log.isDebugEnabled()) {
+            log.debugf("[%s] Stop protocol in slave for Passive Replication protocol. Wait for the master ack",
+                       Thread.currentThread().getName());
+         }
          synchronized (this) {
             while (!masterAckReceived) {
                this.wait();
             }
             masterAckReceived = false;
+         }
+         if (log.isDebugEnabled()) {
+            log.debugf("[%s] Ack received from master. Starting new epoch", Thread.currentThread().getName());
          }
       }
       //this wait should return immediately, because we don't have any remote transactions pending...
@@ -74,6 +88,10 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
       //Custom interceptor after TxInterceptor
       interceptors.put(InterceptorType.CUSTOM_INTERCEPTOR_AFTER_TX_INTERCEPTOR,
                        createInterceptor(new PassivationInterceptor(), PassiveReplicationInterceptor.class));
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Building interceptor chain for Passive Replication protocol %s", interceptors);
+      }
 
       return interceptors;
    }

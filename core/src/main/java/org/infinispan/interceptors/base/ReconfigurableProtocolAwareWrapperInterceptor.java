@@ -6,6 +6,8 @@ import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.TransactionBoundaryCommand;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -19,6 +21,7 @@ import java.util.concurrent.ConcurrentMap;
  */
 public class ReconfigurableProtocolAwareWrapperInterceptor extends CommandInterceptor {
 
+   private static final Log log = LogFactory.getLog(ReconfigurableProtocolAwareWrapperInterceptor.class);
    private final ConcurrentMap<String, CommandInterceptor> protocolDependentInterceptor = new ConcurrentHashMap<String, CommandInterceptor>();
 
    @Override
@@ -45,6 +48,9 @@ public class ReconfigurableProtocolAwareWrapperInterceptor extends CommandInterc
    public final void setProtocolDependentInterceptor(String protocolId, CommandInterceptor interceptor) {
       protocolDependentInterceptor.put(protocolId, interceptor);
       interceptor.setNext(getNext());
+      if (log.isTraceEnabled()) {
+         log.tracef("Added a new replication protocol dependent interceptor. Interceptors are " + protocolDependentInterceptor);
+      }
    }
 
    private CommandInterceptor getNext(GlobalTransaction globalTransaction) {

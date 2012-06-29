@@ -27,7 +27,6 @@ import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.control.CacheViewControlCommand;
 import org.infinispan.commands.control.StateTransferControlCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
-import org.infinispan.commands.tx.TransactionBoundaryCommand;
 import org.infinispan.config.GlobalConfiguration;
 import org.infinispan.factories.ComponentRegistry;
 import org.infinispan.factories.GlobalComponentRegistry;
@@ -36,7 +35,6 @@ import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.infinispan.manager.NamedCacheNotFoundException;
-import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.remoting.responses.ExceptionResponse;
 import org.infinispan.remoting.responses.Response;
 import org.infinispan.remoting.responses.ResponseGenerator;
@@ -62,8 +60,6 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
    private GlobalConfiguration globalConfiguration;
    private Transport transport;
    private CacheViewsManager cacheViewsManager;
-   
-   private ReconfigurableReplicationManager reconfigurableReplicationManager;
 
    /**
     * How to handle an invocation based on the join status of a given cache *
@@ -75,14 +71,12 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
    @Inject
    public void inject(GlobalComponentRegistry gcr,
                       EmbeddedCacheManager embeddedCacheManager, Transport transport,
-                      GlobalConfiguration globalConfiguration, CacheViewsManager cacheViewsManager,
-                      ReconfigurableReplicationManager reconfigurableReplicationManager) {
+                      GlobalConfiguration globalConfiguration, CacheViewsManager cacheViewsManager) {
       this.gcr = gcr;
       this.embeddedCacheManager = embeddedCacheManager;
       this.transport = transport;
       this.globalConfiguration = globalConfiguration;
       this.cacheViewsManager = cacheViewsManager;
-      this.reconfigurableReplicationManager = reconfigurableReplicationManager;
    }
 
    private boolean hasJoinStarted(final ComponentRegistry componentRegistry) throws InterruptedException {
@@ -159,7 +153,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
          if (!hasJoinStarted(componentRegistry)) {
             log.cacheCanNotHandleInvocations(cmd.getCacheName());
             return new ExceptionResponse(new NamedCacheNotFoundException(cmd.getCacheName(),
-                  "Cache has not been started on node " + transport.getAddress()));
+                                                                         "Cache has not been started on node " + transport.getAddress()));
          }
          // if we did start joining, the StateTransferLockInterceptor will make it wait until the state transfer is complete
          // TODO There is a small window between starting the join and blocking the transactions, we need to eliminate it
