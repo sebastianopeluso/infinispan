@@ -75,7 +75,7 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
-import org.infinispan.reconfigurableprotocol.ReconfigurableReplicationManager;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.LockInfo;
 import org.infinispan.statetransfer.StateTransferManager;

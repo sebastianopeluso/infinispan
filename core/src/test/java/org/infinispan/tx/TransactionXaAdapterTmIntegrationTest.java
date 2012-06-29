@@ -24,7 +24,7 @@ package org.infinispan.tx;
 
 import org.infinispan.config.Configuration;
 import org.infinispan.interceptors.locking.ClusteringDependentLogic;
-import org.infinispan.reconfigurableprotocol.ReconfigurableReplicationManager;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.tm.DummyTransaction;
 import org.infinispan.transaction.tm.DummyXid;

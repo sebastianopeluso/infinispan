@@ -1,7 +1,7 @@
 package org.infinispan.commands.remote;
 
 import org.infinispan.context.InvocationContext;
-import org.infinispan.reconfigurableprotocol.ReconfigurableReplicationManager;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 
 /**
  * Command use when switch between protocol to broadcast data between all members

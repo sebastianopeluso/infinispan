@@ -1,4 +1,4 @@
-package org.infinispan.reconfigurableprotocol;
+package org.infinispan.reconfigurableprotocol.manager;
 
 import org.infinispan.CacheException;
 import org.infinispan.commands.CommandsFactory;
@@ -9,10 +9,10 @@ import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
+import org.infinispan.reconfigurableprotocol.ReconfigurableProtocol;
+import org.infinispan.reconfigurableprotocol.ReconfigurableProtocolRegistry;
 import org.infinispan.reconfigurableprotocol.exception.AlreadyRegisterProtocolException;
 import org.infinispan.reconfigurableprotocol.exception.NoSuchReconfigurableProtocolException;
-import org.infinispan.reconfigurableprotocol.manager.EpochManager;
-import org.infinispan.reconfigurableprotocol.manager.ProtocolManager;
 import org.infinispan.reconfigurableprotocol.protocol.PassiveReplicationCommitProtocol;
 import org.infinispan.reconfigurableprotocol.protocol.TotalOrderCommitProtocol;
 import org.infinispan.reconfigurableprotocol.protocol.TwoPhaseCommitProtocol;
@@ -40,8 +40,7 @@ import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.SWITC
       " the transactions and for the switching between them")
 public class ReconfigurableReplicationManager {
 
-   private final ReconfigurableProtocolRegistry registry;
-   private final EpochManager epochManager = new EpochManager();
+   private final ReconfigurableProtocolRegistry registry;   
    private final ProtocolManager protocolManager = new ProtocolManager();
    private final ReclosableLatch switchInProgress = new ReclosableLatch(true);
 
@@ -118,8 +117,7 @@ public class ReconfigurableReplicationManager {
          actual.stopProtocol();
          newProtocol.bootProtocol();
       }
-      protocolManager.change(newProtocol);
-      epochManager.incrementEpoch();
+      protocolManager.changeAndIncrementEpoch(newProtocol);      
       switchInProgress.open();
    }
 
@@ -146,8 +144,9 @@ public class ReconfigurableReplicationManager {
    public final void notifyLocalTransaction(GlobalTransaction globalTransaction) throws InterruptedException {
       //returns immediately if no switch is in progress
       switchInProgress.await();
-      long epoch = epochManager.getEpoch();
-      ReconfigurableProtocol actual = protocolManager.getActual();
+      ProtocolManager.ActualProtocolAndEpoch actualProtocolAndEpoch = protocolManager.getActualProtocolAndEpoch();
+      long epoch = actualProtocolAndEpoch.getEpoch();
+      ReconfigurableProtocol actual = actualProtocolAndEpoch.getProtocol();
 
       globalTransaction.setEpochId(epoch);
       globalTransaction.setProtocolId(actual.getUniqueProtocolName());
@@ -167,7 +166,7 @@ public class ReconfigurableReplicationManager {
     */
    public final void notifyRemoteTransaction(GlobalTransaction globalTransaction) throws InterruptedException {
       long txEpoch = globalTransaction.getEpochId();
-      long epoch = epochManager.getEpoch();
+      long epoch = protocolManager.getEpoch();
       ReconfigurableProtocol protocol = registry.getProtocolById(globalTransaction.getProtocolId());
       globalTransaction.setReconfigurableProtocol(protocol);
 
@@ -177,7 +176,7 @@ public class ReconfigurableReplicationManager {
             throw new CacheException("Cannot commit transaction from previous epoch");
          }
       }
-      epochManager.ensure(txEpoch);
+      protocolManager.ensure(txEpoch);
       protocol.addRemoteTransaction(globalTransaction);
    }
 
