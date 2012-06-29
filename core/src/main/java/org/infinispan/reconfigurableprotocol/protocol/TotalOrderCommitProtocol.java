@@ -18,47 +18,47 @@ import java.util.EnumMap;
 import static org.infinispan.interceptors.InterceptorChain.InterceptorType;
 
 /**
- * // TODO: Document this
+ * Represents the switch protocol when Total Order based replication is in use
  *
  * @author Pedro Ruivo
- * @since 4.0
+ * @since 5.2
  */
 public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
 
    public static final String UID = "TO";
 
    @Override
-   public String getUniqueProtocolName() {
+   public final String getUniqueProtocolName() {
       return UID;
    }
 
    @Override
-   public boolean switchTo(ReconfigurableProtocol protocol) {
+   public final boolean switchTo(ReconfigurableProtocol protocol) {
       return false;
    }
 
    @Override
-   public void stopProtocol() throws InterruptedException {
+   public final void stopProtocol() throws InterruptedException {
       globalStopProtocol(true);
    }
 
    @Override
-   public void bootProtocol() {
+   public final void bootProtocol() {
       //no-op
    }
 
    @Override
-   public boolean canProcessOldTransaction(GlobalTransaction globalTransaction) {
+   public final boolean canProcessOldTransaction(GlobalTransaction globalTransaction) {
       return false;
    }
 
    @Override
-   public void bootstrapProtocol() {
-      // TODO: Customise this generated block
+   public final void bootstrapProtocol() {
+      //no-op
    }
 
    @Override
-   public EnumMap<InterceptorType, CommandInterceptor> buildInterceptorChain() {
+   public final EnumMap<InterceptorType, CommandInterceptor> buildInterceptorChain() {
       EnumMap<InterceptorType, CommandInterceptor> interceptors = buildDefaultInterceptorChain();
 
       //State transfer
@@ -115,13 +115,13 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public boolean use1PC(LocalTransaction localTransaction) {
-      return !configuration.versioning().enabled() || 
+   public final boolean use1PC(LocalTransaction localTransaction) {
+      return !configuration.versioning().enabled() ||
             (configuration.transaction().useSynchronization() && !configuration.clustering().cacheMode().isDistributed());
    }
 
    @Override
-   protected void internalHandleData(Object data, Address from) {
+   protected final void internalHandleData(Object data, Address from) {
       //no-op
    }
 }

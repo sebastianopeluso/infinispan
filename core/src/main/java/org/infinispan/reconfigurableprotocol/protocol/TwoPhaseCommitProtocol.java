@@ -11,7 +11,7 @@ import java.util.EnumMap;
 import static org.infinispan.interceptors.InterceptorChain.InterceptorType;
 
 /**
- * // TODO: Document this
+ * Represents the switch protocol when Two Phase Commit is in use
  *
  * @author Pedro Ruivo
  * @since 5.2
@@ -21,47 +21,47 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
    public static final String UID = "2PC";
 
    @Override
-   public String getUniqueProtocolName() {
+   public final String getUniqueProtocolName() {
       return UID;
    }
 
    @Override
-   public boolean switchTo(ReconfigurableProtocol protocol) {
+   public final boolean switchTo(ReconfigurableProtocol protocol) {
       return PassiveReplicationCommitProtocol.UID.equals(protocol.getUniqueProtocolName());
    }
 
    @Override
-   public void stopProtocol() throws InterruptedException {
+   public final void stopProtocol() throws InterruptedException {
       globalStopProtocol(false);
    }
 
    @Override
-   public void bootProtocol() {
+   public final void bootProtocol() {
       //no-op
    }
 
    @Override
-   public boolean canProcessOldTransaction(GlobalTransaction globalTransaction) {
+   public final boolean canProcessOldTransaction(GlobalTransaction globalTransaction) {
       return PassiveReplicationCommitProtocol.UID.equals(globalTransaction.getReconfigurableProtocol().getUniqueProtocolName());
    }
 
    @Override
-   public void bootstrapProtocol() {
+   public final void bootstrapProtocol() {
       //no-op
    }
 
    @Override
-   public EnumMap<InterceptorType, CommandInterceptor> buildInterceptorChain() {
+   public final EnumMap<InterceptorType, CommandInterceptor> buildInterceptorChain() {
       return buildDefaultInterceptorChain();
    }
 
    @Override
-   public boolean use1PC(LocalTransaction localTransaction) {
+   public final boolean use1PC(LocalTransaction localTransaction) {
       return configuration.transaction().use1PcForAutoCommitTransactions() && localTransaction.isImplicitTransaction();
    }
 
    @Override
-   protected void internalHandleData(Object data, Address from) {
+   protected final void internalHandleData(Object data, Address from) {
       //no-op
    }
 }

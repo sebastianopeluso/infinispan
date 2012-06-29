@@ -13,10 +13,10 @@ import java.util.EnumMap;
 import static org.infinispan.interceptors.InterceptorChain.InterceptorType;
 
 /**
- * // TODO: Document this
+ * Represents the switch protocol when Passive Replication is in use
  *
  * @author Pedro Ruivo
- * @since 4.0
+ * @since 5.2
  */
 public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
 
@@ -25,17 +25,17 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    private boolean masterAckReceived = false;
 
    @Override
-   public String getUniqueProtocolName() {
+   public final String getUniqueProtocolName() {
       return UID;
    }
 
    @Override
-   public boolean switchTo(ReconfigurableProtocol protocol) {
+   public final boolean switchTo(ReconfigurableProtocol protocol) {
       return TwoPhaseCommitProtocol.UID.equals(protocol.getUniqueProtocolName());
    }
 
    @Override
-   public void stopProtocol() throws InterruptedException {
+   public final void stopProtocol() throws InterruptedException {
       if (isCoordinator()) {
          awaitUntilLocalTransactionsFinished();
          broadcastData(MASTER_ACK, false);
@@ -47,26 +47,28 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
             masterAckReceived = false;
          }
       }
+      //this wait should return immediately, because we don't have any remote transactions pending...
+      //it is just to be safe
       awaitUntilRemoteTransactionsFinished();
    }
 
    @Override
-   public void bootProtocol() {
+   public final void bootProtocol() {
       //no-op
    }
 
    @Override
-   public boolean canProcessOldTransaction(GlobalTransaction globalTransaction) {
+   public final boolean canProcessOldTransaction(GlobalTransaction globalTransaction) {
       return TwoPhaseCommitProtocol.UID.equals(globalTransaction.getReconfigurableProtocol().getUniqueProtocolName());
    }
 
    @Override
-   public void bootstrapProtocol() {
+   public final void bootstrapProtocol() {
       //no-op
    }
 
    @Override
-   public EnumMap<InterceptorType, CommandInterceptor> buildInterceptorChain() {
+   public final EnumMap<InterceptorType, CommandInterceptor> buildInterceptorChain() {
       EnumMap<InterceptorType, CommandInterceptor> interceptors = buildDefaultInterceptorChain();
 
       //Custom interceptor after TxInterceptor
@@ -77,12 +79,12 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public boolean use1PC(LocalTransaction localTransaction) {
+   public final boolean use1PC(LocalTransaction localTransaction) {
       return !configuration.versioning().enabled() || configuration.transaction().useSynchronization();
    }
 
    @Override
-   protected void internalHandleData(Object data, Address from) {
+   protected final void internalHandleData(Object data, Address from) {
       if (MASTER_ACK.equals(data)) {
          synchronized (this) {
             masterAckReceived = true;

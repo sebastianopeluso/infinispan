@@ -30,30 +30,33 @@ import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.REGIS
 import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.SWITCH;
 
 /**
- * // TODO: Document this
+ * Manages everything about the replication protocols, namely the switch between protocols and the registry of new
+ * replication protocols
  *
  * @author Pedro Ruivo
- * @since 4.0
+ * @since 5.2
  */
 //TODO add jmx interface to switch and register new protocol
 @MBean(objectName = "ReconfigurableReplicationManager", description = "Manages the replication protocol used to commit" +
       " the transactions and for the switching between them")
 public class ReconfigurableReplicationManager {
 
-   private final ReconfigurableProtocolRegistry registry;   
-   private final ProtocolManager protocolManager = new ProtocolManager();
-   private final ReclosableLatch switchInProgress = new ReclosableLatch(true);
+   private final ReconfigurableProtocolRegistry registry;
+   private final ProtocolManager protocolManager;
+   private final ReclosableLatch switchInProgress;
 
    private RpcManager rpcManager;
    private CommandsFactory commandsFactory;
 
    public ReconfigurableReplicationManager() {
       registry = new ReconfigurableProtocolRegistry();
+      protocolManager = new ProtocolManager();
+      switchInProgress = new ReclosableLatch(true);
    }
 
    @Inject
-   public void inject(InterceptorChain interceptorChain, RpcManager rpcManager, CommandsFactory commandsFactory,
-                      Configuration configuration) {
+   public final void inject(InterceptorChain interceptorChain, RpcManager rpcManager, CommandsFactory commandsFactory,
+                            Configuration configuration) {
       registry.inject(interceptorChain);
       this.rpcManager = rpcManager;
       this.commandsFactory = commandsFactory;
@@ -76,7 +79,7 @@ public class ReconfigurableReplicationManager {
       } catch (AlreadyRegisterProtocolException e) {
          //ignore
       }
-      
+
       switch (configuration.transaction().transactionProtocol()) {
          case TOTAL_ORDER:
             protocol = registry.getProtocolById(TotalOrderCommitProtocol.UID);
@@ -107,17 +110,17 @@ public class ReconfigurableReplicationManager {
       ReconfigurableProtocol newProtocol = registry.getProtocolById(protocolId);
       if (newProtocol == null) {
          throw new NoSuchReconfigurableProtocolException("Protocol ID " + protocolId + " not found");
-      } else if (protocolManager.isActual(newProtocol)) {
+      } else if (protocolManager.isCurrentProtocol(newProtocol)) {
          return; //nothing to do
       }
 
       switchInProgress.close();
-      ReconfigurableProtocol actual = protocolManager.getActual();
+      ReconfigurableProtocol actual = protocolManager.getCurrent();
       if (!actual.switchTo(newProtocol)) {
          actual.stopProtocol();
          newProtocol.bootProtocol();
       }
-      protocolManager.changeAndIncrementEpoch(newProtocol);      
+      protocolManager.changeAndIncrementEpoch(newProtocol);
       switchInProgress.open();
    }
 
@@ -144,9 +147,9 @@ public class ReconfigurableReplicationManager {
    public final void notifyLocalTransaction(GlobalTransaction globalTransaction) throws InterruptedException {
       //returns immediately if no switch is in progress
       switchInProgress.await();
-      ProtocolManager.ActualProtocolAndEpoch actualProtocolAndEpoch = protocolManager.getActualProtocolAndEpoch();
-      long epoch = actualProtocolAndEpoch.getEpoch();
-      ReconfigurableProtocol actual = actualProtocolAndEpoch.getProtocol();
+      ProtocolManager.CurrentProtocolAndEpoch currentProtocolAndEpoch = protocolManager.getCurrentProtocolAndEpoch();
+      long epoch = currentProtocolAndEpoch.getEpoch();
+      ReconfigurableProtocol actual = currentProtocolAndEpoch.getProtocol();
 
       globalTransaction.setEpochId(epoch);
       globalTransaction.setProtocolId(actual.getUniqueProtocolName());
@@ -171,7 +174,7 @@ public class ReconfigurableReplicationManager {
       globalTransaction.setReconfigurableProtocol(protocol);
 
       if (txEpoch < epoch) {
-         ReconfigurableProtocol actual = protocolManager.getActual();
+         ReconfigurableProtocol actual = protocolManager.getCurrent();
          if (!actual.canProcessOldTransaction(globalTransaction)) {
             throw new CacheException("Cannot commit transaction from previous epoch");
          }
@@ -231,7 +234,7 @@ public class ReconfigurableReplicationManager {
 
    @ManagedOperation(description = "Registers a new replication protocol. The new protocol must extend the " +
          "ReconfigurableProtocol")
-   public void register(String clazzName) throws Exception {
+   public final void register(String clazzName) throws Exception {
       try {
          internalRegister(clazzName);
          ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(REGISTER, clazzName);
@@ -278,12 +281,12 @@ public class ReconfigurableReplicationManager {
 
    @ManagedAttribute(description = "Returns the current replication protocol ID", writable = false)
    public final String getActualProtocolId() {
-      return protocolManager.getActual().getUniqueProtocolName();
+      return protocolManager.getCurrent().getUniqueProtocolName();
    }
 
    @ManagedAttribute(description = "Returns the current replication protocol information, namely the protocol ID and " +
          "the class name", writable = false)
    public final String[] getActualProtocol() {
-      return getProtocolInfo(protocolManager.getActual());
+      return getProtocolInfo(protocolManager.getCurrent());
    }
 }
