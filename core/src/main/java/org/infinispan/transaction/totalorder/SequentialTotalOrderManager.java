@@ -32,6 +32,9 @@ public class SequentialTotalOrderManager extends BaseTotalOrderManager {
          log.trace("Exception while processing the rest of the interceptor chain", t);
          result = t;
          exception = true;
+         //if an exception is throw, the TxInterceptor will not remove it from the TxTable and the rollback is not 
+         //sent (with TO)
+         transactionTable.remoteTransactionRollback(prepareCommand.getGlobalTransaction());
       } finally {
          logProcessingFinalStatus(prepareCommand, result, exception);
          updateLocalTransaction(result, exception, prepareCommand.getGlobalTransaction());
