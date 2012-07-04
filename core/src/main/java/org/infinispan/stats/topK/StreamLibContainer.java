@@ -21,7 +21,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class StreamLibContainer {
 
    private static final StreamLibContainer instance = new StreamLibContainer();
-   public static final int MAX_CAPACITY = 1000;
+   public static final int MAX_CAPACITY = 20000;
 
    private int capacity = 100;
    private boolean active = false;
@@ -71,6 +71,10 @@ public class StreamLibContainer {
       } else {
          this.capacity = capacity;
       }
+   }
+
+   public int getCapacity(){
+	   return capacity;
    }
 
    public void addGet(Object key, boolean remote) {

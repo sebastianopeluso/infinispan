@@ -334,13 +334,15 @@ public final class CacheNotifierImpl extends AbstractListenerImpl implements Cac
    }
 
    @Override
-   public void notifyDataRehashed(Collection<Address> oldView, Collection<Address> newView, int newTopologyId, boolean pre) {
+   public void notifyDataRehashed(Collection<Address> oldView, Collection<Address> newView, int newTopologyId, boolean pre,
+                                  Collection<Object> keysMoved) {
       if (!dataRehashedListeners.isEmpty()) {
          EventImpl<Object, Object> e = EventImpl.createEvent(cache, DATA_REHASHED);
          e.setPre(pre);
          e.setMembersAtStart(oldView);
          e.setMembersAtEnd(newView);
          e.setNewTopologyId(newTopologyId);
+         e.setKeysMoved(keysMoved);
          for (ListenerInvocation listener : dataRehashedListeners) listener.invoke(e);
       }
    }

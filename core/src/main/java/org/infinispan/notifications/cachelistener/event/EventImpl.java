@@ -55,6 +55,7 @@ public class EventImpl<K, V> implements CacheEntryActivatedEvent, CacheEntryCrea
    private ConsistentHash consistentHashAtStart, consistentHashAtEnd;
    private int newTopologyId;
    private Map<Object, Object> entries;
+   private Collection<Object> keysMoved;
 
    public EventImpl() {
    }
@@ -253,5 +254,14 @@ public class EventImpl<K, V> implements CacheEntryActivatedEvent, CacheEntryCrea
    @Override
    public Map<K, V> getEntries() {
       return (Map<K, V>) entries;
+   }
+   
+   public void setKeysMoved(Collection<Object> keysMoved) {
+      this.keysMoved = keysMoved;
+   }
+
+   @Override
+   public Collection<Object> getKeysMoved() {
+      return keysMoved;
    }
 }

@@ -44,6 +44,8 @@ import org.infinispan.remoting.ReplicationQueue;
 import org.infinispan.transaction.lookup.TransactionManagerLookup;
 import org.infinispan.util.Util;
 
+import java.util.Properties;
+
 @SuppressWarnings({"deprecation", "boxing"})
 public class LegacyConfigurationAdaptor {
    private LegacyConfigurationAdaptor() {
@@ -235,6 +237,14 @@ public class LegacyConfigurationAdaptor {
                .versioningScheme(config.versioning().scheme());
       }
 
+      if (config.dataPlacement().enabled()) {
+         legacy.dataPlacement().enable()
+               .coolDowntime(config.dataPlacement().coolDownTime())
+               .objectLookupFactory(config.dataPlacement().objectLookupFactory())
+               .withProperties(config.dataPlacement().properties())
+               .maxNumberOfKeysToRequest(config.dataPlacement().maxNumberOfKeysToRequest());
+      }
+      
       return legacy.build();
    }
 
@@ -483,6 +493,12 @@ public class LegacyConfigurationAdaptor {
       builder.transaction().recovery().enabled(legacy.isTransactionRecoveryEnabled());
 
       builder.unsafe().unreliableReturnValues(legacy.isUnsafeUnreliableReturnValues());
+
+      builder.dataPlacement().enabled(legacy.isDataPlacementEnabled())
+            .objectLookupFactory(legacy.getObjectLookupFactory())
+            .coolDownTime(legacy.getCoolDownTime())
+            .withProperties(legacy.getDataPlacementProperties())
+            .maxNumberOfKeysToRequest(legacy.getMaxNumberOfKeyToRequest());
 
       return builder.build();
    }

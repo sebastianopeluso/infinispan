@@ -34,6 +34,7 @@ import org.infinispan.commands.read.ReduceCommand;
 import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
@@ -407,4 +408,12 @@ public interface CommandsFactory {
     */
    CancelCommand buildCancelCommandCommand(UUID commandUUID);
 
+   /**
+    * builds the data placement command
+    *
+    * @param type    the command type
+    * @param roundId the current round id
+    * @return        the data placement command instance
+    */
+   DataPlacementCommand buildDataPlacementCommand(DataPlacementCommand.Type type, long roundId);
 }
