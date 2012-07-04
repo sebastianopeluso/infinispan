@@ -28,88 +28,89 @@ import java.util.Map;
 /**
  * An enumeration of all the recognized XML element local names, by name.
  *
- * @author Pete Muir
+ * @author Pete Muir 
  */
 public enum Element {
-    // must be first
-    UNKNOWN(null),
-    
-    // 
-    ADVANCED_EXTERNALIZER("advancedExternalizer"),
-    ADVANCED_EXTERNALIZERS("advancedExternalizers"),
-    ASYNC("async"),
-    ASYNC_LISTENER_EXECUTOR("asyncListenerExecutor"),
-    ASYNC_TRANSPORT_EXECUTOR("asyncTransportExecutor"),
-    CLUSTERING("clustering"),
-    CUSTOM_INTERCEPTORS("customInterceptors"),
-    DATA_CONTAINER("dataContainer"),
-    DEADLOCK_DETECTION("deadlockDetection"),
-    DEFAULT("default"),
-    EVICTION("eviction"),
-    EVICTION_SCHEDULED_EXECUTOR("evictionScheduledExecutor"),
-    EXPIRATION("expiration"),
-    GROUPS("groups"),
-    GROUPER("grouper"),
-    GLOBAL("global"),
-    GLOBAL_JMX_STATISTICS("globalJmxStatistics"),
-    HASH("hash"),
-    INDEXING("indexing"),
-    INTERCEPTOR("interceptor"),
-    INVOCATION_BATCHING("invocationBatching"),
-    JMX_STATISTICS("jmxStatistics"),
-    L1("l1"),
-    LAZY_DESERIALIZATION("lazyDeserialization"),
-    LOADER("loader"),
-    LOADERS("loaders"),
-    LOCKING("locking"),
-    NAMED_CACHE("namedCache"),
-    PROPERTIES("properties"),
-    PROPERTY("property"),
-    RECOVERY("recovery"),
-    REPLICATION_QUEUE_SCHEDULED_EXECUTOR("replicationQueueScheduledExecutor"),
-    ROOT("infinispan"),
-    SERIALIZATION("serialization"),
-    SHUTDOWN("shutdown"),
-    SINGLETON_STORE("singletonStore"),
-    STATE_RETRIEVAL("stateRetrieval"),
-    STATE_TRANSFER("stateTransfer"),
-    STORE_AS_BINARY("storeAsBinary"),
-    SYNC("sync"),
-    TRANSACTION("transaction"),
-    TRANSPORT("transport"),
-    UNSAFE("unsafe"),
-    VERSIONING("versioning"),
-   TOTAL_ORDER_EXECUTOR("totalOrderExecutor")
-    ;
+   // must be first
+   UNKNOWN(null),
 
-    private final String name;
+   // 
+   ADVANCED_EXTERNALIZER("advancedExternalizer"),
+   ADVANCED_EXTERNALIZERS("advancedExternalizers"),
+   ASYNC("async"),
+   ASYNC_LISTENER_EXECUTOR("asyncListenerExecutor"),
+   ASYNC_TRANSPORT_EXECUTOR("asyncTransportExecutor"),
+   CLUSTERING("clustering"),
+   CUSTOM_INTERCEPTORS("customInterceptors"),
+   DATA_CONTAINER("dataContainer"),
+   DEADLOCK_DETECTION("deadlockDetection"),
+   DEFAULT("default"),
+   EVICTION("eviction"),
+   EVICTION_SCHEDULED_EXECUTOR("evictionScheduledExecutor"),
+   EXPIRATION("expiration"),
+   GROUPS("groups"),
+   GROUPER("grouper"),
+   GLOBAL("global"),
+   GLOBAL_JMX_STATISTICS("globalJmxStatistics"),
+   HASH("hash"),
+   INDEXING("indexing"),
+   INTERCEPTOR("interceptor"),
+   INVOCATION_BATCHING("invocationBatching"),
+   JMX_STATISTICS("jmxStatistics"),
+   L1("l1"),
+   LAZY_DESERIALIZATION("lazyDeserialization"),
+   LOADER("loader"),
+   LOADERS("loaders"),
+   LOCKING("locking"),
+   NAMED_CACHE("namedCache"),
+   PROPERTIES("properties"),
+   PROPERTY("property"),
+   RECOVERY("recovery"),
+   REPLICATION_QUEUE_SCHEDULED_EXECUTOR("replicationQueueScheduledExecutor"),
+   ROOT("infinispan"),
+   SERIALIZATION("serialization"),
+   SHUTDOWN("shutdown"),
+   SINGLETON_STORE("singletonStore"),
+   STATE_RETRIEVAL("stateRetrieval"),
+   STATE_TRANSFER("stateTransfer"),
+   STORE_AS_BINARY("storeAsBinary"),
+   SYNC("sync"),
+   TRANSACTION("transaction"),
+   TRANSPORT("transport"),
+   UNSAFE("unsafe"),
+   VERSIONING("versioning"),
+   TOTAL_ORDER_EXECUTOR("totalOrderExecutor"),
+   DATA_PLACEMENT("dataPlacement")
+   ;
 
-    Element(final String name) {
-        this.name = name;
-    }
+   private final String name;
 
-    /**
-     * Get the local name of this element.
-     *
-     * @return the local name
-     */
-    public String getLocalName() {
-        return name;
-    }
+   Element(final String name) {
+      this.name = name;
+   }
 
-    private static final Map<String, Element> MAP;
+   /**
+    * Get the local name of this element.
+    *
+    * @return the local name
+    */
+   public String getLocalName() {
+      return name;
+   }
 
-    static {
-        final Map<String, Element> map = new HashMap<String, Element>(8);
-        for (Element element : values()) {
-            final String name = element.getLocalName();
-            if (name != null) map.put(name, element);
-        }
-        MAP = map;
-    }
+   private static final Map<String, Element> MAP;
 
-    public static Element forName(String localName) {
-        final Element element = MAP.get(localName);
-        return element == null ? UNKNOWN : element;
-    }
+   static {
+      final Map<String, Element> map = new HashMap<String, Element>(8);
+      for (Element element : values()) {
+         final String name = element.getLocalName();
+         if (name != null) map.put(name, element);
+      }
+      MAP = map;
+   }
+
+   public static Element forName(String localName) {
+      final Element element = MAP.get(localName);
+      return element == null ? UNKNOWN : element;
+   }
 }

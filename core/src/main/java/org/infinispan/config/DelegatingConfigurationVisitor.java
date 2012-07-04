@@ -295,4 +295,11 @@ public class DelegatingConfigurationVisitor implements ConfigurationBeanVisitor 
          delegate.visitVersioningConfigurationBean(config);
       }
    }
+
+   @Override
+   public void visitDataPlacementType(DataPlacementType dataPlacementType) {
+      for (ConfigurationBeanVisitor delegate : delegates) {
+         delegate.visitDataPlacementType(dataPlacementType);
+      }
+   }
 }

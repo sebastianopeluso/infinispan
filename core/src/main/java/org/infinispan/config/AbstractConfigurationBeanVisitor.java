@@ -22,22 +22,7 @@
  */
 package org.infinispan.config;
 
-import org.infinispan.config.Configuration.AsyncType;
-import org.infinispan.config.Configuration.BooleanAttributeType;
-import org.infinispan.config.Configuration.ClusteringType;
-import org.infinispan.config.Configuration.CustomInterceptorsType;
-import org.infinispan.config.Configuration.DataContainerType;
-import org.infinispan.config.Configuration.DeadlockDetectionType;
-import org.infinispan.config.Configuration.EvictionType;
-import org.infinispan.config.Configuration.ExpirationType;
-import org.infinispan.config.Configuration.HashType;
-import org.infinispan.config.Configuration.L1Type;
-import org.infinispan.config.Configuration.LockingType;
-import org.infinispan.config.Configuration.QueryConfigurationBean;
-import org.infinispan.config.Configuration.StateRetrievalType;
-import org.infinispan.config.Configuration.SyncType;
-import org.infinispan.config.Configuration.TransactionType;
-import org.infinispan.config.Configuration.UnsafeType;
+import org.infinispan.config.Configuration.*;
 import org.infinispan.config.GlobalConfiguration.FactoryClassWithPropertiesType;
 import org.infinispan.config.GlobalConfiguration.GlobalJmxStatisticsType;
 import org.infinispan.config.GlobalConfiguration.SerializationType;
@@ -246,6 +231,11 @@ public abstract class AbstractConfigurationBeanVisitor implements ConfigurationB
    @Override
    public void visitVersioningConfigurationBean(Configuration.VersioningConfigurationBean config) {
       defaultVisit(config);
+   }
+
+   @Override
+   public void visitDataPlacementType(Configuration.DataPlacementType dataPlacementType) {
+      defaultVisit(dataPlacementType);
    }
 
    public void defaultVisit(AbstractConfigurationBean c) {

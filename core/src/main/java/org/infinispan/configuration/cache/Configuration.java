@@ -19,7 +19,7 @@
 package org.infinispan.configuration.cache;
 
 public class Configuration {
-   
+
    private final ClassLoader classLoader; //TODO remove this
    private final ClusteringConfiguration clusteringConfiguration;
    private final CustomInterceptorsConfiguration customInterceptorsConfiguration;
@@ -36,6 +36,7 @@ public class Configuration {
    private final TransactionConfiguration transactionConfiguration;
    private final VersioningConfiguration versioningConfiguration;
    private final UnsafeConfiguration unsafeConfiguration;
+   private final DataPlacementConfiguration dataPlacementConfiguration;
 
    Configuration(ClusteringConfiguration clusteringConfiguration,
          CustomInterceptorsConfiguration customInterceptorsConfiguration,
@@ -46,7 +47,7 @@ public class Configuration {
          LoadersConfiguration loadersConfiguration,
          LockingConfiguration lockingConfiguration, StoreAsBinaryConfiguration storeAsBinaryConfiguration,
          TransactionConfiguration transactionConfiguration, UnsafeConfiguration unsafeConfiguration,
-         VersioningConfiguration versioningConfiguration, ClassLoader cl) {
+         VersioningConfiguration versioningConfiguration, ClassLoader cl, DataPlacementConfiguration dataPlacementConfiguration) {
       this.clusteringConfiguration = clusteringConfiguration;
       this.customInterceptorsConfiguration = customInterceptorsConfiguration;
       this.dataContainerConfiguration = dataContainerConfiguration;
@@ -63,8 +64,9 @@ public class Configuration {
       this.unsafeConfiguration = unsafeConfiguration;
       this.versioningConfiguration = versioningConfiguration;
       this.classLoader = cl;
+      this.dataPlacementConfiguration = dataPlacementConfiguration;
    }
-   
+
    /**
     * Will be removed with no replacement
     * @return
@@ -73,65 +75,69 @@ public class Configuration {
    public ClassLoader classLoader() {
       return classLoader;
    }
-   
+
    public ClusteringConfiguration clustering() {
       return clusteringConfiguration;
    }
-   
+
    public CustomInterceptorsConfiguration customInterceptors() {
       return customInterceptorsConfiguration;
    }
-   
+
    public DataContainerConfiguration dataContainer() {
       return dataContainerConfiguration;
    }
-   
+
    public DeadlockDetectionConfiguration deadlockDetection() {
       return deadlockDetectionConfiguration;
    }
-   
+
    public EvictionConfiguration eviction() {
       return evictionConfiguration;
    }
-   
+
    public ExpirationConfiguration expiration() {
       return expirationConfiguration;
    }
-   
+
    public IndexingConfiguration indexing() {
       return indexingConfiguration;
    }
-   
+
    public InvocationBatchingConfiguration invocationBatching() {
       return invocationBatchingConfiguration;
    }
-   
+
    public JMXStatisticsConfiguration jmxStatistics() {
       return jmxStatisticsConfiguration;
    }
-   
+
    public LoadersConfiguration loaders() {
       return loadersConfiguration;
    }
-   
+
    public LockingConfiguration locking() {
       return lockingConfiguration;
    }
-   
+
    public StoreAsBinaryConfiguration storeAsBinary() {
       return storeAsBinaryConfiguration;
    }
-   
+
    public TransactionConfiguration transaction() {
       return transactionConfiguration;
    }
-   
+
    public UnsafeConfiguration unsafe() {
       return unsafeConfiguration;
    }
 
    public VersioningConfiguration versioning() {
       return versioningConfiguration;
+   }
+
+   public DataPlacementConfiguration dataPlacement() {
+      return dataPlacementConfiguration;
    }
 
    @Override
@@ -153,6 +159,7 @@ public class Configuration {
             ", transaction=" + transactionConfiguration +
             ", versioning=" + versioningConfiguration +
             ", unsafe=" + unsafeConfiguration +
+            ", dataPlacement=" + dataPlacementConfiguration +
             '}';
    }
 
@@ -195,6 +202,9 @@ public class Configuration {
          return false;
       if (versioningConfiguration != null ? !versioningConfiguration.equals(that.versioningConfiguration) : that.versioningConfiguration != null)
          return false;
+      if (dataPlacementConfiguration != null ? !dataPlacementConfiguration.equals(that.dataPlacementConfiguration) :
+            that.dataContainerConfiguration != null)
+         return false;
 
       return true;
    }
@@ -217,6 +227,7 @@ public class Configuration {
       result = 31 * result + (transactionConfiguration != null ? transactionConfiguration.hashCode() : 0);
       result = 31 * result + (versioningConfiguration != null ? versioningConfiguration.hashCode() : 0);
       result = 31 * result + (unsafeConfiguration != null ? unsafeConfiguration.hashCode() : 0);
+      result = 31 * result + (dataPlacementConfiguration != null ? dataPlacementConfiguration.hashCode() : 0);
       return result;
    }
 

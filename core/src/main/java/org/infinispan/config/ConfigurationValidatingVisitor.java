@@ -200,7 +200,7 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
       if (bean.transactionProtocol.isPassiveReplication()) {
          if (bean.transactionMode == TransactionMode.NON_TRANSACTIONAL) {
             log.tracef("Non transactional cache is not supported in Passive Replication protocol. Passive Replication " +
-                  "protocol will be ignored.");
+                             "protocol will be ignored.");
             return;
          }
 
@@ -214,6 +214,21 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
          if (cfg.isRequireVersioning() && cfg.getVersioningScheme() == null) {
             log.trace("No versioning scheme specified but versioning is required, defaulting to simple versioning.");
             cfg.setVersioningScheme(VersioningScheme.SIMPLE);
+         }
+      }
+   }
+
+   @Override
+   public void visitDataPlacementType(Configuration.DataPlacementType dataPlacementType) {
+      if (dataPlacementType.enabled) {
+         if (dataPlacementType.objectLookupFactory == null) {
+            throw new ConfigurationException("Expected an Object Lookup Factory instance");
+         }
+         if (dataPlacementType.coolDowntime < 1000) {
+            throw new ConfigurationException("Expected a cool down time higher or equal than 1000");
+         }
+         if (dataPlacementType.maxNumberOfKeysToRequest < 1) {
+            throw new ConfigurationException("The max number of keys to request should be higher than 0");
          }
       }
    }

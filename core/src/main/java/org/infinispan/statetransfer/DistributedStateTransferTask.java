@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -73,6 +74,7 @@ public class DistributedStateTransferTask extends BaseStateTransferTask {
    private List<Object> keysToRemove;
    private Collection<Address> oldCacheSet;
    private Collection<Address> newCacheSet;
+   private final Collection<Object> keysMoved = new LinkedList<Object>();
    private TransactionTable transactionTable;
 
    public DistributedStateTransferTask(RpcManager rpcManager, Configuration configuration, DataContainer dataContainer,
@@ -99,8 +101,8 @@ public class DistributedStateTransferTask extends BaseStateTransferTask {
       if (log.isDebugEnabled())
          log.debugf("Commencing rehash %d on node: %s. Before start, data container had %d entries",
                newViewId, self, dataContainer.size());
-      newCacheSet = Collections.emptySet();
-      oldCacheSet = Collections.emptySet();
+      //newCacheSet = Collections.emptySet();
+      //oldCacheSet = Collections.emptySet();
       keysToRemove = new ArrayList<Object>();
 
       // Don't need to log anything, all transactions will be blocked
@@ -116,7 +118,7 @@ public class DistributedStateTransferTask extends BaseStateTransferTask {
          beforeStartPushing();
 
          // notify listeners that a rehash is about to start
-         cacheNotifier.notifyDataRehashed(oldCacheSet, newCacheSet, newViewId, true);
+         cacheNotifier.notifyDataRehashed(oldCacheSet, newCacheSet, newViewId, true, null);
 
          int numOwners = configuration.getNumOwners();
 
@@ -195,7 +197,7 @@ public class DistributedStateTransferTask extends BaseStateTransferTask {
          // now we can invalidate the keys
          stateTransferManager.invalidateKeys(keysToRemove);
 
-         cacheNotifier.notifyDataRehashed(oldCacheSet, newCacheSet, newViewId, false);
+         cacheNotifier.notifyDataRehashed(oldCacheSet, newCacheSet, newViewId, false, keysMoved);
       }
 
       super.commitStateTransfer();
@@ -242,6 +244,7 @@ public class DistributedStateTransferTask extends BaseStateTransferTask {
 
       // 4. Push K to all the new servers which are *not* in the old servers list
       if (self.equals(pushingOwner)) {
+         keysMoved.add(key);
          if (value == null) {
             try {
                value = cacheStore.load(key);

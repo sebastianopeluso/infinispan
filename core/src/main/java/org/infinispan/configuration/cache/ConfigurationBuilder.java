@@ -38,6 +38,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
    private final TransactionConfigurationBuilder transaction;
    private final VersioningConfigurationBuilder versioning;
    private final UnsafeConfigurationBuilder unsafe;
+   private final DataPlacementConfigurationBuilder dataPlacement;
    
    public ConfigurationBuilder() {
       this.clustering = new ClusteringConfigurationBuilder(this);
@@ -55,6 +56,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
       this.transaction = new TransactionConfigurationBuilder(this);
       this.versioning = new VersioningConfigurationBuilder(this);
       this.unsafe = new UnsafeConfigurationBuilder(this);
+      this.dataPlacement = new DataPlacementConfigurationBuilder(this);
    }
 
    public ConfigurationBuilder classLoader(ClassLoader cl) {
@@ -141,12 +143,17 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
       return unsafe;
    }
 
+   @Override
+   public DataPlacementConfigurationBuilder dataPlacement() {
+      return dataPlacement;
+   }
+
    @SuppressWarnings("unchecked")
    public void validate() {
       for (AbstractConfigurationChildBuilder<?> validatable:
             asList(clustering, dataContainer, deadlockDetection, eviction, expiration, indexing,
                    invocationBatching, jmxStatistics, loaders, locking, storeAsBinary, transaction,
-                   versioning, unsafe)) {
+                   versioning, unsafe, dataPlacement)) {
          validatable.validate();
       }
 
@@ -166,7 +173,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
                dataContainer.create(), deadlockDetection.create(), eviction.create(),
                expiration.create(), indexing.create(), invocationBatching.create(),
                jmxStatistics.create(), loaders.create(), locking.create(), storeAsBinary.create(),
-               transaction.create(), unsafe.create(), versioning.create(), classLoader);// TODO
+               transaction.create(), unsafe.create(), versioning.create(), classLoader, dataPlacement.create());// TODO
    }
 
    public ConfigurationBuilder read(Configuration template) {
@@ -186,6 +193,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
       this.transaction.read(template.transaction());
       this.unsafe.read(template.unsafe());
       this.versioning.read(template.versioning());
+      this.dataPlacement.read(template.dataPlacement());
       
       return this;
    }
@@ -209,6 +217,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
             ", transaction=" + transaction +
             ", versioning=" + versioning +
             ", unsafe=" + unsafe +
+            ", dataPlacement=" + dataPlacement +
             '}';
    }
 

@@ -100,7 +100,12 @@ abstract class AbstractConfigurationChildBuilder<T> implements ConfigurationChil
    public UnsafeConfigurationBuilder unsafe() {
       return builder.unsafe();
    }
-   
+
+   @Override
+   public DataPlacementConfigurationBuilder dataPlacement() {
+      return builder.dataPlacement();
+   }
+
    protected ConfigurationBuilder getBuilder() {
       return builder;
    }

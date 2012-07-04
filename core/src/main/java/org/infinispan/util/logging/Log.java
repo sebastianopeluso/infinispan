@@ -224,7 +224,7 @@ public interface Log extends BasicLogger {
    void passivatedEntries(int numEntries, String duration);
 
    @LogMessage(level = INFO)
-   @Message(value = "MBeans were successfully registered to the platform mbean server.", id = 31)
+   @Message(value = "MBeans were successfully registered to the platform MBean server.", id = 31)
    void mbeansSuccessfullyRegistered();
 
    @LogMessage(level = WARN)
@@ -494,12 +494,12 @@ public interface Log extends BasicLogger {
    void errorRequestingOrApplyingState(@Cause Exception e);
 
    @LogMessage(level = ERROR)
-   @Message(value = "Error while processing 1PC PrepareCommand: %s", id = 97)
-   void errorProcessing1pcPrepareCommand(String message);
+   @Message(value = "Error while processing a prepare in a single-phase transaction", id = 97)
+   void errorProcessing1pcPrepareCommand(@Cause Throwable e);
 
    @LogMessage(level = ERROR)
-   @Message(value = "Exception while rollback: %s", id = 98)
-   void errorRollingBack(String message);
+   @Message(value = "Exception while rollback", id = 98)
+   void errorRollingBack(@Cause Throwable e);
 
    @LogMessage(level = ERROR)
    @Message(value = "Unprocessed Transaction Log Entries! = %d", id = 99)
@@ -658,8 +658,8 @@ public interface Log extends BasicLogger {
    void unableToLockToInvalidate(Object key, Address address);
 
    @LogMessage(level = ERROR)
-   @Message(value = "Execution error: %s", id = 136)
-   void executionError(String message);
+   @Message(value = "Execution error", id = 136)
+   void executionError(@Cause Throwable t);
 
    @LogMessage(level = INFO)
    @Message(value = "Failed invalidating remote cache", id = 137)

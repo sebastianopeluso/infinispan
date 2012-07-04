@@ -24,6 +24,7 @@ import org.infinispan.commands.control.CacheViewControlCommand;
 import org.infinispan.config.ConfigurationException;
 import org.infinispan.config.GlobalConfiguration;
 import org.infinispan.configuration.cache.Configuration;
+import org.infinispan.dataplacement.DataPlacementManager;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
@@ -422,6 +423,17 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
       // so the join request will not be lost.
       cacheViewInfo.getPendingChanges().requestJoin(sender);
       viewTriggerThread.wakeUp();
+   }
+   
+   /**
+    *  Handle the request to move keys   by Li
+    */
+   public void handleRequestMoveKeys(String cacheName){
+	  log.error("signaling moving keys");
+	   
+	  CacheViewInfo cacheViewInfo = getCacheViewInfo(cacheName);
+	  cacheViewInfo.getPendingChanges().requestMoveKeys();
+	  viewTriggerThread.wakeUp();
    }
 
    /**

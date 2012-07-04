@@ -29,6 +29,8 @@ import org.infinispan.config.FluentConfiguration.*;
 import org.infinispan.configuration.cache.VersioningScheme;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.DefaultDataContainer;
+import org.infinispan.dataplacement.c50.C50MLObjectLookupFactory;
+import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.distribution.ch.DefaultConsistentHash;
 import org.infinispan.distribution.ch.TopologyAwareConsistentHash;
@@ -113,7 +115,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
    @XmlTransient
    FluentConfiguration fluentConfig = new FluentConfiguration(this);
-   
+
    @XmlTransient
    private ClassLoader cl;
 
@@ -165,6 +167,9 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
    @XmlElement
    VersioningConfigurationBean versioning = new VersioningConfigurationBean().setConfiguration(this);
+
+   @XmlElement
+   DataPlacementType dataPlacement = new DataPlacementType().setConfiguration(this);
 
    private org.infinispan.configuration.cache.Configuration newConfig;
 
@@ -236,8 +241,8 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    }
 
    /**
-     * Returns the name of the cache associated with this configuration.
-   */
+    * Returns the name of the cache associated with this configuration.
+    */
    public final String getName() {
       return name;
    }
@@ -249,11 +254,11 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       else if (cl == null && globalConfiguration != null)
          // The classloader is not set for this configuration, and we have a global config
          return globalConfiguration.getClassLoader();
-      else 
+      else
          // Return the default CL 
          return Thread.currentThread().getContextClassLoader();
    }
-   
+
    public void setClassLoader(ClassLoader cl) {
       this.cl = cl;
    }
@@ -1027,21 +1032,21 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    public void setL1OnRehash(boolean l1OnRehash) {
       this.clustering.l1.setOnRehash(l1OnRehash);
    }
-   
+
    /**
     * <p>
     * Determines whether a multicast or a web of unicasts are used when performing L1 invalidations.
     * </p>
-    * 
+    *
     * <p>
     * By default multicast will be used.
     * </p>
-    * 
+    *
     * <p>
     * If the threshold is set to -1, then unicasts will always be used. If the threshold is set to 0, then multicast 
     * will be always be used.
     * </p>
-    * 
+    *
     * @param threshold the threshold over which to use a multicast
     * @deprecated Use {@link FluentConfiguration.L1Config#invalidationThreshold(Integer)} instead
     */
@@ -1049,9 +1054,9 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    public void setL1InvalidationThreshold(int threshold) {
       this.clustering.l1.setInvalidationThreshold(threshold);
    }
-   
+
    public int getL1InvalidationThreshold() {
-   	return this.clustering.l1.invalidationThreshold;
+      return this.clustering.l1.invalidationThreshold;
    }
 
    /**
@@ -1187,7 +1192,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    public boolean isIndexLocalOnly() {
       return indexing.isIndexLocalOnly();
    }
-   
+
    public TypedProperties getIndexingProperties() {
       return indexing.properties;
    }
@@ -1431,7 +1436,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       }
       return clustering.hash.consistentHashClass;
    }
-   
+
    public boolean hasConsistentHashClass() {
       return clustering.hash.consistentHashClass != null;
    }
@@ -1454,19 +1459,19 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    public int getNumOwners() {
       return clustering.hash.numOwners;
    }
-   
+
    public int getNumVirtualNodes() {
       return clustering.hash.numVirtualNodes;
    }
-   
+
    public boolean isGroupsEnabled() {
       clustering.hash.groups.setConfiguration(this);
       return clustering.hash.groups.enabled;
    }
-   
+
    public List<Grouper<?>> getGroupers() {
       clustering.hash.groups.setConfiguration(this);
-      return clustering.hash.groups.groupers; 
+      return clustering.hash.groups.groupers;
    }
 
    public boolean isRehashEnabled() {
@@ -1518,6 +1523,26 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
             transaction.transactionMode == TransactionMode.TRANSACTIONAL;
    }
 
+   public boolean isDataPlacementEnabled() {
+      return dataPlacement.enabled;
+   }
+
+   public ObjectLookupFactory getObjectLookupFactory() {
+      return dataPlacement.objectLookupFactory;
+   }
+
+   public TypedProperties getDataPlacementProperties() {
+      return dataPlacement.properties;
+   }
+
+   public int getCoolDownTime() {
+      return dataPlacement.coolDowntime;
+   }
+
+   public int getMaxNumberOfKeyToRequest() {
+      return dataPlacement.maxNumberOfKeysToRequest;
+   }
+
    // ------------------------------------------------------------------------------------------------------------
    //   HELPERS
    // ------------------------------------------------------------------------------------------------------------
@@ -1544,6 +1569,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       unsafe.accept(v);
       indexing.accept(v);
       versioning.accept(v);
+      dataPlacement.accept(v);
    }
 
    /**
@@ -1685,6 +1711,10 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
             dolly.indexing = indexing.clone();
             dolly.indexing.setConfiguration(dolly);
          }
+         if (dataPlacement != null) {
+            dolly.dataPlacement = (DataPlacementType) dataPlacement.clone();
+            dolly.dataPlacement.setConfiguration(dolly);
+         }
          if (newConfig != null)
             dolly.newConfig = newConfig;
          dolly.fluentConfig = new FluentConfiguration(dolly);
@@ -1735,7 +1765,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
    public void assertValid() throws ConfigurationException {
       if (clustering.mode.isClustered() && (globalConfiguration != null
-              && (globalConfiguration.getTransportClass() == null || globalConfiguration.getTransportClass().length() == 0)))
+                                                  && (globalConfiguration.getTransportClass() == null || globalConfiguration.getTransportClass().length() == 0)))
          throw new ConfigurationException("Cache cannot use a clustered mode (" + clustering.mode + ") mode and not define a transport!");
    }
 
@@ -1763,8 +1793,8 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    }
 
    public boolean isExpirationReaperEnabled() {
-       return expiration.reaperEnabled;
-    }
+      return expiration.reaperEnabled;
+   }
 
    /**
     * get the transaction protocol in use
@@ -2378,7 +2408,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    @XmlAccessorType(XmlAccessType.PROPERTY)
    @ConfigurationDoc(name = "recovery", parentName = "transaction")
    @Deprecated public static class RecoveryType extends AbstractFluentConfigurationBean implements RecoveryConfig {
-      
+
       /** The serialVersionUID */
       private static final long serialVersionUID = 7727835976746044904L;
 
@@ -3593,10 +3623,10 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
       @ConfigurationDocRef(bean = Configuration.class, targetElement = "setRehashEnabled")
       protected Boolean rehashEnabled = true;
-      
+
       @ConfigurationDocRef(bean = HashConfig.class, targetElement = "numVirtualNodes")
       protected Integer numVirtualNodes = 1;
-      
+
       @ConfigurationDocRef(bean = HashConfig.class, targetElement = "groups")
       protected GroupsConfiguration groups = new GroupsConfiguration();
       @XmlTransient
@@ -3643,7 +3673,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          activate();
          this.hashFunctionClass = hashFunctionClass;
       }
-      
+
       private void activate() {
          activated = true;
          overriddenConfigurationElements.add("activated");
@@ -3659,18 +3689,18 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       public Integer getNumOwners() {
          return numOwners;
       }
-      
+
       @XmlAttribute
       public Integer getNumVirtualNodes() {
          return numVirtualNodes;
       }
-      
+
       @Override
       public HashConfig numVirtualNodes(Integer numVirtualNodes) {
          setNumVirtualNodes(numVirtualNodes);
          return this;
       }
-      
+
       /**
        * @deprecated The visibility of this will be reduced, use {@link #numVirtualNodes(Integer)}
        */
@@ -3763,21 +3793,21 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          setRehashEnabled(rehashEnabled);
          return this;
       }
-      
+
       @Override
       public GroupsConfiguration groups() {
          groups.setConfiguration(config);
          activate();
          return groups;
       }
-      
+
       @XmlElement
       public void setGroups(GroupsConfiguration groups) {
          testImmutability("groups");
          this.groups = groups;
       }
-      
-      
+
+
       public GroupsConfiguration getGroups() {
          return groups();
       }
@@ -3816,7 +3846,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          result = 31 * result + (rehashEnabled ? 0 : 1);
          return result;
       }
-      
+
       @Override
       public HashType clone() throws CloneNotSupportedException {
          HashType dolly = (HashType) super.clone();
@@ -3855,7 +3885,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
       @ConfigurationDocRef(bean = Configuration.class, targetElement = "setL1OnRehash")
       protected Boolean onRehash = true;
-      
+
       @ConfigurationDocRef(bean = Configuration.class, targetElement = "setL1InvalidationThreshold")
       protected Integer invalidationThreshold = 0;
 
@@ -3954,23 +3984,23 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          setOnRehash(onRehash);
          return this;
       }
-      
+
       @Override
       public L1Config invalidationThreshold(Integer threshold) {
          setInvalidationThreshold(threshold);
          return this;
       }
-      
-     
+
+
       public void setInvalidationThreshold(Integer threshold) {
          testImmutability("invalidationThreshold");
          activate();
          this.invalidationThreshold = threshold;
       }
-      
+
       @XmlAttribute
       public Integer getInvalidationThreshold() {
-	      return invalidationThreshold;
+         return invalidationThreshold;
       }
 
       @Override
@@ -3989,7 +4019,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          if (lifespan != null ? !lifespan.equals(l1Type.lifespan) : l1Type.lifespan != null) return false;
          if (onRehash != null ? !onRehash.equals(l1Type.onRehash) : l1Type.onRehash != null) return false;
          if (invalidationThreshold != null ? !invalidationThreshold.equals(l1Type.invalidationThreshold) : l1Type.invalidationThreshold != null) return false;
-         
+
          return true;
       }
 
@@ -4545,7 +4575,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
       @XmlElement(name = "interceptor")
       private List<CustomInterceptorConfig> customInterceptors = new LinkedList<CustomInterceptorConfig>();
-      
+
       public CustomInterceptorsType() {
          testImmutability("customInterceptors");
       }
@@ -4718,10 +4748,10 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          setIndexLocalOnly(indexLocalOnly);
          return this;
       }
-      
+
       @XmlElement(name = "properties")
       protected TypedProperties properties = new TypedProperties();
-      
+
       @Override
       public IndexingConfig withProperties(Properties properties) {
          testImmutability("properties");
@@ -4764,7 +4794,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
          if (indexLocalOnly != null ? !indexLocalOnly.equals(that.indexLocalOnly) : that.indexLocalOnly != null)
             return false;
-         
+
          if (!properties.equals(that.properties))
             return false;
 
@@ -4796,9 +4826,116 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
             throw new RuntimeException("Should not happen!", shouldNotHappen);
          }
       }
-      
+
       public String toString(){
          return "Indexing[enabled="+enabled+",localOnly="+indexLocalOnly+"]";
+      }
+   }
+
+   @XmlAccessorType(XmlAccessType.PROPERTY)
+   @ConfigurationDoc(name = "dataplacement")
+   @Deprecated public static class DataPlacementType extends AbstractFluentConfigurationBean implements DataPlacementConfig {
+
+      @ConfigurationDocRef(bean = Configuration.class, targetElement = "setDataPlacementEnabled")
+      protected boolean enabled = false;
+
+      @ConfigurationDocRef(bean = Configuration.class, targetElement = "setDataPlacementObjectLookupFactory")
+      protected ObjectLookupFactory objectLookupFactory = new C50MLObjectLookupFactory();
+
+      @XmlElement(name = "properties")
+      protected TypedProperties properties = new TypedProperties();
+
+      @ConfigurationDocRef(bean = Configuration.class, targetElement = "setDataPlacementObjectLookupFactory")
+      protected int coolDowntime = 30000;
+
+      protected int maxNumberOfKeysToRequest = 500;
+
+      @Override
+      public DataPlacementConfig coolDowntime(int milliseconds) {
+         testImmutability("coolDowntime");
+         coolDowntime = milliseconds;
+         return this;
+      }
+
+      @Override
+      public DataPlacementConfig maxNumberOfKeysToRequest(int maxNumberOfKeysToRequest) {
+         testImmutability("maxNumberOfKeysToRequest");
+         maxNumberOfKeysToRequest = maxNumberOfKeysToRequest;
+         return this;
+      }
+
+      private void setEnabled(boolean enabled) {
+         testImmutability("enabled");
+         this.enabled = enabled;
+      }
+
+      @Override
+      public DataPlacementConfig enable() {
+         setEnabled(true);
+         return this;
+      }
+
+      @Override
+      public DataPlacementConfig disable() {
+         setEnabled(false);
+         return this;
+      }
+
+      @Override
+      public DataPlacementConfig objectLookupFactory(ObjectLookupFactory factory) {
+         testImmutability("objectLookupFactory");
+         objectLookupFactory = factory;
+         return this;
+      }
+
+      @Override
+      public DataPlacementConfig withProperties(Properties properties) {
+         testImmutability("properties");
+         this.properties = new TypedProperties(properties);
+         return this;
+      }
+
+      @Override
+      public DataPlacementConfig addProperty(String key, String value) {
+         properties.put(key, value);
+         return this;
+      }
+
+      @Override
+      protected DataPlacementType setConfiguration(Configuration config) {
+         super.setConfiguration(config);
+         return this;
+      }
+
+      public void accept(ConfigurationBeanVisitor v) {
+         v.visitDataPlacementType(this);
+      }
+
+      @Override
+      public boolean equals(Object o) {
+         if (this == o) return true;
+         if (o == null || getClass() != o.getClass()) return false;
+
+         DataPlacementType that = (DataPlacementType) o;
+
+         if (coolDowntime != that.coolDowntime) return false;
+         if (maxNumberOfKeysToRequest != that.maxNumberOfKeysToRequest) return false;
+         if (enabled != that.enabled) return false;
+         if (objectLookupFactory != null ? !objectLookupFactory.equals(that.objectLookupFactory) : that.objectLookupFactory != null)
+            return false;
+         if (properties != null ? !properties.equals(that.properties) : that.properties != null) return false;
+
+         return true;
+      }
+
+      @Override
+      public int hashCode() {
+         int result = (enabled ? 1 : 0);
+         result = 31 * result + (objectLookupFactory != null ? objectLookupFactory.hashCode() : 0);
+         result = 31 * result + (properties != null ? properties.hashCode() : 0);
+         result = 31 * result + coolDowntime;
+         result = 31 * result + maxNumberOfKeysToRequest;
+         return result;
       }
    }
 
@@ -4896,7 +5033,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    public org.infinispan.configuration.cache.Configuration newConfiguration() {
       return newConfig;
    }
-   
+
    public boolean isRequireVersioning() {
       boolean isOptimisticWithWSCheck = isTransactionalCache() && isWriteSkewCheck() &&
             getTransactionLockingMode() == LockingMode.OPTIMISTIC && isEnableVersioning();

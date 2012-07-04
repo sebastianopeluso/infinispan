@@ -110,8 +110,7 @@ public class DummyTransaction implements Transaction {
          status = Status.STATUS_ROLLEDBACK;
          notifyAfterCompletion(Status.STATUS_ROLLEDBACK);
       } catch (Throwable t) {
-         log.errorRollingBack(t.getMessage());
-         log.debug("Error rolling back", t);
+         log.errorRollingBack(t);
          throw new IllegalStateException(t);
       }
       // Disassociate tx from thread.
@@ -231,6 +230,7 @@ public class DummyTransaction implements Transaction {
             s.beforeCompletion();
          } catch (Throwable t) {
             retval = false;
+            status = Status.STATUS_MARKED_ROLLBACK;
             log.beforeCompletionFailed(s, t);
          }
       }
@@ -262,6 +262,11 @@ public class DummyTransaction implements Transaction {
             throw new SystemException(th.getMessage());
          }
       }
+
+      if (status == Status.STATUS_MARKED_ROLLBACK || status == Status.STATUS_ROLLING_BACK) {
+         return false;
+      }
+
       status = Status.STATUS_PREPARED;
       return true;
    }
@@ -296,8 +301,7 @@ public class DummyTransaction implements Transaction {
          try {
             res.rollback(xid);
          } catch (XAException e) {
-            log.errorRollingBack(e.getMessage());
-            log.debug("Error rolling back", e);
+            log.errorRollingBack(e);
          }
       }
    }

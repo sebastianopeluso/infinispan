@@ -75,6 +75,7 @@ public interface CacheViewsManager {
 
    void handleRollbackView(String cacheName, int newViewId, int committedViewId);
 
+   void handleRequestMoveKeys(String cacheName);
    /**
     * @return The last prepared view id for each cache that's running on this node.
     */

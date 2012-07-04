@@ -202,8 +202,7 @@ public class TransactionCoordinator {
          if (shuttingDown)
             log.trace("Exception while rolling back, probably because we're shutting down.");
          else {
-            log.errorRollingBack(e.getMessage());
-            log.debug("Exception while rollback", e);
+            log.errorRollingBack(e);
          }
 
          final Transaction transaction = localTransaction.getTransaction();
@@ -216,9 +215,8 @@ public class TransactionCoordinator {
    }
 
    private void handleCommitFailure(Throwable e, LocalTransaction localTransaction) throws XAException {
-      log.errorProcessing1pcPrepareCommand(e.getMessage());
-      log.debug("Error processing 1PC prepare command", e);
       if (trace) log.tracef("Couldn't commit 1PC transaction %s, trying to rollback.", localTransaction);
+      log.errorProcessing1pcPrepareCommand(e);
       try {
          rollbackInternal(localTransaction);
       } catch (Throwable e1) {

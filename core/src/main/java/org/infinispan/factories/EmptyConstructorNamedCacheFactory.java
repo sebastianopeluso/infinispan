@@ -55,6 +55,7 @@ import org.infinispan.util.concurrent.locks.containers.OwnableReentrantPerEntryL
 import org.infinispan.util.concurrent.locks.containers.OwnableReentrantStripedLockContainer;
 import org.infinispan.util.concurrent.locks.containers.ReentrantPerEntryLockContainer;
 import org.infinispan.util.concurrent.locks.containers.ReentrantStripedLockContainer;
+import org.infinispan.dataplacement.DataPlacementManager;
 
 import static org.infinispan.util.Util.getInstance;
 
@@ -69,7 +70,7 @@ import static org.infinispan.util.Util.getInstance;
                               CacheLoaderManager.class, InvocationContextContainer.class, PassivationManager.class,
                               BatchContainer.class, EvictionManager.class,
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
-                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class})
+                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class, DataPlacementManager.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -131,6 +132,8 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
                      (T) new DistParallelTotalOrderManager() :
                      (T) new ParallelTotalOrderManager())
                : (T) new SequentialTotalOrderManager();
+      } else if (componentType.equals(DataPlacementManager.class)){
+    	return (T) new DataPlacementManager(); 
       }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());

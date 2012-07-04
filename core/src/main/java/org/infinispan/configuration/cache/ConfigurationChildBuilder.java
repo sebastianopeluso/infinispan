@@ -50,5 +50,7 @@ public interface ConfigurationChildBuilder {
   
    UnsafeConfigurationBuilder unsafe();
    
+   DataPlacementConfigurationBuilder dataPlacement();
+   
    Configuration build();
 }

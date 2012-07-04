@@ -34,7 +34,7 @@ import java.util.Set;
 /**
  * OverrideConfigurationVisitor breaks down fields of Configuration object to individual components
  * and then compares them for field updates.
- * 
+ *
  * @author Vladimir Blagojevic
  * @since 4.0
  */
@@ -62,9 +62,10 @@ public class OverrideConfigurationVisitor extends AbstractConfigurationBeanVisit
    private StoreAsBinary storeAsBinary = null;
    private DataContainerType dataContainerType;
    private VersioningConfigurationBean versioningType;
+   private DataPlacementType dataPlacementType;
 
    public void override(OverrideConfigurationVisitor override) {
-      
+
       // special handling for BooleanAttributeType
       Set<Entry<String, BooleanAttributeType>> entrySet = override.bats.entrySet();
       for (Entry<String, BooleanAttributeType> entry : entrySet) {
@@ -73,10 +74,10 @@ public class OverrideConfigurationVisitor extends AbstractConfigurationBeanVisit
          BooleanAttributeType overrideAttributeType = override.bats.get(booleanAttributeName);
          overrideFields(attributeType, overrideAttributeType);
       }
-      
+
       //do we need to make clones of complex objects like list of cache loaders?
-      overrideFields(cacheLoaderManagerConfig, override.cacheLoaderManagerConfig);      
-      
+      overrideFields(cacheLoaderManagerConfig, override.cacheLoaderManagerConfig);
+
       //everything else...
       overrideFields(asyncType, override.asyncType);
       overrideFields(clusteringType, override.clusteringType);
@@ -97,6 +98,7 @@ public class OverrideConfigurationVisitor extends AbstractConfigurationBeanVisit
       overrideFields(storeAsBinary, override.storeAsBinary);
       overrideFields(dataContainerType, override.dataContainerType);
       overrideFields(versioningType, override.versioningType);
+      overrideFields(dataPlacementType, override.dataPlacementType);
    }
 
    private void overrideFields(AbstractConfigurationBean bean, AbstractConfigurationBean overrides) {
@@ -110,10 +112,10 @@ public class OverrideConfigurationVisitor extends AbstractConfigurationBeanVisit
                ReflectionUtil.setValue(bean, overridenField, ReflectionUtil.getValue(overrides,overridenField));
             } catch (Exception e1) {
                throw new CacheException("Could not apply value for field " + overridenField
-                        + " from instance " + overrides + " on instance " + this, e1);
+                                              + " from instance " + overrides + " on instance " + this, e1);
             }
          }
-      } 
+      }
    }
 
    @Override
@@ -155,7 +157,7 @@ public class OverrideConfigurationVisitor extends AbstractConfigurationBeanVisit
    public void visitExpirationType(ExpirationType bean) {
       expirationType = bean;
    }
-   
+
    @Override
    public void visitGroupConfig(GroupsConfiguration bean) {
       groupsConfiguration = bean;
@@ -221,4 +223,8 @@ public class OverrideConfigurationVisitor extends AbstractConfigurationBeanVisit
       this.versioningType = config;
    }
 
+   @Override
+   public void visitDataPlacementType(DataPlacementType dataPlacementType) {
+      this.dataPlacementType = dataPlacementType;
+   }
 }

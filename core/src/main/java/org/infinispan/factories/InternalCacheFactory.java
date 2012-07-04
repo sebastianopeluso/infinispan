@@ -29,6 +29,7 @@ import org.infinispan.config.Configuration;
 import org.infinispan.config.ConfigurationException;
 import org.infinispan.jmx.CacheJmxRegistration;
 import org.infinispan.manager.DefaultCacheManager;
+import org.infinispan.interceptors.DataPlacementInterceptor;
 import org.infinispan.transaction.xa.recovery.RecoveryAdminOperations;
 
 /**

@@ -21,9 +21,12 @@ package org.infinispan.statetransfer;
 import org.infinispan.CacheException;
 import org.infinispan.commands.write.InvalidateCommand;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.dataplacement.ClusterSnapshot;
+import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.distribution.DistributionManager;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.distribution.ch.ConsistentHashHelper;
+import org.infinispan.distribution.ch.DataPlacementConsistentHash;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.loaders.CacheStore;
@@ -31,6 +34,7 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.Collection;
 import java.util.List;
 
 import static org.infinispan.context.Flag.CACHE_MODE_LOCAL;
@@ -44,6 +48,7 @@ import static org.infinispan.context.Flag.SKIP_LOCKING;
  * @author Mircea.Markus@jboss.com
  * @author Bela Ban
  * @author Dan Berindei &lt;dan@infinispan.org&gt;
+ * @author Zhongmiao Li 
  * @since 4.0
  */
 @MBean(objectName = "DistributedStateTransferManager", description = "Component that handles state transfer in distributed mode")
@@ -51,6 +56,8 @@ public class DistributedStateTransferManagerImpl extends BaseStateTransferManage
    private static final Log log = LogFactory.getLog(DistributedStateTransferManagerImpl.class);
 
    protected DistributionManager dm;
+
+   private DataPlacementConsistentHash dataPlacementConsistentHash;
 
    /**
     * Default constructor
@@ -68,7 +75,7 @@ public class DistributedStateTransferManagerImpl extends BaseStateTransferManage
    @Override
    protected BaseStateTransferTask createStateTransferTask(int viewId, List<Address> members, boolean initialView) {
       return new DistributedStateTransferTask(rpcManager, configuration, dataContainer,
-            this, dm, stateTransferLock, cacheNotifier, viewId, members, chOld, chNew, initialView, transactionTable);
+                                              this, dm, stateTransferLock, cacheNotifier, viewId, members, chOld, chNew, initialView, transactionTable);
    }
 
    @Override
@@ -76,9 +83,40 @@ public class DistributedStateTransferManagerImpl extends BaseStateTransferManage
       return configuration.getRehashWaitTime();
    }
 
+
    @Override
    protected ConsistentHash createConsistentHash(List<Address> members) {
-      return ConsistentHashHelper.createConsistentHash(configuration, members);
+      ConsistentHash defaultHash = ConsistentHashHelper.createConsistentHash(configuration, members);
+      if (isDataPlacementConsistentHash()) {
+         dataPlacementConsistentHash.setDefault(defaultHash);
+         return dataPlacementConsistentHash;
+      } else {
+         return defaultHash;
+      }
+   }
+
+   @Override
+   public void commitView(int viewId) {
+      dataPlacementConsistentHash = null; //TODO check: if a node fails, it will create a default consistent hash, 
+      //TODO: and it puts the keys back in their original owner (home)
+      super.commitView(viewId);
+   }
+
+   public void addObjectLookup(Address address, ObjectLookup objectLookup){
+      if (dataPlacementConsistentHash == null) {
+         log.errorf("Trying to add the Object Lookup from %s but the Data Placement Consistent Hash is null", address);
+         return;
+      } else {
+         if (log.isDebugEnabled()) {
+            log.debugf("Add Object Lookup from %s", address);
+         }
+      }
+
+      dataPlacementConsistentHash.addObjectLookup(address, objectLookup);
+   }
+
+   public void createDataPlacementConsistentHashing(ClusterSnapshot clusterSnapshot){
+      dataPlacementConsistentHash = new DataPlacementConsistentHash(clusterSnapshot);
    }
 
    public void invalidateKeys(List<Object> keysToRemove) {
@@ -108,6 +146,10 @@ public class DistributedStateTransferManagerImpl extends BaseStateTransferManage
    public boolean isLocationInDoubt(Object key) {
       return isStateTransferInProgress() && !chOld.isKeyLocalToAddress(getAddress(), key, configuration.getNumOwners())
             && chNew.isKeyLocalToAddress(getAddress(), key, configuration.getNumOwners());
+   }
+
+   private boolean isDataPlacementConsistentHash() {
+      return dataPlacementConsistentHash != null;
    }
 }
 

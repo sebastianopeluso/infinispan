@@ -33,6 +33,7 @@ import org.infinispan.commands.read.MapReduceCommand;
 import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.PrepareResponseCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
@@ -324,20 +325,20 @@ public interface CommandsFactory {
     * Builds a {@link org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand}.
     */
    TxCompletionNotificationCommand buildTxCompletionNotificationCommand(Xid xid, GlobalTransaction globalTransaction);
-   
+
    /**
     * Builds a DistributedExecuteCommand used for migration and execution of distributed Callables and Runnables. 
-    * 
+    *
     * @param callable the callable task
     * @param sender sender's Address
     * @param keys keys used in Callable 
     * @return a DistributedExecuteCommand
     */
    <T>DistributedExecuteCommand<T> buildDistributedExecuteCommand(Callable<T> callable, Address sender, Collection keys);
-   
+
    /**
     * Builds a MapReduceCommand used for migration and execution of MapReduce tasks.
-    * 
+    *
     * @param m Mapper for MapReduceTask
     * @param r Reducer for MapReduceTask
     * @param sender sender's Address
@@ -363,11 +364,11 @@ public interface CommandsFactory {
     * @see org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand
     */
    TxCompletionNotificationCommand buildTxCompletionNotificationCommand(long internalId);
-   
-   
+
+
    /**
     * Builds a ApplyDeltaCommand used for applying Delta objects to DeltaAware containers stored in cache 
-    * 
+    *
     * @return ApplyDeltaCommand instance
     * @see ApplyDeltaCommand
     */
@@ -376,9 +377,18 @@ public interface CommandsFactory {
    /**
     * Builds a PrepareResponseCommand used to send back a collection of keys validated by
     * the keys owners or an exception (i.e. the outcome of the write skew check)
-    * 
+    *
     * @param globalTransaction the transaction associated 
     * @return instance
     */
    PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction);
+
+   /**
+    * builds the data placement command
+    *
+    * @param type    the command type
+    * @param roundId the current round id
+    * @return        the data placement command instance
+    */
+   DataPlacementCommand buildDataPlacementCommand(DataPlacementCommand.Type type, long roundId);
 }
