@@ -169,6 +169,8 @@ public class ProtocolManager {
          return "CurrentProtocolInfo{" +
                "epoch=" + epoch +
                ", current=" + current +
+               ", old=" + old +
+               ", state=" + state +
                '}';
       }
    }

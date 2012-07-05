@@ -81,7 +81,7 @@ public abstract class ReconfigurableProtocol {
     */
    public final void addLocalTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
       if (log.isDebugEnabled()) {
-         log.debugf("[%s] local transaction starts to commit", globalTransaction.prettyPrint());
+         log.debugf("local transaction '%s' starts to commit", globalTransaction.prettyPrint());
       }
       synchronized (localTransactions) {
          localTransactions.put(globalTransaction, Util.getAffectedKeys(Arrays.asList(writeSet)));
@@ -95,7 +95,7 @@ public abstract class ReconfigurableProtocol {
     */
    public final void removeLocalTransaction(GlobalTransaction globalTransaction) {
       if (log.isDebugEnabled()) {
-         log.debugf("[%s] local transaction finished the commit", globalTransaction.prettyPrint());
+         log.debugf("local transaction '%s' finished the commit", globalTransaction.prettyPrint());
       }
       synchronized (localTransactions) {
          localTransactions.remove(globalTransaction);
@@ -111,7 +111,7 @@ public abstract class ReconfigurableProtocol {
     */
    public final void addRemoteTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
       if (log.isDebugEnabled()) {
-         log.debugf("[%s] remote transaction received", globalTransaction.prettyPrint());
+         log.debugf("remote transaction '%s' received", globalTransaction.prettyPrint());
       }
       synchronized (remoteTransactions) {
          if (remoteTransactions.get(globalTransaction) != null) {
@@ -131,7 +131,7 @@ public abstract class ReconfigurableProtocol {
     */
    public final void removeRemoteTransaction(GlobalTransaction globalTransaction) {
       if (log.isDebugEnabled()) {
-         log.debugf("[%s] remote transaction finished", globalTransaction.prettyPrint());
+         log.debugf("remote transaction '%s' finished", globalTransaction.prettyPrint());
       }
       synchronized (remoteTransactions) {
          remoteTransactions.remove(globalTransaction);
@@ -148,12 +148,12 @@ public abstract class ReconfigurableProtocol {
    public final void handleData(Object data, Address from) {
       if (LOCAL_STOP_ACK.equals(data)) {
          if (log.isTraceEnabled()) {
-            log.tracef("[%s] Data message received and it is a stop ack", from);
+            log.tracef("Data message from %s received and it is a stop ack", from);
          }
          ackCollector.ack(from);
       } else {
          if (log.isTraceEnabled()) {
-            log.tracef("[%s] Data message received. Data is %s", from, data);
+            log.tracef("Data message from %s received. Data is %s", from, data);
          }
          internalHandleData(data, from);
       }
