@@ -71,6 +71,7 @@ public class ReconfigurableReplicationManager {
 
       ReconfigurableProtocol protocol = new TwoPhaseCommitProtocol();
       try {
+         protocol.initialize(configuration, componentRegistry, this);         
          registry.registerNewProtocol(protocol);
       } catch (AlreadyRegisterProtocolException e) {
          log.errorf("Tried to register Two Phase Commit protocol but it is already register. This should not happen");
@@ -78,6 +79,7 @@ public class ReconfigurableReplicationManager {
       }
       protocol = new PassiveReplicationCommitProtocol();
       try {
+         protocol.initialize(configuration, componentRegistry, this);
          registry.registerNewProtocol(protocol);
       } catch (AlreadyRegisterProtocolException e) {
          log.errorf("Tried to register Passive Replication protocol but it is already register. This should not happen");
@@ -85,6 +87,7 @@ public class ReconfigurableReplicationManager {
       }
       protocol = new TotalOrderCommitProtocol();
       try {
+         protocol.initialize(configuration, componentRegistry, this);
          registry.registerNewProtocol(protocol);
       } catch (AlreadyRegisterProtocolException e) {
          log.errorf("Tried to register Total Order protocol but it is already register. This should not happen");
