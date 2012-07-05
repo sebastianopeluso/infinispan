@@ -70,8 +70,7 @@ public abstract class ReconfigurableProtocol {
       this.componentRegistry = componentRegistry;
       this.manager = manager;
       this.rpcManager = getComponent(RpcManager.class);
-      this.commandsFactory = getComponent(CommandsFactory.class);
-      this.ackCollector.reset();
+      this.commandsFactory = getComponent(CommandsFactory.class);      
    }
 
    /**
@@ -151,12 +150,12 @@ public abstract class ReconfigurableProtocol {
          if (log.isTraceEnabled()) {
             log.tracef("[%s] Data message received and it is a stop ack", from);
          }
-         ackCollector.addAck(from);
+         ackCollector.ack(from);
       } else {
          if (log.isTraceEnabled()) {
             log.tracef("[%s] Data message received. Data is %s", from, data);
          }
-         internalHandleData(data,from);
+         internalHandleData(data, from);
       }
    }
 
@@ -417,8 +416,7 @@ public abstract class ReconfigurableProtocol {
       awaitUntilLocalTransactionsFinished();
       broadcastData(LOCAL_STOP_ACK, totalOrder);
       ackCollector.awaitAllAck();
-      awaitUntilRemoteTransactionsFinished();
-      ackCollector.reset();
+      awaitUntilRemoteTransactionsFinished();      
       if (log.isDebugEnabled()) {
          log.debugf("[%s] Global stop protocol completed. No transaction are committing now",
                     Thread.currentThread().getName());
@@ -564,12 +562,16 @@ public abstract class ReconfigurableProtocol {
    protected class AckCollector {
       //NOTE: it is assuming that nodes will no leave neither join the cache during the switch
       private final Set<Address> members;
+      private boolean notReady;
 
       public AckCollector() {
          members = new HashSet<Address>();
+         notReady = true;
       }
 
-      public synchronized final void addAck(Address from) {
+      public synchronized final void ack(Address from) {
+         resetIfNeeded();
+
          if (log.isDebugEnabled()) {
             log.debugf("Received stop ack from %s", from);
          }
@@ -580,6 +582,8 @@ public abstract class ReconfigurableProtocol {
       }
 
       public synchronized final void awaitAllAck() throws InterruptedException {
+         resetIfNeeded();
+
          if (log.isDebugEnabled()) {
             log.debugf("[%s] thread will wait for all acks...", Thread.currentThread().getName());
          }
@@ -589,12 +593,16 @@ public abstract class ReconfigurableProtocol {
          if (log.isDebugEnabled()) {
             log.debugf("[%s] all acks received. Moving on...", Thread.currentThread().getName());
          }
+         notReady = true;
       }
 
-      public synchronized final void reset() {
-         members.clear();
-         members.addAll(getCacheMembers());
-         members.remove(rpcManager.getAddress());
+      private void resetIfNeeded() {
+         if (notReady) {
+            members.clear();
+            members.addAll(getCacheMembers());
+            members.remove(rpcManager.getAddress());
+            notReady = false;
+         }
       }
    }
 }

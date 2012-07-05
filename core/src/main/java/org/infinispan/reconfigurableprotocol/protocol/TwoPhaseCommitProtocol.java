@@ -59,7 +59,7 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
 
    @Override
    public final void bootProtocol() {
-      ackCollector.reset();
+      //no-op
    }
 
    @Override
@@ -92,7 +92,7 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
 
    @Override
    public final void bootstrapProtocol() {
-      ackCollector.reset();
+      //no-op
    }
 
    @Override
@@ -113,7 +113,7 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
    @Override
    protected final void internalHandleData(Object data, Address from) {
       if (ACK.equals(data)) {
-         ackCollector.addAck(from);
+         ackCollector.ack(from);
       }
    }
 
@@ -136,7 +136,6 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
             //no-op
          }
          manager.safeSwitch(null);
-         ackCollector.reset();
       }
    }
 }
