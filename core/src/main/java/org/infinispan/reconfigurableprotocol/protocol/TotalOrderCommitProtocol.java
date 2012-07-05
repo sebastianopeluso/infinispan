@@ -36,12 +36,12 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public boolean canSwitchTo(ReconfigurableProtocol protocol) {
+   public final boolean canSwitchTo(ReconfigurableProtocol protocol) {
       return TWO_PC_UID.equals(protocol.getUniqueProtocolName());
    }
 
    @Override
-   public void switchTo(ReconfigurableProtocol protocol) {
+   public final void switchTo(ReconfigurableProtocol protocol) {
       manager.safeSwitch(protocol);
    }
 
@@ -56,19 +56,19 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
+   public final void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
       //no-op
    }
 
    @Override
-   public void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
-                                     ReconfigurableProtocol currentProtocol) {
+   public final void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                           ReconfigurableProtocol currentProtocol) {
       throwOldTxException();
    }
 
    @Override
-   public void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
-                                             ReconfigurableProtocol oldProtocol) {
+   public final void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                                   ReconfigurableProtocol oldProtocol) {
       if (TWO_PC_UID.equals(oldProtocol.getUniqueProtocolName())) {
          try {
             oldProtocol.ensureNoConflict(writeSet);
@@ -154,7 +154,7 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public boolean useTotalOrder() {
+   public final boolean useTotalOrder() {
       return true;
    }
 

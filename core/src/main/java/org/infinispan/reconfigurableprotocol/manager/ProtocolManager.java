@@ -39,7 +39,10 @@ public class ProtocolManager {
    public final synchronized ReconfigurableProtocol getCurrent() {
       return current;
    }
-   
+
+   /**
+    * signal the switch start changing the state to "in progress"
+    */
    public final synchronized void inProgress() {
       this.state = State.IN_PROGRESS;
    }
@@ -101,15 +104,29 @@ public class ProtocolManager {
          log.debugf("[%s] epoch is the desired. Moving on...", Thread.currentThread().getName());
       }
    }
-   
+
+   /**
+    * returns true if the current state is unsafe
+    *
+    * @return  true if the current state is unsafe
+    */
    public final synchronized boolean isUnsafe() {
       return state == State.UNSAFE;
    }
-   
+
+   /**
+    * returns true if the current state is switch in progress
+    * @return  true if the current state is switch in progress
+    */
    public final synchronized boolean isInProgress() {
       return state == State.IN_PROGRESS;
    }
 
+   /**
+    * ensure that the switch is not in progress when the method returns
+    *
+    * @throws InterruptedException  if interrupted while waiting for the switch to end
+    */
    public final synchronized void ensureNotInProgress() throws InterruptedException {
       while (isInProgress()) {
          wait();
@@ -142,7 +159,7 @@ public class ProtocolManager {
       public final ReconfigurableProtocol getOld() {
          return old;
       }
-      
+
       public final boolean isUnsafe() {
          return state == State.UNSAFE;
       }
@@ -156,7 +173,10 @@ public class ProtocolManager {
       }
    }
 
-   private enum State {
+   /**
+    * the possible states
+    */
+   private static enum State {
       SAFE,
       UNSAFE,
       IN_PROGRESS

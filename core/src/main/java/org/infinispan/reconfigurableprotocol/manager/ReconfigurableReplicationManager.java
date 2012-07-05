@@ -213,7 +213,7 @@ public class ReconfigurableReplicationManager {
     * @param globalTransaction      the global transaction
     * @throws InterruptedException  if interrupted while waiting for the new epoch
     */
-   public final void notifyRemoteTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) 
+   public final void notifyRemoteTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet)
          throws InterruptedException, NoSuchReconfigurableProtocolException {
       long txEpoch = globalTransaction.getEpochId();
       ReconfigurableProtocol txProtocol = registry.getProtocolById(globalTransaction.getProtocolId());
@@ -247,7 +247,7 @@ public class ReconfigurableReplicationManager {
          } else {
             currentProtocol.processTransaction(globalTransaction, writeSet);
          }
-      }      
+      }
       txProtocol.addRemoteTransaction(globalTransaction, writeSet);
    }
 
@@ -303,15 +303,26 @@ public class ReconfigurableReplicationManager {
                    clazzName);
          throw new Exception("Class " + clazzName + " does not extends ReconfigurableProtocol class");
       }
-      ReconfigurableProtocol newProtocol = (ReconfigurableProtocol) clazz.newInstance();      
+      ReconfigurableProtocol newProtocol = (ReconfigurableProtocol) clazz.newInstance();
       newProtocol.initialize(configuration, componentRegistry, this);
       registry.registerNewProtocol(newProtocol);
    }
 
+   /**
+    * change the protocol and set the state as safe (i.e it is safe to process new epoch transactions)
+    *
+    * @param newProtocol   the new replication protocol
+    */
    public final void safeSwitch(ReconfigurableProtocol newProtocol) {
       protocolManager.change(newProtocol, true);
    }
 
+   /**
+    * change the protocol and set the state as unsafe (i.e it is not safe to process new epoch transactions and some
+    * precautions may be needed)
+    *
+    * @param newProtocol   the new replication protocol
+    */
    public final void unsafeSwitch(ReconfigurableProtocol newProtocol) {
       protocolManager.change(newProtocol, false);
    }
@@ -329,6 +340,9 @@ public class ReconfigurableReplicationManager {
       return info;
    }
 
+   /**
+    * manages the cool down time between two consecutive switches
+    */
    private class CoolDownTimeManager {
       private long nextSwitchTime; //in milliseconds
       private long coolDownTimePeriod; //in milliseconds;
@@ -376,12 +390,12 @@ public class ReconfigurableReplicationManager {
       }
       try {
          ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(SWITCH, protocolId);
-         
+
          if (protocolManager.getCurrent().useTotalOrder()) {
             rpcManager.broadcastRpcCommand(command, false, true);
             return;
          }
-         
+
          rpcManager.broadcastRpcCommand(command, false, false);
          internalSwitchTo(protocolId);
       } catch (Exception e) {

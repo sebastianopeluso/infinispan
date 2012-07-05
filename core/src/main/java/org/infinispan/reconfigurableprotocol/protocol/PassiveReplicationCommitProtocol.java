@@ -32,12 +32,12 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public boolean canSwitchTo(ReconfigurableProtocol protocol) {
+   public final boolean canSwitchTo(ReconfigurableProtocol protocol) {
       return TwoPhaseCommitProtocol.UID.equals(protocol.getUniqueProtocolName());
    }
 
    @Override
-   public void switchTo(ReconfigurableProtocol protocol) {
+   public final void switchTo(ReconfigurableProtocol protocol) {
       manager.unsafeSwitch(protocol);
       new SendMasterAckThread().start();
    }
@@ -80,13 +80,13 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
+   public final void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
       //no-op
    }
 
    @Override
-   public void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
-                                     ReconfigurableProtocol currentProtocol) {
+   public final void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                           ReconfigurableProtocol currentProtocol) {
       if (!TwoPhaseCommitProtocol.UID.equals(currentProtocol.getUniqueProtocolName())) {
          throwOldTxException();
       }
@@ -94,8 +94,8 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
-                                             ReconfigurableProtocol oldProtocol) {
+   public final void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                                   ReconfigurableProtocol oldProtocol) {
       if (!TwoPhaseCommitProtocol.UID.equals(oldProtocol.getUniqueProtocolName())) {
          throwSpeculativeTxException();
       }
@@ -128,7 +128,7 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public boolean useTotalOrder() {
+   public final boolean useTotalOrder() {
       return false;
    }
 
@@ -156,6 +156,9 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
       }
    }
 
+   /**
+    * Asynchronously sends the Ack after all local transaction has finished
+    */
    private class SendMasterAckThread extends Thread {
 
       private SendMasterAckThread() {

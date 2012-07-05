@@ -78,6 +78,7 @@ public abstract class ReconfigurableProtocol {
     * Adds the global transaction to the list of local transactions finished by this protocol
     *
     * @param globalTransaction   the global transaction
+    * @param writeSet            the modifications array
     */
    public final void addLocalTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
       if (log.isDebugEnabled()) {
@@ -107,6 +108,7 @@ public abstract class ReconfigurableProtocol {
     * Adds the global transaction to the list of remote transactions finished by this protocol
     *
     * @param globalTransaction   the global transaction
+    * @param writeSet            the modifications array
     */
    public final void addRemoteTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
       if (log.isDebugEnabled()) {
@@ -163,10 +165,18 @@ public abstract class ReconfigurableProtocol {
       return "ReconfigurableProtocol{protocolName=" + getUniqueProtocolName() + "}";
    }
 
+   /**
+    * it ensures that the write set in parameters does not conflict with transactions that are committing with this
+    * protocol. This method can block waiting for transactions to finish
+    *
+    * @param writeSet               the modifications array
+    * @throws InterruptedException  if it is interrupted while waiting
+    */
    public final void ensureNoConflict(WriteCommand[] writeSet) throws InterruptedException {
       if (writeSet == null) {
          return;
       }
+
       Set<Object> keys = Util.getAffectedKeys(Arrays.asList(writeSet));
       synchronized (localTransactions) {
          boolean conflict = true;
@@ -431,10 +441,16 @@ public abstract class ReconfigurableProtocol {
       return rpcManager.getTransport().isCoordinator();
    }
 
+   /**
+    * throw an exception when this protocol cannot process an old transaction
+    */
    protected final void throwOldTxException() {
       throw new CacheException("Old transaction from " + getUniqueProtocolName() + " not allowed in current epoch");
    }
 
+   /**
+    * throw an exception when this protocol cannot process a speculative transaction
+    */
    protected final void throwSpeculativeTxException() {
       throw new CacheException("Speculative transaction from " + getUniqueProtocolName() + " not allowed");
    }
@@ -475,10 +491,30 @@ public abstract class ReconfigurableProtocol {
     */
    public abstract void bootProtocol();
 
+   /**
+    * method invoked before a normal remote transaction will be processed in a safe state
+    *
+    * @param globalTransaction   the global transaction
+    * @param writeSet            the modifications array
+    */
    public abstract void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet);
 
+   /**
+    * method invoked before an old remote transaction will be processed
+    *
+    * @param globalTransaction   the global transaction
+    * @param writeSet            the modifications array
+    * @param currentProtocol     the current replication protocol
+    */
    public abstract void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet, ReconfigurableProtocol currentProtocol);
 
+   /**
+    * method invoked before a correct epoch transaction will be processed in an unsafe state
+    *
+    * @param globalTransaction   the global transaction
+    * @param writeSet            the modifications array
+    * @param oldProtocol         the old replication protocol
+    */
    public abstract void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
                                                       ReconfigurableProtocol oldProtocol);
 
@@ -506,7 +542,12 @@ public abstract class ReconfigurableProtocol {
     * @return                 true if it can be committed in 1 phase, false otherwise
     */
    public abstract boolean use1PC(LocalTransaction localTransaction);
-   
+
+   /**
+    * returns true is the replication protocol uses Total Order properties
+    *
+    * @return  true is the replication protocol uses Total Order properties  
+    */
    public abstract boolean useTotalOrder();
 
    /**

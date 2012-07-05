@@ -34,7 +34,7 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public boolean canSwitchTo(ReconfigurableProtocol protocol) {
+   public final boolean canSwitchTo(ReconfigurableProtocol protocol) {
       return PB_UID.equals(protocol.getUniqueProtocolName()) ||
             TO_UID.endsWith(protocol.getUniqueProtocolName());
    }
@@ -63,13 +63,13 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
+   public final void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
       //no-op
    }
 
    @Override
-   public void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
-                                     ReconfigurableProtocol currentProtocol) {
+   public final void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                           ReconfigurableProtocol currentProtocol) {
       if (PB_UID.equals(currentProtocol.getUniqueProtocolName())) {
          return;
       } else if (TO_UID.equals(currentProtocol.getUniqueProtocolName())) {
@@ -82,8 +82,8 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
-                                             ReconfigurableProtocol oldProtocol) {
+   public final void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                                   ReconfigurableProtocol oldProtocol) {
       if (PB_UID.equals(oldProtocol.getUniqueProtocolName())) {
          return;
       }
@@ -106,7 +106,7 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public boolean useTotalOrder() {
+   public final boolean useTotalOrder() {
       return false;
    }
 
@@ -117,6 +117,9 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
       }
    }
 
+   /**
+    * Asynchronously sends the Ack when all local transactions are finished
+    */
    private class SendAckThread extends Thread {
 
       public SendAckThread() {
