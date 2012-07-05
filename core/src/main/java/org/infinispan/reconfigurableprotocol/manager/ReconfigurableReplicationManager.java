@@ -1,5 +1,6 @@
 package org.infinispan.reconfigurableprotocol.manager;
 
+import org.infinispan.CacheException;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.ReconfigurableProtocolCommand;
 import org.infinispan.commands.write.WriteCommand;
@@ -182,7 +183,8 @@ public class ReconfigurableReplicationManager {
     * @param globalTransaction      the global transaction
     * @throws InterruptedException  if interrupted while waiting for the switch to finish
     */
-   public final void notifyLocalTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) throws InterruptedException {
+   public final void notifyLocalTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet, String executionProtocolId) 
+         throws InterruptedException {
       //returns immediately if no switch is in progress
       if (log.isDebugEnabled()) {
          log.debugf("[%s] local transaction %s wants to commit. check if switch is in progress...",
@@ -194,6 +196,11 @@ public class ReconfigurableReplicationManager {
       ProtocolManager.CurrentProtocolInfo currentProtocolInfo = protocolManager.getCurrentProtocolInfo();
       long epoch = currentProtocolInfo.getEpoch();
       ReconfigurableProtocol actual = currentProtocolInfo.getCurrent();
+      
+      if (!actual.getUniqueProtocolName().equals(executionProtocolId)) {
+         throw new CacheException("Cannot commit transaction. the execution protocol is different from the current " +
+                                        "protocol");
+      }
 
       globalTransaction.setEpochId(epoch);
       globalTransaction.setProtocolId(actual.getUniqueProtocolName());

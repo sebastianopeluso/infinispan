@@ -34,6 +34,7 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
 import org.infinispan.interceptors.InterceptorChain;
+import org.infinispan.reconfigurableprotocol.ProtocolTable;
 import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
@@ -68,18 +69,21 @@ public class TransactionCoordinator {
 
    boolean trace;
 
-   private ReconfigurableReplicationManager reconfigurableReplicationManager;
+   private ReconfigurableReplicationManager manager;
+   private ProtocolTable protocolTable;
 
    @Inject
    public void init(CommandsFactory commandsFactory, InvocationContextContainer icc, InterceptorChain invoker,
                     TransactionTable txTable, Configuration configuration,
-                    ReconfigurableReplicationManager reconfigurableReplicationManager) {
+                    ReconfigurableReplicationManager reconfigurableReplicationManager,
+                    ProtocolTable protocolTable) {
       this.commandsFactory = commandsFactory;
       this.icc = icc;
       this.invoker = invoker;
       this.txTable = txTable;
       this.configuration = configuration;
-      this.reconfigurableReplicationManager = reconfigurableReplicationManager;
+      this.manager = reconfigurableReplicationManager;
+      this.protocolTable = protocolTable;
       trace = log.isTraceEnabled();
    }
 
@@ -134,8 +138,11 @@ public class TransactionCoordinator {
       GlobalTransaction globalTransaction = localTransaction.getGlobalTransaction();
       List<WriteCommand> modificationsList = localTransaction.getModifications();
       try {
-         reconfigurableReplicationManager.notifyLocalTransaction(globalTransaction, modificationsList.toArray(
-               new WriteCommand[modificationsList.size()]));
+         WriteCommand[] writeSet = modificationsList == null || modificationsList.isEmpty() ?
+               new WriteCommand[0] :
+               modificationsList.toArray(new WriteCommand[modificationsList.size()]);
+         manager.notifyLocalTransaction(globalTransaction, writeSet, protocolTable.getProtocolId(
+               localTransaction.getTransaction()));
       } catch (InterruptedException e) {
          rollback(localTransaction);
          throw new XAException(XAException.XA_RBROLLBACK);
@@ -196,6 +203,8 @@ public class TransactionCoordinator {
             if (!isOnePhaseTotalOrder()) { //in total order and 1PC, the rollback command is not needed
                handleCommitFailure(e, localTransaction);
             }
+         } finally {
+            protocolTable.remove(localTransaction.getTransaction());
          }
       } else {
          CommitCommand commitCommand = commandCreator.createCommitCommand(localTransaction.getGlobalTransaction());
@@ -204,6 +213,8 @@ public class TransactionCoordinator {
             txTable.removeLocalTransaction(localTransaction);
          } catch (Throwable e) {
             handleCommitFailure(e, localTransaction);
+         } finally {
+            protocolTable.remove(localTransaction.getTransaction());
          }
       }
    }
@@ -225,6 +236,8 @@ public class TransactionCoordinator {
             txTable.failureCompletingTransaction(transaction);
          }
          throw new XAException(XAException.XAER_RMERR);
+      }  finally {
+         protocolTable.remove(localTransaction.getTransaction());
       }
    }
 

@@ -168,4 +168,14 @@ public final class ImmutableContext implements InvocationContext {
    public void clearLockedKeys() {
       throw new CacheException("This context is immutable");
    }
+
+   @Override
+   public void setProtocolId(String protocolId) {
+      throw newUnsupportedMethod();
+   }
+
+   @Override
+   public String getProtocolId() {
+      throw newUnsupportedMethod();
+   }
 }

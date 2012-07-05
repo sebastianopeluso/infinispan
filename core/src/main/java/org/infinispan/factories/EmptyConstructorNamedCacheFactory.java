@@ -40,6 +40,7 @@ import org.infinispan.loaders.CacheLoaderManager;
 import org.infinispan.loaders.CacheLoaderManagerImpl;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
+import org.infinispan.reconfigurableprotocol.ProtocolTable;
 import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
@@ -71,7 +72,7 @@ import static org.infinispan.util.Util.getInstance;
                               BatchContainer.class, EvictionManager.class,
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
                               ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class,
-                              ReconfigurableReplicationManager.class})
+                              ReconfigurableReplicationManager.class, ProtocolTable.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -135,6 +136,8 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
                : (T) new SequentialTotalOrderManager();
       } else if (componentType.equals(ReconfigurableReplicationManager.class)) {
          return (T) new ReconfigurableReplicationManager();
+      } else if (componentType.equals(ProtocolTable.class)) {
+         return (T) new ProtocolTable();
       }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());

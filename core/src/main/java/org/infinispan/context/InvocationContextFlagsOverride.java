@@ -187,4 +187,14 @@ public class InvocationContextFlagsOverride implements InvocationContext {
    public void clearLockedKeys() {
       delegate.clearLockedKeys();
    }
+
+   @Override
+   public void setProtocolId(String protocolId) {
+      delegate.setProtocolId(protocolId);
+   }
+
+   @Override
+   public String getProtocolId() {
+      return delegate.getProtocolId();
+   }
 }

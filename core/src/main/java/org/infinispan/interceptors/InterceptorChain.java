@@ -35,6 +35,7 @@ import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.interceptors.base.ReconfigurableProtocolAwareWrapperInterceptor;
 import org.infinispan.reconfigurableprotocol.ReconfigurableProtocol;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.util.ReflectionUtil;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -72,6 +73,8 @@ public class InterceptorChain {
    private final Map<InterceptorType, ReconfigurableProtocolAwareWrapperInterceptor> wrappers = 
          new EnumMap<InterceptorType, ReconfigurableProtocolAwareWrapperInterceptor>(InterceptorType.class);
 
+   private ReconfigurableReplicationManager manager;
+
    /**
     * reference to the first interceptor in the chain
     */
@@ -87,6 +90,11 @@ public class InterceptorChain {
       for (InterceptorType type : InterceptorType.values()) {
          wrappers.put(type, new ReconfigurableProtocolAwareWrapperInterceptor());
       }
+   }
+
+   @Inject
+   public void inject(ReconfigurableReplicationManager manager) {
+      this.manager = manager;
    }
 
    @Start
@@ -362,6 +370,7 @@ public class InterceptorChain {
     */
    public Object invoke(InvocationContext ctx, VisitableCommand command) {
       try {
+         ctx.setProtocolId(manager.getCurrentProtocolId());
          return command.acceptVisitor(ctx, firstInChain);
       } catch (CacheException e) {
          if (e.getCause() instanceof InterruptedException)
@@ -452,15 +461,15 @@ public class InterceptorChain {
       }
       return false;
    }
-   
-   public void appendWrapper(InterceptorType type) {                  
+
+   public void appendWrapper(InterceptorType type) {
       appendInterceptor(wrappers.get(type), false);
    }
-   
-   public void registerNewProtocol(ReconfigurableProtocol protocol) {      
+
+   public void registerNewProtocol(ReconfigurableProtocol protocol) {
       EnumMap<InterceptorType, CommandInterceptor> newInterceptors = protocol.buildInterceptorChain();
       for (Map.Entry<InterceptorType, CommandInterceptor> entry : newInterceptors.entrySet()) {
          wrappers.get(entry.getKey()).setProtocolDependentInterceptor(protocol.getUniqueProtocolName(), entry.getValue());
-      }      
+      }
    }
 }

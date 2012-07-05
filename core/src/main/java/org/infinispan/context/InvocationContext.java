@@ -40,7 +40,7 @@ public interface InvocationContext extends EntryLookup, FlagContainer, Cloneable
     * Returns true if the call was originated locally, false if it is the result of a remote rpc.
     */
    boolean isOriginLocal();
-   
+
    /**
     * Get the origin of the command, or null if the command originated locally
     * @return
@@ -115,4 +115,18 @@ public interface InvocationContext extends EntryLookup, FlagContainer, Cloneable
     * @param key lock to test
     */
    boolean hasLockedKey(Object key);
+
+   /**
+    * sets the replication protocol to be used by the command
+    *
+    * @param protocolId the protocol ID
+    */
+   void setProtocolId(String protocolId);
+
+   /**
+    * returns the protocol ID to be used by the command
+    *
+    * @return  the protocol ID to be used by the command
+    */
+   String getProtocolId();
 }

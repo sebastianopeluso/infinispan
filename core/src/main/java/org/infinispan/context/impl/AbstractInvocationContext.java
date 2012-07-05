@@ -63,6 +63,8 @@ public abstract class AbstractInvocationContext implements InvocationContext {
       }
    }
 
+   private String protocolId;
+
    /**
     * Tests whether a context flag is set.
     *
@@ -194,5 +196,15 @@ public abstract class AbstractInvocationContext implements InvocationContext {
       return getClass().getSimpleName() + "{" +
             "flags=" + flags +
             '}';
+   }
+
+   @Override
+   public void setProtocolId(String protocolId) {
+      this.protocolId = protocolId;
+   }
+
+   @Override
+   public String getProtocolId() {
+      return protocolId;
    }
 }

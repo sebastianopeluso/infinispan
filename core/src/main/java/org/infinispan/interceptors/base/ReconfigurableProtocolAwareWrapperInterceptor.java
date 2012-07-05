@@ -1,9 +1,11 @@
 package org.infinispan.interceptors.base;
 
+import org.infinispan.commands.VisitableCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.TransactionBoundaryCommand;
+import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
@@ -39,6 +41,11 @@ public class ReconfigurableProtocolAwareWrapperInterceptor extends CommandInterc
       return handleTxBoundaryCommand(ctx, command);
    }
 
+   @Override
+   protected Object handleDefault(InvocationContext ctx, VisitableCommand command) throws Throwable {
+      return command.acceptVisitor(ctx, getNext(ctx.getProtocolId()));
+   }
+
    /**
     * set the command interceptor that a transaction boundary command created in a specific transaction protocol
     * should visit
@@ -54,7 +61,10 @@ public class ReconfigurableProtocolAwareWrapperInterceptor extends CommandInterc
    }
 
    private CommandInterceptor getNext(GlobalTransaction globalTransaction) {
-      String protocolId = globalTransaction.getProtocolId();
+      return getNext(globalTransaction.getProtocolId());
+   }
+
+   private CommandInterceptor getNext(String protocolId) {
       CommandInterceptor next = protocolDependentInterceptor.get(protocolId);
       return next != null ? next : getNext();
    }
