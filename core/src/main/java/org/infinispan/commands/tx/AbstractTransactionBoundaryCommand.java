@@ -160,7 +160,7 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    }
 
    protected void visitRemoteTransaction(RemoteTransaction tx) throws InterruptedException, NoSuchReconfigurableProtocolException {
-      reconfigurableReplicationManager.notifyRemoteTransaction(tx.getGlobalTransaction());
+      reconfigurableReplicationManager.notifyRemoteTransaction(tx.getGlobalTransaction(), null);
    }
 
    @Override

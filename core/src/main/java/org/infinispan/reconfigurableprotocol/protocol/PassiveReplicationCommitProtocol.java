@@ -1,5 +1,6 @@
 package org.infinispan.reconfigurableprotocol.protocol;
 
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.interceptors.PassivationInterceptor;
 import org.infinispan.interceptors.PassiveReplicationInterceptor;
 import org.infinispan.interceptors.base.CommandInterceptor;
@@ -22,6 +23,7 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
 
    public static final String UID = "PB";
    private static final String MASTER_ACK = "_MASTER_ACK_";
+   private static final String SWITCH_TO_MASTER_ACK = "_MASTER_ACK_2_";
    private boolean masterAckReceived = false;
 
    @Override
@@ -30,8 +32,14 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public final boolean switchTo(ReconfigurableProtocol protocol) {
+   public boolean canSwitchTo(ReconfigurableProtocol protocol) {
       return TwoPhaseCommitProtocol.UID.equals(protocol.getUniqueProtocolName());
+   }
+
+   @Override
+   public void switchTo(ReconfigurableProtocol protocol) {
+      manager.unsafeSwitch(protocol);
+      new SendMasterAckThread().start();
    }
 
    @Override
@@ -72,8 +80,26 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public final boolean canProcessOldTransaction(GlobalTransaction globalTransaction) {
-      return TwoPhaseCommitProtocol.UID.equals(globalTransaction.getReconfigurableProtocol().getUniqueProtocolName());
+   public void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
+      //no-op
+   }
+
+   @Override
+   public void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                     ReconfigurableProtocol currentProtocol) {
+      if (!TwoPhaseCommitProtocol.UID.equals(currentProtocol.getUniqueProtocolName())) {
+         throwOldTxException();
+      }
+      //no-op
+   }
+
+   @Override
+   public void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                             ReconfigurableProtocol oldProtocol) {
+      if (!TwoPhaseCommitProtocol.UID.equals(oldProtocol.getUniqueProtocolName())) {
+         throwSpeculativeTxException();
+      }
+      //no-op
    }
 
    @Override
@@ -102,12 +128,50 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
+   public boolean useTotalOrder() {
+      return false;
+   }
+
+   @Override
    protected final void internalHandleData(Object data, Address from) {
       if (MASTER_ACK.equals(data)) {
+         if (log.isDebugEnabled()) {
+            log.debugf("Handle Master Ack message");
+         }
          synchronized (this) {
             masterAckReceived = true;
             this.notifyAll();
          }
+      } else if (SWITCH_TO_MASTER_ACK.equals(data)) {
+         if (log.isDebugEnabled()) {
+            log.debugf("Handle Switch To Master Ack message");
+         }
+         try {
+            //just to be safe... we will not have remote transactions
+            awaitUntilRemoteTransactionsFinished();
+         } catch (InterruptedException e) {
+            //ignore
+         }
+         manager.safeSwitch(null);
+      }
+   }
+
+   private class SendMasterAckThread extends Thread {
+
+      private SendMasterAckThread() {
+         super("PB-Send-Ack-Thread");
+      }
+
+      @Override
+      public void run() {
+         try {
+            awaitUntilLocalTransactionsFinished();
+         } catch (InterruptedException e) {
+            //interrupted
+            return;
+         }
+         broadcastData(SWITCH_TO_MASTER_ACK, false);
+         manager.safeSwitch(null);
       }
    }
 }

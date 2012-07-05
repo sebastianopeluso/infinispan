@@ -1,5 +1,6 @@
 package org.infinispan.reconfigurableprotocol.protocol;
 
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderDistributionInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderInterceptor;
@@ -27,14 +28,21 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
 
    public static final String UID = "TO";
 
+   private static final String TWO_PC_UID = TwoPhaseCommitProtocol.UID;
+
    @Override
    public final String getUniqueProtocolName() {
       return UID;
    }
 
    @Override
-   public final boolean switchTo(ReconfigurableProtocol protocol) {
-      return false;
+   public boolean canSwitchTo(ReconfigurableProtocol protocol) {
+      return TWO_PC_UID.equals(protocol.getUniqueProtocolName());
+   }
+
+   @Override
+   public void switchTo(ReconfigurableProtocol protocol) {
+      manager.safeSwitch(protocol);
    }
 
    @Override
@@ -48,8 +56,29 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public final boolean canProcessOldTransaction(GlobalTransaction globalTransaction) {
-      return false;
+   public void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
+      //no-op
+   }
+
+   @Override
+   public void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                     ReconfigurableProtocol currentProtocol) {
+      throwOldTxException();
+   }
+
+   @Override
+   public void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                             ReconfigurableProtocol oldProtocol) {
+      if (TWO_PC_UID.equals(oldProtocol.getUniqueProtocolName())) {
+         try {
+            oldProtocol.ensureNoConflict(writeSet);
+            return;
+         } catch (InterruptedException e) {
+            //no-op
+         }
+      }
+
+      throwSpeculativeTxException();
    }
 
    @Override
@@ -122,6 +151,11 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
    public final boolean use1PC(LocalTransaction localTransaction) {
       return !configuration.versioning().enabled() ||
             (configuration.transaction().useSynchronization() && !configuration.clustering().cacheMode().isDistributed());
+   }
+
+   @Override
+   public boolean useTotalOrder() {
+      return true;
    }
 
    @Override

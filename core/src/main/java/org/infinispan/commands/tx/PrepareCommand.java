@@ -115,7 +115,7 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
       * https://jira.jboss.org/jira/browse/ISPN-48
       */
       remoteTransaction.setModifications(getModifications());
-      visitRemoteTransaction(remoteTransaction);
+      reconfigurableReplicationManager.notifyRemoteTransaction(getGlobalTransaction(), modifications);
 
       // 2. then set it on the invocation context
       RemoteTxInvocationContext ctx = icc.createRemoteTxInvocationContext(remoteTransaction, getOrigin());

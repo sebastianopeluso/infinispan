@@ -1,7 +1,9 @@
 package org.infinispan.reconfigurableprotocol;
 
+import org.infinispan.CacheException;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.ReconfigurableProtocolCommand;
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.factories.ComponentRegistry;
 import org.infinispan.interceptors.*;
@@ -9,19 +11,24 @@ import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.interceptors.locking.NonTransactionalLockingInterceptor;
 import org.infinispan.interceptors.locking.OptimisticLockingInterceptor;
 import org.infinispan.interceptors.locking.PessimisticLockingInterceptor;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.transaction.TransactionMode;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.Util;
 import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.DATA;
@@ -37,31 +44,34 @@ public abstract class ReconfigurableProtocol {
 
    protected final Log log = LogFactory.getLog(getClass());
 
-   private static final String LOCAL_STOP_ACK = "___LOCAL_ACK___";
+   private static final String LOCAL_STOP_ACK = "_LOCAL_ACK_";
 
    protected Configuration configuration;
    private ComponentRegistry componentRegistry;
    private RpcManager rpcManager;
    private CommandsFactory commandsFactory;
+   protected ReconfigurableReplicationManager manager;
 
-   private final Set<GlobalTransaction> localTransactions;
-   private final Set<GlobalTransaction> remoteTransactions;
+   protected final Map<GlobalTransaction, Set<Object>> localTransactions;
+   protected final Map<GlobalTransaction, Set<Object>> remoteTransactions;
 
-   private final StopAckCollector stopAckCollector;
+   private final AckCollector ackCollector;
 
    public ReconfigurableProtocol() {
-      localTransactions = new HashSet<GlobalTransaction>();
-      remoteTransactions = new HashSet<GlobalTransaction>();
-      stopAckCollector = new StopAckCollector();
+      localTransactions = new HashMap<GlobalTransaction, Set<Object>>();
+      remoteTransactions = new HashMap<GlobalTransaction, Set<Object>>();
+      ackCollector = new AckCollector();
    }
 
    //sets the dependencies
-   public final void initialize(Configuration configuration, ComponentRegistry componentRegistry) {
+   public final void initialize(Configuration configuration, ComponentRegistry componentRegistry,
+                                ReconfigurableReplicationManager manager) {
       this.configuration = configuration;
       this.componentRegistry = componentRegistry;
+      this.manager = manager;
       this.rpcManager = getComponent(RpcManager.class);
       this.commandsFactory = getComponent(CommandsFactory.class);
-      this.stopAckCollector.reset();
+      this.ackCollector.reset();
    }
 
    /**
@@ -69,12 +79,12 @@ public abstract class ReconfigurableProtocol {
     *
     * @param globalTransaction   the global transaction
     */
-   public final void addLocalTransaction(GlobalTransaction globalTransaction) {
+   public final void addLocalTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
       if (log.isDebugEnabled()) {
          log.debugf("[%s] local transaction starts to commit", globalTransaction.prettyPrint());
       }
       synchronized (localTransactions) {
-         localTransactions.add(globalTransaction);
+         localTransactions.put(globalTransaction, Util.getAffectedKeys(Arrays.asList(writeSet)));
       }
    }
 
@@ -98,12 +108,18 @@ public abstract class ReconfigurableProtocol {
     *
     * @param globalTransaction   the global transaction
     */
-   public final void addRemoteTransaction(GlobalTransaction globalTransaction) {
+   public final void addRemoteTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
       if (log.isDebugEnabled()) {
          log.debugf("[%s] remote transaction received", globalTransaction.prettyPrint());
       }
       synchronized (remoteTransactions) {
-         remoteTransactions.add(globalTransaction);
+         if (remoteTransactions.get(globalTransaction) != null) {
+            //no-op
+         } else if (writeSet == null) {
+            remoteTransactions.put(globalTransaction, null);
+         } else {
+            remoteTransactions.put(globalTransaction, Util.getAffectedKeys(Arrays.asList(writeSet)));
+         }
       }
    }
 
@@ -133,7 +149,7 @@ public abstract class ReconfigurableProtocol {
          if (log.isTraceEnabled()) {
             log.tracef("[%s] Data message received and it is a stop ack", from);
          }
-         stopAckCollector.addAck(from);
+         ackCollector.addAck(from);
       } else {
          if (log.isTraceEnabled()) {
             log.tracef("[%s] Data message received. Data is %s", from, data);
@@ -145,6 +161,40 @@ public abstract class ReconfigurableProtocol {
    @Override
    public final String toString() {
       return "ReconfigurableProtocol{protocolName=" + getUniqueProtocolName() + "}";
+   }
+
+   public final void ensureNoConflict(WriteCommand[] writeSet) throws InterruptedException {
+      if (writeSet == null) {
+         return;
+      }
+      Set<Object> keys = Util.getAffectedKeys(Arrays.asList(writeSet));
+      synchronized (localTransactions) {
+         boolean conflict = true;
+         while (conflict) {
+            conflict = false;
+            for (Set<Object> localWriteSet : localTransactions.values()) {
+               if (localWriteSet == null || keys == null) {
+                  conflict = true;
+                  break;
+               }
+            }
+            localTransactions.wait();
+         }
+      }
+
+      synchronized (remoteTransactions) {
+         boolean conflict = true;
+         while (conflict) {
+            conflict = false;
+            for (Set<Object> localWriteSet : remoteTransactions.values()) {
+               if (localWriteSet == null || keys == null) {
+                  conflict = true;
+                  break;
+               }
+            }
+            remoteTransactions.wait();
+         }
+      }
    }
 
    /**
@@ -240,6 +290,12 @@ public abstract class ReconfigurableProtocol {
       if (log.isTraceEnabled()) {
          log.tracef("Broadcast data. Data is %s, Using total order? %s", data, totalOrder);
       }
+
+      if (LOCAL_STOP_ACK.equals(data)) {
+         throw new IllegalStateException("Cannot broadcast data for protocol " + getUniqueProtocolName() + ". It" +
+                                               " is equals to the private data");
+      }
+
       ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(DATA, getUniqueProtocolName());
       command.setData(data);
       rpcManager.broadcastRpcCommand(command, false, totalOrder);
@@ -350,9 +406,9 @@ public abstract class ReconfigurableProtocol {
       }
       awaitUntilLocalTransactionsFinished();
       broadcastData(LOCAL_STOP_ACK, totalOrder);
-      stopAckCollector.awaitAllAck();
+      ackCollector.awaitAllAck();
       awaitUntilRemoteTransactionsFinished();
-      stopAckCollector.reset();
+      ackCollector.reset();
       if (log.isDebugEnabled()) {
          log.debugf("[%s] Global stop protocol completed. No transaction are committing now",
                     Thread.currentThread().getName());
@@ -375,6 +431,14 @@ public abstract class ReconfigurableProtocol {
       return rpcManager.getTransport().isCoordinator();
    }
 
+   protected final void throwOldTxException() {
+      throw new CacheException("Old transaction from " + getUniqueProtocolName() + " not allowed in current epoch");
+   }
+
+   protected final void throwSpeculativeTxException() {
+      throw new CacheException("Speculative transaction from " + getUniqueProtocolName() + " not allowed");
+   }
+
    /**
     * the global unique protocol name
     *
@@ -383,13 +447,21 @@ public abstract class ReconfigurableProtocol {
    public abstract String getUniqueProtocolName();
 
    /**
+    * returns true if the {@link #switchTo(ReconfigurableProtocol)} can be perform
+    * with the new protocol
+    *
+    * @param protocol   the new protocol
+    * @return           true if this protocol can switch directly to the new protocol, false otherwise
+    */
+   public abstract boolean canSwitchTo(ReconfigurableProtocol protocol);
+
+   /**
     * this method switches between te current protocol to the new protocol without ensure this strong condition:
     *  -- no transaction in the current protocol are running in all the system see {@link #stopProtocol()}
     *
-    * @param protocol   the new protocol
-    * @return           true if the switch is done, false otherwise
+    * @param protocol   the new protocol                      
     */
-   public abstract boolean switchTo(ReconfigurableProtocol protocol);
+   public abstract void switchTo(ReconfigurableProtocol protocol);
 
    /**
     * it ensures that no transactions in the current protocol are running in the system (strong condition). this is
@@ -403,14 +475,12 @@ public abstract class ReconfigurableProtocol {
     */
    public abstract void bootProtocol();
 
-   /**
-    * this method check if the {@param globalTransaction} (which contains information about the protocol that is committing it)
-    * can be safely committed when this protocol is running.
-    *
-    * @param globalTransaction   the global transaction    
-    * @return                    true if it can be validated, false otherwise
-    */
-   public abstract boolean canProcessOldTransaction(GlobalTransaction globalTransaction);
+   public abstract void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet);
+
+   public abstract void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet, ReconfigurableProtocol currentProtocol);
+
+   public abstract void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                                      ReconfigurableProtocol oldProtocol);
 
    /**
     * one of the first methods to be invoked when this protocol is register. It must register all the components added and
@@ -436,6 +506,8 @@ public abstract class ReconfigurableProtocol {
     * @return                 true if it can be committed in 1 phase, false otherwise
     */
    public abstract boolean use1PC(LocalTransaction localTransaction);
+   
+   public abstract boolean useTotalOrder();
 
    /**
     * method invoked when a message is received for this protocol
@@ -448,11 +520,11 @@ public abstract class ReconfigurableProtocol {
    /**
     * class the collects all the ack from all member, unblocking waiting threads in the end
     */
-   private class StopAckCollector {
+   protected class AckCollector {
       //NOTE: it is assuming that nodes will no leave neither join the cache during the switch
       private final Set<Address> members;
 
-      private StopAckCollector() {
+      public AckCollector() {
          members = new HashSet<Address>();
       }
 
@@ -467,7 +539,6 @@ public abstract class ReconfigurableProtocol {
       }
 
       public synchronized final void awaitAllAck() throws InterruptedException {
-         //TODO the message is not self deliver!
          if (log.isDebugEnabled()) {
             log.debugf("[%s] thread will wait for all acks...", Thread.currentThread().getName());
          }
@@ -482,6 +553,7 @@ public abstract class ReconfigurableProtocol {
       public synchronized final void reset() {
          members.clear();
          members.addAll(getCacheMembers());
+         members.remove(rpcManager.getAddress());
       }
    }
 }

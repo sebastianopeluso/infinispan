@@ -627,4 +627,37 @@ public final class Util {
       }
       return set;
    }
+
+   /**
+    * it returns a set of keys touched by the modification collection
+    * @param modifications the modification collection
+
+    * @return a set of keys touched by the modification collection
+    */
+   public static Set<Object> getAffectedKeys(Collection<WriteCommand> modifications) {
+      if (modifications == null) {
+         return Collections.emptySet();
+      }
+      Set<Object> set = new HashSet<Object>(modifications.size());
+      for (WriteCommand wc: modifications) {
+         switch (wc.getCommandId()) {
+            case ClearCommand.COMMAND_ID:
+               return null;
+            case PutKeyValueCommand.COMMAND_ID:
+            case RemoveCommand.COMMAND_ID:
+            case ReplaceCommand.COMMAND_ID:
+               set.add(((DataWriteCommand) wc).getKey());
+               break;
+            case PutMapCommand.COMMAND_ID:
+               set.addAll(wc.getAffectedKeys());
+               break;
+            case ApplyDeltaCommand.COMMAND_ID:
+               ApplyDeltaCommand command = (ApplyDeltaCommand) wc;
+               Object[] compositeKeys = command.getCompositeKeys();
+               set.addAll(Arrays.asList(compositeKeys));
+               break;
+         }
+      }
+      return set;
+   }
 }

@@ -132,8 +132,10 @@ public class TransactionCoordinator {
       validateNotMarkedForRollback(localTransaction);
 
       GlobalTransaction globalTransaction = localTransaction.getGlobalTransaction();
+      List<WriteCommand> modificationsList = localTransaction.getModifications();
       try {
-         reconfigurableReplicationManager.notifyLocalTransaction(globalTransaction);
+         reconfigurableReplicationManager.notifyLocalTransaction(globalTransaction, modificationsList.toArray(
+               new WriteCommand[modificationsList.size()]));
       } catch (InterruptedException e) {
          rollback(localTransaction);
          throw new XAException(XAException.XA_RBROLLBACK);
@@ -144,7 +146,7 @@ public class TransactionCoordinator {
          return XA_OK;
       }
 
-      PrepareCommand prepareCommand = commandCreator.createPrepareCommand(localTransaction.getGlobalTransaction(), localTransaction.getModifications());
+      PrepareCommand prepareCommand = commandCreator.createPrepareCommand(localTransaction.getGlobalTransaction(), modificationsList);
       if (trace) log.tracef("Sending prepare command through the chain: %s", prepareCommand);
 
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();

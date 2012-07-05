@@ -16,6 +16,8 @@ public class ProtocolManager {
 
    private long epoch = 0;
    private ReconfigurableProtocol current;
+   private ReconfigurableProtocol old;
+   private State state;
 
    /**
     * init the protocol manager with the initial replication protocol
@@ -23,7 +25,10 @@ public class ProtocolManager {
     * @param actual  the initial replication protocol
     */
    public final synchronized void init(ReconfigurableProtocol actual) {
+      this.old = null;
       this.current = actual;
+      this.state = State.SAFE;
+      this.epoch = 0;
    }
 
    /**
@@ -34,13 +39,23 @@ public class ProtocolManager {
    public final synchronized ReconfigurableProtocol getCurrent() {
       return current;
    }
+   
+   public final synchronized void inProgress() {
+      this.state = State.IN_PROGRESS;
+   }
 
    /**
     * atomically changes the current protocol and increments the epoch
     *
     * @param newProtocol   the new replication protocol to use
     */
-   public final synchronized void changeAndIncrementEpoch(ReconfigurableProtocol newProtocol) {
+   public final synchronized void change(ReconfigurableProtocol newProtocol, boolean safe) {
+      state = safe ? State.SAFE : State.UNSAFE;
+      notifyAll();
+      if (newProtocol == null || isCurrentProtocol(newProtocol)) {
+         return;
+      }
+      old = current;
       current = newProtocol;
       epoch++;
       this.notifyAll();
@@ -65,17 +80,8 @@ public class ProtocolManager {
     *
     * @return  the current replication protocol and epoch
     */
-   public final synchronized CurrentProtocolAndEpoch getCurrentProtocolAndEpoch() {
-      return new CurrentProtocolAndEpoch(epoch, current);
-   }
-
-   /**
-    * returns the current epoch
-    *
-    * @return  the current epoch
-    */
-   public final synchronized long getEpoch() {
-      return epoch;
+   public final synchronized CurrentProtocolInfo getCurrentProtocolInfo() {
+      return new CurrentProtocolInfo(epoch, current, old, state);
    }
 
    /**
@@ -95,33 +101,64 @@ public class ProtocolManager {
          log.debugf("[%s] epoch is the desired. Moving on...", Thread.currentThread().getName());
       }
    }
+   
+   public final synchronized boolean isUnsafe() {
+      return state == State.UNSAFE;
+   }
+   
+   public final synchronized boolean isInProgress() {
+      return state == State.IN_PROGRESS;
+   }
+
+   public final synchronized void ensureNotInProgress() throws InterruptedException {
+      while (isInProgress()) {
+         wait();
+      }
+   }
 
    /**
     * class used to atomically retrieve the current replication protocol and epoch
     */
-   public static class CurrentProtocolAndEpoch {
+   public static class CurrentProtocolInfo {
       private final long epoch;
-      private final ReconfigurableProtocol current;
+      private final ReconfigurableProtocol current, old;
+      private final State state;
 
-      public CurrentProtocolAndEpoch(long epoch, ReconfigurableProtocol current) {
+      public CurrentProtocolInfo(long epoch, ReconfigurableProtocol current, ReconfigurableProtocol old, State state) {
          this.epoch = epoch;
          this.current = current;
+         this.old = old;
+         this.state = state;
       }
 
       public final long getEpoch() {
          return epoch;
       }
 
-      public final ReconfigurableProtocol getProtocol() {
+      public final ReconfigurableProtocol getCurrent() {
          return current;
+      }
+
+      public final ReconfigurableProtocol getOld() {
+         return old;
+      }
+      
+      public final boolean isUnsafe() {
+         return state == State.UNSAFE;
       }
 
       @Override
       public final String toString() {
-         return "CurrentProtocolAndEpoch{" +
+         return "CurrentProtocolInfo{" +
                "epoch=" + epoch +
                ", current=" + current +
                '}';
       }
+   }
+
+   private enum State {
+      SAFE,
+      UNSAFE,
+      IN_PROGRESS
    }
 }

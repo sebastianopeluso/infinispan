@@ -63,7 +63,7 @@ public class ReconfigurableProtocolRegistry {
                    protocol.getUniqueProtocolName());
          throw new AlreadyRegisterProtocolException(protocol);
       }
-
+      
       idsToProtocol.put(protocol.getUniqueProtocolName(), protocol);
       protocol.bootstrapProtocol();
       interceptorChain.registerNewProtocol(protocol);
