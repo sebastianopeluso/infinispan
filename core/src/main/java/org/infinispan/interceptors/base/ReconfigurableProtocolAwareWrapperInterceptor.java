@@ -46,6 +46,14 @@ public class ReconfigurableProtocolAwareWrapperInterceptor extends CommandInterc
       return command.acceptVisitor(ctx, getNext(ctx.getProtocolId()));
    }
 
+   @Override
+   public void setNext(CommandInterceptor next) {
+      super.setNext(next);
+      for (CommandInterceptor ci : protocolDependentInterceptor.values()) {
+         ci.setNext(next);
+      }
+   }
+
    /**
     * set the command interceptor that a transaction boundary command created in a specific transaction protocol
     * should visit
