@@ -40,6 +40,7 @@ import org.infinispan.loaders.CacheLoaderManager;
 import org.infinispan.loaders.CacheLoaderManagerImpl;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
 import org.infinispan.statetransfer.totalorder.TotalOrderStateTransferLockImpl;
@@ -69,7 +70,8 @@ import static org.infinispan.util.Util.getInstance;
                               CacheLoaderManager.class, InvocationContextContainer.class, PassivationManager.class,
                               BatchContainer.class, EvictionManager.class,
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
-                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class})
+                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class,
+                              ReconfigurableReplicationManager.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -128,9 +130,11 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
 
          return needsMultiThreadValidation ?
                (configuration.getCacheMode().isDistributed() ?
-                     (T) new DistParallelTotalOrderManager() :
-                     (T) new ParallelTotalOrderManager())
+                      (T) new DistParallelTotalOrderManager() :
+                      (T) new ParallelTotalOrderManager())
                : (T) new SequentialTotalOrderManager();
+      } else if (componentType.equals(ReconfigurableReplicationManager.class)) {
+         return (T) new ReconfigurableReplicationManager();
       }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());
