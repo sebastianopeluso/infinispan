@@ -164,6 +164,10 @@ public class ProtocolManager {
          return state == State.UNSAFE;
       }
 
+      public final String printState() {
+         return state.name();
+      }
+
       @Override
       public final String toString() {
          return "CurrentProtocolInfo{" +

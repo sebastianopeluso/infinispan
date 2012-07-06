@@ -490,4 +490,28 @@ public class ReconfigurableReplicationManager {
    public final int getSwitchCoolDownTime() {
       return coolDownTimeManager.getCoolDownTimePeriod();
    }
+
+   @ManagedOperation(description = "Prints the current state")
+   public final String printState() {
+      ProtocolManager.CurrentProtocolInfo currentProtocolInfo = protocolManager.getCurrentProtocolInfo();
+      StringBuilder sb = new StringBuilder();
+      sb.append("Epoch=").append(currentProtocolInfo.getEpoch()).append("\n");
+
+      Map.Entry<String, String> info = getProtocolInfo(currentProtocolInfo.getCurrent()).entrySet().iterator().next();
+
+      sb.append("Current Protocol ID=").append(info.getKey()).append("\n");
+      sb.append("Current Protocol Class=").append(info.getValue()).append("\n");
+
+      if (currentProtocolInfo.getOld() == null) {
+         sb.append("Old Protocol ID=null\n");
+         sb.append("Old Protocol Class=null\n");
+      } else {
+         info = getProtocolInfo(currentProtocolInfo.getOld()).entrySet().iterator().next();
+         sb.append("Old Protocol ID=").append(info.getKey()).append("\n");
+         sb.append("Old Protocol Class=").append(info.getValue()).append("\n");
+      }
+
+      sb.append("State=").append(currentProtocolInfo.printState());
+      return sb.toString();
+   }
 }
