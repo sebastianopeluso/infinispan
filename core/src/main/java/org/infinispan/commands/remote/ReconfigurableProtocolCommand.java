@@ -63,7 +63,7 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
             manager.switchTo(protocolId);
             break;
          case SET_COOL_DOWN_TIME:
-            manager.setSwitchCoolDownTime((Integer) data);
+            manager.internalSetSwitchCoolDownTime((Integer) data);
             break;
          default:
             break;

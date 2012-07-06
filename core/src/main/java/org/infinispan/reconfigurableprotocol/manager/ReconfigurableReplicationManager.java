@@ -28,8 +28,11 @@ import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.Type;
 
@@ -337,16 +340,19 @@ public class ReconfigurableReplicationManager {
       protocolManager.change(newProtocol, false);
    }
 
+   public final void internalSetSwitchCoolDownTime(int seconds) {
+      coolDownTimeManager.setCoolDownTimePeriod(seconds);
+   }
+
    /**
     * Returns the information about the protocol, namely the protocol ID and the full class name
     *
     * @param protocol   the protocol
     * @return           the information about the protocol, namely the protocol ID and the full class name
     */
-   private String[] getProtocolInfo(ReconfigurableProtocol protocol) {
-      String[] info = new String[2];
-      info[0] = protocol.getUniqueProtocolName();
-      info[1] = protocol.getClass().getCanonicalName();
+   private Map<String, String> getProtocolInfo(ReconfigurableProtocol protocol) {
+      Map<String, String> info = new LinkedHashMap<String, String>();
+      info.put(protocol.getUniqueProtocolName(), protocol.getClass().getCanonicalName());
       return info;
    }
 
@@ -451,11 +457,11 @@ public class ReconfigurableReplicationManager {
 
    @ManagedAttribute(description = "Returns a collection with the information about the replication protocols available, " +
          "namely, the protocol ID and the class name", writable = false)
-   public final Collection<String[]> getAvailableProtocolsInfo() {
+   public final Map<String, String> getAvailableProtocolsInfo() {
       Collection<ReconfigurableProtocol> protocols = registry.getAllAvailableProtocols();
-      List<String[]> result = new LinkedList<String[]>();
+      Map<String, String> result = new HashMap<String, String>(protocols.size() * 2);
       for (ReconfigurableProtocol p : protocols) {
-         result.add(getProtocolInfo(p));
+         result.putAll(getProtocolInfo(p));
       }
       return result;
    }
@@ -467,13 +473,13 @@ public class ReconfigurableReplicationManager {
 
    @ManagedAttribute(description = "Returns the current replication protocol information, namely the protocol ID and " +
          "the class name", writable = false)
-   public final String[] getCurrentProtocolInfo() {
+   public final Map<String, String> getCurrentProtocolInfo() {
       return getProtocolInfo(protocolManager.getCurrent());
    }
 
    @ManagedOperation(description = "Sets the new cool down time period (in seconds) to wait before two consecutive switches")
    public final void setSwitchCoolDownTime(int seconds) {
-      coolDownTimeManager.setCoolDownTimePeriod(seconds);
+      internalSetSwitchCoolDownTime(seconds);
       ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.SET_COOL_DOWN_TIME, null);
       command.setData(seconds);
       rpcManager.broadcastRpcCommand(command, false, false);
