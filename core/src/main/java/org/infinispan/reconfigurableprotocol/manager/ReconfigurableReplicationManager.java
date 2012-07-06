@@ -369,7 +369,7 @@ public class ReconfigurableReplicationManager {
       }
 
       public synchronized boolean checkAndSetToSwitch() {
-         if (nextSwitchTime >= System.currentTimeMillis()) {
+         if (nextSwitchTime <= System.currentTimeMillis()) {
             nextSwitchTime = System.currentTimeMillis() + coolDownTimePeriod;
             return true;
          } else {
@@ -438,6 +438,7 @@ public class ReconfigurableReplicationManager {
       }
 
       if (!coolDownTimeManager.checkAndSetToSwitch()) {
+         log.warnf("Tried to switch to %s but you cannot do it right now...", protocolId);
          throw new Exception("You need to wait before perform a new switch");
       }
 
