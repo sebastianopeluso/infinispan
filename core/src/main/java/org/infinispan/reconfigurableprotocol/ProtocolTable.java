@@ -18,6 +18,8 @@ public class ProtocolTable {
    private final ConcurrentMap<Transaction, String> transactionToProtocol;
    private ReconfigurableReplicationManager manager;
 
+   private final ThreadLocal<String> protocolId = new ThreadLocal<String>();
+
    public ProtocolTable() {
       transactionToProtocol = new ConcurrentHashMap<Transaction, String>();
    }
@@ -49,6 +51,24 @@ public class ProtocolTable {
     */
    public final void remove(Transaction transaction) {
       transactionToProtocol.remove(transaction);
+   }
+
+   /**
+    * sets the replication protocol to use by the thread that invokes this method
+    *
+    * @param protocolId the protocol Id
+    */
+   public final void setThreadProtocolId(String protocolId) {
+      this.protocolId.set(protocolId);
+   }
+
+   /**
+    * returns the replication protocol to use by the thread that invokes this method
+    *
+    * @return  the replication protocol to use by the thread that invokes this method
+    */
+   public final String getThreadProtocolId() {
+      return protocolId.get();
    }
 
 }

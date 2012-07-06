@@ -41,15 +41,21 @@ import org.infinispan.loaders.CacheLoaderManagerImpl;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
 import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
 import org.infinispan.reconfigurableprotocol.ProtocolTable;
+import org.infinispan.reconfigurableprotocol.component.ClusteringDependentLogicDelegate;
+import org.infinispan.reconfigurableprotocol.component.StateTransferLockDelegate;
+import org.infinispan.reconfigurableprotocol.exception.AlreadyExistingComponentProtocolException;
 import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
+import org.infinispan.reconfigurableprotocol.protocol.PassiveReplicationCommitProtocol;
+import org.infinispan.reconfigurableprotocol.protocol.TotalOrderCommitProtocol;
+import org.infinispan.reconfigurableprotocol.protocol.TwoPhaseCommitProtocol;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
 import org.infinispan.statetransfer.totalorder.TotalOrderStateTransferLockImpl;
+import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.totalorder.DistParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.ParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.SequentialTotalOrderManager;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
-import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.xa.recovery.RecoveryAdminOperations;
 import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.concurrent.locks.containers.LockContainer;
@@ -80,19 +86,39 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
    public <T> T construct(Class<T> componentType) {
       Class<?> componentImpl;
       if (componentType.equals(ClusteringDependentLogic.class)) {
-         if (configuration.getCacheMode().isReplicated() || !configuration.getCacheMode().isClustered() || configuration.getCacheMode().isInvalidation()) {
-            if (configuration.isTotalOrder()) {
-               return componentType.cast(new ClusteringDependentLogic.TotalOrderAllNodesLogic());
+         ClusteringDependentLogicDelegate cdl = new ClusteringDependentLogicDelegate();
+         
+         try {
+            if (configuration.getCacheMode().isReplicated() || !configuration.getCacheMode().isClustered() || configuration.getCacheMode().isInvalidation()) {
+               componentRegistry.registerComponent(new ClusteringDependentLogic.AllNodesLogic(),
+                                                   ClusteringDependentLogic.AllNodesLogic.class);
+               componentRegistry.registerComponent(new ClusteringDependentLogic.TotalOrderAllNodesLogic(),
+                                                   ClusteringDependentLogic.TotalOrderAllNodesLogic.class);
+
+               cdl.add(TwoPhaseCommitProtocol.UID,
+                       componentRegistry.getComponent(ClusteringDependentLogic.AllNodesLogic.class));
+               cdl.add(PassiveReplicationCommitProtocol.UID,
+                       componentRegistry.getComponent(ClusteringDependentLogic.AllNodesLogic.class));
+               cdl.add(TotalOrderCommitProtocol.UID,
+                       componentRegistry.getComponent(ClusteringDependentLogic.TotalOrderAllNodesLogic.class));
             } else {
-               return componentType.cast(new ClusteringDependentLogic.AllNodesLogic());
+               componentRegistry.registerComponent(new ClusteringDependentLogic.DistributionLogic(),
+                                                   ClusteringDependentLogic.DistributionLogic.class);
+               componentRegistry.registerComponent(new ClusteringDependentLogic.TotalOrderDistributionLogic(),
+                                                   ClusteringDependentLogic.TotalOrderDistributionLogic.class);
+
+               cdl.add(TwoPhaseCommitProtocol.UID,
+                       componentRegistry.getComponent(ClusteringDependentLogic.DistributionLogic.class));
+               cdl.add(PassiveReplicationCommitProtocol.UID,
+                       componentRegistry.getComponent(ClusteringDependentLogic.DistributionLogic.class));
+               cdl.add(TotalOrderCommitProtocol.UID,
+                       componentRegistry.getComponent(ClusteringDependentLogic.TotalOrderDistributionLogic.class));
             }
-         } else {
-            if (configuration.isTotalOrder()) {
-               return componentType.cast(new ClusteringDependentLogic.TotalOrderDistributionLogic());
-            } else {
-               return componentType.cast(new ClusteringDependentLogic.DistributionLogic());
-            }
+         } catch (AlreadyExistingComponentProtocolException e) {
+            throw new ConfigurationException(e);
          }
+         
+         return componentType.cast(cdl);
       } else if (componentType.equals(InvocationContextContainer.class)) {
          componentImpl = configuration.isTransactionalCache() ? TransactionalInvocationContextContainer.class
                : NonTransactionalInvocationContextContainer.class;
@@ -112,11 +138,23 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
       } else if (componentType.equals(RecoveryAdminOperations.class)) {
          return (T) new RecoveryAdminOperations();
       } else if (componentType.equals(StateTransferLock.class)) {
-         if (configuration.getTransactionProtocol().isTotalOrder()) {
-            return (T) new TotalOrderStateTransferLockImpl();
-         } else {
-            return (T) new StateTransferLockImpl();
+         StateTransferLockDelegate stl = new StateTransferLockDelegate();
+         
+         try {
+            componentRegistry.registerComponent(new StateTransferLockImpl(), StateTransferLockImpl.class);
+            componentRegistry.registerComponent(new TotalOrderStateTransferLockImpl(), TotalOrderStateTransferLockImpl.class);
+
+            stl.add(TwoPhaseCommitProtocol.UID,
+                    componentRegistry.getComponent(StateTransferLockImpl.class));
+            stl.add(PassiveReplicationCommitProtocol.UID,
+                    componentRegistry.getComponent(StateTransferLockImpl.class));
+            stl.add(TotalOrderCommitProtocol.UID,
+                    componentRegistry.getComponent(TotalOrderStateTransferLockImpl.class));
+         } catch (AlreadyExistingComponentProtocolException e) {
+            throw new ConfigurationException(e);
          }
+         
+         return componentType.cast(stl);
       } else if (componentType.equals(EvictionManager.class)) {
          return (T) new EvictionManagerImpl();
       } else if (componentType.equals(LockContainer.class)) {

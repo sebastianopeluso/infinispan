@@ -87,6 +87,7 @@ public class TransactionalInvocationContextContainer extends AbstractInvocationC
       localContext.setLocalTransaction(localTransaction);
       localContext.setTransaction(tx);
       localContext.setProtocolId(protocolTable.getProtocolId(tx));
+      protocolTable.setThreadProtocolId(localContext.getProtocolId());
       ctxHolder.set(localContext);
       return localContext;
    }
@@ -104,6 +105,7 @@ public class TransactionalInvocationContextContainer extends AbstractInvocationC
       RemoteTxInvocationContext ctx = new RemoteTxInvocationContext();
       ctx.setOrigin(origin);
       ctx.setRemoteTransaction(tx);
+      protocolTable.setThreadProtocolId(tx.getGlobalTransaction().getProtocolId());
       ctxHolder.set(ctx);
       return ctx;
    }
