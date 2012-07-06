@@ -31,7 +31,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.DATA;
+import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.Type;
 import static org.infinispan.interceptors.InterceptorChain.InterceptorType;
 
 /**
@@ -70,7 +70,7 @@ public abstract class ReconfigurableProtocol {
       this.componentRegistry = componentRegistry;
       this.manager = manager;
       this.rpcManager = getComponent(RpcManager.class);
-      this.commandsFactory = getComponent(CommandsFactory.class);      
+      this.commandsFactory = getComponent(CommandsFactory.class);
    }
 
    /**
@@ -305,7 +305,7 @@ public abstract class ReconfigurableProtocol {
                                                " is equals to the private data");
       }
 
-      ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(DATA, getUniqueProtocolName());
+      ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.DATA, getUniqueProtocolName());
       command.setData(data);
       rpcManager.broadcastRpcCommand(command, false, totalOrder);
    }
@@ -416,7 +416,7 @@ public abstract class ReconfigurableProtocol {
       awaitUntilLocalTransactionsFinished();
       broadcastData(LOCAL_STOP_ACK, totalOrder);
       ackCollector.awaitAllAck();
-      awaitUntilRemoteTransactionsFinished();      
+      awaitUntilRemoteTransactionsFinished();
       if (log.isDebugEnabled()) {
          log.debugf("[%s] Global stop protocol completed. No transaction are committing now",
                     Thread.currentThread().getName());

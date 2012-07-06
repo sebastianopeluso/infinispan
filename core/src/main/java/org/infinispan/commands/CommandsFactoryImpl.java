@@ -128,7 +128,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
    private LockManager lockManager;
    private InternalEntryFactory entryFactory;
    private TotalOrderManager totalOrderManager;
-   private ReconfigurableReplicationManager reconfigurableReplicationManager;         
+   private ReconfigurableReplicationManager reconfigurableReplicationManager;
 
    private Map<Byte, ModuleCommandInitializer> moduleCommandInitializers;
 
@@ -345,7 +345,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
                   initializeReplicableCommand(nested, false);
                }
             pc.markTransactionAsRemote(isRemote);
-            if (configuration.isEnableDeadlockDetection() && isRemote && 
+            if (configuration.isEnableDeadlockDetection() && isRemote &&
                   pc.getGlobalTransaction() instanceof DldGlobalTransaction) {
                DldGlobalTransaction transaction = (DldGlobalTransaction) pc.getGlobalTransaction();
                transaction.setLocksHeldAtOrigin(pc.getAffectedKeys());
@@ -517,7 +517,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
    }
 
    @Override
-   public ReconfigurableProtocolCommand buildReconfigurableProtocolCommand(byte type, String protocolId) {
+   public ReconfigurableProtocolCommand buildReconfigurableProtocolCommand(ReconfigurableProtocolCommand.Type type, String protocolId) {
       return new ReconfigurableProtocolCommand(cacheName, type, protocolId);
    }
 }

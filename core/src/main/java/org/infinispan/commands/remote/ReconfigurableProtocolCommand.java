@@ -13,17 +13,27 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
 
    public static final byte COMMAND_ID = 101;
 
-   public static final byte SWITCH = 1;
-   public static final byte REGISTER = 2;
-   public static final byte DATA = 3;
+   public static enum Type {
+      SWITCH(false),
+      REGISTER(false),
+      DATA(true),
+      SWITCH_REQ(false),
+      SET_COOL_DOWN_TIME(true);
 
-   private ReconfigurableReplicationManager reconfigurableReplicationManager;
+      final boolean hasData;
 
-   private byte type;
+      Type(boolean hasData) {
+         this.hasData = hasData;
+      }
+   }
+
+   private ReconfigurableReplicationManager manager;
+
+   private Type type;
    private String protocolId;
    private Object data;
 
-   public ReconfigurableProtocolCommand(String cacheName, byte type, String protocolId) {
+   public ReconfigurableProtocolCommand(String cacheName, Type type, String protocolId) {
       super(cacheName);
       this.type = type;
       this.protocolId = protocolId;
@@ -33,21 +43,27 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
       super(cacheName);
    }
 
-   public final void init(ReconfigurableReplicationManager reconfigurableReplicationManager) {
-      this.reconfigurableReplicationManager = reconfigurableReplicationManager;
+   public final void init(ReconfigurableReplicationManager manager) {
+      this.manager = manager;
    }
 
    @Override
    public final Object perform(InvocationContext ctx) throws Throwable {
       switch (type) {
          case SWITCH:
-            reconfigurableReplicationManager.switchTo(protocolId);
+            manager.internalSwitchTo(protocolId);
             break;
          case REGISTER:
-            reconfigurableReplicationManager.internalRegister(protocolId);
+            manager.internalRegister(protocolId);
             break;
          case DATA:
-            reconfigurableReplicationManager.handleProtocolData(protocolId, data, getOrigin());
+            manager.handleProtocolData(protocolId, data, getOrigin());
+            break;
+         case SWITCH_REQ:
+            manager.switchTo(protocolId);
+            break;
+         case SET_COOL_DOWN_TIME:
+            manager.setSwitchCoolDownTime((Integer) data);
             break;
          default:
             break;
@@ -62,18 +78,18 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
 
    @Override
    public final Object[] getParameters() {
-      if (type != DATA) {
-         return new Object[] {type, protocolId};
+      if (type.hasData) {
+         return new Object[] {(byte)type.ordinal(), protocolId, data};
       } else {
-         return new Object[] {type, protocolId, data};
+         return new Object[] {(byte)type.ordinal(), protocolId};
       }
    }
 
    @Override
    public final void setParameters(int commandId, Object[] parameters) {
-      this.type = (Byte) parameters[0];
+      this.type = Type.values()[(Byte) parameters[0]];
       this.protocolId = (String) parameters[1];
-      if (type == DATA) {
+      if (type.hasData) {
          data = parameters[2];
       }
    }

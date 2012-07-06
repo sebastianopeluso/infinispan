@@ -383,5 +383,5 @@ public interface CommandsFactory {
     */
    PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction);
    
-   ReconfigurableProtocolCommand buildReconfigurableProtocolCommand(byte type, String protocolId);
+   ReconfigurableProtocolCommand buildReconfigurableProtocolCommand(ReconfigurableProtocolCommand.Type type, String protocolId);
 }

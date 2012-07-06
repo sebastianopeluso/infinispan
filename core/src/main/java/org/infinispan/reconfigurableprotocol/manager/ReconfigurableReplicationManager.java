@@ -27,11 +27,11 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.REGISTER;
-import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.SWITCH;
+import static org.infinispan.commands.remote.ReconfigurableProtocolCommand.Type;
 
 /**
  * Manages everything about the replication protocols, namely the switch between protocols and the registry of new
@@ -72,7 +72,7 @@ public class ReconfigurableReplicationManager {
 
       ReconfigurableProtocol protocol = new TwoPhaseCommitProtocol();
       try {
-         protocol.initialize(configuration, componentRegistry, this);         
+         protocol.initialize(configuration, componentRegistry, this);
          registry.registerNewProtocol(protocol);
       } catch (AlreadyRegisterProtocolException e) {
          log.errorf("Tried to register Two Phase Commit protocol but it is already register. This should not happen");
@@ -183,7 +183,7 @@ public class ReconfigurableReplicationManager {
     * @param globalTransaction      the global transaction
     * @throws InterruptedException  if interrupted while waiting for the switch to finish
     */
-   public final void notifyLocalTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet, String executionProtocolId) 
+   public final void notifyLocalTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet, String executionProtocolId)
          throws InterruptedException {
       //returns immediately if no switch is in progress
       if (log.isDebugEnabled()) {
@@ -196,7 +196,7 @@ public class ReconfigurableReplicationManager {
       ProtocolManager.CurrentProtocolInfo currentProtocolInfo = protocolManager.getCurrentProtocolInfo();
       long epoch = currentProtocolInfo.getEpoch();
       ReconfigurableProtocol actual = currentProtocolInfo.getCurrent();
-      
+
       if (!actual.getUniqueProtocolName().equals(executionProtocolId)) {
          throw new CacheException("Cannot commit transaction. the execution protocol is different from the current " +
                                         "protocol");
@@ -380,12 +380,42 @@ public class ReconfigurableReplicationManager {
       }
    }
 
+   private class SwitchTask implements Runnable {
+
+      private final String protocolId;
+
+      private SwitchTask(String protocolId) {
+         this.protocolId = protocolId;
+      }
+
+      @Override
+      public void run() {
+         try {
+            ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.SWITCH, protocolId);
+
+            if (protocolManager.getCurrent().useTotalOrder()) {
+               rpcManager.broadcastRpcCommand(command, false, true);
+               return;
+            }
+
+            rpcManager.broadcastRpcCommand(command, false, false);
+            internalSwitchTo(protocolId);
+         } catch (Exception e) {
+            if (log.isDebugEnabled()) {
+               log.debugf(e, "Error switching protocol to %s.", protocolId);
+            } else {
+               log.warnf("Error switching protocol to %s. %s", protocolId, e.getMessage());
+            }
+         }
+      }
+   }
+
    @ManagedOperation(description = "Registers a new replication protocol. The new protocol must extend the " +
          "ReconfigurableProtocol")
    public final void register(String clazzName) throws Exception {
       try {
          internalRegister(clazzName);
-         ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(REGISTER, clazzName);
+         ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.REGISTER, clazzName);
          rpcManager.broadcastRpcCommand(command, false, false);
       } catch (Exception e) {
          throw new Exception("Exception while registering class: " + e.getMessage());
@@ -395,22 +425,17 @@ public class ReconfigurableReplicationManager {
    @ManagedOperation(description = "Switch the current replication protocol for the new one. It fails if the protocol " +
          "does not exists or it is equals to the current")
    public final void switchTo(String protocolId) throws Exception {
+      if (!rpcManager.getTransport().isCoordinator()) {
+         ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.SWITCH_REQ, protocolId);
+         rpcManager.invokeRemotely(Collections.singleton(rpcManager.getTransport().getCoordinator()), command, true);
+         return;
+      }
+
       if (!coolDownTimeManager.checkAndSetToSwitch()) {
          throw new Exception("You need to wait before perform a new switch");
       }
-      try {
-         ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(SWITCH, protocolId);
 
-         if (protocolManager.getCurrent().useTotalOrder()) {
-            rpcManager.broadcastRpcCommand(command, false, true);
-            return;
-         }
-
-         rpcManager.broadcastRpcCommand(command, false, false);
-         internalSwitchTo(protocolId);
-      } catch (Exception e) {
-         throw new Exception("Exception while switching protocols: " + e.getMessage());
-      }
+      new Thread(new SwitchTask(protocolId), "Switch-Thread").start();
    }
 
    @ManagedAttribute(description = "Returns a collection of replication protocols IDs that can be used in the switchTo",
@@ -449,6 +474,9 @@ public class ReconfigurableReplicationManager {
    @ManagedOperation(description = "Sets the new cool down time period (in seconds) to wait before two consecutive switches")
    public final void setSwitchCoolDownTime(int seconds) {
       coolDownTimeManager.setCoolDownTimePeriod(seconds);
+      ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.SET_COOL_DOWN_TIME, null);
+      command.setData(seconds);
+      rpcManager.broadcastRpcCommand(command, false, false);
    }
 
    @ManagedAttribute(description = "Returns the cool down time period in seconds", writable = false)
