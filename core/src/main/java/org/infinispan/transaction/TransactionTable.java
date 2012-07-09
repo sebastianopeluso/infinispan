@@ -338,7 +338,8 @@ public class TransactionTable {
     * Removes the {@link RemoteTransaction} corresponding to the given tx.
     */
    public void remoteTransactionCommitted(GlobalTransaction gtx) {
-      if (configuration.isSecondPhaseAsync() || configuration.isTotalOrder()) {
+      boolean totalOrder = gtx.getReconfigurableProtocol().useTotalOrder();
+      if (configuration.isSecondPhaseAsync() || totalOrder) {
          removeRemoteTransaction(gtx);
          log.tracef("Remote transaction removed %s", gtx);
       }
@@ -488,9 +489,8 @@ public class TransactionTable {
     *
     * This method creates only one transaction per global transaction, resolving the race condition
     *
-    * @param globalTransaction the global transaction
-    * @return the remote transaction. This remote transaction implements the interface
-    *         {@link org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction}
+    * @param globalTransaction   the global transaction
+    * @return                    the remote transaction 
     */
    public RemoteTransaction getOrCreateIfAbsentRemoteTransaction(GlobalTransaction globalTransaction) {
       RemoteTransaction remoteTransaction = remoteTransactions.get(globalTransaction);
@@ -500,7 +500,7 @@ public class TransactionTable {
          RemoteTransaction existing = remoteTransactions.putIfAbsent(globalTransaction, remoteTransaction);
          if (existing != null) {
             log.tracef("Returning a concurrent created remote transaction %s for global transaction %s",
-                      existing, globalTransaction.prettyPrint());
+                       existing, globalTransaction.prettyPrint());
             remoteTransaction = existing;
          } else {
             log.tracef("Created a new remote transaction %s for global transaction %s",

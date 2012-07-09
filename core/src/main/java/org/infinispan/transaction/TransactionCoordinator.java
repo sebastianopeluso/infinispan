@@ -191,7 +191,8 @@ public class TransactionCoordinator {
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();
       ctx.setLocalTransaction(localTransaction);
 
-      if (localTransaction.getGlobalTransaction().getReconfigurableProtocol().use1PC(localTransaction) || isOnePhase) {
+      boolean use1PC = localTransaction.getGlobalTransaction().getReconfigurableProtocol().use1PC(localTransaction);
+      if (use1PC || isOnePhase) {
          validateNotMarkedForRollback(localTransaction);
          if (trace) log.trace("Doing an 1PC prepare call on the interceptor chain");
          PrepareCommand command = commandCreator.createPrepareCommand(localTransaction.getGlobalTransaction(), localTransaction.getModifications());
@@ -200,7 +201,8 @@ public class TransactionCoordinator {
          try {
             invoker.invoke(ctx, command);
          } catch (Throwable e) {
-            if (!isOnePhaseTotalOrder()) { //in total order and 1PC, the rollback command is not needed
+            //in total order and 1PC, the rollback command is not needed
+            if (!localTransaction.getGlobalTransaction().getReconfigurableProtocol().useTotalOrder()) {
                handleCommitFailure(e, localTransaction);
             }
          } finally {
@@ -273,30 +275,6 @@ public class TransactionCoordinator {
          rollback(localTransaction);
          throw new XAException(XAException.XA_RBROLLBACK);
       }
-   }
-
-   private boolean is1PcForAutoCommitTransaction(LocalTransaction localTransaction) {
-      return configuration.isUse1PcForAutoCommitTransactions() && localTransaction.isImplicitTransaction();
-   }
-
-   /**
-    * a transaction can commit in one phase, in total order protocol, when the write skew is disable or the one phase
-    * configuration parameter is set to true.
-    *
-    * Note: in distribution, the 1PC optimization can't be done with the write skew check
-    *
-    * @return true if it can use 1PC false otherwise
-    */
-   private boolean isOnePhaseTotalOrder() {
-      return configuration.isTotalOrder() &&
-            (!configuration.isRequireVersioning() || (
-                  configuration.isUseSynchronizationForTransactions() &&
-                        !configuration.getCacheMode().isDistributed()));
-   }
-
-   public boolean isOnePhasePassiveReplication() {
-      return configuration.isPassiveReplication() && (!configuration.isRequireVersioning() ||
-                                                            configuration.isUseSynchronizationForTransactions());
    }
 
    private static interface CommandCreator {

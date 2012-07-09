@@ -229,7 +229,7 @@ public class ReconfigurableReplicationManager {
    public final void notifyRemoteTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet)
          throws InterruptedException, NoSuchReconfigurableProtocolException {
       long txEpoch = globalTransaction.getEpochId();
-      ReconfigurableProtocol txProtocol = registry.getProtocolById(globalTransaction.getProtocolId());
+      ReconfigurableProtocol txProtocol = globalTransaction.getReconfigurableProtocol();
       ProtocolManager.CurrentProtocolInfo currentProtocolInfo = protocolManager.getCurrentProtocolInfo();
       long epoch = currentProtocolInfo.getEpoch();
 
@@ -244,7 +244,6 @@ public class ReconfigurableReplicationManager {
          throw new NoSuchReconfigurableProtocolException(globalTransaction.getProtocolId());
       }
 
-      globalTransaction.setReconfigurableProtocol(txProtocol);
       ReconfigurableProtocol currentProtocol = currentProtocolInfo.getCurrent();
       protocolManager.ensure(txEpoch);
 
@@ -300,6 +299,19 @@ public class ReconfigurableReplicationManager {
          log.fatalf("Remote transaction %s is finished but the commit protocol %s does not exits",
                     globalTransaction.prettyPrint(), globalTransaction.getProtocolId());
       }
+   }
+
+   /**
+    * initializes the global transaction (possibly remote)
+    *
+    * @param globalTransaction   the global transaction
+    */
+   public final void initGlobalTransactionIfNeeded(GlobalTransaction globalTransaction) {
+      if (globalTransaction == null || globalTransaction.getReconfigurableProtocol() != null) {
+         return;
+      }
+      ReconfigurableProtocol protocol = registry.getProtocolById(globalTransaction.getProtocolId());
+      globalTransaction.setReconfigurableProtocol(protocol);
    }
 
    /**

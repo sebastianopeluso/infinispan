@@ -136,12 +136,13 @@ public class ReplicationInterceptor extends BaseRpcInterceptor {
    protected void broadcastPrepare(TxInvocationContext context, PrepareCommand command) {
       boolean syncPrepare =  configuration.getCacheMode().isSynchronous() ||
             (command.isOnePhaseCommit() && configuration.isSyncCommitPhase());
-      rpcManager.broadcastRpcCommand(command, syncPrepare, false, configuration.isTotalOrder());
+      boolean totalOrder = command.getGlobalTransaction().getReconfigurableProtocol().useTotalOrder();
+      rpcManager.broadcastRpcCommand(command, syncPrepare, false, totalOrder);
    }
 
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
-      if (shouldInvokeRemoteTxCommand(ctx) && shouldInvokeRemoteRollbackCommand(ctx, command) && 
+      if (shouldInvokeRemoteTxCommand(ctx) && shouldInvokeRemoteRollbackCommand(ctx, command) &&
             !configuration.isOnePhaseCommit()) {
          rpcManager.broadcastRpcCommand(command, configuration.isSyncRollbackPhase(), true, false);
       }

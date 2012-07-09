@@ -132,10 +132,10 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
       entryFactory.wrapEntryForPut(ctx, command.getKey(), null, !command.isPutIfAbsent());
       return invokeNextAndApplyChanges(ctx, command);
    }
-   
+
    @Override
-   public Object visitApplyDeltaCommand(InvocationContext ctx, ApplyDeltaCommand command) throws Throwable {      
-      entryFactory.wrapEntryForDelta(ctx, command.getDeltaAwareKey(), command.getDelta());  
+   public Object visitApplyDeltaCommand(InvocationContext ctx, ApplyDeltaCommand command) throws Throwable {
+      entryFactory.wrapEntryForDelta(ctx, command.getDeltaAwareKey(), command.getDelta());
       return invokeNextInterceptor(ctx, command);
    }
 
@@ -306,8 +306,10 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
     */
    protected boolean shouldCommitEntries(PrepareCommand command, TxInvocationContext ctx) {
       //one phase commit in remote context in total order or it has no modifications (local commands)
-      return (configuration.isTotalOrder() && command.isOnePhaseCommit() && (!ctx.isOriginLocal() || !ctx.hasModifications())) ||
+      boolean totalOrder = command.getGlobalTransaction().getReconfigurableProtocol().useTotalOrder();
+      return (totalOrder && command.isOnePhaseCommit() &&
+                    (!ctx.isOriginLocal() || !ctx.hasModifications())) ||
             //original condition: one phase commit
-            (!configuration.isTotalOrder() && command.isOnePhaseCommit());
+            (!totalOrder && command.isOnePhaseCommit());
    }
 }

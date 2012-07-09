@@ -79,6 +79,7 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
       this.txTable = txTable;
       this.configuration = configuration;
       this.reconfigurableReplicationManager = reconfigurableReplicationManager;
+      reconfigurableReplicationManager.initGlobalTransactionIfNeeded(globalTx);
    }
 
    @Override
@@ -219,5 +220,9 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    @Override
    public boolean isReturnValueExpected() {
       return true;
+   }
+
+   protected final boolean isTotalOrder() {
+      return globalTx.getReconfigurableProtocol().useTotalOrder();
    }
 }
