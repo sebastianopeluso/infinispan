@@ -519,4 +519,16 @@ public class ReconfigurableReplicationManager {
       sb.append("State=").append(currentProtocolInfo.printState());
       return sb.toString();
    }
+
+   @ManagedOperation(description = "Prints the pending local transactions for the protocol Id")
+   public final String printLocalTransactions(String protocolId) {
+      ReconfigurableProtocol protocol = registry.getProtocolById(protocolId);
+      return protocol == null ? "No such protocol" : protocol.printLocalTransactions();
+   }
+
+   @ManagedOperation(description = "Prints the pending remote transactions for the protocol Id")
+   public final String printRemoteTransactions(String protocolId) {
+      ReconfigurableProtocol protocol = registry.getProtocolById(protocolId);
+      return protocol == null ? "No such protocol" : protocol.printRemoteTransactions();
+   }
 }

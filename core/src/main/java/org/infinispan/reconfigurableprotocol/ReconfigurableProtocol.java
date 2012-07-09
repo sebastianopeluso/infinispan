@@ -207,6 +207,36 @@ public abstract class ReconfigurableProtocol {
    }
 
    /**
+    * returns all the pending local transactions and their write set
+    *
+    * @return  all the pending local transactions and their write set  
+    */
+   public final String printLocalTransactions() {
+      StringBuilder sb = new StringBuilder("Local transactions are:\n");
+      synchronized (localTransactions) {
+         for (Map.Entry<GlobalTransaction, Set<Object>> entry : localTransactions.entrySet()) {
+            sb.append(entry.getKey().prettyPrint()).append("=>").append(entry.getValue()).append("\n");
+         }
+      }
+      return sb.toString();
+   }
+
+   /**
+    * returns all the pending remote transactions and their write set
+    *
+    * @return  all the pending remote transactions and their write set  
+    */
+   public final String printRemoteTransactions() {
+      StringBuilder sb = new StringBuilder("Remote transactions are:\n");
+      synchronized (remoteTransactions) {
+         for (Map.Entry<GlobalTransaction, Set<Object>> entry : remoteTransactions.entrySet()) {
+            sb.append(entry.getKey().prettyPrint()).append("=>").append(entry.getValue()).append("\n");
+         }
+      }
+      return sb.toString();
+   }
+
+   /**
     * blocks until the local transaction set is empty, i.e., no more local transactions are committing
     *
     * @throws InterruptedException  if interrupted
