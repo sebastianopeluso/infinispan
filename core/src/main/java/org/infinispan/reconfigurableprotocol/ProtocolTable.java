@@ -68,7 +68,11 @@ public class ProtocolTable {
     * @return  the replication protocol to use by the thread that invokes this method
     */
    public final String getThreadProtocolId() {
-      return protocolId.get();
+      String pId = protocolId.get();
+      if (pId == null || pId.equals("")) {
+         pId = manager.getCurrentProtocolId();
+      }
+      return pId;
    }
 
 }
