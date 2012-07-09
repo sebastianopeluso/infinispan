@@ -39,11 +39,14 @@ import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.loaders.CacheLoaderManager;
 import org.infinispan.loaders.CacheStore;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
+import org.infinispan.reconfigurableprotocol.ProtocolTable;
+import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
+import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.util.concurrent.NotifyingNotifiableFuture;
 import org.infinispan.util.concurrent.ReclosableLatch;
 import org.infinispan.util.concurrent.locks.containers.LockContainer;
@@ -93,6 +96,10 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
    protected TransactionTable transactionTable;
    private LockContainer<?> lockContainer;
 
+   protected TotalOrderManager totalOrderManager;
+   private ProtocolTable protocolTable;
+   private ReconfigurableReplicationManager manager;
+
    public BaseStateTransferManagerImpl() {
    }
 
@@ -100,7 +107,8 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
    public void init(Configuration configuration, RpcManager rpcManager, CommandsFactory cf,
                     DataContainer dataContainer, InterceptorChain interceptorChain, InvocationContextContainer icc,
                     CacheLoaderManager cacheLoaderManager, CacheNotifier cacheNotifier, StateTransferLock stateTransferLock,
-                    CacheViewsManager cacheViewsManager, TransactionTable transactionTable, LockContainer<?> lockContainer) {
+                    CacheViewsManager cacheViewsManager, TransactionTable transactionTable, LockContainer<?> lockContainer,
+                    TotalOrderManager totalOrderManager, ProtocolTable protocolTable, ReconfigurableReplicationManager manager) {
       this.cacheLoaderManager = cacheLoaderManager;
       this.configuration = configuration;
       this.rpcManager = rpcManager;
@@ -113,6 +121,9 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
       this.cacheViewsManager = cacheViewsManager;
       this.transactionTable = transactionTable;
       this.lockContainer = lockContainer;
+      this.totalOrderManager = totalOrderManager;
+      this.protocolTable = protocolTable;
+      this.manager = manager;
    }
 
    // needs to be AFTER the DistributionManager and *after* the cache loader manager (if any) inits and preloads
@@ -209,11 +220,11 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
    }
 
    private boolean isLatchOpen(CountDownLatch latch) {
-         return latch.getCount() == 0;
+      return latch.getCount() == 0;
    }
 
    private boolean isLatchOpen(ReclosableLatch latch) {
-        return latch.isOpened();
+      return latch.isOpened();
    }
 
    @Override
@@ -246,7 +257,7 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
          }
 
          if(trace) log.tracef("After applying state data container has %d keys", dataContainer.size());
-      } 
+      }
    }
 
    @Override
@@ -340,7 +351,7 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
             return;
          } else {
             throw new IllegalArgumentException(String.format("Cannot commit view %d, we are at view %d",
-                  viewId, oldView.getViewId()));
+                                                             viewId, oldView.getViewId()));
          }
       }
 
@@ -358,11 +369,11 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
       if (tempTask == null) {
          if (committedViewId == oldView.getViewId()) {
             log.tracef("Ignoring rollback for cache view %d as we don't have a state transfer in progress",
-                  committedViewId);
+                       committedViewId);
             return;
          } else {
             throw new IllegalArgumentException(String.format("Cannot rollback to view %d, we are at view %d",
-                  committedViewId, oldView.getViewId()));
+                                                             committedViewId, oldView.getViewId()));
          }
       }
 
@@ -404,6 +415,10 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
    protected abstract long getTimeout();
 
    protected boolean usePriorityQueue() {
-      return false;
+      return isTotalOrder();
+   }
+
+   protected final boolean isTotalOrder() {
+      return manager.isTotalOrderBasedProtocol(protocolTable.getThreadProtocolId());
    }
 }

@@ -344,6 +344,11 @@ public class ReconfigurableReplicationManager {
       coolDownTimeManager.setCoolDownTimePeriod(seconds);
    }
 
+   public final boolean isTotalOrderBasedProtocol(String protocolId) {
+      ReconfigurableProtocol protocol = registry.getProtocolById(protocolId);
+      return protocol != null && protocol.useTotalOrder();
+   }
+
    /**
     * Returns the information about the protocol, namely the protocol ID and the full class name
     *

@@ -22,19 +22,11 @@
  */
 package org.infinispan.factories;
 
-import org.infinispan.config.ConfigurationException;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
-import org.infinispan.reconfigurableprotocol.component.StateTransferManagerDelegate;
-import org.infinispan.reconfigurableprotocol.exception.AlreadyExistingComponentProtocolException;
-import org.infinispan.reconfigurableprotocol.protocol.PassiveReplicationCommitProtocol;
-import org.infinispan.reconfigurableprotocol.protocol.TotalOrderCommitProtocol;
-import org.infinispan.reconfigurableprotocol.protocol.TwoPhaseCommitProtocol;
 import org.infinispan.statetransfer.DistributedStateTransferManagerImpl;
 import org.infinispan.statetransfer.DummyInvalidationStateTransferManagerImpl;
 import org.infinispan.statetransfer.ReplicatedStateTransferManagerImpl;
 import org.infinispan.statetransfer.StateTransferManager;
-import org.infinispan.statetransfer.totalorder.TotalOrderDistributedStateTransferManagerImpl;
-import org.infinispan.statetransfer.totalorder.TotalOrderReplicatedStateTransferManagerImpl;
 
 /**
  * Constructs {@link org.infinispan.statetransfer.StateTransferManager} instances.
@@ -52,45 +44,9 @@ public class StateTransferManagerFactory extends AbstractNamedCacheComponentFact
          return null;
 
       if (configuration.getCacheMode().isDistributed()) {
-         componentRegistry.registerComponent(new DistributedStateTransferManagerImpl(),
-                                             DistributedStateTransferManagerImpl.class);
-         componentRegistry.registerComponent(new TotalOrderDistributedStateTransferManagerImpl(),
-                                             TotalOrderDistributedStateTransferManagerImpl.class);
-
-         StateTransferManagerDelegate stm = new StateTransferManagerDelegate();
-
-         try {
-            stm.add(TwoPhaseCommitProtocol.UID,
-                    componentRegistry.getComponent(DistributedStateTransferManagerImpl.class));
-            stm.add(PassiveReplicationCommitProtocol.UID,
-                    componentRegistry.getComponent(DistributedStateTransferManagerImpl.class));
-            stm.add(TotalOrderCommitProtocol.UID,
-                    componentRegistry.getComponent(TotalOrderDistributedStateTransferManagerImpl.class));
-         } catch (AlreadyExistingComponentProtocolException e) {
-            throw new ConfigurationException(e);
-         }
-
-         return componentType.cast(stm);
+         return componentType.cast(new DistributedStateTransferManagerImpl());
       }else if (configuration.getCacheMode().isReplicated()) {
-         componentRegistry.registerComponent(new ReplicatedStateTransferManagerImpl(),
-                                             ReplicatedStateTransferManagerImpl.class);
-         componentRegistry.registerComponent(new TotalOrderReplicatedStateTransferManagerImpl(),
-                                             TotalOrderReplicatedStateTransferManagerImpl.class);
-
-         StateTransferManagerDelegate stm = new StateTransferManagerDelegate();
-
-         try {
-            stm.add(TwoPhaseCommitProtocol.UID,
-                    componentRegistry.getComponent(ReplicatedStateTransferManagerImpl.class));
-            stm.add(PassiveReplicationCommitProtocol.UID,
-                    componentRegistry.getComponent(ReplicatedStateTransferManagerImpl.class));
-            stm.add(TotalOrderCommitProtocol.UID,
-                    componentRegistry.getComponent(TotalOrderReplicatedStateTransferManagerImpl.class));
-         } catch (AlreadyExistingComponentProtocolException e) {
-            throw new ConfigurationException(e);
-         }
-
-         return componentType.cast(stm);
+         return componentType.cast(new ReplicatedStateTransferManagerImpl());
       } else if (configuration.getCacheMode().isInvalidation())
          return componentType.cast(new DummyInvalidationStateTransferManagerImpl());
       else

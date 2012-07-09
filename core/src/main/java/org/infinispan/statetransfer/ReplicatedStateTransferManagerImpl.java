@@ -23,6 +23,7 @@ import org.infinispan.distribution.ch.ConsistentHashHelper;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.loaders.CacheStore;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.statetransfer.totalorder.TotalOrderReplicatedStateTransferTask;
 
 import java.util.List;
 
@@ -30,6 +31,7 @@ import java.util.List;
  * The replicated mode implementation of {@link StateTransferManager}
  *
  * @author Dan Berindei &lt;dan@infinispan.org&gt;
+ * @author Pedro Ruivo
  * @since 5.1
  */
 @MBean(objectName = "ReplicatedStateTransferManager", description = "Component that handles state transfer in replicated mode")
@@ -43,8 +45,15 @@ public class ReplicatedStateTransferManagerImpl extends BaseStateTransferManager
 
    @Override
    protected ReplicatedStateTransferTask createStateTransferTask(int viewId, List<Address> members, boolean initialView) {
-      return new ReplicatedStateTransferTask(rpcManager, configuration, dataContainer,
-            this, stateTransferLock, cacheNotifier, viewId, members, chOld, chNew, initialView);
+      if (isTotalOrder()) {
+         return new TotalOrderReplicatedStateTransferTask(rpcManager, configuration, dataContainer, this, stateTransferLock,
+                                                          cacheNotifier, viewId, members, chOld, chNew, initialView,
+                                                          totalOrderManager);
+      } else {
+         return new ReplicatedStateTransferTask(rpcManager, configuration, dataContainer,
+                                                this, stateTransferLock, cacheNotifier, viewId, members, chOld, chNew,
+                                                initialView);
+      }
    }
 
    @Override
