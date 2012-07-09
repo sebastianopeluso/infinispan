@@ -52,6 +52,7 @@ public class ReconfigurableReplicationManager {
    private final ReconfigurableProtocolRegistry registry;
    private final ProtocolManager protocolManager;
    private final CoolDownTimeManager coolDownTimeManager;
+   private final StatisticManager statisticManager;
 
    private RpcManager rpcManager;
    private CommandsFactory commandsFactory;
@@ -59,8 +60,9 @@ public class ReconfigurableReplicationManager {
    private ComponentRegistry componentRegistry;
 
    public ReconfigurableReplicationManager() {
+      statisticManager = new StatisticManager();
       registry = new ReconfigurableProtocolRegistry();
-      protocolManager = new ProtocolManager();
+      protocolManager = new ProtocolManager(statisticManager);
       coolDownTimeManager = new CoolDownTimeManager();
    }
 
@@ -543,4 +545,38 @@ public class ReconfigurableReplicationManager {
       ReconfigurableProtocol protocol = registry.getProtocolById(protocolId);
       return protocol == null ? "No such protocol" : protocol.printRemoteTransactions();
    }
+
+   @ManagedOperation(description = "Returns the average time in duration between two safe states for a particular " +
+         "switch")
+   public final double getAvgSafeToSafeDuration(String from, String to) {
+      return statisticManager.getSafeToSafe(from, to);
+   }
+
+   @ManagedOperation(description = "Returns the average time in duration to change between a safe state to an unsafe " +
+         "state for a particular switch")
+   public final double getAvgSafeToUnsafeDuration(String from, String to) {
+      return statisticManager.getSafeToUnsafe(from, to);
+   }
+
+   @ManagedOperation(description = "Returns the average time in duration to change between an unsafe state to a safe " +
+         "state for a particular switch")
+   public final double getAvgUnsafeToSafeDuration(String from, String to) {
+      return statisticManager.getUnsafeToSafe(from, to);
+   }
+
+   @ManagedOperation(description = "Returns the number of times that this particular switch happen")
+   public final int getSwitchCounter(String from, String to) {
+      return statisticManager.getSwitchCounter(from, to);
+   }
+
+   @ManagedOperation(description = "Returns all the averages times for all the switches")
+   public final String printSwitchAvgDurations() {
+      return statisticManager.printAllStats();
+   }
+   
+   @ManagedOperation(description = "Resets the switch statistics")
+   public final void resetSwitchStats() {
+      statisticManager.reset();
+   }   
+
 }

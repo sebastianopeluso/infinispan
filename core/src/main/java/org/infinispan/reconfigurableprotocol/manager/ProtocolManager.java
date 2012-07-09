@@ -14,10 +14,18 @@ public class ProtocolManager {
 
    private static final Log log = LogFactory.getLog(ProtocolManager.class);
 
+   private final StatisticManager statisticManager;
+
    private long epoch = 0;
    private ReconfigurableProtocol current;
    private ReconfigurableProtocol old;
    private State state;
+
+   private StatisticManager.Stats currentStat;
+
+   public ProtocolManager(StatisticManager statisticManager) {
+      this.statisticManager = statisticManager;
+   }
 
    /**
     * init the protocol manager with the initial replication protocol
@@ -44,6 +52,7 @@ public class ProtocolManager {
     * signal the switch start changing the state to "in progress"
     */
    public final synchronized void inProgress() {
+      this.currentStat = statisticManager.createNewStats(current.getUniqueProtocolName());
       this.state = State.IN_PROGRESS;
    }
 
@@ -53,7 +62,13 @@ public class ProtocolManager {
     * @param newProtocol   the new replication protocol to use
     */
    public final synchronized void change(ReconfigurableProtocol newProtocol, boolean safe) {
-      state = safe ? State.SAFE : State.UNSAFE;
+      if (safe) {
+         currentStat.safe(newProtocol == null ? null : newProtocol.getUniqueProtocolName());
+         state = State.SAFE;
+      } else {
+         currentStat.unsafe(newProtocol == null ? null : newProtocol.getUniqueProtocolName());
+         state = State.UNSAFE;
+      }
       notifyAll();
       if (newProtocol == null || isCurrentProtocol(newProtocol)) {
          return;
