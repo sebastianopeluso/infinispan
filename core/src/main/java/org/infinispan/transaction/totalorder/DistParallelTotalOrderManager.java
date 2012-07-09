@@ -8,9 +8,9 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.distribution.DistributionManager;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.base.CommandInterceptor;
-import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
@@ -54,14 +54,14 @@ public class DistParallelTotalOrderManager extends ParallelTotalOrderManager {
    @Override
    protected ParallelPrepareProcessor constructParallelPrepareProcessor(PrepareCommand prepareCommand, TxInvocationContext ctx,
                                                                         CommandInterceptor invoker,
-                                                                        TotalOrderRemoteTransaction totalOrderRemoteTransaction) {
-      return new DistributedParallelPrepareProcessor(prepareCommand, ctx, invoker, totalOrderRemoteTransaction);
+                                                                        RemoteTransaction remoteTransaction) {
+      return new DistributedParallelPrepareProcessor(prepareCommand, ctx, invoker, remoteTransaction);
    }
 
    private class DistributedParallelPrepareProcessor extends ParallelPrepareProcessor {
 
       private DistributedParallelPrepareProcessor(PrepareCommand prepareCommand, TxInvocationContext txInvocationContext,
-                                                  CommandInterceptor invoker, TotalOrderRemoteTransaction totalOrderRemoteTransaction) {
+                                                  CommandInterceptor invoker, RemoteTransaction totalOrderRemoteTransaction) {
          super(prepareCommand, txInvocationContext, invoker, totalOrderRemoteTransaction);
       }
 

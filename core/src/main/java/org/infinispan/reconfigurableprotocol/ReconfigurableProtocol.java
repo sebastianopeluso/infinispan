@@ -184,10 +184,10 @@ public abstract class ReconfigurableProtocol {
             for (Set<Object> localWriteSet : localTransactions.values()) {
                if (localWriteSet == null || keys == null) {
                   conflict = true;
+                  localTransactions.wait();
                   break;
                }
             }
-            localTransactions.wait();
          }
       }
 
@@ -198,10 +198,10 @@ public abstract class ReconfigurableProtocol {
             for (Set<Object> localWriteSet : remoteTransactions.values()) {
                if (localWriteSet == null || keys == null) {
                   conflict = true;
+                  remoteTransactions.wait();
                   break;
                }
             }
-            remoteTransactions.wait();
          }
       }
    }

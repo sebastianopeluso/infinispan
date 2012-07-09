@@ -5,6 +5,8 @@ import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.reconfigurableprotocol.ReconfigurableProtocol;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.RemoteTransaction;
+import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
 import java.util.EnumMap;
@@ -27,6 +29,8 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
    private static final String ACK = "_ACK_";
 
    private final AckCollector ackCollector = new AckCollector();
+
+   private TransactionTable transactionTable;
 
    @Override
    public final String getUniqueProtocolName() {
@@ -78,6 +82,11 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
             return;
          }
       }
+
+      RemoteTransaction remoteTransaction = transactionTable.getRemoteTransaction(globalTransaction);
+      if (remoteTransaction.check2ndPhaseAndPrepare()) {
+         transactionTable.remoteTransactionRollback(globalTransaction);
+      }
       throwOldTxException();
    }
 
@@ -87,12 +96,16 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
       if (PB_UID.equals(oldProtocol.getUniqueProtocolName())) {
          return;
       }
+      RemoteTransaction remoteTransaction = transactionTable.getRemoteTransaction(globalTransaction);
+      if (remoteTransaction.check2ndPhaseAndPrepare()) {
+         transactionTable.remoteTransactionRollback(globalTransaction);
+      }
       throwSpeculativeTxException();
    }
 
    @Override
    public final void bootstrapProtocol() {
-      //no-op
+      this.transactionTable = getComponent(TransactionTable.class);
    }
 
    @Override

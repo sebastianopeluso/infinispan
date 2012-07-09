@@ -24,6 +24,7 @@ package org.infinispan.transaction;
 
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
+import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.transaction.xa.InvalidTransactionException;
 import org.infinispan.util.logging.Log;
@@ -55,6 +56,9 @@ public class RemoteTransaction extends AbstractCacheTransaction implements Clone
    private boolean missingModifications;
 
    private EnumSet<State> state;
+
+   //lazy initialization (e.g. 2PC does not need it)
+   private TxDependencyLatch dependencyLatch;
 
    private enum State {
       /**
@@ -135,6 +139,7 @@ public class RemoteTransaction extends AbstractCacheTransaction implements Clone
          RemoteTransaction dolly = (RemoteTransaction) super.clone();
          dolly.modifications = new ArrayList<WriteCommand>(modifications);
          dolly.lookedUpEntries = new HashMap<Object, CacheEntry>(lookedUpEntries);
+         dolly.state.addAll(state);
          return dolly;
       } catch (CloneNotSupportedException e) {
          throw new IllegalStateException("Impossible!!");
@@ -150,6 +155,8 @@ public class RemoteTransaction extends AbstractCacheTransaction implements Clone
             ", backupKeyLocks " + backupKeyLocks +
             ", isMissingModifications " + missingModifications +
             ", tx=" + tx +
+            ", state=" + state +
+            ", dependencyLatch=" + dependencyLatch +
             '}';
    }
 
@@ -198,10 +205,12 @@ public class RemoteTransaction extends AbstractCacheTransaction implements Clone
     * Commit and rollback commands invokes this method and they are blocked here if the state is PREPARING
     *
     * @param commit true if it is a commit command, false otherwise
+    * @param newVersions the new versions in commit command (null for rollback)              
     * @return true if the command needs to be processed, false otherwise
     * @throws InterruptedException when it is interrupted while waiting
     */
-   public final synchronized boolean waitPrepared(boolean commit) throws InterruptedException {
+   public final synchronized boolean waitPrepared(boolean commit, EntryVersionsMap newVersions) throws InterruptedException {
+      setUpdatedEntryVersions(newVersions);
       boolean result;
       if (state.contains(State.PREPARED)) {
          result = true;
@@ -217,5 +226,30 @@ public class RemoteTransaction extends AbstractCacheTransaction implements Clone
          result = false;
       }
       return result;
+   }
+
+   /**
+    * mark the transactions as prepared and returns true if the second phase command was already delivered
+    *
+    * Note: used in {@link org.infinispan.reconfigurableprotocol.ReconfigurableProtocol} to abort and remove
+    * transactions ASAP
+    *
+    * @return  true if the 2nd phase commands was already deliver, false otherwise
+    */
+   public final synchronized boolean check2ndPhaseAndPrepare() {
+      state.add(State.PREPARED);
+      return state.contains(State.ROLLBACK_ONLY) || state.contains(State.COMMIT_ONLY);
+   }
+
+   /**
+    * returns the dependency latch for this transaction (lazy construction)
+    *
+    * @return  the dependency latch for this transaction
+    */
+   public synchronized final TxDependencyLatch getDependencyLatch() {
+      if (dependencyLatch == null) {
+         dependencyLatch = new TxDependencyLatch(getGlobalTransaction());
+      }
+      return dependencyLatch;
    }
 }
