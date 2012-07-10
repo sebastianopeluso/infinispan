@@ -133,14 +133,14 @@ public class StatisticManager {
 
       public void add(long start, long unsafe, long safe) {
          if (unsafe != NO_STAT) {
-            safeToSafe = safe - start;
-            safeToUnsafe = unsafe - start;
-            unsafeToSafe = safe - unsafe;
+            safeToSafe += (safe - start);
+            safeToUnsafe += (unsafe - start);
+            unsafeToSafe += (safe - unsafe);
             safeToSafeCounter++;
             safeToUnsafeCounter++;
             unsafeToSafeCounter++;
          } else {
-            safeToSafe = safe - start;
+            safeToSafe += (safe - start);
             safeToSafeCounter++;
          }
          switchCount++;
@@ -148,21 +148,21 @@ public class StatisticManager {
 
       public double getSafeToSafe() {
          if (safeToSafeCounter == 0) {
-            return 0;
+            return NO_STAT;
          }
          return safeToSafe * 1.0 / safeToSafeCounter;
       }
 
       public double getSafeToUnsafe() {
          if (safeToUnsafeCounter == 0) {
-            return 0;
+            return NO_STAT;
          }
          return safeToUnsafe * 1.0 / safeToUnsafeCounter;
       }
 
       public double getUnsafeToSafe() {
          if (unsafeToSafeCounter == 0) {
-            return 0;
+            return NO_STAT;
          }
          return unsafeToSafe * 1.0 / unsafeToSafeCounter;
       }
