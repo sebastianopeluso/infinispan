@@ -40,7 +40,9 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    @Override
    public final void switchTo(ReconfigurableProtocol protocol) {
       manager.unsafeSwitch(protocol);
-      new SendMasterAckThread().start();
+      if (isCoordinator()) {
+         new SendMasterAckThread().start();
+      }
    }
 
    @Override
