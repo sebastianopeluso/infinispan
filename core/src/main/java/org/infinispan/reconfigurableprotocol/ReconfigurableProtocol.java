@@ -80,9 +80,6 @@ public abstract class ReconfigurableProtocol {
     * @param writeSet            the modifications array
     */
    public final void addLocalTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
-      if (log.isDebugEnabled()) {
-         log.debugf("local transaction '%s' starts to commit", globalTransaction.prettyPrint());
-      }
       synchronized (localTransactions) {
          localTransactions.put(globalTransaction, Util.getAffectedKeys(Arrays.asList(writeSet)));
       }
@@ -94,9 +91,6 @@ public abstract class ReconfigurableProtocol {
     * @param globalTransaction   the global transaction
     */
    public final void removeLocalTransaction(GlobalTransaction globalTransaction) {
-      if (log.isDebugEnabled()) {
-         log.debugf("local transaction '%s' finished the commit", globalTransaction.prettyPrint());
-      }
       synchronized (localTransactions) {
          localTransactions.remove(globalTransaction);
          localTransactions.notifyAll();
@@ -110,9 +104,6 @@ public abstract class ReconfigurableProtocol {
     * @param writeSet            the modifications array
     */
    public final void addRemoteTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
-      if (log.isDebugEnabled()) {
-         log.debugf("remote transaction '%s' received", globalTransaction.prettyPrint());
-      }
       synchronized (remoteTransactions) {
          if (remoteTransactions.get(globalTransaction) != null) {
             //no-op
@@ -130,9 +121,6 @@ public abstract class ReconfigurableProtocol {
     * @param globalTransaction   the global transaction
     */
    public final void removeRemoteTransaction(GlobalTransaction globalTransaction) {
-      if (log.isDebugEnabled()) {
-         log.debugf("remote transaction '%s' finished", globalTransaction.prettyPrint());
-      }
       synchronized (remoteTransactions) {
          remoteTransactions.remove(globalTransaction);
          remoteTransactions.notifyAll();
@@ -472,15 +460,54 @@ public abstract class ReconfigurableProtocol {
    /**
     * throw an exception when this protocol cannot process an old transaction
     */
-   protected final void throwOldTxException() {
-      throw new CacheException("Old transaction from " + getUniqueProtocolName() + " not allowed in current epoch");
+   protected final void throwOldTxException(GlobalTransaction globalTransaction) {
+      throw new CacheException("Old transaction '" + globalTransaction.prettyPrint() + "' from " +
+                                     getUniqueProtocolName() + " not allowed in current epoch");
    }
 
    /**
     * throw an exception when this protocol cannot process a speculative transaction
     */
-   protected final void throwSpeculativeTxException() {
-      throw new CacheException("Speculative transaction from " + getUniqueProtocolName() + " not allowed");
+   protected final void throwSpeculativeTxException(GlobalTransaction globalTransaction) {
+      throw new CacheException("Speculative transaction '" + globalTransaction.prettyPrint() + "' from " +
+                                     getUniqueProtocolName() + " not allowed");
+   }
+
+   /**
+    * logs the normal transaction process
+    *
+    * @param globalTransaction   the global transaction
+    */
+   protected final void logProcessTransaction(GlobalTransaction globalTransaction) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Process transaction '%s'", globalTransaction.prettyPrint());
+      }
+   }
+
+   /**
+    * logs the old transaction process
+    *
+    * @param globalTransaction   the global transaction
+    * @param current             the current protocol
+    */
+   protected final void logProcessOldTransaction(GlobalTransaction globalTransaction, ReconfigurableProtocol current) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Process old transaction '%s' and the current protocol is %s",
+                    globalTransaction.prettyPrint(), current.getUniqueProtocolName());
+      }
+   }
+
+   /**
+    * logs the speculative transaction process
+    *
+    * @param globalTransaction   the global transaction
+    * @param old                 the old protocol
+    */
+   protected final void logProcessSpeculativeTransaction(GlobalTransaction globalTransaction, ReconfigurableProtocol old) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Process speculative transaction '%s' and the old protocol is %s",
+                    globalTransaction.prettyPrint(), old.getUniqueProtocolName());
+      }
    }
 
    /**

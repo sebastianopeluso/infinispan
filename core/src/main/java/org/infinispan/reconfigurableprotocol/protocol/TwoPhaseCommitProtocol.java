@@ -68,12 +68,13 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
 
    @Override
    public final void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
-      //no-op
+      logProcessTransaction(globalTransaction);
    }
 
    @Override
    public final void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
                                            ReconfigurableProtocol currentProtocol) {
+      logProcessOldTransaction(globalTransaction, currentProtocol);
       if (PB_UID.equals(currentProtocol.getUniqueProtocolName())) {
          return;
       } else if (TO_UID.equals(currentProtocol.getUniqueProtocolName())) {
@@ -87,20 +88,24 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
       if (remoteTransaction.check2ndPhaseAndPrepare()) {
          transactionTable.remoteTransactionRollback(globalTransaction);
       }
-      throwOldTxException();
+
+      throwOldTxException(globalTransaction);
    }
 
    @Override
    public final void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
                                                    ReconfigurableProtocol oldProtocol) {
+      logProcessSpeculativeTransaction(globalTransaction, oldProtocol);
       if (PB_UID.equals(oldProtocol.getUniqueProtocolName())) {
          return;
       }
+
       RemoteTransaction remoteTransaction = transactionTable.getRemoteTransaction(globalTransaction);
       if (remoteTransaction.check2ndPhaseAndPrepare()) {
          transactionTable.remoteTransactionRollback(globalTransaction);
       }
-      throwSpeculativeTxException();
+
+      throwSpeculativeTxException(globalTransaction);
    }
 
    @Override

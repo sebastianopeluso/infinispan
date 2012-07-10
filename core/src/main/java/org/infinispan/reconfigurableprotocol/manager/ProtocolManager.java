@@ -54,6 +54,9 @@ public class ProtocolManager {
    public final synchronized void inProgress() {
       this.currentStat = statisticManager.createNewStats(current.getUniqueProtocolName());
       this.state = State.IN_PROGRESS;
+      if (log.isDebugEnabled()) {
+         log.debugf("Changed state to %s", state);
+      }
    }
 
    /**
@@ -71,15 +74,18 @@ public class ProtocolManager {
       }
       notifyAll();
       if (newProtocol == null || isCurrentProtocol(newProtocol)) {
+         if (log.isDebugEnabled()) {
+            log.debugf("Changed state to %s", state);
+         }
          return;
       }
       old = current;
       current = newProtocol;
       epoch++;
       this.notifyAll();
-      if (log.isTraceEnabled()) {
-         log.tracef("Changed to new protocol. Current protocol is %s and current epoch is %s",
-                    current.getUniqueProtocolName(), epoch);
+      if (log.isDebugEnabled()) {
+         log.debugf("Changed to new protocol. Current protocol is %s, current epoch is %s and current state is %s",
+                    current.getUniqueProtocolName(), epoch, state);
       }
    }
 
@@ -110,7 +116,7 @@ public class ProtocolManager {
     */
    public final synchronized void ensure(long epoch) throws InterruptedException {
       if (log.isDebugEnabled()) {
-         log.debugf("[%s] will block until %s >= %s", Thread.currentThread().getName(), epoch, this.epoch);
+         log.debugf("[%s] will block until %s >= %s", Thread.currentThread().getName(), this.epoch, epoch);
       }
       while (this.epoch < epoch) {
          this.wait();
@@ -143,8 +149,14 @@ public class ProtocolManager {
     * @throws InterruptedException  if interrupted while waiting for the switch to end
     */
    public final synchronized void ensureNotInProgress() throws InterruptedException {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] will wait until no switch is in progress", Thread.currentThread().getName());
+      }
       while (isInProgress()) {
          wait();
+      }
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] no switch in progress. Moving on...", Thread.currentThread().getName());
       }
    }
 

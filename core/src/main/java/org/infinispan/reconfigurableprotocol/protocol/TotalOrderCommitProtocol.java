@@ -57,18 +57,19 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
 
    @Override
    public final void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
-      //no-op
+      logProcessTransaction(globalTransaction);
    }
 
    @Override
    public final void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
                                            ReconfigurableProtocol currentProtocol) {
-      throwOldTxException();
+      throwOldTxException(globalTransaction);
    }
 
    @Override
    public final void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
                                                    ReconfigurableProtocol oldProtocol) {
+      logProcessSpeculativeTransaction(globalTransaction, oldProtocol);
       if (TWO_PC_UID.equals(oldProtocol.getUniqueProtocolName())) {
          try {
             oldProtocol.ensureNoConflict(writeSet);
@@ -78,7 +79,7 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
          }
       }
 
-      throwSpeculativeTxException();
+      throwSpeculativeTxException(globalTransaction);
    }
 
    @Override

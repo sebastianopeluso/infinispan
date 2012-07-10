@@ -24,6 +24,7 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    public static final String UID = "PB";
    private static final String MASTER_ACK = "_MASTER_ACK_";
    private static final String SWITCH_TO_MASTER_ACK = "_MASTER_ACK_2_";
+   private static final String TWO_PC_UID = TwoPhaseCommitProtocol.UID;
    private boolean masterAckReceived = false;
 
    @Override
@@ -33,7 +34,7 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
 
    @Override
    public final boolean canSwitchTo(ReconfigurableProtocol protocol) {
-      return TwoPhaseCommitProtocol.UID.equals(protocol.getUniqueProtocolName());
+      return TWO_PC_UID.equals(protocol.getUniqueProtocolName());
    }
 
    @Override
@@ -81,25 +82,27 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
 
    @Override
    public final void processTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet) {
-      //no-op
+      logProcessTransaction(globalTransaction);
    }
 
    @Override
    public final void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
                                            ReconfigurableProtocol currentProtocol) {
-      if (!TwoPhaseCommitProtocol.UID.equals(currentProtocol.getUniqueProtocolName())) {
-         throwOldTxException();
+      logProcessOldTransaction(globalTransaction, currentProtocol);
+      if (TWO_PC_UID.equals(currentProtocol.getUniqueProtocolName())) {
+         return;
       }
-      //no-op
+      throwOldTxException(globalTransaction);
    }
 
    @Override
    public final void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
                                                    ReconfigurableProtocol oldProtocol) {
-      if (!TwoPhaseCommitProtocol.UID.equals(oldProtocol.getUniqueProtocolName())) {
-         throwSpeculativeTxException();
+      logProcessSpeculativeTransaction(globalTransaction, oldProtocol);
+      if (TWO_PC_UID.equals(oldProtocol.getUniqueProtocolName())) {
+         return;
       }
-      //no-op
+      throwSpeculativeTxException(globalTransaction);
    }
 
    @Override
