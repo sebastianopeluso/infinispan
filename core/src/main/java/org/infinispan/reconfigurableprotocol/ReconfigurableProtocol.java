@@ -314,18 +314,11 @@ public abstract class ReconfigurableProtocol {
     * @param totalOrder if the data should be sent in total order
     */
    protected final void broadcastData(Object data, boolean totalOrder) {
-      if (log.isTraceEnabled()) {
-         log.tracef("Broadcast data. Data is %s, Using total order? %s", data, totalOrder);
-      }
-
       if (LOCAL_STOP_ACK.equals(data)) {
          throw new IllegalStateException("Cannot broadcast data for protocol " + getUniqueProtocolName() + ". It" +
                                                " is equals to the private data");
       }
-
-      ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.DATA, getUniqueProtocolName());
-      command.setData(data);
-      rpcManager.broadcastRpcCommand(command, false, totalOrder);
+      internalBroadcastData(data, totalOrder);
    }
 
    /**
@@ -432,7 +425,7 @@ public abstract class ReconfigurableProtocol {
                     totalOrder);
       }
       awaitUntilLocalTransactionsFinished();
-      broadcastData(LOCAL_STOP_ACK, totalOrder);
+      internalBroadcastData(LOCAL_STOP_ACK, totalOrder);
       ackCollector.awaitAllAck();
       awaitUntilRemoteTransactionsFinished();
       if (log.isDebugEnabled()) {
@@ -508,6 +501,22 @@ public abstract class ReconfigurableProtocol {
          log.tracef("Process speculative transaction '%s' and the old protocol is %s",
                     globalTransaction.prettyPrint(), old.getUniqueProtocolName());
       }
+   }
+
+   /**
+    * broadcast the data for all members in the cluster
+    *
+    * @param data       the data
+    * @param totalOrder if the data should be sent in total order
+    */
+   private void internalBroadcastData(Object data, boolean totalOrder) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Broadcast data. Data is %s, Using total order? %s", data, totalOrder);
+      }
+
+      ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.DATA, getUniqueProtocolName());
+      command.setData(data);
+      rpcManager.broadcastRpcCommand(command, false, totalOrder);
    }
 
    /**

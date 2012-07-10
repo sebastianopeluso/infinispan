@@ -3,6 +3,8 @@ package org.infinispan.commands.remote;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 
+import java.util.concurrent.CountDownLatch;
+
 /**
  * Command use when switch between protocol to broadcast data between all members
  *
@@ -51,7 +53,9 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
    public final Object perform(InvocationContext ctx) throws Throwable {
       switch (type) {
          case SWITCH:
-            manager.internalSwitchTo(protocolId);
+            CountDownLatch notifier = new CountDownLatch(1);
+            manager.startSwitchTask(protocolId, notifier);
+            notifier.await();
             break;
          case REGISTER:
             manager.internalRegister(protocolId);
