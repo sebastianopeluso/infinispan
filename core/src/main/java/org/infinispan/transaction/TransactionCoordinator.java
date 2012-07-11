@@ -265,6 +265,7 @@ public class TransactionCoordinator {
       RollbackCommand rollbackCommand = commandsFactory.buildRollbackCommand(localTransaction.getGlobalTransaction());
       LocalTxInvocationContext ctx = icc.createTxInvocationContext();
       ctx.setLocalTransaction(localTransaction);
+      manager.notifyLocalTransactionForRollback(localTransaction.getGlobalTransaction(), protocolTable.getThreadProtocolId());
       invoker.invoke(ctx, rollbackCommand);
       txTable.removeLocalTransaction(localTransaction);
    }

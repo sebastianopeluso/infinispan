@@ -157,20 +157,33 @@ public class ReconfigurableReplicationManager {
       long epoch = currentProtocolInfo.getEpoch();
       ReconfigurableProtocol actual = currentProtocolInfo.getCurrent();
 
+      globalTransaction.setEpochId(epoch);
+      globalTransaction.setProtocolId(actual.getUniqueProtocolName());
+      globalTransaction.setReconfigurableProtocol(actual);
+
       if (!actual.getUniqueProtocolName().equals(executionProtocolId)) {
          throw new CacheException("Cannot commit transaction. the execution protocol is different from the current " +
                                         "protocol");
       }
-
-      globalTransaction.setEpochId(epoch);
-      globalTransaction.setProtocolId(actual.getUniqueProtocolName());
-      globalTransaction.setReconfigurableProtocol(actual);
 
       actual.addLocalTransaction(globalTransaction, writeSet);
 
       if (log.isDebugEnabled()) {
          log.debugf("[%s] local transaction %s will use %s as commit protocol", Thread.currentThread().getName(),
                     globalTransaction.prettyPrint(), currentProtocolInfo);
+      }
+   }
+
+   public final void notifyLocalTransactionForRollback(GlobalTransaction globalTransaction, String executionProtocolId) {
+      if (globalTransaction.getReconfigurableProtocol() == null) {
+         String protocolId = globalTransaction.getProtocolId();
+         if (protocolId == null) {
+            protocolId = executionProtocolId;
+         }
+         //this probably will originate a epoch mismatch, but it is not a problem
+         globalTransaction.setReconfigurableProtocol(registry.getProtocolById(protocolId));
+         globalTransaction.setProtocolId(protocolId);
+         globalTransaction.setEpochId(-1);
       }
    }
 

@@ -1,5 +1,6 @@
 package org.infinispan.reconfigurableprotocol.protocol;
 
+import org.infinispan.CacheException;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderDistributionInterceptor;
@@ -12,6 +13,7 @@ import org.infinispan.interceptors.totalorder.TotalOrderVersionedReplicationInte
 import org.infinispan.reconfigurableprotocol.ReconfigurableProtocol;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
 import java.util.EnumMap;
@@ -29,6 +31,8 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
    public static final String UID = "TO";
 
    private static final String TWO_PC_UID = TwoPhaseCommitProtocol.UID;
+
+   private TransactionTable transactionTable;
 
    @Override
    public final String getUniqueProtocolName() {
@@ -63,28 +67,41 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
    @Override
    public final void processOldTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
                                            ReconfigurableProtocol currentProtocol) {
-      throwOldTxException(globalTransaction);
+      try {
+         throwOldTxException(globalTransaction);
+      } catch (CacheException ce) {
+         addException(ce, globalTransaction);
+         throw ce;
+      }
    }
 
    @Override
    public final void processSpeculativeTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
                                                    ReconfigurableProtocol oldProtocol) {
-      logProcessSpeculativeTransaction(globalTransaction, oldProtocol);
-      if (TWO_PC_UID.equals(oldProtocol.getUniqueProtocolName())) {
-         try {
-            oldProtocol.ensureNoConflict(writeSet);
-            return;
-         } catch (InterruptedException e) {
-            //no-op
+      try{
+         logProcessSpeculativeTransaction(globalTransaction, oldProtocol);
+         if (TWO_PC_UID.equals(oldProtocol.getUniqueProtocolName())) {
+            try {
+               oldProtocol.ensureNoConflict(writeSet);
+               return;
+            } catch (InterruptedException e) {
+               //no-op
+            }
          }
-      }
 
-      throwSpeculativeTxException(globalTransaction);
+         throwSpeculativeTxException(globalTransaction);
+      } catch (CacheException ce) {
+         addException(ce, globalTransaction);
+         throw ce;
+      } catch (Exception e) {
+         addException(e, globalTransaction);
+         throw new CacheException(e);
+      }
    }
 
    @Override
    public final void bootstrapProtocol() {
-      //no-op
+      transactionTable = getComponent(TransactionTable.class);
    }
 
    @Override
@@ -162,5 +179,15 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
    @Override
    protected final void internalHandleData(Object data, Address from) {
       //no-op
+   }
+
+   private void addException(Exception e, GlobalTransaction globalTransaction) {
+      //this is not the most efficient way to do it, but it should have a lower number of local transactions
+      for (LocalTransaction localTransaction : transactionTable.getLocalTransactions()) {
+         if (localTransaction.getGlobalTransaction().equals(globalTransaction)) {
+            localTransaction.addException(e, true);
+            break;
+         }
+      }
    }
 }
