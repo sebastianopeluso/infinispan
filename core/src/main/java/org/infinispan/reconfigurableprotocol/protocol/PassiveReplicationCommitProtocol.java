@@ -128,7 +128,10 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
 
    @Override
    public final boolean use1PC(LocalTransaction localTransaction) {
-      return !configuration.versioning().enabled() || configuration.transaction().useSynchronization();
+      //force 1 phase commit for passive replication
+      return true;
+      //original condition
+      //return !configuration.versioning().enabled() || configuration.transaction().useSynchronization();
    }
 
    @Override

@@ -167,8 +167,11 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
 
    @Override
    public final boolean use1PC(LocalTransaction localTransaction) {
-      return !configuration.versioning().enabled() ||
-            (configuration.transaction().useSynchronization() && !configuration.clustering().cacheMode().isDistributed());
+      //force always one phase commit for total order protocol
+      return true;
+      //original condition:
+      //return !configuration.versioning().enabled() ||
+      //      (configuration.transaction().useSynchronization() && !configuration.clustering().cacheMode().isDistributed());
    }
 
    @Override
