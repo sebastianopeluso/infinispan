@@ -60,8 +60,8 @@ public class RpcManagerWrapper implements RpcManager {
    }
 
    @Override
-   public Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand, 
-                                                ResponseMode mode, long timeout, boolean usePriorityQueue, boolean totalOrder) {      
+   public Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpcCommand,
+                                                ResponseMode mode, long timeout, boolean usePriorityQueue, boolean totalOrder) {
       log.tracef("RpcManagerWrapper.invokeRemotely_1");
       long currentTime = System.nanoTime();
       Map<Address, Response> ret = actual.invokeRemotely(recipients, rpcCommand, mode, timeout, usePriorityQueue, totalOrder);
@@ -119,9 +119,9 @@ public class RpcManagerWrapper implements RpcManager {
       actual.invokeRemotely(recipients, rpc, sync);
       updateStats(rpc, sync, currentTime, recipients);
    }
-   
+
    @Override
-   public Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync, 
+   public Map<Address, Response> invokeRemotely(Collection<Address> recipients, ReplicableCommand rpc, boolean sync,
                                                 boolean usePriorityQueue, boolean totalOrder) throws RpcException {
       log.tracef("RpcManagerWrapper.invokeRemotely_4");
       long currentTime = System.nanoTime();
@@ -229,7 +229,7 @@ public class RpcManagerWrapper implements RpcManager {
             recipientSizeStat = IspnStats.NUM_NODES_COMPLETE_NOTIFY;
 
             log.tracef("Update stats for command %s. Is sync? %s. Duration stat is %s, counter stats is %s, " +
-                             "recipient size stat is %s", command, durationStat, counterStat, recipientSizeStat);
+                             "recipient size stat is %s", command, sync, durationStat, counterStat, recipientSizeStat);
 
             TransactionsStatisticsRegistry.addValueAndFlushIfNeeded(durationStat, System.nanoTime() - init, true);
             TransactionsStatisticsRegistry.incrementValueAndFlushIfNeeded(counterStat, true);
