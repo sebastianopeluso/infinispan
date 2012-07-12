@@ -32,7 +32,9 @@ public class NodeScopeStatisticCollector {
    private long lastResetTime;
 
    public final synchronized void reset(){
-      log.tracef("Resetting Node Scope Statistics");
+      if (log.isTraceEnabled()) {
+         log.tracef("Resetting Node Scope Statistics");
+      }
       this.localTransactionStatistics = new LocalTransactionStatistics(this.configuration);
       this.remoteTransactionStatistics = new RemoteTransactionStatistics(this.configuration);
 
@@ -50,7 +52,9 @@ public class NodeScopeStatisticCollector {
    }
 
    public final synchronized void merge(TransactionStatistics ts){
-      log.tracef("Merge transaction statistics %s to the node statistics", ts);
+      if (log.isTraceEnabled()) {
+         log.tracef("Merge transaction statistics %s to the node statistics", ts);
+      }
       if(ts instanceof LocalTransactionStatistics){
          ts.flush(this.localTransactionStatistics);
          if(ts.isCommit()){
@@ -87,7 +91,9 @@ public class NodeScopeStatisticCollector {
 
 
    public final synchronized double getPercentile(IspnStats param, int percentile) throws NoIspnStatException{
-      log.tracef("Get percentile %s from %s", percentile, param);
+      if (log.isTraceEnabled()) {
+         log.tracef("Get percentile %s from %s", percentile, param);
+      }
       switch (param) {
          case RO_LOCAL_PERCENTILE:
             return localTransactionRoExecutionTime.getKPercentile(percentile);
@@ -108,7 +114,9 @@ public class NodeScopeStatisticCollector {
 
    @SuppressWarnings("UnnecessaryBoxing")
    public final synchronized Object getAttribute(IspnStats param) throws NoIspnStatException{
-      log.tracef("Get attribute %s", param);
+      if (log.isTraceEnabled()) {
+         log.tracef("Get attribute %s", param);
+      }
       switch (param) {
          case LOCAL_EXEC_NO_CONT:{
             long numLocalTxToPrepare = localTransactionStatistics.getValue(IspnStats.NUM_PREPARES);

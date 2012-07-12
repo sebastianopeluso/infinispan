@@ -23,10 +23,10 @@ import static org.infinispan.stats.translations.ExposedStatistics.IspnStats;
  */
 public class InboundInvocationHandlerWrapper implements InboundInvocationHandler {
 
-   private final InboundInvocationHandler actual;
    private static final Log log = LogFactory.getLog(InboundInvocationHandlerWrapper.class);
 
    private final TransactionTable transactionTable;
+   private final InboundInvocationHandler actual;
 
    public InboundInvocationHandlerWrapper(InboundInvocationHandler actual, TransactionTable transactionTable) {
       this.actual = actual;
@@ -35,15 +35,22 @@ public class InboundInvocationHandlerWrapper implements InboundInvocationHandler
 
    @Override
    public Response handle(CacheRpcCommand command, Address origin) throws Throwable {
-      log.tracef("Handle remote command [%s] by the invocation handle wrapper from %s", command, origin);
+      if (log.isTraceEnabled()) {
+         log.tracef("Handle remote command [%s] by the invocation handle wrapper from %s", command, origin);
+      }
       GlobalTransaction globalTransaction = getGlobalTransaction(command);
       try{
          if (globalTransaction != null) {
-            log.debugf("The command %s is transactional and the global transaction is %s", command, globalTransaction);
+            if (log.isDebugEnabled()) {
+               log.debugf("The command %s is transactional and the global transaction is %s", command,
+                          globalTransaction.prettyPrint());
+            }
             TransactionsStatisticsRegistry.attachRemoteTransactionStatistic(globalTransaction, command instanceof PrepareCommand ||
                   command instanceof CommitCommand);
          } else {
-            log.debugf("The command %s is NOT transactional", command);
+            if (log.isDebugEnabled()) {
+               log.debugf("The command %s is NOT transactional", command);
+            }
          }
 
          boolean txCompleteNotify = command instanceof TxCompletionNotificationCommand;
@@ -63,7 +70,9 @@ public class InboundInvocationHandlerWrapper implements InboundInvocationHandler
          return ret;
       } finally {
          if (globalTransaction != null) {
-            log.debugf("Detach statistics for command %s", command, globalTransaction);
+            if (log.isDebugEnabled()) {
+               log.debugf("Detach statistics for command %s", command, globalTransaction.prettyPrint());
+            }
             TransactionsStatisticsRegistry.detachRemoteTransactionStatistic(globalTransaction,
                                                                             !transactionTable.containRemoteTx(globalTransaction));
          }

@@ -9,8 +9,6 @@ import org.infinispan.stats.translations.ExposedStatistics.IspnStats;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.concurrent.TimeoutException;
 import org.infinispan.util.concurrent.locks.LockManager;
-import org.infinispan.util.logging.Log;
-import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
 
@@ -21,7 +19,6 @@ import java.util.Collection;
  * @since 5.2
  */
 public class LockManagerWrapper implements LockManager {
-   private static final Log log = LogFactory.getLog(LockManagerWrapper.class);
 
    private final LockManager actual;
 
@@ -47,68 +44,56 @@ public class LockManagerWrapper implements LockManager {
 
    @Override
    public boolean lockAndRecord(Object key, InvocationContext ctx, long timeoutMillis) throws InterruptedException {
-      log.tracef("LockManagerWrapper.lockAndRecord");
       return actual.lockAndRecord(key, ctx, timeoutMillis);
    }
 
    @Override
    public void unlock(Collection<Object> lockedKeys, Object lockOwner) {
-      log.tracef("LockManagerWrapper.unlock");
       actual.unlock(lockedKeys, lockOwner);
    }
 
    @Override
    public void unlockAll(InvocationContext ctx) {
-      log.tracef("LockManagerWrapper.unlockAll");
       actual.unlockAll(ctx);
    }
 
    @Override
    public boolean ownsLock(Object key, Object owner) {
-      log.tracef("LockManagerWrapper.ownsLock");
       return actual.ownsLock(key, owner);
    }
 
    @Override
    public boolean isLocked(Object key) {
-      log.tracef("LockManagerWrapper.isLocked");
       return actual.isLocked(key);
    }
 
    @Override
    public Object getOwner(Object key) {
-      log.tracef("LockManagerWrapper.getOwner");
       return actual.getOwner(key);
    }
 
    @Override
    public String printLockInfo() {
-      log.tracef("LockManagerWrapper.printLockInfo");
       return actual.printLockInfo();
    }
 
    @Override
    public boolean possiblyLocked(CacheEntry entry) {
-      log.tracef("LockManagerWrapper.possiblyLocked");
       return actual.possiblyLocked(entry);
    }
 
    @Override
    public int getNumberOfLocksHeld() {
-      log.tracef("LockManagerWrapper.getNumberOfLocksHeld");
       return actual.getNumberOfLocksHeld();
    }
 
    @Override
    public int getLockId(Object key) {
-      log.tracef("LockManagerWrapper.getLockId");
       return actual.getLockId(key);
    }
 
    @Override
    public boolean acquireLock(InvocationContext ctx, Object key) throws InterruptedException, TimeoutException {
-      log.tracef("LockManagerWrapper.acquireLock");
-
       long lockingTime = 0;
       boolean locked,
             experiencedContention = false,
@@ -141,20 +126,17 @@ public class LockManagerWrapper implements LockManager {
          TransactionsStatisticsRegistry.addTakenLock(key); //Idempotent
       }
 
-
       return locked;
    }
 
    @Override
    public boolean acquireLock(InvocationContext ctx, Object key, long timeoutMillis) throws InterruptedException,
                                                                                             TimeoutException {
-      log.tracef("LockManagerWrapper.acquireLock");
       return actual.acquireLock(ctx, key, timeoutMillis);
    }
 
    @Override
    public boolean acquireLockNoCheck(InvocationContext ctx, Object key) throws InterruptedException, TimeoutException {
-      log.tracef("LockManagerWrapper.acquireLockNoCheck");
       return actual.acquireLockNoCheck(ctx, key);
    }
 }
