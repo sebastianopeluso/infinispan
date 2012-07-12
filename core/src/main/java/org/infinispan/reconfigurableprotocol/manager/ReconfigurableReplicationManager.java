@@ -81,24 +81,24 @@ public class ReconfigurableReplicationManager {
          protocol.initialize(configuration, componentRegistry, this);
          registry.registerNewProtocol(protocol);
       } catch (AlreadyRegisterProtocolException e) {
-         log.errorf("Tried to register Two Phase Commit protocol but it is already register. This should not happen");
-         throw new IllegalStateException("this should not happen");
+         //this exception is catch when you inject the extended statistics
+         log.errorf("Tried to register Two Phase Commit protocol but it is already register.");
       }
       protocol = new PassiveReplicationCommitProtocol();
       try {
          protocol.initialize(configuration, componentRegistry, this);
          registry.registerNewProtocol(protocol);
       } catch (AlreadyRegisterProtocolException e) {
-         log.errorf("Tried to register Passive Replication protocol but it is already register. This should not happen");
-         throw new IllegalStateException("this should not happen");
+         //this exception is catch when you inject the extended statistics
+         log.errorf("Tried to register Passive Replication protocol but it is already register.");
       }
       protocol = new TotalOrderCommitProtocol();
       try {
          protocol.initialize(configuration, componentRegistry, this);
          registry.registerNewProtocol(protocol);
       } catch (AlreadyRegisterProtocolException e) {
-         log.errorf("Tried to register Total Order protocol but it is already register. This should not happen");
-         throw new IllegalStateException("this should not happen");
+         //this exception is catch when you inject the extended statistics
+         log.errorf("Tried to register Total Order protocol but it is already register.");
       }
 
       switch (configuration.transaction().transactionProtocol()) {
