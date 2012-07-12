@@ -16,10 +16,10 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
    public static final byte COMMAND_ID = 101;
 
    public static enum Type {
-      SWITCH(false),
+      SWITCH(true),
       REGISTER(false),
       DATA(true),
-      SWITCH_REQ(false),
+      SWITCH_REQ(true),
       SET_COOL_DOWN_TIME(true);
 
       final boolean hasData;
@@ -54,7 +54,7 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
       switch (type) {
          case SWITCH:
             CountDownLatch notifier = new CountDownLatch(1);
-            manager.startSwitchTask(protocolId, notifier);
+            manager.startSwitchTask(protocolId, (Boolean) data, notifier);
             notifier.await();
             break;
          case REGISTER:
@@ -64,7 +64,7 @@ public class ReconfigurableProtocolCommand extends BaseRpcCommand {
             manager.handleProtocolData(protocolId, data, getOrigin());
             break;
          case SWITCH_REQ:
-            manager.switchTo(protocolId);
+            manager.switchTo(protocolId, (Boolean) data);
             break;
          case SET_COOL_DOWN_TIME:
             manager.internalSetSwitchCoolDownTime((Integer) data);

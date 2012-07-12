@@ -331,8 +331,8 @@ public class ReconfigurableReplicationManager {
       return protocol != null && protocol.useTotalOrder();
    }
 
-   public final void startSwitchTask(String protocolId, CountDownLatch notifier) {
-      new Thread(new SwitchTask(protocolId, notifier), "Switch-Thread").start();
+   public final void startSwitchTask(String protocolId, boolean forceStopTheWorld, CountDownLatch notifier) {
+      new Thread(new SwitchTask(protocolId, forceStopTheWorld, notifier), "Switch-Thread").start();
    }
 
    /**
@@ -355,12 +355,14 @@ public class ReconfigurableReplicationManager {
     *  1) first it tries to use the non-blocking switch (switchTo method in protocol)
     *  2) if the first fails, it uses the stop-the-world model
     *
+    *
     * @param protocolId                               the new protocol ID
+    * @param forceStopTheWorld                        true if it must use the stop the world switch (no optimization)
     * @throws NoSuchReconfigurableProtocolException   if the new protocol does not exist
     * @throws InterruptedException                    if it is interrupted
     */
-   private void internalSwitchTo(String protocolId, CountDownLatch notifier) throws NoSuchReconfigurableProtocolException,
-                                                                                    InterruptedException, SwitchInProgressException {
+   private void internalSwitchTo(String protocolId, boolean forceStopTheWorld, CountDownLatch notifier) throws NoSuchReconfigurableProtocolException,
+                                                                                                               InterruptedException, SwitchInProgressException {
       ReconfigurableProtocol newProtocol = registry.getProtocolById(protocolId);
       if (newProtocol == null) {
          log.warnf("Tried to switch the replication protocol to %s but it does not exist", protocolId);
@@ -376,7 +378,7 @@ public class ReconfigurableReplicationManager {
       protocolManager.inProgress();
       ReconfigurableProtocol currentProtocol = protocolManager.getCurrent();
 
-      if (currentProtocol.canSwitchTo(newProtocol)) {
+      if (!forceStopTheWorld && currentProtocol.canSwitchTo(newProtocol)) {
          if (log.isDebugEnabled()) {
             log.debugf("Perform switch from %s to %s with the optimized switch", currentProtocol.getUniqueProtocolName(),
                        newProtocol.getUniqueProtocolName());
@@ -429,16 +431,18 @@ public class ReconfigurableReplicationManager {
 
       private final String protocolId;
       private final CountDownLatch notifier;
+      private final boolean forceStopTheWorld;
 
-      private SwitchTask(String protocolId, CountDownLatch notifier) {
+      private SwitchTask(String protocolId, boolean forceStopTheWorld, CountDownLatch notifier) {
          this.protocolId = protocolId;
          this.notifier = notifier;
+         this.forceStopTheWorld = forceStopTheWorld;
       }
 
       @Override
       public void run() {
          try {
-            internalSwitchTo(protocolId, notifier);
+            internalSwitchTo(protocolId, forceStopTheWorld, notifier);
          } catch (Exception e) {
             if (log.isDebugEnabled()) {
                log.debugf(e, "Error switching protocol to %s.", protocolId);
@@ -463,9 +467,10 @@ public class ReconfigurableReplicationManager {
 
    @ManagedOperation(description = "Switch the current replication protocol for the new one. It fails if the protocol " +
          "does not exists or it is equals to the current")
-   public final void switchTo(String protocolId) throws Exception {
+   public final void switchTo(String protocolId, boolean forceStopTheWorld) throws Exception {
       if (!rpcManager.getTransport().isCoordinator()) {
          ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.SWITCH_REQ, protocolId);
+         command.setData(forceStopTheWorld);
          rpcManager.invokeRemotely(Collections.singleton(rpcManager.getTransport().getCoordinator()), command, true);
          return;
       }
@@ -479,6 +484,7 @@ public class ReconfigurableReplicationManager {
       }
 
       ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.SWITCH, protocolId);
+      command.setData(forceStopTheWorld);
 
       if (protocolManager.getCurrent().useTotalOrder()) {
          rpcManager.broadcastRpcCommand(command, false, true);
@@ -486,7 +492,7 @@ public class ReconfigurableReplicationManager {
       }
 
       rpcManager.broadcastRpcCommand(command, false, false);
-      startSwitchTask(protocolId, new CountDownLatch(1));
+      startSwitchTask(protocolId, forceStopTheWorld, new CountDownLatch(1));
    }
 
    @ManagedAttribute(description = "Returns a collection of replication protocols IDs that can be used in the switchTo",
