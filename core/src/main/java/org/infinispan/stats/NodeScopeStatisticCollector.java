@@ -334,6 +334,12 @@ public class NodeScopeStatisticCollector {
             long totalLocalBornTx = localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_RO_TX) +
                   localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_WR_TX);
             return new Double(totalLocalBornTx * 1.0 / convertNanosToSeconds(System.nanoTime() - this.lastResetTime));
+         case WRITE_TX_THROUGHPUT:
+            return new Double(localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_WR_TX) * 1.0 /
+                                    convertNanosToSeconds(System.nanoTime() - lastResetTime));
+         case READ_TX_THROUGHPUT:
+            return new Double(localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_RO_TX) * 1.0 /
+                                    convertNanosToSeconds(System.nanoTime() - lastResetTime));
          case LOCK_HOLD_TIME_LOCAL:
             return microAvgLocal(IspnStats.NUM_HELD_LOCKS,IspnStats.LOCK_HOLD_TIME);
          case LOCK_HOLD_TIME_REMOTE:

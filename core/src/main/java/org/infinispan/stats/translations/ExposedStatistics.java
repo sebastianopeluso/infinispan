@@ -62,9 +62,11 @@ public class ExposedStatistics {
       WRITE_SKEW_PROBABILITY(false, false), // ONLY FOR QUERY
 
       //Abort rate, arrival rate and throughput
-      ABORT_RATE(false, false),     // ONLY FOR QUERY, derived on the fly
-      ARRIVAL_RATE(false, false),   // ONLY FOR QUERY, derived on the fly
-      THROUGHPUT(false, false),     // ONLY FOR QUERY, derived on the fly
+      ABORT_RATE(false, false),           // ONLY FOR QUERY, derived on the fly
+      ARRIVAL_RATE(false, false),         // ONLY FOR QUERY, derived on the fly
+      THROUGHPUT(false, false),           // ONLY FOR QUERY, derived on the fly
+      WRITE_TX_THROUGHPUT(false, false),  // ONLY FOR QUERY, derived on the fly
+      READ_TX_THROUGHPUT(false, false),   // ONLY FOR QUERY, derived on the fly
 
       //Percentile stuff
       RO_LOCAL_PERCENTILE(false, false),  // ONLY FOR QUERY, derived on the fly

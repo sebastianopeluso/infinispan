@@ -583,6 +583,18 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
       return (Double)TransactionsStatisticsRegistry.getAttribute(IspnStats.THROUGHPUT);
    }
 
+   @ManagedAttribute(description = "Write transactions throughput (in transactions per second)")
+   @Metric(displayName = "WriteTxThroughput")
+   public double getWriteTxThroughput(){
+      return (Double)TransactionsStatisticsRegistry.getAttribute(IspnStats.WRITE_TX_THROUGHPUT);
+   }
+
+   @ManagedAttribute(description = "Read only transactions throughput (in transactions per second)")
+   @Metric(displayName = "ReadTxThroughput")
+   public double getReadTxThroughput(){
+      return (Double)TransactionsStatisticsRegistry.getAttribute(IspnStats.READ_TX_THROUGHPUT);
+   }
+
    @ManagedAttribute(description = "Average number of get operations per (local) read-only transaction")
    @Operation(displayName = "Average number of get operations per (local) read-only transaction")
    public long getAvgGetsPerROTransaction(){
