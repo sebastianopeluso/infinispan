@@ -36,7 +36,6 @@ import org.infinispan.util.logging.LogFactory;
 import javax.transaction.Transaction;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -64,7 +63,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    private final Transaction transaction;
 
    private final boolean implicitTransaction;
-   private boolean prepareSent = false;   
+   private boolean prepareSent = false;
 
    //total order result -- has the result and behaves like a synchronization point between the remote and local
    // prepare commands
@@ -127,7 +126,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       if (isMarkedForRollback()) {
          throw new CacheException("This transaction is marked for rollback and cannot acquire locks!");
       }
-      if (lookedUpEntries == null) lookedUpEntries = new HashMap<Object, CacheEntry>(4);
+      if (lookedUpEntries == null) lookedUpEntries = createMapEntries(4);
       lookedUpEntries.put(key, e);
    }
 
@@ -137,7 +136,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
          throw new CacheException("This transaction is marked for rollback and cannot acquire locks!");
       }
       if (lookedUpEntries == null) {
-         lookedUpEntries = new HashMap<Object, CacheEntry>(entries);
+         lookedUpEntries = createMapEntries(entries);
       } else {
          lookedUpEntries.putAll(entries);
       }
@@ -311,7 +310,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
     * @param exception is it an exception?
     */
    public void addPrepareResult(Object object, boolean exception) {
-      prepareResult.addResultFromPrepare(object, exception);      
+      prepareResult.addResultFromPrepare(object, exception);
    }
 
    /**

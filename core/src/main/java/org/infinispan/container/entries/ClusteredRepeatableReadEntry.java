@@ -32,9 +32,9 @@ import org.infinispan.util.logging.LogFactory;
  * @since 5.1
  */
 public class ClusteredRepeatableReadEntry extends RepeatableReadEntry {
-   
+
    private static Log log = LogFactory.getLog(ClusteredRepeatableReadEntry.class);
-   
+
    private EntryVersion version;
 
    public ClusteredRepeatableReadEntry(Object key, Object value, EntryVersion version, long lifespan) {
@@ -49,7 +49,7 @@ public class ClusteredRepeatableReadEntry extends RepeatableReadEntry {
          return version == null;
       }
       if (ice.getVersion() == null)
-         throw new IllegalStateException("Entries cannot have null versions!");
+         throw new IllegalStateException("Entries cannot have null versions! Entry is " + key);
       // Could be that we didn't do a remote get first ... so we haven't effectively read this entry yet.
       if (version == null) return true;
       log.tracef("Current version is: %s, version at read time is %s", ice.getVersion(), version);

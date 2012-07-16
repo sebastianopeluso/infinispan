@@ -52,12 +52,9 @@ import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
 import org.infinispan.statetransfer.totalorder.TotalOrderStateTransferLockImpl;
 import org.infinispan.transaction.TransactionCoordinator;
-import org.infinispan.transaction.totalorder.DistParallelTotalOrderManager;
-import org.infinispan.transaction.totalorder.ParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.SequentialTotalOrderManager;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.transaction.xa.recovery.RecoveryAdminOperations;
-import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.concurrent.locks.containers.LockContainer;
 import org.infinispan.util.concurrent.locks.containers.OwnableReentrantPerEntryLockContainer;
 import org.infinispan.util.concurrent.locks.containers.OwnableReentrantStripedLockContainer;
@@ -87,7 +84,7 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
       Class<?> componentImpl;
       if (componentType.equals(ClusteringDependentLogic.class)) {
          ClusteringDependentLogicDelegate cdl = new ClusteringDependentLogicDelegate();
-         
+
          try {
             if (configuration.getCacheMode().isReplicated() || !configuration.getCacheMode().isClustered() || configuration.getCacheMode().isInvalidation()) {
                componentRegistry.registerComponent(new ClusteringDependentLogic.AllNodesLogic(),
@@ -117,7 +114,7 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          } catch (AlreadyExistingComponentProtocolException e) {
             throw new ConfigurationException(e);
          }
-         
+
          return componentType.cast(cdl);
       } else if (componentType.equals(InvocationContextContainer.class)) {
          componentImpl = configuration.isTransactionalCache() ? TransactionalInvocationContextContainer.class
@@ -139,7 +136,7 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          return (T) new RecoveryAdminOperations();
       } else if (componentType.equals(StateTransferLock.class)) {
          StateTransferLockDelegate stl = new StateTransferLockDelegate();
-         
+
          try {
             componentRegistry.registerComponent(new StateTransferLockImpl(), StateTransferLockImpl.class);
             componentRegistry.registerComponent(new TotalOrderStateTransferLockImpl(), TotalOrderStateTransferLockImpl.class);
@@ -153,7 +150,7 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          } catch (AlreadyExistingComponentProtocolException e) {
             throw new ConfigurationException(e);
          }
-         
+
          return componentType.cast(stl);
       } else if (componentType.equals(EvictionManager.class)) {
          return (T) new EvictionManagerImpl();
@@ -164,14 +161,16 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
                notTransactional ? new ReentrantPerEntryLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantPerEntryLockContainer(configuration.getConcurrencyLevel());
          return (T) lockContainer;
       } else if (componentType.equals(TotalOrderManager.class)) {
-         boolean needsMultiThreadValidation = configuration.getIsolationLevel() == IsolationLevel.REPEATABLE_READ &&
+         /*boolean needsMultiThreadValidation = configuration.getIsolationLevel() == IsolationLevel.REPEATABLE_READ &&
                configuration.isWriteSkewCheck() && !configuration.isUseSynchronizationForTransactions();
 
          return needsMultiThreadValidation ?
                (configuration.getCacheMode().isDistributed() ?
                       (T) new DistParallelTotalOrderManager() :
                       (T) new ParallelTotalOrderManager())
-               : (T) new SequentialTotalOrderManager();
+               : (T) new SequentialTotalOrderManager();*/
+         //for 1pc in this branch
+         return (T) new SequentialTotalOrderManager();
       } else if (componentType.equals(ReconfigurableReplicationManager.class)) {
          return (T) new ReconfigurableReplicationManager();
       } else if (componentType.equals(ProtocolTable.class)) {

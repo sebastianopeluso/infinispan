@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 
@@ -82,14 +81,14 @@ public class RemoteTransaction extends AbstractCacheTransaction implements Clone
    public RemoteTransaction(WriteCommand[] modifications, GlobalTransaction tx, int viewId) {
       super(tx, viewId);
       this.modifications = modifications == null || modifications.length == 0 ? Collections.<WriteCommand>emptyList() : Arrays.asList(modifications);
-      lookedUpEntries = new HashMap<Object, CacheEntry>(this.modifications.size());
+      lookedUpEntries = createMapEntries(this.modifications.size());
       this.state = EnumSet.noneOf(State.class);
    }
 
    public RemoteTransaction(GlobalTransaction tx, int viewId) {
       super(tx, viewId);
       this.modifications = new LinkedList<WriteCommand>();
-      lookedUpEntries = new HashMap<Object, CacheEntry>(2);
+      lookedUpEntries = createMapEntries(2);
       this.state = EnumSet.noneOf(State.class);
    }
 
@@ -138,7 +137,7 @@ public class RemoteTransaction extends AbstractCacheTransaction implements Clone
       try {
          RemoteTransaction dolly = (RemoteTransaction) super.clone();
          dolly.modifications = new ArrayList<WriteCommand>(modifications);
-         dolly.lookedUpEntries = new HashMap<Object, CacheEntry>(lookedUpEntries);
+         dolly.lookedUpEntries = createMapEntries(lookedUpEntries);
          dolly.state.addAll(state);
          return dolly;
       } catch (CloneNotSupportedException e) {
