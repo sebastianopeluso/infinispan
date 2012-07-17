@@ -28,6 +28,7 @@ import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.control.CacheViewControlCommand;
 import org.infinispan.commands.control.StateTransferControlCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
+import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.RpcException;
 import org.infinispan.remoting.responses.ExceptionResponse;
@@ -408,6 +409,14 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          if (retval == null)
             throw new NotSerializableException("RpcDispatcher returned a null.  This is most often caused by args for "
                                                      + command.getClass().getSimpleName() + " not being serializable.");
+         
+         /*if (command instanceof PrepareCommand) {
+            for (Rsp<?> rsp : retval.values()) {
+               if (!rsp.wasReceived()) {
+                  throw new TimeoutException("Didn't receive response from " + rsp.getSender());
+               }
+            }
+         }*/
       }
       return retval;
    }
