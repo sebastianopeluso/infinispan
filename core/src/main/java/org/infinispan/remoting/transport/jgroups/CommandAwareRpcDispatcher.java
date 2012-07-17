@@ -410,13 +410,13 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             throw new NotSerializableException("RpcDispatcher returned a null.  This is most often caused by args for "
                                                      + command.getClass().getSimpleName() + " not being serializable.");
          
-         /*if (command instanceof PrepareCommand) {
+         if (command instanceof PrepareCommand) {
             for (Rsp<?> rsp : retval.values()) {
                if (!rsp.wasReceived()) {
                   throw new TimeoutException("Didn't receive response from " + rsp.getSender());
                }
             }
-         }*/
+         }
       }
       return retval;
    }

@@ -126,10 +126,7 @@ public class WriteSkewHelper {
          keysChecked.addAll(writeCommand.getAffectedKeys());
       }
 
-      EntryVersionsMap uv = context.getCacheTransaction().getUpdatedEntryVersions();
-      if (uv == null) {
-         uv = new EntryVersionsMap();
-      }
+      EntryVersionsMap uv = context.getCacheTransaction().getUpdatedEntryVersions();      
 
       for (Map.Entry<Object, CacheEntry> entry : context.getLookedUpEntries().entrySet()) {
          if (keysChecked.contains(entry.getKey()) || !entry.getValue().isChanged()) {
@@ -140,6 +137,9 @@ public class WriteSkewHelper {
             version = versionGenerator.generateNew();
          } else {
             version = versionGenerator.increment(version);
+         }
+         if (uv == null) {
+            uv = new EntryVersionsMap();
          }
          uv.put(entry.getKey(), version);
       }
