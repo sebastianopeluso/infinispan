@@ -39,6 +39,11 @@ public class SequentialTotalOrderManager extends BaseTotalOrderManager {
          logProcessingFinalStatus(prepareCommand, result, exception);
          updateLocalTransaction(result, exception, prepareCommand.getGlobalTransaction());
          updateProcessingDurationStats(startTime, now());
+         if (exception) {
+            transactionTable.remoteTransactionRollback(prepareCommand.getGlobalTransaction());
+         } else {
+            transactionTable.remoteTransactionCommitted(prepareCommand.getGlobalTransaction());
+         }
       }
    }
 
