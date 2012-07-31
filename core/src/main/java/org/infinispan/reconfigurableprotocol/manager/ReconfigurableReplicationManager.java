@@ -363,38 +363,41 @@ public class ReconfigurableReplicationManager {
     */
    private void internalSwitchTo(String protocolId, boolean forceStopTheWorld, CountDownLatch notifier) throws NoSuchReconfigurableProtocolException,
                                                                                                                InterruptedException, SwitchInProgressException {
-      ReconfigurableProtocol newProtocol = registry.getProtocolById(protocolId);
-      if (newProtocol == null) {
-         log.warnf("Tried to switch the replication protocol to %s but it does not exist", protocolId);
-         throw new NoSuchReconfigurableProtocolException(protocolId);
-      } else if (protocolManager.isCurrentProtocol(newProtocol)) {
-         log.warnf("Tried to switch the replication protocol to %s but it is already the current protocol", protocolId);
-         return; //nothing to do
-      } else if (protocolManager.isInProgress() || protocolManager.isUnsafe()) {
-         log.warnf("Tried to switch the replication protocol to %s but a switch is already in progress", protocolId);
-         throw new SwitchInProgressException("Switch is in progress");
-      }
-
-      protocolManager.inProgress();
-      ReconfigurableProtocol currentProtocol = protocolManager.getCurrent();
-
-      if (!forceStopTheWorld && currentProtocol.canSwitchTo(newProtocol)) {
-         if (log.isDebugEnabled()) {
-            log.debugf("Perform switch from %s to %s with the optimized switch", currentProtocol.getUniqueProtocolName(),
-                       newProtocol.getUniqueProtocolName());
+      try {
+         ReconfigurableProtocol newProtocol = registry.getProtocolById(protocolId);
+         if (newProtocol == null) {
+            log.warnf("Tried to switch the replication protocol to %s but it does not exist", protocolId);
+            throw new NoSuchReconfigurableProtocolException(protocolId);
+         } else if (protocolManager.isCurrentProtocol(newProtocol)) {
+            log.warnf("Tried to switch the replication protocol to %s but it is already the current protocol", protocolId);
+            return; //nothing to do
+         } else if (protocolManager.isInProgress() || protocolManager.isUnsafe()) {
+            log.warnf("Tried to switch the replication protocol to %s but a switch is already in progress", protocolId);
+            throw new SwitchInProgressException("Switch is in progress");
          }
-         currentProtocol.switchTo(newProtocol);
-      } else {
-         if (log.isDebugEnabled()) {
-            log.debugf("Perform switch from %s to %s by stop-the-world model", currentProtocol.getUniqueProtocolName(),
-                       newProtocol.getUniqueProtocolName());
+
+         protocolManager.inProgress();
+         ReconfigurableProtocol currentProtocol = protocolManager.getCurrent();
+
+         if (!forceStopTheWorld && currentProtocol.canSwitchTo(newProtocol)) {
+            if (log.isDebugEnabled()) {
+               log.debugf("Perform switch from %s to %s with the optimized switch", currentProtocol.getUniqueProtocolName(),
+                          newProtocol.getUniqueProtocolName());
+            }
+            currentProtocol.switchTo(newProtocol);
+         } else {
+            if (log.isDebugEnabled()) {
+               log.debugf("Perform switch from %s to %s by stop-the-world model", currentProtocol.getUniqueProtocolName(),
+                          newProtocol.getUniqueProtocolName());
+            }
+            notifier.countDown();
+            currentProtocol.stopProtocol();
+            newProtocol.bootProtocol();
+            safeSwitch(newProtocol);
          }
+      } finally {
          notifier.countDown();
-         currentProtocol.stopProtocol();
-         newProtocol.bootProtocol();
-         safeSwitch(newProtocol);
       }
-      notifier.countDown();
    }
 
    /**
@@ -478,6 +481,9 @@ public class ReconfigurableReplicationManager {
       if (registry.getProtocolById(protocolId) == null) {
          log.warnf("Tried to switch the replication protocol to %s but it does not exist", protocolId);
          throw new NoSuchReconfigurableProtocolException(protocolId);
+      } else if (protocolManager.isCurrentProtocol(registry.getProtocolById(protocolId))) {
+         log.warnf("Tried to switch the replication protocol to %s but it is already the current protocol", protocolId);
+         return; //nothing to do
       } else if (!coolDownTimeManager.checkAndSetToSwitch()) {
          log.warnf("Tried to switch to %s but you cannot do it right now...", protocolId);
          throw new Exception("You need to wait before perform a new switch");
