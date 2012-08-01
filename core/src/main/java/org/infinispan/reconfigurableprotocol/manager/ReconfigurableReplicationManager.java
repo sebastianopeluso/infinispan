@@ -1,6 +1,5 @@
 package org.infinispan.reconfigurableprotocol.manager;
 
-import org.infinispan.CacheException;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.ReconfigurableProtocolCommand;
 import org.infinispan.commands.write.WriteCommand;
@@ -26,6 +25,7 @@ import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import javax.transaction.Transaction;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -135,6 +135,13 @@ public class ReconfigurableReplicationManager {
       }
    }
 
+   public final String beginTransaction(Transaction transaction) throws InterruptedException {
+      protocolManager.ensureNotInProgress();
+      ReconfigurableProtocol currentProtocol = protocolManager.getCurrent();
+      currentProtocol.startTransaction(transaction);
+      return currentProtocol.getUniqueProtocolName();
+   }
+
    /**
     * notifies the protocol to a new local transaction that wants to commit.
     * sets the epoch and the protocol to use for this transaction.     
@@ -143,7 +150,8 @@ public class ReconfigurableReplicationManager {
     * @param globalTransaction      the global transaction
     * @throws InterruptedException  if interrupted while waiting for the switch to finish
     */
-   public final void notifyLocalTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet, String executionProtocolId)
+   public final void notifyLocalTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                            String executionProtocolId, Transaction transaction)
          throws InterruptedException {
       //returns immediately if no switch is in progress
       if (log.isDebugEnabled()) {
@@ -151,22 +159,16 @@ public class ReconfigurableReplicationManager {
                     Thread.currentThread().getName(), globalTransaction.prettyPrint());
       }
 
-      protocolManager.ensureNotInProgress();
+      ProtocolManager.CurrentProtocolInfo currentProtocolInfo =
+            protocolManager.startCommitTransaction(globalTransaction, writeSet,
+                                                   registry.getProtocolById(executionProtocolId), transaction);
 
-      ProtocolManager.CurrentProtocolInfo currentProtocolInfo = protocolManager.getCurrentProtocolInfo();
       long epoch = currentProtocolInfo.getEpoch();
       ReconfigurableProtocol actual = currentProtocolInfo.getCurrent();
 
       globalTransaction.setEpochId(epoch);
       globalTransaction.setProtocolId(actual.getUniqueProtocolName());
       globalTransaction.setReconfigurableProtocol(actual);
-
-      if (!actual.getUniqueProtocolName().equals(executionProtocolId)) {
-         throw new CacheException("Cannot commit transaction. the execution protocol is different from the current " +
-                                        "protocol");
-      }
-
-      actual.addLocalTransaction(globalTransaction, writeSet);
 
       if (log.isDebugEnabled()) {
          log.debugf("[%s] local transaction %s will use %s as commit protocol", Thread.currentThread().getName(),
@@ -331,8 +333,8 @@ public class ReconfigurableReplicationManager {
       return protocol != null && protocol.useTotalOrder();
    }
 
-   public final void startSwitchTask(String protocolId, boolean forceStopTheWorld, CountDownLatch notifier) {
-      new Thread(new SwitchTask(protocolId, forceStopTheWorld, notifier), "Switch-Thread").start();
+   public final void startSwitchTask(String protocolId, boolean forceStopTheWorld, boolean abortOnStop, CountDownLatch notifier) {
+      new Thread(new SwitchTask(protocolId, forceStopTheWorld, abortOnStop, notifier), "Switch-Thread").start();
    }
 
    /**
@@ -361,8 +363,8 @@ public class ReconfigurableReplicationManager {
     * @throws NoSuchReconfigurableProtocolException   if the new protocol does not exist
     * @throws InterruptedException                    if it is interrupted
     */
-   private void internalSwitchTo(String protocolId, boolean forceStopTheWorld, CountDownLatch notifier) throws NoSuchReconfigurableProtocolException,
-                                                                                                               InterruptedException, SwitchInProgressException {
+   private void internalSwitchTo(String protocolId, boolean forceStopTheWorld, boolean abortOnStop, CountDownLatch notifier)
+         throws NoSuchReconfigurableProtocolException, InterruptedException, SwitchInProgressException {
       try {
          ReconfigurableProtocol newProtocol = registry.getProtocolById(protocolId);
          if (newProtocol == null) {
@@ -391,7 +393,7 @@ public class ReconfigurableReplicationManager {
                           newProtocol.getUniqueProtocolName());
             }
             notifier.countDown();
-            currentProtocol.stopProtocol();
+            currentProtocol.stopProtocol(abortOnStop);
             newProtocol.bootProtocol();
             safeSwitch(newProtocol);
          }
@@ -435,17 +437,19 @@ public class ReconfigurableReplicationManager {
       private final String protocolId;
       private final CountDownLatch notifier;
       private final boolean forceStopTheWorld;
+      private final boolean abortOnStop;
 
-      private SwitchTask(String protocolId, boolean forceStopTheWorld, CountDownLatch notifier) {
+      private SwitchTask(String protocolId, boolean forceStopTheWorld, boolean abortOnStop, CountDownLatch notifier) {
          this.protocolId = protocolId;
          this.notifier = notifier;
          this.forceStopTheWorld = forceStopTheWorld;
+         this.abortOnStop = abortOnStop;
       }
 
       @Override
       public void run() {
          try {
-            internalSwitchTo(protocolId, forceStopTheWorld, notifier);
+            internalSwitchTo(protocolId, forceStopTheWorld, abortOnStop, notifier);
          } catch (Exception e) {
             if (log.isDebugEnabled()) {
                log.debugf(e, "Error switching protocol to %s.", protocolId);
@@ -470,10 +474,11 @@ public class ReconfigurableReplicationManager {
 
    @ManagedOperation(description = "Switch the current replication protocol for the new one. It fails if the protocol " +
          "does not exists or it is equals to the current")
-   public final void switchTo(String protocolId, boolean forceStopTheWorld) throws Exception {
+   public final void switchTo(String protocolId, boolean forceStopTheWorld, boolean abortOnStop) throws Exception {
       if (!rpcManager.getTransport().isCoordinator()) {
          ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.SWITCH_REQ, protocolId);
-         command.setData(forceStopTheWorld);
+         command.setForceStop(forceStopTheWorld);
+         command.setAbortOnStop(abortOnStop);
          rpcManager.invokeRemotely(Collections.singleton(rpcManager.getTransport().getCoordinator()), command, true);
          return;
       }
@@ -490,7 +495,8 @@ public class ReconfigurableReplicationManager {
       }
 
       ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.SWITCH, protocolId);
-      command.setData(forceStopTheWorld);
+      command.setForceStop(forceStopTheWorld);
+      command.setAbortOnStop(abortOnStop);
 
       if (protocolManager.getCurrent().useTotalOrder()) {
          rpcManager.broadcastRpcCommand(command, false, true);
@@ -498,7 +504,7 @@ public class ReconfigurableReplicationManager {
       }
 
       rpcManager.broadcastRpcCommand(command, false, false);
-      startSwitchTask(protocolId, forceStopTheWorld, new CountDownLatch(1));
+      startSwitchTask(protocolId, forceStopTheWorld, abortOnStop, new CountDownLatch(1));
    }
 
    @ManagedAttribute(description = "Returns a collection of replication protocols IDs that can be used in the switchTo",

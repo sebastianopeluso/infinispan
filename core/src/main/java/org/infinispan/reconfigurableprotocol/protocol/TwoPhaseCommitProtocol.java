@@ -47,7 +47,7 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
    public final void switchTo(ReconfigurableProtocol protocol) {
       if (TO_UID.equals(protocol.getUniqueProtocolName())) {
          try {
-            awaitUntilLocalTransactionsFinished();
+            awaitUntilLocalCommittingTransactionsFinished();
          } catch (InterruptedException e) {
             //no-op
          }
@@ -57,8 +57,8 @@ public class TwoPhaseCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public final void stopProtocol() throws InterruptedException {
-      globalStopProtocol(false);
+   public final void stopProtocol(boolean abortOnStop) throws InterruptedException {
+      globalStopProtocol(false, abortOnStop);
    }
 
    @Override

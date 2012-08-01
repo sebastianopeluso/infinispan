@@ -1,8 +1,12 @@
 package org.infinispan.reconfigurableprotocol.manager;
 
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.reconfigurableprotocol.ReconfigurableProtocol;
+import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+
+import javax.transaction.Transaction;
 
 /**
  * Manages the current replication protocol in use and synchronize it with the epoch number
@@ -158,6 +162,17 @@ public class ProtocolManager {
       if (log.isDebugEnabled()) {
          log.debugf("[%s] no switch in progress. Moving on...", Thread.currentThread().getName());
       }
+   }
+
+   public final synchronized CurrentProtocolInfo startCommitTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                                                        ReconfigurableProtocol execProtocol, Transaction transaction) {
+      if (isCurrentProtocol(execProtocol)) {
+         execProtocol.commitTransaction(globalTransaction, writeSet, transaction);
+      } else {
+         execProtocol.commitTransaction(transaction);
+         current.addLocalTransaction(globalTransaction, writeSet);
+      }
+      return getCurrentProtocolInfo();      
    }
 
    /**

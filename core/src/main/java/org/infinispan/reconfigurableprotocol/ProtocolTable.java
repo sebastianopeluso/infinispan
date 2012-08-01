@@ -37,12 +37,17 @@ public class ProtocolTable {
     * @return              the protocol Id to run the transaction
     */
    public final String getProtocolId(Transaction transaction) {
-      String currentProtocolId = manager.getCurrentProtocolId();
-      String existing = transactionToProtocol.putIfAbsent(transaction, currentProtocolId);
-      if (existing != null) {
-         return existing;
+      String protocolId = transactionToProtocol.get(transaction);
+      if (protocolId == null) {
+         try {
+            protocolId = manager.beginTransaction(transaction);
+         } catch (InterruptedException e) {            
+            Thread.currentThread().interrupt();
+            return null;
+         }
+         transactionToProtocol.put(transaction, protocolId);
       }
-      return currentProtocolId;
+      return protocolId;      
    }
 
    /**

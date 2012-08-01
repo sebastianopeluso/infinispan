@@ -45,13 +45,14 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public final void stopProtocol() throws InterruptedException {
+   public final void stopProtocol(boolean abortOnStop) throws InterruptedException {
       if (isCoordinator()) {
          if (log.isDebugEnabled()) {
             log.debugf("[%s] Stop protocol in master for Passive Replication protocol. Wait until all local transactions " +
                              "are finished", Thread.currentThread().getName());
          }
-         awaitUntilLocalTransactionsFinished();
+         awaitUntilLocalExecutingTransactionsFinished(abortOnStop);
+         awaitUntilLocalCommittingTransactionsFinished();
          broadcastData(MASTER_ACK, false);
          if (log.isDebugEnabled()) {
             log.debugf("[%s] Ack sent to the slaves. Starting new epoch", Thread.currentThread().getName());
@@ -175,7 +176,7 @@ public class PassiveReplicationCommitProtocol extends ReconfigurableProtocol {
       @Override
       public void run() {
          try {
-            awaitUntilLocalTransactionsFinished();
+            awaitUntilLocalCommittingTransactionsFinished();
          } catch (InterruptedException e) {
             //interrupted
             return;

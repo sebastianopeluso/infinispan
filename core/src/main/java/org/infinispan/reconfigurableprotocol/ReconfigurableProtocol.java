@@ -23,6 +23,9 @@ import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import javax.transaction.Status;
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -54,12 +57,14 @@ public abstract class ReconfigurableProtocol {
 
    protected final Map<GlobalTransaction, Set<Object>> localTransactions;
    protected final Map<GlobalTransaction, Set<Object>> remoteTransactions;
+   protected final Set<Transaction> localExecutionTransactions;
 
    private final AckCollector ackCollector;
 
    public ReconfigurableProtocol() {
       localTransactions = new HashMap<GlobalTransaction, Set<Object>>();
       remoteTransactions = new HashMap<GlobalTransaction, Set<Object>>();
+      localExecutionTransactions = new HashSet<Transaction>();
       ackCollector = new AckCollector();
    }
 
@@ -71,6 +76,44 @@ public abstract class ReconfigurableProtocol {
       this.manager = manager;
       this.rpcManager = getComponent(RpcManager.class);
       this.commandsFactory = getComponent(CommandsFactory.class);
+   }
+
+   public final void startTransaction(Transaction transaction) {
+      synchronized (localExecutionTransactions) {
+         localExecutionTransactions.add(transaction);
+      }
+   }
+
+   public final void commitTransaction(GlobalTransaction globalTransaction, WriteCommand[] writeSet,
+                                       Transaction transaction) {
+      synchronized (localExecutionTransactions) {
+         synchronized (localTransactions) {
+            localExecutionTransactions.remove(transaction);
+            localExecutionTransactions.notifyAll();
+            try {
+               if (transaction.getStatus() == Status.STATUS_MARKED_ROLLBACK) {
+                  throw new CacheException("Transaction " + globalTransaction.prettyPrint() + " is marked for rollback.");
+               }
+            } catch (SystemException e) {
+               throw new CacheException(e);
+            }
+            localTransactions.put(globalTransaction, Util.getAffectedKeys(Arrays.asList(writeSet)));
+         }
+      }
+   }
+
+   public final void commitTransaction(Transaction transaction) {
+      synchronized (localExecutionTransactions) {
+         localExecutionTransactions.remove(transaction);
+         localExecutionTransactions.notifyAll();
+         try {
+            if (transaction.getStatus() == Status.STATUS_MARKED_ROLLBACK) {
+               throw new CacheException("Transaction " + transaction + " is marked for rollback.");
+            }
+         } catch (SystemException e) {
+            throw new CacheException(e);
+         }
+      }
    }
 
    /**
@@ -200,12 +243,20 @@ public abstract class ReconfigurableProtocol {
     * @return  all the pending local transactions and their write set  
     */
    public final String printLocalTransactions() {
-      StringBuilder sb = new StringBuilder("Local transactions are:\n");
+      StringBuilder sb = new StringBuilder("Local committing transactions are:\n");
       synchronized (localTransactions) {
          for (Map.Entry<GlobalTransaction, Set<Object>> entry : localTransactions.entrySet()) {
             sb.append(entry.getKey().prettyPrint()).append("=>").append(entry.getValue()).append("\n");
          }
       }
+
+      sb.append("\nLocal executing transactions are:\n");
+      synchronized (localExecutionTransactions) {
+         for (Transaction transaction : localExecutionTransactions) {
+            sb.append(transaction).append("\n");
+         }
+      }
+      
       return sb.toString();
    }
 
@@ -229,13 +280,41 @@ public abstract class ReconfigurableProtocol {
     *
     * @throws InterruptedException  if interrupted
     */
-   protected final void awaitUntilLocalTransactionsFinished() throws InterruptedException {
+   protected final void awaitUntilLocalCommittingTransactionsFinished() throws InterruptedException {
       if (log.isTraceEnabled()) {
          log.tracef("[%s] thread will wait until all local transaction are finished", Thread.currentThread().getName());
       }
       synchronized (localTransactions) {
          while (!localTransactions.isEmpty()) {
             localTransactions.wait();
+         }
+      }
+      if (log.isTraceEnabled()) {
+         log.tracef("[%s] all local transaction are finished. Moving on...", Thread.currentThread().getName());
+      }
+   }
+
+   protected final void awaitUntilLocalExecutingTransactionsFinished(boolean abort) throws InterruptedException {
+      if (log.isTraceEnabled()) {
+         log.tracef("[%s] thread will wait until all executing local transaction are finished", Thread.currentThread().getName());
+      }
+      synchronized (localExecutionTransactions) {
+         if (abort) {
+            for (Transaction transaction : localExecutionTransactions) {
+               try {
+                  transaction.setRollbackOnly();
+               } catch (SystemException e) {
+                  if (log.isDebugEnabled()) {
+                     log.warnf(e, "Error marking transaction %s to rollback only.", transaction);
+                  } else {
+                     log.warnf("Error marking transaction %s to rollback only. %s", transaction, e.getMessage());
+                  }
+               }
+            }
+         } else {
+            while (!localExecutionTransactions.isEmpty()) {
+               localExecutionTransactions.wait();
+            }
          }
       }
       if (log.isTraceEnabled()) {
@@ -412,7 +491,7 @@ public abstract class ReconfigurableProtocol {
     * @param totalOrder             if it uses total order
     * @throws InterruptedException  if interrupted
     */
-   protected final void globalStopProtocol(boolean totalOrder) throws InterruptedException {
+   protected final void globalStopProtocol(boolean totalOrder, boolean abortOnStop) throws InterruptedException {
       /*
       1) block local transactions (already done by Manager)
       2) wait until all local transactions has finished
@@ -424,7 +503,8 @@ public abstract class ReconfigurableProtocol {
          log.debugf("[%s] Performing the global stop protocol. Using total order? %s", Thread.currentThread().getName(),
                     totalOrder);
       }
-      awaitUntilLocalTransactionsFinished();
+      awaitUntilLocalExecutingTransactionsFinished(abortOnStop);
+      awaitUntilLocalCommittingTransactionsFinished();
       internalBroadcastData(LOCAL_STOP_ACK, totalOrder);
       ackCollector.awaitAllAck();
       awaitUntilRemoteTransactionsFinished();
@@ -537,7 +617,7 @@ public abstract class ReconfigurableProtocol {
 
    /**
     * this method switches between te current protocol to the new protocol without ensure this strong condition:
-    *  -- no transaction in the current protocol are running in all the system see {@link #stopProtocol()}
+    *  -- no transaction in the current protocol are running in all the system see {@link #stopProtocol(boolean)}
     *
     * @param protocol   the new protocol                      
     */
@@ -547,8 +627,10 @@ public abstract class ReconfigurableProtocol {
     * it ensures that no transactions in the current protocol are running in the system (strong condition). this is
     * necessary to switch to any protocol
     * In other words, it means that all transactions active with that protocol in the cluster need to be ended
+    * @param abortOnStop   abort local executing transaction (that did not request the commit) otherwise it waits for
+    *                      that transactions to finish
     */
-   public abstract void stopProtocol() throws InterruptedException;
+   public abstract void stopProtocol(boolean abortOnStop) throws InterruptedException;
 
    /**
     * it starts this new protocol

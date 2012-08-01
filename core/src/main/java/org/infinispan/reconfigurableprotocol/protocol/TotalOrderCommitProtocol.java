@@ -50,8 +50,8 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
    }
 
    @Override
-   public final void stopProtocol() throws InterruptedException {
-      globalStopProtocol(true);
+   public final void stopProtocol(boolean abortOnStop) throws InterruptedException {
+      globalStopProtocol(true, abortOnStop);
    }
 
    @Override

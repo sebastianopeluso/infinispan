@@ -142,7 +142,7 @@ public class TransactionCoordinator {
                new WriteCommand[0] :
                modificationsList.toArray(new WriteCommand[modificationsList.size()]);
          manager.notifyLocalTransaction(globalTransaction, writeSet, protocolTable.getProtocolId(
-               localTransaction.getTransaction()));
+               localTransaction.getTransaction()), localTransaction.getTransaction());
       } catch (InterruptedException e) {
          rollback(localTransaction);
          throw new XAException(XAException.XA_RBROLLBACK);
