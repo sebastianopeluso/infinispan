@@ -311,6 +311,7 @@ public abstract class ReconfigurableProtocol {
                   }
                }
             }
+            manager.addNumberOfAbortedTransactionDueToSwitch(localExecutionTransactions.size());
          } else {
             while (!localExecutionTransactions.isEmpty()) {
                localExecutionTransactions.wait();
@@ -534,6 +535,7 @@ public abstract class ReconfigurableProtocol {
     * throw an exception when this protocol cannot process an old transaction
     */
    protected final void throwOldTxException(GlobalTransaction globalTransaction) {
+      manager.addNumberOfAbortedTransactionDueToSwitch(1);
       throw new CacheException("Old transaction '" + globalTransaction.prettyPrint() + "' from " +
                                      getUniqueProtocolName() + " not allowed in current epoch");
    }
@@ -542,6 +544,7 @@ public abstract class ReconfigurableProtocol {
     * throw an exception when this protocol cannot process a speculative transaction
     */
    protected final void throwSpeculativeTxException(GlobalTransaction globalTransaction) {
+      manager.addNumberOfAbortedTransactionDueToSwitch(1);
       throw new CacheException("Speculative transaction '" + globalTransaction.prettyPrint() + "' from " +
                                      getUniqueProtocolName() + " not allowed");
    }

@@ -20,6 +20,7 @@ import org.infinispan.reconfigurableprotocol.protocol.TotalOrderCommitProtocol;
 import org.infinispan.reconfigurableprotocol.protocol.TwoPhaseCommitProtocol;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
@@ -136,9 +137,19 @@ public class ReconfigurableReplicationManager {
    }
 
    public final String beginTransaction(Transaction transaction) throws InterruptedException {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] local transaction %s is starting. check if switch is in progress...",
+                    Thread.currentThread().getName(), transaction);
+      }
       protocolManager.ensureNotInProgress();
       ReconfigurableProtocol currentProtocol = protocolManager.getCurrent();
       currentProtocol.startTransaction(transaction);
+
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] local transaction %s will use %s while executing", Thread.currentThread().getName(),
+                    transaction, currentProtocol.getUniqueProtocolName());
+      }
+
       return currentProtocol.getUniqueProtocolName();
    }
 
@@ -155,8 +166,8 @@ public class ReconfigurableReplicationManager {
          throws InterruptedException {
       //returns immediately if no switch is in progress
       if (log.isDebugEnabled()) {
-         log.debugf("[%s] local transaction %s wants to commit. check if switch is in progress...",
-                    Thread.currentThread().getName(), globalTransaction.prettyPrint());
+         log.debugf("[%s] local transaction %s [%s] wants to commit",
+                    Thread.currentThread().getName(), globalTransaction.prettyPrint(), transaction);
       }
 
       ProtocolManager.CurrentProtocolInfo currentProtocolInfo =
@@ -176,7 +187,15 @@ public class ReconfigurableReplicationManager {
       }
    }
 
-   public final void notifyLocalTransactionForRollback(GlobalTransaction globalTransaction, String executionProtocolId) {
+   public final void notifyLocalTransactionForRollback(LocalTransaction localTransaction, String executionProtocolId) {
+
+      GlobalTransaction globalTransaction = localTransaction.getGlobalTransaction();
+
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] local transaction %s [%s] wants to rollback",
+                    Thread.currentThread().getName(), globalTransaction.prettyPrint(), localTransaction.getTransaction());
+      }
+
       if (globalTransaction.getReconfigurableProtocol() == null) {
          String protocolId = globalTransaction.getProtocolId();
          if (protocolId == null) {
@@ -186,6 +205,12 @@ public class ReconfigurableReplicationManager {
          globalTransaction.setReconfigurableProtocol(registry.getProtocolById(protocolId));
          globalTransaction.setProtocolId(protocolId);
          globalTransaction.setEpochId(-1);
+      }
+
+      try {
+         globalTransaction.getReconfigurableProtocol().commitTransaction(localTransaction.getTransaction());
+      } catch (Exception e) {
+         //ignore: this probably will throw an exception saying that the transaction is marked for rollback...
       }
    }
 
@@ -335,6 +360,10 @@ public class ReconfigurableReplicationManager {
 
    public final void startSwitchTask(String protocolId, boolean forceStopTheWorld, boolean abortOnStop, CountDownLatch notifier) {
       new Thread(new SwitchTask(protocolId, forceStopTheWorld, abortOnStop, notifier), "Switch-Thread").start();
+   }
+
+   public final void addNumberOfAbortedTransactionDueToSwitch(int val) {
+      protocolManager.addNumberOfTransactionsAborted(val);
    }
 
    /**
@@ -610,6 +639,11 @@ public class ReconfigurableReplicationManager {
    @ManagedOperation(description = "Returns the number of times that this particular switch happen")
    public final int getSwitchCounter(String from, String to) {
       return statisticManager.getSwitchCounter(from, to);
+   }
+
+   @ManagedOperation(description = "Returns the number of transactions aborted by this particular switch")
+   public final int getNumberOfAbortedTransactions(String from, String to) {
+      return statisticManager.getNumberOfAbortedTransactions(from, to);
    }
 
    @ManagedOperation(description = "Returns all the averages times for all the switches")

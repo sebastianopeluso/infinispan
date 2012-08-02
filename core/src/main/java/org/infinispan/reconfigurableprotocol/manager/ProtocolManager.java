@@ -174,6 +174,12 @@ public class ProtocolManager {
       }
       return getCurrentProtocolInfo();      
    }
+   
+   public final synchronized void addNumberOfTransactionsAborted(int val) {
+      if (currentStat != null) {
+         currentStat.addNumberOfTransactionAborted(val);
+      }
+   }   
 
    /**
     * class used to atomically retrieve the current replication protocol and epoch

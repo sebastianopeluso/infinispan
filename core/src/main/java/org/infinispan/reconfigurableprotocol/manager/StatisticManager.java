@@ -59,6 +59,13 @@ public class StatisticManager {
       }
    }
 
+   public final int getNumberOfAbortedTransactions(String from, String to) {
+      synchronized (switchStats) {
+         StatEntry entry = getEntry(from, to);
+         return entry == null ? (int)NO_STAT : entry.numberOfTransactionAborted;
+      }
+   }
+
    public final String printAllStats() {
       StringBuilder sb = new StringBuilder();
       synchronized (switchStats) {
@@ -72,6 +79,7 @@ public class StatisticManager {
                sb.append(",SafeToUnsafe=").append(convertNanosToMilli(entry.getSafeToUnsafe()));
                sb.append(",UnsafeToSafe=").append(convertNanosToMilli(entry.getUnsafeToSafe()));
                sb.append(",Counter=").append(entry.switchCount);
+               sb.append(",NumberOfTransactionAborted=").append(entry.numberOfTransactionAborted);
                sb.append("\n");
             }
          }
@@ -92,20 +100,20 @@ public class StatisticManager {
    private void createNonExistingNewEntry(Stats stats) {
       Map<String, StatEntry> newEntry = new HashMap<String, StatEntry>();
       StatEntry statEntry = new StatEntry();
-      statEntry.add(stats.start, stats.unsafe, stats.safe);
+      statEntry.add(stats.start, stats.unsafe, stats.safe, stats.numberOfTransactionAborted);
       newEntry.put(stats.to, statEntry);
       switchStats.put(stats.from, newEntry);
    }
 
    private void createNewEntry(Stats stats) {
       StatEntry statEntry = new StatEntry();
-      statEntry.add(stats.start, stats.unsafe, stats.safe);
+      statEntry.add(stats.start, stats.unsafe, stats.safe, stats.numberOfTransactionAborted);
       switchStats.get(stats.from).put(stats.to, statEntry);
    }
 
    private void updateEntry(Stats stats) {
       StatEntry entry = switchStats.get(stats.from).get(stats.to);
-      entry.add(stats.start, stats.unsafe, stats.safe);
+      entry.add(stats.start, stats.unsafe, stats.safe, stats.numberOfTransactionAborted);
    }
 
    private StatEntry getEntry(String from, String to) {
@@ -130,8 +138,9 @@ public class StatisticManager {
       private int unsafeToSafeCounter;
 
       private int switchCount;
+      private int numberOfTransactionAborted;
 
-      public void add(long start, long unsafe, long safe) {
+      public void add(long start, long unsafe, long safe, int numberOfTransactionAborted) {
          if (unsafe != NO_STAT) {
             safeToSafe += (safe - start);
             safeToUnsafe += (unsafe - start);
@@ -144,6 +153,7 @@ public class StatisticManager {
             safeToSafeCounter++;
          }
          switchCount++;
+         this.numberOfTransactionAborted += numberOfTransactionAborted;
       }
 
       public double getSafeToSafe() {
@@ -166,6 +176,10 @@ public class StatisticManager {
          }
          return unsafeToSafe * 1.0 / unsafeToSafeCounter;
       }
+
+      public int getNumberOfTransactionAborted() {
+         return numberOfTransactionAborted;
+      }
    }
 
    public static class Stats {
@@ -176,6 +190,7 @@ public class StatisticManager {
       private long unsafe = NO_STAT;
       private long safe = NO_STAT;
       private String to;
+      private int numberOfTransactionAborted;
 
       private Stats(String from, StatisticManager manager) {
          this.start = System.nanoTime();
@@ -196,6 +211,10 @@ public class StatisticManager {
          }
          safe = System.nanoTime();
          manager.add(this);
+      }
+      
+      public final void addNumberOfTransactionAborted(int val) {
+         numberOfTransactionAborted += val;
       }
    }
 
