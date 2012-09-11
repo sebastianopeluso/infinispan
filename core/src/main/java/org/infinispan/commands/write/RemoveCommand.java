@@ -81,6 +81,9 @@ public class RemoveCommand extends AbstractDataWriteCommand {
          if (value == null) {
             return null;
          } else {
+            if (e != null) {
+               e.setUnchanged();
+            }
             successful = false;
             return false;
          }
@@ -89,6 +92,7 @@ public class RemoveCommand extends AbstractDataWriteCommand {
       if (!(e instanceof MVCCEntry)) ctx.putLookedUpEntry(key, null);
 
       if (value != null && e.getValue() != null && !e.getValue().equals(value)) {
+         e.setUnchanged();
          successful = false;
          return false;
       }

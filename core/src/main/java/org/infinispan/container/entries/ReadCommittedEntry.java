@@ -229,6 +229,11 @@ public class ReadCommittedEntry implements MVCCEntry {
    }
 
    @Override
+   public void setUnchanged() {
+      unsetFlag(CHANGED);
+   }
+
+   @Override
    public boolean isValid() {
       return isFlagSet(VALID);
    }

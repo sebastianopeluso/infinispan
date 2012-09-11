@@ -88,6 +88,7 @@ public class PutKeyValueCommand extends AbstractDataWriteCommand {
 
       Object entryValue = e.getValue();
       if (entryValue != null && putIfAbsent && !e.isRemoved()) {
+         e.setUnchanged();
          successful = false;
          return entryValue;
       } else {

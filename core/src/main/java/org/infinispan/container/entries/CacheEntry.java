@@ -139,6 +139,8 @@ public interface CacheEntry extends Map.Entry<Object, Object>, Versioned {
 
    void setValid(boolean valid);
 
+   void setUnchanged();
+
    /**
     * @return true if this entry is a placeholder for the sake of acquiring a lock; and false if it is a real entry. 
     */

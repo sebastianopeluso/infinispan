@@ -642,6 +642,11 @@ public class Immutables {
       public InternalCacheEntry clone() {
          return new ImmutableInternalCacheEntry(entry.clone());
       }
+
+      @Override
+      public void setUnchanged() {
+         throw new UnsupportedOperationException();
+      }
    }
 
    private static class ImmutableInternalCacheValue implements InternalCacheValue, Immutable {

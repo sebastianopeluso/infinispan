@@ -224,6 +224,11 @@ public class DeltaAwareCacheEntry implements CacheEntry, StateChangingEntry {
    }
 
    @Override
+   public void setUnchanged() {
+      unsetFlag(CHANGED);
+   }
+
+   @Override
    public boolean isValid() {
       if (wrappedEntry != null) {
          return wrappedEntry.isValid();

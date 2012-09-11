@@ -72,7 +72,10 @@ public class ReplaceCommand extends AbstractDataWriteCommand {
       if (e != null) {
          if (ctx.isOriginLocal()) {
         	 	//ISPN-514
-            if (e.isNull() || e.getValue() == null) return returnValue(null, false, ctx);    
+            if (e.isNull() || e.getValue() == null) {
+               e.setUnchanged();
+               return returnValue(null, false, ctx);
+            }    
 
             if (oldValue == null || oldValue.equals(e.getValue())) {
                Object old = e.setValue(newValue);
@@ -80,6 +83,7 @@ public class ReplaceCommand extends AbstractDataWriteCommand {
                e.setMaxIdle(maxIdleTimeMillis);
                return returnValue(old, true, ctx);
             }
+            e.setUnchanged();
             return returnValue(null, false, ctx);
          } else {
             // for remotely originating calls, this doesn't check the status of what is under the key at the moment

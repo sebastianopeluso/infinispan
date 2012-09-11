@@ -150,4 +150,9 @@ public abstract class AbstractInternalCacheEntry implements InternalCacheEntry {
          throw new RuntimeException("Should never happen!", e);
       }
    }
+
+   @Override
+   public void setUnchanged() {
+      //no-op
+   }
 }
