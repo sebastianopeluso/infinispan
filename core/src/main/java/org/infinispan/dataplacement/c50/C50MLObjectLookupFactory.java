@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -125,23 +126,41 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    }
 
    @Override
-   public Object[] serializeObjectLookup(ObjectLookup objectLookup) {
-      if (objectLookup != null && objectLookup instanceof C50MLObjectLookup) {
-         C50MLObjectLookup c50MLObjectLookup = (C50MLObjectLookup) objectLookup;
-         return new Object[] {c50MLObjectLookup.bloomFilter, c50MLObjectLookup.c50MLTree};
+   public Object[] serializeObjectLookup(Collection<ObjectLookup> objectLookupCollection) {
+      List<Object> objectList = new LinkedList<Object>();
+      if (objectLookupCollection == null || objectLookupCollection.isEmpty()) {
+         return objectList.toArray();
       }
-      return new Object[0];
+
+      for (ObjectLookup objectLookup : objectLookupCollection) {
+         if (objectLookup instanceof C50MLObjectLookup) {
+            objectList.add(((C50MLObjectLookup) objectLookup).bloomFilter);
+            objectList.add(((C50MLObjectLookup) objectLookup).c50MLTree);
+         }
+      }
+
+      return objectList.toArray();
    }
 
    @SuppressWarnings("unchecked")
    @Override
-   public ObjectLookup deSerializeObjectLookup(Object[] parameters) {
+   public Collection<ObjectLookup> deSerializeObjectLookup(Object[] parameters) {
       if (parameters.length == 0) {
          return null;
       }
-      BloomFilter bloomFilter = (BloomFilter) parameters[0];
-      C50MLTree c50MLTree = (C50MLTree) parameters[1];
-      return new C50MLObjectLookup(bloomFilter, c50MLTree, keyFeatureManager);
+
+      List<ObjectLookup> objectLookupList = new LinkedList<ObjectLookup>();
+      Iterator<Object> iterator = Arrays.asList(parameters).iterator();
+
+      while (iterator.hasNext()) {
+         BloomFilter bloomFilter = (BloomFilter) iterator.next();
+         if (iterator.hasNext()) {
+            C50MLTree tree = (C50MLTree) iterator.next();
+            objectLookupList.add(new C50MLObjectLookup(bloomFilter, tree, keyFeatureManager));
+         }
+      }
+
+      return objectLookupList.isEmpty() ? null : objectLookupList;
    }
 
    public Map<String, AbstractFeature> getFeatureMap() {

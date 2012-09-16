@@ -4,7 +4,9 @@ import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.remoting.transport.Address;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,15 +23,15 @@ import java.util.Set;
 public class DataPlacementConsistentHash extends AbstractConsistentHash {
 
    private ConsistentHash defaultConsistentHash;
-   private final Map<Address, ObjectLookup> lookUpperList;
+   private final Map<Address, Collection<ObjectLookup>> lookUpperList;
    private final List<Address> addressList;
 
    public DataPlacementConsistentHash(List<Address> addressList) {
       this.addressList = new ArrayList<Address>(addressList);
-      lookUpperList = new HashMap<Address, ObjectLookup>();
+      lookUpperList = new HashMap<Address, Collection<ObjectLookup>>();
    }
 
-   public void addObjectLookup(Address address, ObjectLookup objectLookup) {
+   public void addObjectLookup(Address address, Collection<ObjectLookup> objectLookup) {
       if (objectLookup == null) {
          return;
       }
@@ -48,17 +50,26 @@ public class DataPlacementConsistentHash extends AbstractConsistentHash {
 
    @Override
    public List<Address> locate(Object key, int replCount) {
-      List<Address> defaultAddList = defaultConsistentHash.locate(key, replCount);
-      ObjectLookup objectLookup = lookUpperList.get(defaultAddList.get(0));
-      int index = objectLookup == null ? ObjectLookup.KEY_NOT_FOUND : objectLookup.query(key);
+      List<Address> defaultOwners = defaultConsistentHash.locate(key, replCount);
+      Collection<ObjectLookup> objectLookupCollection = lookUpperList.get(defaultOwners.get(0));
 
-      if (index == ObjectLookup.KEY_NOT_FOUND) {
-         return defaultAddList;
-      } else {
-         List<Address> addList = new ArrayList<Address>();
-         addList.add(addressList.get(index));
-         return addList;
+      if (objectLookupCollection == null) {
+         return defaultOwners;
       }
+
+      List<Address> newOwners = new LinkedList<Address>();
+
+      for (ObjectLookup objectLookup : objectLookupCollection) {
+         int index = objectLookup.query(key);
+         if (index != -1) {
+            newOwners.add(addressList.get(index));
+         }
+      }
+
+      if (newOwners.size() != replCount) {
+         return defaultOwners;
+      }
+      return newOwners;
    }
 
    @Override

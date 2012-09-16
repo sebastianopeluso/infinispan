@@ -1,24 +1,23 @@
 package org.infinispan.dataplacement;
 
-import org.infinispan.container.DataContainer;
-import org.infinispan.dataplacement.lookup.ObjectLookup;
+import org.infinispan.commons.hash.Hash;
 import org.infinispan.distribution.DistributionManager;
+import org.infinispan.distribution.ch.ConsistentHash;
+import org.infinispan.distribution.ch.DataPlacementConsistentHash;
 import org.infinispan.remoting.transport.Address;
-import org.infinispan.stats.topK.StreamLibContainer;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.TreeMap;
 
 /**
- * It is responsible to collect all the remote top accesses (to his own keys) from every member and decide 
- * to where the keys should be moved
+ * // TODO: Document this
  *
  * @author Zhongmiao Li
  * @author João Paiva
@@ -29,42 +28,42 @@ public class ObjectPlacementManager {
 
    private static final Log log = LogFactory.getLog(ObjectPlacementManager.class);
 
-   private final StreamLibContainer analyticsBean;
-
    //contains the list of members (same order in all nodes)
    private final List<Address> addressList;
 
-   //The object that were sent out. The left of pair is the destination, the right is the number that it is moved
-   private final Map<Object, Pair<Integer, Integer>> allSentObjects;
+   //<node index, <key, number of accesses>
+   private final Map<Integer, Map<Object, Long>> remoteRequests;
 
    //<node index, <key, number of accesses>
-   private final Map<Integer, Map<Object, Long>> requestReceivedMap;
-
-   //<key, destination node index>
-   private final Map<Object, Integer> objectsToMove;
+   private final Map<Integer, Map<Object, Long>> localRequests;
 
    private boolean hasReceivedAllRequests;
 
-   private final DataContainer dataContainer;
-   private final DistributionManager distributionManager;
+   //this can be quite big. save it as an array to save some memory
+   private Object[] allKeysMoved;
 
-   public ObjectPlacementManager(DistributionManager distributionManager, DataContainer dataContainer){
-      analyticsBean = StreamLibContainer.getInstance();
-      this.dataContainer = dataContainer;
+   private final DistributionManager distributionManager;
+   private final Hash hash;
+   private final int defaultNumberOfOwners;
+
+   public ObjectPlacementManager(DistributionManager distributionManager, Hash hash, int defaultNumberOfOwners){
       this.distributionManager = distributionManager;
+      this.hash = hash;
+      this.defaultNumberOfOwners = defaultNumberOfOwners;
 
       addressList = new ArrayList<Address>();
-      allSentObjects = new HashMap<Object, Pair<Integer, Integer>>();
-      requestReceivedMap = new TreeMap<Integer, Map<Object, Long>>();
-      objectsToMove = new HashMap<Object, Integer>();
+      remoteRequests = new TreeMap<Integer, Map<Object, Long>>();
+      localRequests = new TreeMap<Integer, Map<Object, Long>>();
       hasReceivedAllRequests = false;
+      allKeysMoved = new Object[0];
    }
 
    /**
     * reset the state (before each round)
     */
    public final synchronized void resetState() {
-      requestReceivedMap.clear();
+      remoteRequests.clear();
+      localRequests.clear();
       hasReceivedAllRequests = false;
    }
 
@@ -78,208 +77,173 @@ public class ObjectPlacementManager {
       addressList.addAll(addresses);
    }
 
-   /**
-    * collects a remote top access from a member.
-    *
-    * Note: it returns true only once, on the first time it has all the remote top accessed needed
-    *
-    * @param sender        the sender
-    * @param objectRequest the remote top accesses    
-    * @return              true if it has all the remote top accesses needed (see Note)
-    */
-   public final synchronized boolean aggregateResult(Address sender,Map<Object, Long> objectRequest){
+   public final synchronized boolean aggregateRequest(Address member, ObjectRequest objectRequest) {
       if (hasReceivedAllRequests) {
          return false;
       }
 
-      int senderID = addressList.indexOf(sender);
+      int senderID = addressList.indexOf(member);
 
       if (senderID < 0) {
-         log.warnf("Received request list from %s but it does not exits", sender);
+         log.warnf("Received request list from %s but it does not exits", member);
          return false;
       }
 
-      requestReceivedMap.put(senderID, objectRequest);
-      hasReceivedAllRequests = addressList.size() <= requestReceivedMap.size();
+      remoteRequests.put(senderID, objectRequest.getRemoteAccesses());
+      localRequests.put(senderID, objectRequest.getLocalAccesses());
+      hasReceivedAllRequests = addressList.size() <= remoteRequests.size();
 
       if (log.isDebugEnabled()) {
-         log.debugf("Received request list from %s. Received from %s nodes and expects %s. Keys are %s", sender,
-                    requestReceivedMap.size(), addressList.size(), objectRequest);
+         log.debugf("Received request list from %s. Received from %s nodes and expects %s. Remote keys are %s and " +
+                          "local keys are %s", member, remoteRequests.size(), addressList.size(),
+                    objectRequest.getRemoteAccesses(), objectRequest.getLocalAccesses());
       } else {
-         log.infof("Received request list from %s. Received from %s nodes and expects %s", sender,
-                   requestReceivedMap.size(), addressList.size());
+         log.infof("Received request list from %s. Received from %s nodes and expects %s", member,
+                   remoteRequests.size(), addressList.size());
       }
 
       return hasReceivedAllRequests;
    }
 
-   /**
-    * calculates (only once) where the objects should be moved
-    *
-    * @return  a map with each object and the new owner index 
-    */
-   public final synchronized Map<Object, Integer> getObjectsToMove() {
-      Map<Object, Pair<Long, Integer>> fullRequestList = compactRequestList();
-      populateObjectToMove(fullRequestList);
-      return objectsToMove;
-   }
+   public final synchronized Map<Object, OwnersInfo> calculateObjectsToMove() {
+      Map<Object, OwnersInfo> newOwnersMap = new HashMap<Object, OwnersInfo>();
 
-   /**
-    * gives information about the error in Object Lookup created
-    *
-    * @param objectLookup  the Object Lookup instance to test
-    */
-   public final void testObjectLookup(ObjectLookup objectLookup) {
-      log.warn("Testing bloom filter before sending!");
-      int bfErrorCount = 0;
-      for(Entry<Object, Integer> entry : objectsToMove.entrySet()) {
-         if(objectLookup.query(entry.getKey()) != entry.getValue()){
-            ++bfErrorCount;
+      for (int requesterIdx = 0; requesterIdx < addressList.size(); ++requesterIdx) {
+         Map<Object, Long> requestedObjects = remoteRequests.remove(requesterIdx);
+
+         if (requestedObjects == null) {
+            continue;
          }
+
+         for (Map.Entry<Object, Long> entry : requestedObjects.entrySet()) {
+            calculateNewOwners(newOwnersMap, entry.getKey(), entry.getValue(), requesterIdx);
+         }
+         //release memory asap
+         requestedObjects.clear();
       }
-      log.warn("Error of look upper before sending :"+bfErrorCount);
-   }
+      //release memory asap
+      remoteRequests.clear();
+      localRequests.clear();
 
-   /**
-    * Merge the request lists from all other nodes into a single request list
-    *
-    * @return  a map with the object and the corresponding node index and number of accesses (the higher number of
-    *          accesses)
-    */
-   private Map<Object, Pair<Long, Integer>> compactRequestList() {
-      Map<Object, Pair<Long, Integer>> fullRequestList = new HashMap<Object, Pair<Long, Integer>>();
+      removeNotMovedObjects(newOwnersMap);
 
-      Iterator<Entry<Integer, Map<Object, Long>>> iterator = requestReceivedMap.entrySet().iterator();
-
-      Entry<Integer, Map<Object, Long>> actualEntry;
-      Map<Object, Long> requestList;
-      Integer addressIndex;
-      if (iterator.hasNext()) {
-         actualEntry = iterator.next();
-         requestList = actualEntry.getValue();
-         addressIndex = actualEntry.getKey();
-
-         // Put objects of the first lisk into the fullList
-         for (Entry<Object, Long> entry : requestList.entrySet()) {
-            fullRequestList.put(entry.getKey(), new Pair<Long, Integer>(entry.getValue(), addressIndex));
+      //process the old moved keys. this will set the new owners of the previous rounds
+      for (Object key : allKeysMoved) {
+         if (!newOwnersMap.containsKey(key)) {
+            newOwnersMap.put(key, createOwnersInfo(key));
          }
       }
 
-      // For the following lists, when merging into the full list, has to
-      // compare if its request has the highest remote access
-      int conflictFailCnt = 0, conflictSuccCnt = 0, mergeCnt = 0;
-      while (iterator.hasNext()) {
-         actualEntry = iterator.next();
-         requestList = actualEntry.getValue();
-         addressIndex = actualEntry.getKey();
+      //update all the keys moved array
+      allKeysMoved = newOwnersMap.keySet().toArray(new Object[newOwnersMap.size()]);
 
-         for (Entry<Object, Long> entry : requestList.entrySet()) {
-            Pair<Long, Integer> pair = fullRequestList.get(entry.getKey());
-            if (pair == null) {
-               fullRequestList.put(entry.getKey(), new Pair<Long, Integer>(entry.getValue(), addressIndex));
-               ++mergeCnt;
-            } else {
-               if (pair.left < entry.getValue()) {
-                  fullRequestList.put(entry.getKey(), new Pair<Long, Integer>(entry.getValue(), addressIndex));
-                  ++conflictSuccCnt;
-               } else {
-                  ++conflictFailCnt;
-               }
+      return newOwnersMap;
+   }
+
+   private void removeNotMovedObjects(Map<Object, OwnersInfo> newOwnersMap) {
+      ConsistentHash defaultConsistentHash = getDefaultConsistentHash();
+      Iterator<Map.Entry<Object, OwnersInfo>> iterator = newOwnersMap.entrySet().iterator();
+
+      //if the owners info corresponds to the default consistent hash owners, remove the key from the map 
+      mainLoop: while (iterator.hasNext()) {
+         Map.Entry<Object, OwnersInfo> entry = iterator.next();
+         Object key = entry.getKey();
+         OwnersInfo ownersInfo = entry.getValue();
+         Collection<Integer> ownerInfoIndexes = ownersInfo.getNewOwnersIndexes();
+         Collection<Address> defaultOwners = defaultConsistentHash.locate(key, defaultNumberOfOwners);
+
+         if (ownerInfoIndexes.size() != defaultOwners.size()) {
+            continue;
+         }
+
+         for (Address address : defaultOwners) {
+            if (!ownerInfoIndexes.contains(addressList.indexOf(address))) {
+               continue mainLoop;
             }
          }
+         iterator.remove();
       }
-      log.info("Merged:" + mergeCnt);
-      log.info("Conflict but succeeded:" + conflictSuccCnt);
-      log.info("Conflict but failed:" + conflictFailCnt);
-      log.info("Size of fullrequestList: " + fullRequestList.size());
+   }
 
-      return fullRequestList;
+   private void calculateNewOwners(Map<Object, OwnersInfo> newOwnersMap, Object key, long numberOfRequests, int requesterId) {
+      OwnersInfo newOwnersInfo = newOwnersMap.get(key);
+
+      if (newOwnersInfo == null) {
+         newOwnersInfo = createOwnersInfo(key);
+         newOwnersMap.put(key, newOwnersInfo);
+      }
+      newOwnersInfo.calculateNewOwner(requesterId, numberOfRequests);
+   }
+
+   private Map<Integer, Long> getLocalAccesses(Object key) {
+      Map<Integer, Long> localAccessesMap = new TreeMap<Integer, Long>();
+
+      for (Map.Entry<Integer, Map<Object, Long>> entry : localRequests.entrySet()) {
+         int localNodeIndex = entry.getKey();
+         Long localAccesses = entry.getValue().remove(key);
+
+         if (localAccesses != null) {
+            localAccessesMap.put(localNodeIndex, localAccesses);
+         }
+      }
+      return localAccessesMap;
+   }
+
+   private OwnersInfo createOwnersInfo(Object key) {
+      Collection<Address> replicas = distributionManager.locate(key);
+      Map<Integer, Long> localAccesses = getLocalAccesses(key);
+
+      OwnersInfo ownersInfo = new OwnersInfo(replicas.size());
+
+      for (Address currentOwner : replicas) {
+         int ownerIndex = addressList.indexOf(currentOwner);
+
+         if (ownerIndex == -1) {
+            ownerIndex = findNewOwner(key, replicas);
+         }
+
+         Long accesses = localAccesses.remove(ownerIndex);
+
+         if (accesses == null) {
+            accesses = 0L;
+         }
+
+         ownersInfo.add(ownerIndex, accesses);
+      }
+
+      return ownersInfo;
+   }
+
+   private int findNewOwner(Object key, Collection<Address> alreadyOwner) {
+      int size = addressList.size();
+
+      if (size <= 1) {
+         return 0;
+      }
+
+      int startIndex = hash.hash(key) % size;
+
+      for (int index = startIndex + 1; index != startIndex; index = (index + 1) % size) {
+         if (!alreadyOwner.contains(addressList.get(index))) {
+            return index;
+         }
+         index += (index + 1) % size;
+      }
+
+      return 0;
    }
 
    /**
-    * create the object to move map, with the object and the new owner entries
+    * returns the actual consistent hashing
     *
-    * @param fullRequestList  the merged request list
+    * @return  the actual consistent hashing
     */
-   private void populateObjectToMove(Map<Object, Pair<Long, Integer>> fullRequestList) {
-      log.info("Generating final list");
-      Map<Object, Long> localGetList = this.analyticsBean.getTopKFrom(StreamLibContainer.Stat.LOCAL_GET);
-
-      // !TODO Has to modify for better efficiency after debugging
-      int failedConflict = 0, succeededConflict = 0;
-
-      for (Entry<Object, Pair<Long, Integer>> entry : fullRequestList.entrySet()) {
-         if (!localGetList.containsKey(entry.getKey())) {
-            objectsToMove.put(entry.getKey(), entry.getValue().right);
-         } else if (localGetList.get(entry.getKey()) < entry.getValue().left) {
-            objectsToMove.put(entry.getKey(), entry.getValue().right);
-            ++succeededConflict;
-         } else {
-            ++failedConflict;
-         }
-      }
-      log.info("Succeeded conflict in final :" + succeededConflict);
-      log.info("Failed conflict in final :" + failedConflict);
+   private ConsistentHash getDefaultConsistentHash() {
+      ConsistentHash hash = this.distributionManager.getConsistentHash();
+      return hash instanceof DataPlacementConsistentHash ?
+            ((DataPlacementConsistentHash) hash).getDefaultHash() :
+            hash;
    }
 
-   public void prePhaseTest(){
-      log.debugf("Doing pre-phase testing!");
-      log.debugf("SentObjectList size: %s", allSentObjects.size());
-      log.debugf("Current round sent object size: %s", objectsToMove.size());
-
-      for (Object key : objectsToMove.keySet()) {
-         if (!allSentObjects.containsKey(key) && !dataContainer.containsKey(key)) {
-            log.errorf("Trying to move a key that it does not have. Key is %s", key);
-         }
-      }
-   }
-
-   /**
-    * Test if keys are moved out as expected 
-    */
-   public void postPhaseTest(){
-      log.debug("Doing post-phase testing!");
-      log.debugf("Size of DataContainer: %s", dataContainer.size());
-      log.debugf("SentObjectsList size before merging current round: %s", allSentObjects.size());
-
-      //Check if try to move some key twice
-      log.debugf("Testing if keys are moved more than once");
-      for(Entry<Object, Integer> entry : objectsToMove.entrySet()){
-         Pair<Integer,Integer> temp = allSentObjects.get(entry.getKey());
-         if(temp == null) {
-            allSentObjects.put(entry.getKey(), new Pair<Integer, Integer>(entry.getValue(),1));
-         } else if(entry.getValue() !=  temp.left.intValue()){
-            ++temp.right;
-            log.warnf("Moved %s more than one. Key moved %s times", entry.getKey(), temp.right);
-         }
-      }
-
-      log.debugf("SentObjectsList size after merging current round: %s", allSentObjects.size());
-
-      log.debugf("Testing if keys are moved correctly");
-      int stillContainsCount = 0;
-      for (Object key : objectsToMove.keySet()) {
-         if (dataContainer.containsKey(key)) {
-            log.errorf("Key %s not moved correctly", key);
-            ++stillContainsCount;
-         }
-      }
-
-      log.debugf("Test result: %s keys are not moved out correctly!", stillContainsCount);
-
-      //Check if some keys are moved to some other places by using MLHash
-      log.debugf("Testing keys new owner");
-      int bfErrorCount = 0;
-      for (Entry<Object, Integer> entry : objectsToMove.entrySet()) {
-         Address expectedOwner = distributionManager.locate(entry.getKey()).get(0);
-         Address newOwner = addressList.get(entry.getValue());
-         if(!expectedOwner.equals(newOwner)){
-            log.errorf("Key %s moved to a wrong owner. Expected owner is %s and the new owner is %s", entry.getKey(),
-                       expectedOwner, newOwner);
-            ++bfErrorCount;
-         }
-      }
-
-      log.debugf("Test result: %s keys are in wrong place" ,bfErrorCount);
-   }
 }
+

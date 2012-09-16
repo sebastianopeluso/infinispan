@@ -44,6 +44,10 @@ public class ObjectRequest {
       }
       return toString();
    }
+   
+   public int getSerializedSize() {
+      return 2;
+   }
 
    public static Object[] getParameters(ObjectRequest request) {
       return new Object[] {request.localAccesses, request.remoteAccesses};

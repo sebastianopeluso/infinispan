@@ -1,6 +1,9 @@
 package org.infinispan.dataplacement;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * // TODO: Document this
@@ -37,5 +40,20 @@ public class OwnersInfo {
          ownersIndexes.set(toReplaceIndex, requestIdx);
          ownersAccesses.set(toReplaceIndex, numberOfAccesses);
       }
+   }
+   
+   public int getOwner(int index) {
+      if (index > ownersIndexes.size()) {
+         return -1;
+      }
+      return ownersIndexes.get(index);
+   }
+   
+   public int getReplicationCount() {
+      return ownersIndexes.size();
+   }
+   
+   public List<Integer> getNewOwnersIndexes() {
+      return new LinkedList<Integer>(ownersIndexes);
    }
 }

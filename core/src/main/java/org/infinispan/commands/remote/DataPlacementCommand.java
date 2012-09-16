@@ -2,10 +2,9 @@ package org.infinispan.commands.remote;
 
 import org.infinispan.context.InvocationContext;
 import org.infinispan.dataplacement.DataPlacementManager;
+import org.infinispan.dataplacement.ObjectRequest;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
-
-import java.util.Map;
 
 /**
  * The command used to send information among nodes
@@ -57,7 +56,7 @@ public class DataPlacementCommand extends BaseRpcCommand {
    private Type type;
    private long roundId;
    private int coolDownTime;
-   private Map<Object, Long> remoteTopList;
+   private ObjectRequest request;
    private Object[] objectLookupParameters;
 
 
@@ -75,8 +74,8 @@ public class DataPlacementCommand extends BaseRpcCommand {
       this.dataPlacementManager = dataPlacementManager;
    }
 
-   public void setRemoteTopList(Map<Object, Long> remoteTopList) {
-      this.remoteTopList = remoteTopList;
+   public void setRequest(ObjectRequest request) {
+      this.request = request;
    }
 
    public void setObjectLookup(Object[] objectLookupParameters) {
@@ -98,7 +97,7 @@ public class DataPlacementCommand extends BaseRpcCommand {
                dataPlacementManager.startDataPlacement(roundId);
                break;
             case REMOTE_TOP_LIST_PHASE:
-               dataPlacementManager.addRequest(getOrigin(), remoteTopList, roundId);
+               dataPlacementManager.addRequest(getOrigin(), request, roundId);
                break;
             case OBJECT_LOOKUP_PHASE:
                dataPlacementManager.addObjectLookup(getOrigin(), objectLookupParameters, roundId);
@@ -130,9 +129,13 @@ public class DataPlacementCommand extends BaseRpcCommand {
          case ACK_COORDINATOR_PHASE:
             return new Object[] {(byte) type.ordinal(), roundId};
          case REMOTE_TOP_LIST_PHASE:
-            return new Object[] {(byte) type.ordinal(), roundId, remoteTopList};
+            Object[] retVal = new Object[2 + request.getSerializedSize()];
+            retVal[0] = (byte) type.ordinal();
+            retVal[1] = roundId;
+            System.arraycopy(ObjectRequest.getParameters(request), 0, retVal, 2, request.getSerializedSize());
+            return retVal;
          case OBJECT_LOOKUP_PHASE:
-            Object[] retVal = new Object[2 + objectLookupParameters.length];
+            retVal = new Object[2 + objectLookupParameters.length];
             retVal[0] = (byte) type.ordinal();
             retVal[1] = roundId;
             System.arraycopy(objectLookupParameters, 0, retVal, 2, objectLookupParameters.length);
@@ -155,7 +158,9 @@ public class DataPlacementCommand extends BaseRpcCommand {
             break;
          case REMOTE_TOP_LIST_PHASE:
             roundId = (Long) parameters[1];
-            remoteTopList = (Map<Object, Long>) parameters[2];
+            Object[] requestTemp = new Object[parameters.length - 2];
+            System.arraycopy(parameters, 2, requestTemp, 0, requestTemp.length);
+            request = ObjectRequest.setParameters(requestTemp);
             break;
          case OBJECT_LOOKUP_PHASE:
             roundId = (Long) parameters[1];

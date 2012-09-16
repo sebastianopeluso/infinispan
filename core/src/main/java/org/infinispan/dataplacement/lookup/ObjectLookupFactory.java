@@ -2,6 +2,7 @@ package org.infinispan.dataplacement.lookup;
 
 import org.infinispan.configuration.cache.Configuration;
 
+import java.util.Collection;
 import java.util.Map;
 
 /**
@@ -30,17 +31,19 @@ public interface ObjectLookupFactory {
    /**
     * Serializes in a array of objects the information to send for other nodes 
     *
-    * @param objectLookup  the object lookup
-    * @return              the array of objects
+    *
+    * @param objectLookupCollection a collection of objects lookup to serialize
+    * @return                       the array of objects
     */
-   Object[] serializeObjectLookup(ObjectLookup objectLookup);
+   Object[] serializeObjectLookup(Collection<ObjectLookup> objectLookupCollection);
 
    /**
     * Creates the object lookup from the parameters from other nodes
     *
+    *
     * @param parameters the parameters
     * @return           the object lookup instance (or null if it is not possible to create it)                          
     */
-   ObjectLookup deSerializeObjectLookup(Object[] parameters);
+   Collection<ObjectLookup> deSerializeObjectLookup(Object[] parameters);
 
 }

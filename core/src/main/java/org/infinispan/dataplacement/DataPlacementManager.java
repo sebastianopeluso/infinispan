@@ -5,7 +5,6 @@ import org.infinispan.cacheviews.CacheViewsManager;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.configuration.cache.Configuration;
-import org.infinispan.container.DataContainer;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
 import org.infinispan.distribution.DistributionManager;
@@ -29,7 +28,10 @@ import org.infinispan.statetransfer.StateTransferManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -57,6 +59,7 @@ public class DataPlacementManager {
 
    private Boolean expectPre = true;
    private String cacheName;
+   private int defaultNumberOfOwners;
 
    private RemoteAccessesManager remoteAccessesManager;
    private ObjectPlacementManager objectPlacementManager;
@@ -73,8 +76,7 @@ public class DataPlacementManager {
    @Inject
    public void inject(CommandsFactory commandsFactory, DistributionManager distributionManager, RpcManager rpcManager,
                       CacheViewsManager cacheViewsManager, Cache cache, StateTransferManager stateTransfer,
-                      DataContainer dataContainer, CacheNotifier cacheNotifier, CacheManagerNotifier cacheManagerNotifier,
-                      Configuration configuration) {
+                      CacheNotifier cacheNotifier, CacheManagerNotifier cacheManagerNotifier, Configuration configuration) {
       this.rpcManager = rpcManager;
       this.commandsFactory = commandsFactory;
       this.cacheViewsManager = cacheViewsManager;
@@ -94,8 +96,11 @@ public class DataPlacementManager {
       //the original manager (== problems!!)
       synchronized (this) {
          if (stateTransfer instanceof DistributedStateTransferManagerImpl && !roundManager.isEnabled()) {
-            remoteAccessesManager = new RemoteAccessesManager(distributionManager,dataContainer);
-            objectPlacementManager = new ObjectPlacementManager(distributionManager,dataContainer);
+            defaultNumberOfOwners = configuration.clustering().hash().numOwners(); 
+            remoteAccessesManager = new RemoteAccessesManager(distributionManager);
+            objectPlacementManager = new ObjectPlacementManager(distributionManager,
+                                                                configuration.clustering().hash().hash(),
+                                                                defaultNumberOfOwners);
             objectLookupManager = new ObjectLookupManager((DistributedStateTransferManagerImpl) stateTransfer);
             roundManager.enable();
             cacheNotifier.addListener(this);
@@ -146,7 +151,7 @@ public class DataPlacementManager {
     * @param objectRequest the request list
     * @param roundId       the round id
     */
-   public final void addRequest(Address sender, Map<Object, Long> objectRequest, long roundId) {
+   public final void addRequest(Address sender, ObjectRequest objectRequest, long roundId) {
       if (log.isDebugEnabled()) {
          log.debugf("Keys request received from %s in round %s", sender, roundId);
       }
@@ -156,27 +161,40 @@ public class DataPlacementManager {
          return;
       }
 
-      if(objectPlacementManager.aggregateResult(sender, objectRequest)){
-         Map<Object, Integer> objectsToMove = objectPlacementManager.getObjectsToMove();
+      if(objectPlacementManager.aggregateRequest(sender, objectRequest)){
+         Map<Object, OwnersInfo> objectsToMove = objectPlacementManager.calculateObjectsToMove();
 
          if (log.isTraceEnabled()) {
             log.tracef("All keys request list received. Object to move are " + objectsToMove);
          }
 
-         ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(objectsToMove);
-
-         if (objectLookup != null) {
-            objectPlacementManager.testObjectLookup(objectLookup);
-         } else {
-            log.warn("Object Lookup is null");
-         }
-
+         List<ObjectLookup> objectLookupList = new LinkedList<ObjectLookup>();
+         int maxNumberOfOwners = defaultNumberOfOwners;
+         
+         for (int replicaCounter = 0; replicaCounter < maxNumberOfOwners; ++replicaCounter) {
+            Map<Object, Integer> newOwner = new HashMap<Object, Integer>();
+            for (Map.Entry<Object, OwnersInfo> entry : objectsToMove.entrySet()) {
+               OwnersInfo ownersInfo = entry.getValue();               
+               maxNumberOfOwners = Math.max(ownersInfo.getReplicationCount(), maxNumberOfOwners);
+               int newOwnerIndex = ownersInfo.getOwner(replicaCounter);
+               if (newOwnerIndex != -1) {
+                  newOwner.put(entry.getKey(), newOwnerIndex);
+               }
+            }
+            
+            if (!newOwner.isEmpty()) {
+               ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(newOwner);
+               objectLookupList.add(objectLookup);
+            }
+            
+         }                  
+         
          DataPlacementCommand command = commandsFactory.buildDataPlacementCommand(DataPlacementCommand.Type.OBJECT_LOOKUP_PHASE,
                                                                                   roundManager.getCurrentRoundId());
-         command.setObjectLookup(objectLookupFactory.serializeObjectLookup(objectLookup));
+         command.setObjectLookup(objectLookupFactory.serializeObjectLookup(objectLookupList));
 
          rpcManager.broadcastRpcCommand(command, false, false);
-         addObjectLookup(rpcManager.getAddress(), objectLookupFactory.serializeObjectLookup(objectLookup), roundId);
+         addObjectLookup(rpcManager.getAddress(), objectLookupFactory.serializeObjectLookup(objectLookupList), roundId);
       }
    }
 
@@ -198,8 +216,8 @@ public class DataPlacementManager {
          return;
       }
 
-      ObjectLookup objectLookup = objectLookupFactory.deSerializeObjectLookup(objectLookupParameters);
-      if (objectLookupManager.addObjectLookup(from, objectLookup)) {
+      Collection<ObjectLookup> objectLookupCollection = objectLookupFactory.deSerializeObjectLookup(objectLookupParameters);
+      if (objectLookupManager.addObjectLookup(from, objectLookupCollection)) {
          if (log.isTraceEnabled()) {
             log.tracef("All remote Object Lookup received. Send Ack to coordinator");
          }
@@ -253,35 +271,20 @@ public class DataPlacementManager {
          log.trace("Start sending keys request");
       }
 
-      remoteAccessesManager.calculateRemoteAccessesPerMember();
-      Map<Object, Long> request;
-
       for (Address address : rpcManager.getTransport().getMembers()) {
-         request = remoteAccessesManager.getRemoteListFor(address);
+         ObjectRequest request = remoteAccessesManager.getObjectRequestForAddress(address);
 
          if (address.equals(rpcManager.getAddress())) {
             addRequest(address, request, roundManager.getCurrentRoundId());
          } else {
             DataPlacementCommand command = commandsFactory.buildDataPlacementCommand(DataPlacementCommand.Type.REMOTE_TOP_LIST_PHASE,
-                                                                                     roundManager.getCurrentRoundId());
-            command.setRemoteTopList(request);
+                                                                                     roundManager.getCurrentRoundId());            
+            command.setRequest(request);
             rpcManager.invokeRemotely(Collections.singleton(address), command, false);
-            logRemoteTopListSent(request, address);
+            if (log.isDebugEnabled()) {
+               log.debugf("Sending request list objects to %s. Request is %s", address, request.toString(log.isTraceEnabled()));
+            }
          }
-      }
-   }
-
-   /**
-    * log keys request list to owner
-    *
-    * @param request the request list
-    * @param to      the owner
-    */
-   private void logRemoteTopListSent(Map<?,?> request, Address to) {
-      if (log.isTraceEnabled()) {
-         log.tracef("Sending request list of %s objects to %s. Request list is %s", request.size(), to, request);
-      } else if (log.isDebugEnabled()) {
-         log.debugf("Sending request list of %s objects to %s", request.size(), to);
       }
    }
 
@@ -315,17 +318,8 @@ public class DataPlacementManager {
       if (event.getMembersAtEnd().size() == event.getMembersAtStart().size()) {
          if (event.isPre() && expectPre) {
             expectPre = false;
-            if (log.isDebugEnabled()) {
-               log.debug("Doing data placement pre-phase test");
-               objectPlacementManager.prePhaseTest();
-            }
          } else if(!event.isPre() && !expectPre) {
             expectPre = true;
-            if (log.isDebugEnabled()) {
-               log.debug("Doing data placement post-phase test");
-               objectPlacementManager.postPhaseTest();
-               remoteAccessesManager.postPhaseTest();
-            }
             roundManager.markRoundFinished();
          }
       }

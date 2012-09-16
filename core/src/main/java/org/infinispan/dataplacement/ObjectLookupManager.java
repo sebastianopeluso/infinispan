@@ -5,6 +5,7 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.DistributedStateTransferManagerImpl;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -56,11 +57,12 @@ public class ObjectLookupManager {
     * Note: it only returns true on the first time that it is ready to the stat transfer. the following
     *       invocations return false
     *
+    *
     * @param from          the creator member
     * @param objectLookup  the Object Lookup instance
     * @return              true if it has all the object lookup, false otherwise (see Note)
     */
-   public final synchronized boolean addObjectLookup(Address from, ObjectLookup objectLookup) {
+   public final synchronized boolean addObjectLookup(Address from, Collection<ObjectLookup> objectLookup) {
       if (hasAllObjectLookup()) {
          return false;
       }
