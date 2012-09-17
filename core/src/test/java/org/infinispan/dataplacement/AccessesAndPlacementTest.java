@@ -18,13 +18,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.isA;
+import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * // TODO: Document this
+ * Test the functionality of the Remote Accesses Manager and the Object placement manager 
  *
  * @author Pedro Ruivo
  * @since 1.0
@@ -178,7 +177,7 @@ public class AccessesAndPlacementTest {
       RemoteAccessesManager manager = createRemoteAccessManager();
       StreamLibContainer container = StreamLibContainer.getInstance();
       container.setActive(true);
-      container.setCapacity(5);
+      container.setCapacity(2);
       container.resetAll();
 
       TestKey key1 = new TestKey(1, members.get(0), members.get(1));
@@ -195,14 +194,12 @@ public class AccessesAndPlacementTest {
       Map<Object, Long> local = new HashMap<Object, Long>();
 
       local.put(key1, 10L);
-      local.put(key4, 2L);
 
       assertAccesses(manager.getObjectRequestForAddress(members.get(0)), remote, local);
 
       remote.clear();
       local.clear();
 
-      local.put(key1, 10L);
       remote.put(key2, 5L);
 
       assertAccesses(manager.getObjectRequestForAddress(members.get(1)), remote, local);
@@ -210,7 +207,6 @@ public class AccessesAndPlacementTest {
       remote.clear();
       local.clear();
 
-      remote.put(key2, 5L);
       remote.put(key3, 15L);
 
       assertAccesses(manager.getObjectRequestForAddress(members.get(2)), remote, local);
@@ -219,7 +215,6 @@ public class AccessesAndPlacementTest {
       local.clear();
 
       local.put(key4, 2L);
-      remote.put(key3, 15L);
 
       assertAccesses(manager.getObjectRequestForAddress(members.get(3)), remote, local);
    }
@@ -271,31 +266,35 @@ public class AccessesAndPlacementTest {
    }
 
    private ObjectPlacementManager createObjectPlacementManager() {
-      DefaultConsistentHash consistentHash = mock(DefaultConsistentHash.class);
-      when(consistentHash.locate(isA(TestKey.class), anyInt())).thenAnswer(new Answer<List<Address>>() {
-         @Override
-         public List<Address> answer(InvocationOnMock invocationOnMock) throws Throwable {
-            return new LinkedList<Address>(((TestKey) invocationOnMock.getArguments()[0]).getOwners());
-         }
-      });
-
-      DistributionManager distributionManager = mock(DistributionManager.class);
-      when(distributionManager.locate(isA(TestKey.class))).thenAnswer(new Answer<List<Address>>() {
-         @Override
-         public List<Address> answer(InvocationOnMock invocationOnMock) throws Throwable {
-            return new LinkedList<Address>(((TestKey) invocationOnMock.getArguments()[0]).getOwners());
-         }
-      });
-      when(distributionManager.getConsistentHash()).thenReturn(consistentHash);
-      return new ObjectPlacementManager(distributionManager, new MurmurHash3(), 2);
+      return new ObjectPlacementManager(getMockDistributionManager(), new MurmurHash3(), 2);
    }
 
    private RemoteAccessesManager createRemoteAccessManager() {
+      return new RemoteAccessesManager(getMockDistributionManager());
+   }
+
+   private DistributionManager getMockDistributionManager() {
       DefaultConsistentHash consistentHash = mock(DefaultConsistentHash.class);
       when(consistentHash.locate(isA(TestKey.class), anyInt())).thenAnswer(new Answer<List<Address>>() {
          @Override
          public List<Address> answer(InvocationOnMock invocationOnMock) throws Throwable {
             return new LinkedList<Address>(((TestKey) invocationOnMock.getArguments()[0]).getOwners());
+         }
+      });
+
+      when(consistentHash.locateAll(anyCollectionOf(Object.class), anyInt())).thenAnswer(new Answer<Object>() {
+         @Override
+         public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+            Collection<Object> keys = (Collection<Object>) invocationOnMock.getArguments()[0];
+
+            Map<Object, List<Address>> addresses = new HashMap<Object, List<Address>>();
+            for (Object key : keys) {
+               if (key instanceof TestKey) {
+                  addresses.put(key, new LinkedList<Address>(((TestKey) key).getOwners()));
+               }
+            }
+
+            return addresses;
          }
       });
 
@@ -307,7 +306,7 @@ public class AccessesAndPlacementTest {
          }
       });
       when(distributionManager.getConsistentHash()).thenReturn(consistentHash);
-      return new RemoteAccessesManager(distributionManager);
+      return distributionManager;
    }
 
    private class TestKey {

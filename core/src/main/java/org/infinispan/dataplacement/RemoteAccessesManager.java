@@ -50,24 +50,37 @@ public class RemoteAccessesManager {
    }
 
    /**
-    * calculates the remote request list to send for each member
+    * calculates the object request list to request to each member
     */
    private void calculateAccessesIfNeeded(){
       if (hasAccessesCalculated) {
          return;
       }
       hasAccessesCalculated = true;
+      int minSize = (int) (streamLibContainer.getCapacity() * 0.8);
+
+      if (log.isTraceEnabled()) {
+         log.trace("Calculating accessed keys for data placement optimization");
+      }
 
       Map<Object, Long> tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.REMOTE_GET);
 
-      log.info("Size of Remote Get is: " + tempAccesses.size());
+      if (log.isDebugEnabled()) {
+         log.debugf("Size of remote accesses is %s and minimum size to send the request is %s ", tempAccesses.size(),
+                    minSize);
+      }
 
       // Only send statistics if there are enough objects
-      if (tempAccesses.size() >= streamLibContainer.getCapacity() * 0.8) {
+      if (tempAccesses.size() >= minSize) {
          remoteAccessPerAddress.putAll(sortObjectsByPrimaryOwner(tempAccesses));
       }
 
       tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.LOCAL_GET);
+
+      if (log.isDebugEnabled()) {
+         log.debugf("Size of local accesses is %s and minimum size to send the request is %s ", tempAccesses.size(),
+                    minSize);
+      }
 
       if (tempAccesses.size() >= streamLibContainer.getCapacity() * 0.8) {
          localAccessPerAddress.putAll(sortObjectsByPrimaryOwner(tempAccesses));
@@ -75,52 +88,54 @@ public class RemoteAccessesManager {
    }
 
    /**
-    * returns the remote request list to send for the member
-    * @param member  the member to send the list
-    * @return        the request list, object and number of accesses, or null if it has no accesses to that member
+    * returns the request object list for the {@code member}
+    *
+    * @param member  the destination member
+    * @return        the request object list. It can be empty if no requests are necessary
     */
    public synchronized final ObjectRequest getObjectRequestForAddress(Address member) {
       calculateAccessesIfNeeded();
       ObjectRequest request = new ObjectRequest(remoteAccessPerAddress.remove(member), localAccessPerAddress.remove(member));
 
       if (log.isInfoEnabled()) {
-         log.debugf("Getting request list to send to %s. Request is %s", member, request.toString(log.isDebugEnabled()));
+         log.debugf("Getting request list for %s. Request is %s", member, request.toString(log.isDebugEnabled()));
       }
 
       return request;
    }
 
    /**
-    * sort the keys and access sorted by owner
+    * sort the keys and number of access by primary owner
     *
-    *
-    * @param remoteGet        the remote accesses
-    * @return                 the map between owner and each object and number of access 
+    * @param accesses   the remote accesses
+    * @return           the map between primary owner and object and number of accesses 
     */
-   private Map<Address, Map<Object, Long>> sortObjectsByPrimaryOwner(Map<Object, Long> remoteGet) {
+   private Map<Address, Map<Object, Long>> sortObjectsByPrimaryOwner(Map<Object, Long> accesses) {
       Map<Address, Map<Object, Long>> objectLists = new HashMap<Address, Map<Object, Long>>();
-      Map<Object, List<Address>> mappedObjects = getDefaultConsistentHash().locateAll(remoteGet.keySet(), 1);
+      Map<Object, List<Address>> primaryOwners = getDefaultConsistentHash().locateAll(accesses.keySet(), 1);
 
-      Address address;
-      Object key;
+      if (log.isDebugEnabled()) {
+         log.debugf("Accesses ara %s and primary owners are %s", accesses, primaryOwners);
+      }
 
-      for (Entry<Object, Long> entry : remoteGet.entrySet()) {
-         key = entry.getKey();
-         address = mappedObjects.remove(key).get(0);
+      for (Entry<Object, Long> entry : accesses.entrySet()) {
+         Object key = entry.getKey();
+         Address primaryOwner = primaryOwners.remove(key).get(0);
 
-         if (!objectLists.containsKey(address)) {
-            objectLists.put(address, new HashMap<Object, Long>());
+         if (!objectLists.containsKey(primaryOwner)) {
+            objectLists.put(primaryOwner, new HashMap<Object, Long>());
          }
-         objectLists.get(address).put(entry.getKey(), entry.getValue());
+         objectLists.get(primaryOwner).put(entry.getKey(), entry.getValue());
       }
 
       log.infof("List sorted. Number of primary owners is %s", objectLists.size());
-      if (log.isDebugEnabled()) {
-         for(Entry<Address,Map<Object, Long>> map : objectLists.entrySet()){
-            log.debugf("%s: %s keys requested", map.getKey(), map.getValue().size());
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Numbers of keys sent by primary owner");
+         for (Entry<Object, List<Address>> entry : primaryOwners.entrySet()) {
+            log.tracef("Primary Owner: %s, number of keys requested: %s", entry.getKey(), entry.getValue().size());
          }
       }
-
       return objectLists;
    }
 
