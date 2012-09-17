@@ -17,7 +17,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * // TODO: Document this
+ * Collects all the remote and local access for each member for the key in which this member is the 
+ * primary owner
  *
  * @author Zhongmiao Li
  * @author João Paiva
@@ -77,6 +78,14 @@ public class ObjectPlacementManager {
       addressList.addAll(addresses);
    }
 
+   /**
+    * collects the local and remote accesses for each member
+    *
+    * @param member        the member that sent the {@code objectRequest}
+    * @param objectRequest the local and remote accesses
+    * @return              true if all requests are received, false otherwise. It only returns true on the first
+    *                      time it has all the objects
+    */
    public final synchronized boolean aggregateRequest(Address member, ObjectRequest objectRequest) {
       if (hasReceivedAllRequests) {
          return false;
@@ -94,17 +103,18 @@ public class ObjectPlacementManager {
       hasReceivedAllRequests = addressList.size() <= remoteRequests.size();
 
       if (log.isDebugEnabled()) {
-         log.debugf("Received request list from %s. Received from %s nodes and expects %s. Remote keys are %s and " +
-                          "local keys are %s", member, remoteRequests.size(), addressList.size(),
-                    objectRequest.getRemoteAccesses(), objectRequest.getLocalAccesses());
-      } else {
-         log.infof("Received request list from %s. Received from %s nodes and expects %s", member,
-                   remoteRequests.size(), addressList.size());
+         log.debugf("Received request list from %s. Received from %s nodes and expects %s. Request is %s", member,
+                    remoteRequests.size(), addressList.size(), objectRequest.toString(log.isTraceEnabled()));
       }
 
       return hasReceivedAllRequests;
    }
 
+   /**
+    * calculate the new owners based on the requests received.
+    *
+    * @return  a map with the keys to be moved and the new owners
+    */
    public final synchronized Map<Object, OwnersInfo> calculateObjectsToMove() {
       Map<Object, OwnersInfo> newOwnersMap = new HashMap<Object, OwnersInfo>();
 
@@ -140,6 +150,12 @@ public class ObjectPlacementManager {
       return newOwnersMap;
    }
 
+   /**
+    * for each object to move, it checks if the owners are different from the owners returned by the original
+    * Infinispan's consistent hash. If this is true, the object is removed from the map {@code newOwnersMap}
+    *
+    * @param newOwnersMap  the map with the key to be moved and the new owners
+    */
    private void removeNotMovedObjects(Map<Object, OwnersInfo> newOwnersMap) {
       ConsistentHash defaultConsistentHash = getDefaultConsistentHash();
       Iterator<Map.Entry<Object, OwnersInfo>> iterator = newOwnersMap.entrySet().iterator();
@@ -165,6 +181,15 @@ public class ObjectPlacementManager {
       }
    }
 
+   /**
+    * updates the owner information for the {@code key} based in the {@code numberOfRequests} made by the member who
+    * requested this {@code key} (identified by {@code requesterId})
+    *
+    * @param newOwnersMap     the new owners map to be updated
+    * @param key              the key requested
+    * @param numberOfRequests the number of accesses made to this key
+    * @param requesterId      the member id
+    */
    private void calculateNewOwners(Map<Object, OwnersInfo> newOwnersMap, Object key, long numberOfRequests, int requesterId) {
       OwnersInfo newOwnersInfo = newOwnersMap.get(key);
 
@@ -175,6 +200,12 @@ public class ObjectPlacementManager {
       newOwnersInfo.calculateNewOwner(requesterId, numberOfRequests);
    }
 
+   /**
+    * returns the local accesses and owners for the {@code key}
+    *
+    * @param key  the key
+    * @return     the local accesses and owners for the key     
+    */
    private Map<Integer, Long> getLocalAccesses(Object key) {
       Map<Integer, Long> localAccessesMap = new TreeMap<Integer, Long>();
 
@@ -189,6 +220,13 @@ public class ObjectPlacementManager {
       return localAccessesMap;
    }
 
+   /**
+    * creates a new owners information initialized with the current owners returned by the current consistent hash
+    * and their number of accesses for the {@code key}
+    *
+    * @param key  the key
+    * @return     the new owners information.
+    */
    private OwnersInfo createOwnersInfo(Object key) {
       Collection<Address> replicas = distributionManager.locate(key);
       Map<Integer, Long> localAccesses = getLocalAccesses(key);
@@ -205,6 +243,7 @@ public class ObjectPlacementManager {
          Long accesses = localAccesses.remove(ownerIndex);
 
          if (accesses == null) {
+            //TODO check if this should be zero or the min number of local accesses from the member
             accesses = 0L;
          }
 
@@ -214,6 +253,15 @@ public class ObjectPlacementManager {
       return ownersInfo;
    }
 
+   /**
+    * finds the new owner for the {@code key} based on the Infinispan's consistent hash. this is invoked
+    * when the one or more current owners are not in the cluster anymore and it is necessary to find new owners
+    * to respect the default number of owners per key
+    *
+    * @param key           the key
+    * @param alreadyOwner  the current owners
+    * @return              the new owner index
+    */
    private int findNewOwner(Object key, Collection<Address> alreadyOwner) {
       int size = addressList.size();
 
@@ -227,7 +275,7 @@ public class ObjectPlacementManager {
          if (!alreadyOwner.contains(addressList.get(index))) {
             return index;
          }
-         index += (index + 1) % size;
+         index = (index + 1) % size;
       }
 
       return 0;
