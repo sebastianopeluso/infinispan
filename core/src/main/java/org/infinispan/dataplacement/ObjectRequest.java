@@ -4,7 +4,8 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * // TODO: Document this
+ * Contains the information of the remote and local accesses for a member. This information is sent to the 
+ * primary owner in orde to calculate the best placement for the objects
  *
  * @author Pedro Ruivo
  * @since 5.2

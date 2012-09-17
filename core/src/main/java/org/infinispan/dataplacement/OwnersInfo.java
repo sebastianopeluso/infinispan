@@ -1,12 +1,11 @@
 package org.infinispan.dataplacement;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
 /**
- * // TODO: Document this
+ * Maintains information about the new owners and their number of accesses 
  *
  * @author Pedro Ruivo
  * @since 5.2
@@ -41,19 +40,27 @@ public class OwnersInfo {
          ownersAccesses.set(toReplaceIndex, numberOfAccesses);
       }
    }
-   
+
    public int getOwner(int index) {
       if (index > ownersIndexes.size()) {
          return -1;
       }
       return ownersIndexes.get(index);
    }
-   
+
    public int getReplicationCount() {
       return ownersIndexes.size();
    }
-   
+
    public List<Integer> getNewOwnersIndexes() {
       return new LinkedList<Integer>(ownersIndexes);
+   }
+
+   @Override
+   public String toString() {
+      return "OwnersInfo{" +
+            "ownersIndexes=" + ownersIndexes +
+            ", ownersAccesses=" + ownersAccesses +
+            '}';
    }
 }

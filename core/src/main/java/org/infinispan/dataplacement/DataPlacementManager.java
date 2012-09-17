@@ -83,7 +83,7 @@ public class DataPlacementManager {
       this.cacheName = cache.getName();
 
       if (!configuration.dataPlacement().enabled()) {
-         log.info("Data placement not enabled");
+         log.info("Data placement not enabled in Configuration");
          return;
       }
 
@@ -93,7 +93,7 @@ public class DataPlacementManager {
       roundManager.setCoolDownTime(configuration.dataPlacement().coolDownTime());
 
       //this is needed because the custom statistics invokes this method twice. the seconds time, it replaces
-      //the original manager (== problems!!)
+      //the original object placement and remote accesses manager (== problems!!)
       synchronized (this) {
          if (stateTransfer instanceof DistributedStateTransferManagerImpl && !roundManager.isEnabled()) {
             defaultNumberOfOwners = configuration.clustering().hash().numOwners(); 
@@ -187,7 +187,11 @@ public class DataPlacementManager {
                objectLookupList.add(objectLookup);
             }
             
-         }                  
+         }
+         
+         if (log.isDebugEnabled()) {
+            log.debugf("Created %s bloom filters and machine learner rules for each key", maxNumberOfOwners);
+         }
          
          DataPlacementCommand command = commandsFactory.buildDataPlacementCommand(DataPlacementCommand.Type.OBJECT_LOOKUP_PHASE,
                                                                                   roundManager.getCurrentRoundId());
