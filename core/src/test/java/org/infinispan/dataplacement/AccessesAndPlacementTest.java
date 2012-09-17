@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
  * Test the functionality of the Remote Accesses Manager and the Object placement manager 
  *
  * @author Pedro Ruivo
- * @since 1.0
+ * @since 5.2
  */
 @Test(groups = "functional", testName = "dataplacement.AccessesAndPlacementTest")
 public class AccessesAndPlacementTest {
