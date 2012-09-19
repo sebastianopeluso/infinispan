@@ -102,7 +102,7 @@ public class RoundManager {
       if (log.isDebugEnabled()) {
          log.debugf("[%s] ensured round %s", Thread.currentThread().getName(), roundId);
       }
-      return true;
+      return roundId == currentRoundId;
    }
 
    /**

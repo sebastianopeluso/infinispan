@@ -9,6 +9,7 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -38,7 +39,7 @@ public class ObjectPlacementManager {
    //<node index, <key, number of accesses>
    private final Map<Integer, Map<Object, Long>> localRequests;
 
-   private boolean hasReceivedAllRequests;
+   private final BitSet requestReceived;
 
    //this can be quite big. save it as an array to save some memory
    private Object[] allKeysMoved;
@@ -55,27 +56,21 @@ public class ObjectPlacementManager {
       addressList = new ArrayList<Address>();
       remoteRequests = new TreeMap<Integer, Map<Object, Long>>();
       localRequests = new TreeMap<Integer, Map<Object, Long>>();
-      hasReceivedAllRequests = false;
+      requestReceived = new BitSet();
       allKeysMoved = new Object[0];
    }
 
    /**
     * reset the state (before each round)
+    *
+    * @param members the current cluster members
     */
-   public final synchronized void resetState() {
+   public final synchronized void resetState(List<Address> members) {
+      addressList.clear();
+      addressList.addAll(members);
       remoteRequests.clear();
       localRequests.clear();
-      hasReceivedAllRequests = false;
-   }
-
-   /**
-    * updates the members list
-    *
-    * @param addresses  the new member list
-    */
-   public final synchronized void updateMembersList(List<Address> addresses) {
-      addressList.clear();
-      addressList.addAll(addresses);
+      requestReceived.clear();
    }
 
    /**
@@ -87,27 +82,24 @@ public class ObjectPlacementManager {
     *                      time it has all the objects
     */
    public final synchronized boolean aggregateRequest(Address member, ObjectRequest objectRequest) {
-      if (hasReceivedAllRequests) {
+      if (hasReceivedAllRequests()) {
          return false;
       }
 
       int senderID = addressList.indexOf(member);
 
       if (senderID < 0) {
-         log.warnf("Received request list from %s but it does not exits", member);
+         log.warnf("Received request list from %s but it does not exits in%s", member, addressList);
          return false;
       }
 
       remoteRequests.put(senderID, objectRequest.getRemoteAccesses());
       localRequests.put(senderID, objectRequest.getLocalAccesses());
-      hasReceivedAllRequests = addressList.size() <= remoteRequests.size();
+      requestReceived.set(senderID);
 
-      if (log.isDebugEnabled()) {
-         log.debugf("Received request list from %s. Received from %s nodes and expects %s. Request is %s", member,
-                    remoteRequests.size(), addressList.size(), objectRequest.toString(log.isTraceEnabled()));
-      }
+      logRequestReceived(member, objectRequest);
 
-      return hasReceivedAllRequests;
+      return hasReceivedAllRequests();
    }
 
    /**
@@ -291,6 +283,28 @@ public class ObjectPlacementManager {
       return hash instanceof DataPlacementConsistentHash ?
             ((DataPlacementConsistentHash) hash).getDefaultHash() :
             hash;
+   }
+
+   private boolean hasReceivedAllRequests() {
+      return requestReceived.cardinality() == addressList.size();
+   }
+
+   private void logRequestReceived(Address sender, ObjectRequest request) {
+      if (log.isTraceEnabled()) {
+         StringBuilder missingMembers = new StringBuilder();
+
+         for (int i = 0; i < addressList.size(); ++i) {
+            if (!requestReceived.get(i)) {
+               missingMembers.append(addressList.get(i)).append(" ");
+            }
+         }
+
+         log.debugf("Object Request received from %s. Missing request are %s. The Object Request is %s", sender,
+                    missingMembers, request.toString(true));
+      } else if (log.isDebugEnabled()) {
+         log.debugf("Object Request received from %s. Missing request are %s. The Object Request is %s", sender,
+                    (addressList.size() - requestReceived.cardinality()), request.toString());
+      }
    }
 
 }

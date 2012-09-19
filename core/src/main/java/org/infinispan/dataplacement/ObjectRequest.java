@@ -1,5 +1,6 @@
 package org.infinispan.dataplacement;
 
+import java.io.Serializable;
 import java.util.Collections;
 import java.util.Map;
 
@@ -10,7 +11,7 @@ import java.util.Map;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class ObjectRequest {
+public class ObjectRequest implements Serializable {
 
    private final Map<Object, Long> remoteAccesses;
    private final Map<Object, Long> localAccesses;
@@ -44,21 +45,5 @@ public class ObjectRequest {
                '}';
       }
       return toString();
-   }
-   
-   public int getSerializedSize() {
-      return 2;
-   }
-
-   public static Object[] getParameters(ObjectRequest request) {
-      return new Object[] {request.localAccesses, request.remoteAccesses};
-   }
-
-   @SuppressWarnings("unchecked")
-   public static ObjectRequest setParameters(Object[] parameters) {
-      if (parameters.length != 2) {
-         return null;
-      }
-      return new ObjectRequest((Map<Object, Long>) parameters[0], (Map<Object, Long>) parameters[1]);
    }
 }

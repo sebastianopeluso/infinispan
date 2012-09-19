@@ -34,7 +34,7 @@ public class AccessesAndPlacementTest {
    public void testNoMovement() {
       List<Address> members = createMembers(4);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.updateMembersList(members);
+      manager.resetState(members);
       Map<?, ?> newOwners = manager.calculateObjectsToMove();
       assert newOwners.isEmpty();
    }
@@ -43,7 +43,7 @@ public class AccessesAndPlacementTest {
    public void testReturnValue() {
       List<Address> members = createMembers(2);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.updateMembersList(members);
+      manager.resetState(members);
 
       assert !manager.aggregateRequest(members.get(0), new ObjectRequest(null, null));
       assert manager.aggregateRequest(members.get(1), new ObjectRequest(null, null));
@@ -54,7 +54,7 @@ public class AccessesAndPlacementTest {
    public void testObjectPlacement() {
       List<Address> members = createMembers(4);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.updateMembersList(members);
+      manager.resetState(members);
 
       Map<Object, Long> request = new HashMap<Object, Long>();
 
@@ -91,7 +91,7 @@ public class AccessesAndPlacementTest {
    public void testObjectPlacement2() {
       List<Address> members = createMembers(4);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.updateMembersList(members);
+      manager.resetState(members);
 
       Map<Object, Long> remote = new HashMap<Object, Long>();
       Map<Object, Long> local = new HashMap<Object, Long>();
@@ -139,7 +139,7 @@ public class AccessesAndPlacementTest {
    public void testObjectPlacement3() {
       List<Address> members = createMembers(4);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.updateMembersList(members);
+      manager.resetState(members);
 
       Map<Object, Long> request = new HashMap<Object, Long>();
 
