@@ -1,5 +1,6 @@
 package org.infinispan.dataplacement;
 
+import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -15,6 +16,9 @@ public class RoundManager {
    private static final Log log = LogFactory.getLog(RoundManager.class);
 
    private long currentRoundId;
+   private long nextRoundId;
+
+   private ClusterSnapshot roundClusterSnapshot;
 
    //in milliseconds
    private long coolDownTime;
@@ -70,17 +74,19 @@ public class RoundManager {
       }
 
       updateNextRoundTimestamp();
-      roundInProgress = true;
-      return ++currentRoundId;
+      return ++nextRoundId;
    }
 
    /**
     * it blocks the current thread until the current round is higher or equals to the round id
     *
+    *
+    *
     * @param roundId    the round id
+    * @param sender     the sender address 
     * @return           true if the round id is ensured, false otherwise (not enabled or interrupted)    
     */
-   public final synchronized boolean ensure(long roundId) {
+   public final synchronized boolean ensure(long roundId, Address sender) {
       if (!enabled) {
          log.warnf("Not possible to ensure round %s. Data placement not enabled", roundId);
          return false;
@@ -102,17 +108,44 @@ public class RoundManager {
       if (log.isDebugEnabled()) {
          log.debugf("[%s] ensured round %s", Thread.currentThread().getName(), roundId);
       }
-      return roundId == currentRoundId;
+
+      if (!roundInProgress) {
+         log.warnf("Not possible to process command. No data placement protocol is in progress", roundId);
+         return false;
+      }
+
+      boolean acceptCommand = roundId == currentRoundId;
+
+      if (acceptCommand) {
+         if (!roundClusterSnapshot.contains(sender)) {
+            log.warnf("RNot possible to process command. The sender [%s] is not in the current snapshot: %s", sender,
+                      roundClusterSnapshot);
+            return false;
+         }
+      }
+
+      return acceptCommand;
    }
 
    /**
     * invoked in all members when a new round starts
-    * @param roundId the new round id
+    *
+    * @param roundId                the new round id
+    * @param roundClusterSnapshot   the round cluster snapshot
+    * @param myAddress              the node address
     */
-   public final synchronized void startNewRound(long roundId) {
+   public final synchronized boolean startNewRound(long roundId, ClusterSnapshot roundClusterSnapshot, Address myAddress) {
       currentRoundId = roundId;
-      roundInProgress = true;
+      this.roundClusterSnapshot = roundClusterSnapshot;
+      roundInProgress = roundClusterSnapshot.contains(myAddress);
       notifyAll();
+
+      if (!roundInProgress) {
+         log.warnf("Data placement start received but I [%s] am not in the round cluster snapshot: %s", myAddress,
+                   roundClusterSnapshot);
+      }
+
+      return roundInProgress;
    }
 
    /**

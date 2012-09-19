@@ -57,7 +57,6 @@ public class DataPlacementManager {
    private int defaultNumberOfOwners;
 
    private Boolean expectPre = true;
-   private ClusterSnapshot roundClusterSnapshot;
 
    private RemoteAccessesManager remoteAccessesManager;
    private ObjectPlacementManager objectPlacementManager;
@@ -122,7 +121,7 @@ public class DataPlacementManager {
          log.tracef("Start data placement protocol with round %s", newRoundId);
       }
 
-      roundClusterSnapshot = new ClusterSnapshot(members, hashFunction);
+      ClusterSnapshot roundClusterSnapshot = new ClusterSnapshot(members, hashFunction);
 
       if (!roundClusterSnapshot.contains(rpcManager.getAddress())) {
          log.warnf("Data placement start received but I [%s] am not in the member list %s", rpcManager.getAddress(),
@@ -133,7 +132,10 @@ public class DataPlacementManager {
       objectPlacementManager.resetState(roundClusterSnapshot);
       objectLookupManager.resetState(roundClusterSnapshot);
       remoteAccessesManager.resetState(roundClusterSnapshot);
-      roundManager.startNewRound(newRoundId);
+      if (!roundManager.startNewRound(newRoundId, roundClusterSnapshot, rpcManager.getAddress())) {
+         log.info("Data placement not started!");
+         return;
+      }
       new Thread("Data-Placement-Thread") {
          @Override
          public void run() {
@@ -159,13 +161,8 @@ public class DataPlacementManager {
          log.debugf("Keys request received from %s in round %s", sender, roundId);
       }
 
-      if (!roundManager.ensure(roundId)) {
+      if (!roundManager.ensure(roundId, sender)) {
          log.warn("Not possible to process key request list");
-         return;
-      }
-
-      if (!roundClusterSnapshot.contains(sender)) {
-         log.warnf("Received a request from %s but it is not in the member list %s", sender, roundClusterSnapshot);
          return;
       }
 
@@ -223,13 +220,8 @@ public class DataPlacementManager {
          log.debugf("Remote Object Lookup received from %s in round %s", sender, roundId);
       }
 
-      if (!roundManager.ensure(roundId)) {
+      if (!roundManager.ensure(roundId, sender)) {
          log.warn("Not possible to process remote Object Lookup");
-         return;
-      }
-
-      if (!roundClusterSnapshot.contains(sender)) {
-         log.warnf("Received an object lookup from %s but it is not in the member list %s", sender, roundClusterSnapshot);
          return;
       }
 
@@ -259,13 +251,8 @@ public class DataPlacementManager {
          log.debugf("Ack received in round %s", roundId);
       }
 
-      if (!roundManager.ensure(roundId)) {
+      if (!roundManager.ensure(roundId, sender)) {
          log.warn("Not possible to process Ack");
-         return;
-      }
-
-      if (!roundClusterSnapshot.contains(sender)) {
-         log.warnf("Received an ack from %s but it is not in the member list %s", sender, roundClusterSnapshot);
          return;
       }
 
@@ -348,12 +335,14 @@ public class DataPlacementManager {
          log.trace("Data placement request received.");
       }
 
+      long newRoundId = roundManager.getNewRoundId();
       DataPlacementCommand command = commandsFactory.buildDataPlacementCommand(DataPlacementCommand.Type.DATA_PLACEMENT_START,
-                                                                               roundManager.getNewRoundId());
+                                                                               newRoundId);
       Collection<Address> members = rpcManager.getTransport().getMembers();
-      command.setMembers(members.toArray(new Address[members.size()]));
+      Address[] addressArray = members.toArray(new Address[members.size()]);
+      command.setMembers(addressArray);
       rpcManager.broadcastRpcCommand(command, false, false);
-      startDataPlacement(roundManager.getCurrentRoundId(), null);
+      startDataPlacement(newRoundId, addressArray);
    }
 
    @ManagedOperation(description = "Updates the cool down time between two or more data placement requests")

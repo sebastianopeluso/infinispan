@@ -128,7 +128,7 @@ public class RemoteAccessesManager {
       Map<Object, List<Address>> primaryOwners = getDefaultConsistentHash().locateAll(accesses.keySet(), 1);
 
       if (log.isDebugEnabled()) {
-         log.debugf("Accesses ara %s and primary owners are %s", accesses, primaryOwners);
+         log.debugf("Accesses are %s and primary owners are %s", accesses, primaryOwners);
       }
 
       for (Entry<Object, Long> entry : accesses.entrySet()) {

@@ -77,7 +77,7 @@ public class ObjectPlacementManager {
       int senderIdx = clusterSnapshot.indexOf(member);
 
       if (senderIdx < 0) {
-         log.warnf("Received request list from %s but it does not exits in%s", member, clusterSnapshot);
+         log.warnf("Received request list from %s but it does not exits in %s", member, clusterSnapshot);
          return false;
       }
 
