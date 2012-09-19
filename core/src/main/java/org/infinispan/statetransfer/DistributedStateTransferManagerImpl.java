@@ -21,6 +21,7 @@ package org.infinispan.statetransfer;
 import org.infinispan.CacheException;
 import org.infinispan.commands.write.InvalidateCommand;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.dataplacement.ClusterSnapshot;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.distribution.DistributionManager;
 import org.infinispan.distribution.ch.ConsistentHash;
@@ -114,8 +115,8 @@ public class DistributedStateTransferManagerImpl extends BaseStateTransferManage
       dataPlacementConsistentHash.addObjectLookup(address, objectLookup);
    }
 
-   public void createDataPlacementConsistentHashing(List<Address> membersList){
-      dataPlacementConsistentHash = new DataPlacementConsistentHash(membersList);
+   public void createDataPlacementConsistentHashing(ClusterSnapshot clusterSnapshot){
+      dataPlacementConsistentHash = new DataPlacementConsistentHash(clusterSnapshot);
    }
 
    public void invalidateKeys(List<Object> keysToRemove) {

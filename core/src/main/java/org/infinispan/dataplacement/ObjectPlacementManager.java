@@ -8,12 +8,10 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -30,8 +28,7 @@ public class ObjectPlacementManager {
 
    private static final Log log = LogFactory.getLog(ObjectPlacementManager.class);
 
-   //contains the list of members (same order in all nodes)
-   private final List<Address> addressList;
+   private ClusterSnapshot clusterSnapshot;
 
    //<node index, <key, number of accesses>
    private final Map<Integer, Map<Object, Long>> remoteRequests;
@@ -53,7 +50,6 @@ public class ObjectPlacementManager {
       this.hash = hash;
       this.defaultNumberOfOwners = defaultNumberOfOwners;
 
-      addressList = new ArrayList<Address>();
       remoteRequests = new TreeMap<Integer, Map<Object, Long>>();
       localRequests = new TreeMap<Integer, Map<Object, Long>>();
       requestReceived = new BitSet();
@@ -63,11 +59,10 @@ public class ObjectPlacementManager {
    /**
     * reset the state (before each round)
     *
-    * @param members the current cluster members
+    * @param roundClusterSnapshot the current cluster members
     */
-   public final synchronized void resetState(List<Address> members) {
-      addressList.clear();
-      addressList.addAll(members);
+   public final synchronized void resetState(ClusterSnapshot roundClusterSnapshot) {
+      clusterSnapshot = roundClusterSnapshot;
       remoteRequests.clear();
       localRequests.clear();
       requestReceived.clear();
@@ -86,10 +81,10 @@ public class ObjectPlacementManager {
          return false;
       }
 
-      int senderID = addressList.indexOf(member);
+      int senderID = clusterSnapshot.indexOf(member);
 
       if (senderID < 0) {
-         log.warnf("Received request list from %s but it does not exits in%s", member, addressList);
+         log.warnf("Received request list from %s but it does not exits in%s", member, clusterSnapshot);
          return false;
       }
 
@@ -110,7 +105,7 @@ public class ObjectPlacementManager {
    public final synchronized Map<Object, OwnersInfo> calculateObjectsToMove() {
       Map<Object, OwnersInfo> newOwnersMap = new HashMap<Object, OwnersInfo>();
 
-      for (int requesterIdx = 0; requesterIdx < addressList.size(); ++requesterIdx) {
+      for (int requesterIdx = 0; requesterIdx < clusterSnapshot.size(); ++requesterIdx) {
          Map<Object, Long> requestedObjects = remoteRequests.remove(requesterIdx);
 
          if (requestedObjects == null) {
@@ -165,7 +160,7 @@ public class ObjectPlacementManager {
          }
 
          for (Address address : defaultOwners) {
-            if (!ownerInfoIndexes.contains(addressList.indexOf(address))) {
+            if (!ownerInfoIndexes.contains(clusterSnapshot.indexOf(address))) {
                continue mainLoop;
             }
          }
@@ -226,7 +221,7 @@ public class ObjectPlacementManager {
       OwnersInfo ownersInfo = new OwnersInfo(replicas.size());
 
       for (Address currentOwner : replicas) {
-         int ownerIndex = addressList.indexOf(currentOwner);
+         int ownerIndex = clusterSnapshot.indexOf(currentOwner);
 
          if (ownerIndex == -1) {
             ownerIndex = findNewOwner(key, replicas);
@@ -255,7 +250,7 @@ public class ObjectPlacementManager {
     * @return              the new owner index
     */
    private int findNewOwner(Object key, Collection<Address> alreadyOwner) {
-      int size = addressList.size();
+      int size = clusterSnapshot.size();
 
       if (size <= 1) {
          return 0;
@@ -264,7 +259,7 @@ public class ObjectPlacementManager {
       int startIndex = hash.hash(key) % size;
 
       for (int index = startIndex + 1; index != startIndex; index = (index + 1) % size) {
-         if (!alreadyOwner.contains(addressList.get(index))) {
+         if (!alreadyOwner.contains(clusterSnapshot.get(index))) {
             return index;
          }
          index = (index + 1) % size;
@@ -286,16 +281,16 @@ public class ObjectPlacementManager {
    }
 
    private boolean hasReceivedAllRequests() {
-      return requestReceived.cardinality() == addressList.size();
+      return requestReceived.cardinality() == clusterSnapshot.size();
    }
 
    private void logRequestReceived(Address sender, ObjectRequest request) {
       if (log.isTraceEnabled()) {
          StringBuilder missingMembers = new StringBuilder();
 
-         for (int i = 0; i < addressList.size(); ++i) {
+         for (int i = 0; i < clusterSnapshot.size(); ++i) {
             if (!requestReceived.get(i)) {
-               missingMembers.append(addressList.get(i)).append(" ");
+               missingMembers.append(clusterSnapshot.get(i)).append(" ");
             }
          }
 
@@ -303,7 +298,7 @@ public class ObjectPlacementManager {
                     missingMembers, request.toString(true));
       } else if (log.isDebugEnabled()) {
          log.debugf("Object Request received from %s. Missing request are %s. The Object Request is %s", sender,
-                    (addressList.size() - requestReceived.cardinality()), request.toString());
+                    (clusterSnapshot.size() - requestReceived.cardinality()), request.toString());
       }
    }
 

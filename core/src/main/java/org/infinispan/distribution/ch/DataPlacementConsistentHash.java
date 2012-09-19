@@ -1,9 +1,9 @@
 package org.infinispan.distribution.ch;
 
+import org.infinispan.dataplacement.ClusterSnapshot;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.remoting.transport.Address;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -24,10 +24,10 @@ public class DataPlacementConsistentHash extends AbstractConsistentHash {
 
    private ConsistentHash defaultConsistentHash;
    private final Map<Address, Collection<ObjectLookup>> lookUpperList;
-   private final List<Address> addressList;
+   private final ClusterSnapshot clusterSnapshot;
 
-   public DataPlacementConsistentHash(List<Address> addressList) {
-      this.addressList = new ArrayList<Address>(addressList);
+   public DataPlacementConsistentHash(ClusterSnapshot clusterSnapshot) {
+      this.clusterSnapshot = clusterSnapshot;
       lookUpperList = new HashMap<Address, Collection<ObjectLookup>>();
    }
 
@@ -62,7 +62,7 @@ public class DataPlacementConsistentHash extends AbstractConsistentHash {
       for (ObjectLookup objectLookup : objectLookupCollection) {
          int index = objectLookup.query(key);
          if (index != -1) {
-            newOwners.add(addressList.get(index));
+            newOwners.add(clusterSnapshot.get(index));
          }
       }
 

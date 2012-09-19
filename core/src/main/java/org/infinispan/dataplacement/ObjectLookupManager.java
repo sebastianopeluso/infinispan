@@ -6,10 +6,8 @@ import org.infinispan.statetransfer.DistributedStateTransferManagerImpl;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
-import java.util.List;
 
 /**
  * Collects all the Object Lookup from all the members. In the coordinator side, it collects all the acks before
@@ -22,7 +20,7 @@ public class ObjectLookupManager {
 
    private static final Log log = LogFactory.getLog(ObjectLookupManager.class);
 
-   private final List<Address> addressList;
+   private ClusterSnapshot clusterSnapshot;
 
    //the state transfer manager
    private final DistributedStateTransferManagerImpl stateTransfer;
@@ -33,7 +31,6 @@ public class ObjectLookupManager {
 
    public ObjectLookupManager(DistributedStateTransferManagerImpl stateTransfer) {
       this.stateTransfer = stateTransfer;
-      addressList = new ArrayList<Address>();
       objectLookupReceived = new BitSet();
       acksReceived = new BitSet();
    }
@@ -41,14 +38,13 @@ public class ObjectLookupManager {
    /**
     * reset the state (before each round)
     *
-    * @param members the current cluster members                    
+    * @param roundClusterSnapshot the current cluster members                    
     */
-   public final synchronized void resetState(List<Address> members) {
-      addressList.clear();
-      addressList.addAll(members);
+   public final synchronized void resetState(ClusterSnapshot roundClusterSnapshot) {
+      clusterSnapshot = roundClusterSnapshot;
       objectLookupReceived.clear();
       acksReceived.clear();
-      stateTransfer.createDataPlacementConsistentHashing(addressList);
+      stateTransfer.createDataPlacementConsistentHashing(clusterSnapshot);
    }
 
    /**
@@ -67,10 +63,10 @@ public class ObjectLookupManager {
          return false;
       }
 
-      int senderId = addressList.indexOf(from);
+      int senderId = clusterSnapshot.indexOf(from);
 
       if (senderId < 0) {
-         log.warnf("Receive an object lookup from %s but it is not in members list %s", from, addressList);
+         log.warnf("Receive an object lookup from %s but it is not in members list %s", from, clusterSnapshot);
          return false;
       }
 
@@ -95,10 +91,10 @@ public class ObjectLookupManager {
          return false;
       }
 
-      int senderId = addressList.indexOf(from);
+      int senderId = clusterSnapshot.indexOf(from);
 
       if (senderId < 0) {
-         log.warnf("Receive an ack from %s but it is not in members list %s", from, addressList);
+         log.warnf("Receive an ack from %s but it is not in members list %s", from, clusterSnapshot);
          return false;
       }
 
@@ -115,7 +111,7 @@ public class ObjectLookupManager {
     * @return  true if it has all the Object Lookup from all members
     */
    private boolean hasAllObjectLookup() {
-      return addressList.size() == objectLookupReceived.cardinality();
+      return clusterSnapshot.size() == objectLookupReceived.cardinality();
    }
 
    /**
@@ -124,23 +120,23 @@ public class ObjectLookupManager {
     * @return  true if it has all the acks from all members
     */
    private boolean hasAllAcks() {
-      return addressList.size() == acksReceived.cardinality();
+      return clusterSnapshot.size() == acksReceived.cardinality();
    }
 
    private void logObjectLookupReceived(Address from, Collection<ObjectLookup> objectLookup) {
       if (log.isTraceEnabled()) {
          StringBuilder missingMembers = new StringBuilder();
 
-         for (int i = 0; i < addressList.size(); ++i) {
+         for (int i = 0; i < clusterSnapshot.size(); ++i) {
             if (!objectLookupReceived.get(i)) {
-               missingMembers.append(addressList.get(i)).append(" ");
+               missingMembers.append(clusterSnapshot.get(i)).append(" ");
             }
          }
          log.debugf("Objects lookup received from %s. Missing objects lookup are %s. Objects lookup received are %s",
                     from, missingMembers, objectLookup);
       } else if (log.isDebugEnabled()) {
          log.debugf("Objects lookup received from %s. Missing objects lookup are %s",
-                    from, (addressList.size() - objectLookupReceived.cardinality()));
+                    from, (clusterSnapshot.size() - objectLookupReceived.cardinality()));
       }
    }
 
@@ -148,9 +144,9 @@ public class ObjectLookupManager {
       if (log.isDebugEnabled()) {
          StringBuilder missingMembers = new StringBuilder();
 
-         for (int i = 0; i < addressList.size(); ++i) {
+         for (int i = 0; i < clusterSnapshot.size(); ++i) {
             if (!acksReceived.get(i)) {
-               missingMembers.append(addressList.get(i)).append(" ");
+               missingMembers.append(clusterSnapshot.get(i)).append(" ");
             }
          }
          log.debugf("Ack received from %s. Missing ack are %s", from, missingMembers);

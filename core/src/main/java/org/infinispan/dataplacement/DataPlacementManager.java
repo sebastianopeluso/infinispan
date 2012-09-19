@@ -4,6 +4,7 @@ import org.infinispan.Cache;
 import org.infinispan.cacheviews.CacheViewsManager;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.DataPlacementCommand;
+import org.infinispan.commons.hash.Hash;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
@@ -23,15 +24,12 @@ import org.infinispan.statetransfer.StateTransferManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 
 /**
@@ -54,10 +52,12 @@ public class DataPlacementManager {
    private RpcManager rpcManager;
    private CommandsFactory commandsFactory;
    private CacheViewsManager cacheViewsManager;
-
-   private Boolean expectPre = true;
+   private Hash hashFunction;
    private String cacheName;
    private int defaultNumberOfOwners;
+
+   private Boolean expectPre = true;
+   private ClusterSnapshot roundClusterSnapshot;
 
    private RemoteAccessesManager remoteAccessesManager;
    private ObjectPlacementManager objectPlacementManager;
@@ -66,11 +66,9 @@ public class DataPlacementManager {
    private ObjectLookupFactory objectLookupFactory;
 
    private final RoundManager roundManager;
-   private final Set<Address> currentRoundMembers;
 
    public DataPlacementManager() {
       roundManager = new RoundManager(INITIAL_COOL_DOWN_TIME);
-      currentRoundMembers = new HashSet<Address>();
    }
 
    @Inject
@@ -81,6 +79,7 @@ public class DataPlacementManager {
       this.commandsFactory = commandsFactory;
       this.cacheViewsManager = cacheViewsManager;
       this.cacheName = cache.getName();
+      this.hashFunction = configuration.clustering().hash().hash();
 
       if (!configuration.dataPlacement().enabled()) {
          log.info("Data placement not enabled in Configuration");
@@ -122,18 +121,17 @@ public class DataPlacementManager {
       if (log.isTraceEnabled()) {
          log.tracef("Start data placement protocol with round %s", newRoundId);
       }
-      List<Address> addressList = Arrays.asList(members);
-      currentRoundMembers.clear();
-      currentRoundMembers.addAll(addressList);
 
-      if (!currentRoundMembers.contains(rpcManager.getAddress())) {
+      roundClusterSnapshot = new ClusterSnapshot(members, hashFunction);
+
+      if (!roundClusterSnapshot.contains(rpcManager.getAddress())) {
          log.warnf("Data placement start received but I [%s] am not in the member list %s", rpcManager.getAddress(),
-                   currentRoundMembers);
+                   roundClusterSnapshot);
          return;
       }
 
-      objectPlacementManager.resetState(addressList);
-      objectLookupManager.resetState(addressList);
+      objectPlacementManager.resetState(roundClusterSnapshot);
+      objectLookupManager.resetState(roundClusterSnapshot);
       remoteAccessesManager.resetState();
       roundManager.startNewRound(newRoundId);
       new Thread("Data-Placement-Thread") {
@@ -166,8 +164,8 @@ public class DataPlacementManager {
          return;
       }
 
-      if (!currentRoundMembers.contains(sender)) {
-         log.warnf("Received a request from %s but it is not in the member list %s", sender, currentRoundMembers);
+      if (!roundClusterSnapshot.contains(sender)) {
+         log.warnf("Received a request from %s but it is not in the member list %s", sender, roundClusterSnapshot);
          return;
       }
 
@@ -230,8 +228,8 @@ public class DataPlacementManager {
          return;
       }
 
-      if (!currentRoundMembers.contains(sender)) {
-         log.warnf("Received an object lookup from %s but it is not in the member list %s", sender, currentRoundMembers);
+      if (!roundClusterSnapshot.contains(sender)) {
+         log.warnf("Received an object lookup from %s but it is not in the member list %s", sender, roundClusterSnapshot);
          return;
       }
 
@@ -266,8 +264,8 @@ public class DataPlacementManager {
          return;
       }
 
-      if (!currentRoundMembers.contains(sender)) {
-         log.warnf("Received an ack from %s but it is not in the member list %s", sender, currentRoundMembers);
+      if (!roundClusterSnapshot.contains(sender)) {
+         log.warnf("Received an ack from %s but it is not in the member list %s", sender, roundClusterSnapshot);
          return;
       }
 

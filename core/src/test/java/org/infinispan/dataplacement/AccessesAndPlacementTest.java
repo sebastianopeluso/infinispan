@@ -1,5 +1,6 @@
 package org.infinispan.dataplacement;
 
+import org.infinispan.commons.hash.Hash;
 import org.infinispan.commons.hash.MurmurHash3;
 import org.infinispan.distribution.DistributionManager;
 import org.infinispan.distribution.TestAddress;
@@ -31,54 +32,56 @@ import static org.mockito.Mockito.when;
 @Test(groups = "functional", testName = "dataplacement.AccessesAndPlacementTest")
 public class AccessesAndPlacementTest {
 
+   private static final Hash HASH = new MurmurHash3();
+
    public void testNoMovement() {
-      List<Address> members = createMembers(4);
+      ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.resetState(members);
+      manager.resetState(clusterSnapshot);
       Map<?, ?> newOwners = manager.calculateObjectsToMove();
       assert newOwners.isEmpty();
    }
 
    @SuppressWarnings("AssertWithSideEffects")
    public void testReturnValue() {
-      List<Address> members = createMembers(2);
+      ClusterSnapshot clusterSnapshot = createClusterSnapshot(2);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.resetState(members);
+      manager.resetState(clusterSnapshot);
 
-      assert !manager.aggregateRequest(members.get(0), new ObjectRequest(null, null));
-      assert manager.aggregateRequest(members.get(1), new ObjectRequest(null, null));
-      assert !manager.aggregateRequest(members.get(0), new ObjectRequest(null, null));
-      assert !manager.aggregateRequest(members.get(1), new ObjectRequest(null, null));
+      assert !manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(null, null));
+      assert manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(null, null));
+      assert !manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(null, null));
+      assert !manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(null, null));
    }
 
    public void testObjectPlacement() {
-      List<Address> members = createMembers(4);
+      ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.resetState(members);
+      manager.resetState(clusterSnapshot);
 
       Map<Object, Long> request = new HashMap<Object, Long>();
 
-      TestKey key1 = new TestKey(1, members.get(0), members.get(1));
-      TestKey key2 = new TestKey(2, members.get(2), members.get(3));
+      TestKey key1 = new TestKey(1, clusterSnapshot.get(0), clusterSnapshot.get(1));
+      TestKey key2 = new TestKey(2, clusterSnapshot.get(2), clusterSnapshot.get(3));
 
       request.put(key1, 1L);
 
-      manager.aggregateRequest(members.get(2), new ObjectRequest(request, null));
+      manager.aggregateRequest(clusterSnapshot.get(2), new ObjectRequest(request, null));
 
       request = new HashMap<Object, Long>();
       request.put(key1, 1L);
 
-      manager.aggregateRequest(members.get(3), new ObjectRequest(request, null));
+      manager.aggregateRequest(clusterSnapshot.get(3), new ObjectRequest(request, null));
 
       request = new HashMap<Object, Long>();
       request.put(key2, 1L);
 
-      manager.aggregateRequest(members.get(0), new ObjectRequest(request, null));
+      manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(request, null));
 
       request = new HashMap<Object, Long>();
       request.put(key2, 1L);
 
-      manager.aggregateRequest(members.get(1), new ObjectRequest(request, null));
+      manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(request, null));
 
       Map<Object, OwnersInfo> newOwners = manager.calculateObjectsToMove();
 
@@ -89,20 +92,20 @@ public class AccessesAndPlacementTest {
    }
 
    public void testObjectPlacement2() {
-      List<Address> members = createMembers(4);
+      ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.resetState(members);
+      manager.resetState(clusterSnapshot);
 
       Map<Object, Long> remote = new HashMap<Object, Long>();
       Map<Object, Long> local = new HashMap<Object, Long>();
 
-      TestKey key1 = new TestKey(1, members.get(0), members.get(1));
-      TestKey key2 = new TestKey(2, members.get(2), members.get(3));
+      TestKey key1 = new TestKey(1, clusterSnapshot.get(0), clusterSnapshot.get(1));
+      TestKey key2 = new TestKey(2, clusterSnapshot.get(2), clusterSnapshot.get(3));
 
       remote.put(key2, 1L);
       local.put(key1, 4L);
 
-      manager.aggregateRequest(members.get(0), new ObjectRequest(remote, local));
+      manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(remote, local));
 
       remote = new HashMap<Object, Long>();
       local = new HashMap<Object, Long>();
@@ -110,7 +113,7 @@ public class AccessesAndPlacementTest {
       remote.put(key2, 3L);
       local.put(key1, 1L);
 
-      manager.aggregateRequest(members.get(1), new ObjectRequest(remote, local));
+      manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(remote, local));
 
       remote = new HashMap<Object, Long>();
       local = new HashMap<Object, Long>();
@@ -118,7 +121,7 @@ public class AccessesAndPlacementTest {
       remote.put(key1, 2L);
       local.put(key2, 4L);
 
-      manager.aggregateRequest(members.get(2), new ObjectRequest(remote, local));
+      manager.aggregateRequest(clusterSnapshot.get(2), new ObjectRequest(remote, local));
 
       remote = new HashMap<Object, Long>();
       local = new HashMap<Object, Long>();
@@ -126,7 +129,7 @@ public class AccessesAndPlacementTest {
       remote.put(key1, 3L);
       local.put(key2, 2L);
 
-      manager.aggregateRequest(members.get(3), new ObjectRequest(remote, null));
+      manager.aggregateRequest(clusterSnapshot.get(3), new ObjectRequest(remote, null));
 
       Map<Object, OwnersInfo> newOwners = manager.calculateObjectsToMove();
 
@@ -137,35 +140,35 @@ public class AccessesAndPlacementTest {
    }
 
    public void testObjectPlacement3() {
-      List<Address> members = createMembers(4);
+      ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.resetState(members);
+      manager.resetState(clusterSnapshot);
 
       Map<Object, Long> request = new HashMap<Object, Long>();
 
-      TestKey key = new TestKey(2, members.get(2), members.get(3));
+      TestKey key = new TestKey(2, clusterSnapshot.get(2), clusterSnapshot.get(3));
 
       request.put(key, 2L);
 
-      manager.aggregateRequest(members.get(0), new ObjectRequest(request, null));
+      manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(request, null));
 
       request = new HashMap<Object, Long>();
 
       request.put(key, 3L);
 
-      manager.aggregateRequest(members.get(1), new ObjectRequest(request, null));
+      manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(request, null));
 
       request = new HashMap<Object, Long>();
 
       request.put(key, 5L);
 
-      manager.aggregateRequest(members.get(2), new ObjectRequest(null, request));
+      manager.aggregateRequest(clusterSnapshot.get(2), new ObjectRequest(null, request));
 
       request = new HashMap<Object, Long>();
 
       request.put(key, 6L);
 
-      manager.aggregateRequest(members.get(3), new ObjectRequest(null, request));
+      manager.aggregateRequest(clusterSnapshot.get(3), new ObjectRequest(null, request));
 
       Map<Object, OwnersInfo> newOwners = manager.calculateObjectsToMove();
 
@@ -173,17 +176,17 @@ public class AccessesAndPlacementTest {
    }
 
    public void testRemoteAccesses() {
-      List<Address> members = createMembers(4);
+      ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
       RemoteAccessesManager manager = createRemoteAccessManager();
       StreamLibContainer container = StreamLibContainer.getInstance();
       container.setActive(true);
       container.setCapacity(2);
       container.resetAll();
 
-      TestKey key1 = new TestKey(1, members.get(0), members.get(1));
-      TestKey key2 = new TestKey(2, members.get(1), members.get(2));
-      TestKey key3 = new TestKey(3, members.get(2), members.get(3));
-      TestKey key4 = new TestKey(4, members.get(3), members.get(0));
+      TestKey key1 = new TestKey(1, clusterSnapshot.get(0), clusterSnapshot.get(1));
+      TestKey key2 = new TestKey(2, clusterSnapshot.get(1), clusterSnapshot.get(2));
+      TestKey key3 = new TestKey(3, clusterSnapshot.get(2), clusterSnapshot.get(3));
+      TestKey key4 = new TestKey(4, clusterSnapshot.get(3), clusterSnapshot.get(0));
 
       addKey(key1, false, 10, container);
       addKey(key2, true, 5, container);
@@ -195,28 +198,28 @@ public class AccessesAndPlacementTest {
 
       local.put(key1, 10L);
 
-      assertAccesses(manager.getObjectRequestForAddress(members.get(0)), remote, local);
+      assertAccesses(manager.getObjectRequestForAddress(clusterSnapshot.get(0)), remote, local);
 
       remote.clear();
       local.clear();
 
       remote.put(key2, 5L);
 
-      assertAccesses(manager.getObjectRequestForAddress(members.get(1)), remote, local);
+      assertAccesses(manager.getObjectRequestForAddress(clusterSnapshot.get(1)), remote, local);
 
       remote.clear();
       local.clear();
 
       remote.put(key3, 15L);
 
-      assertAccesses(manager.getObjectRequestForAddress(members.get(2)), remote, local);
+      assertAccesses(manager.getObjectRequestForAddress(clusterSnapshot.get(2)), remote, local);
 
       remote.clear();
       local.clear();
 
       local.put(key4, 2L);
 
-      assertAccesses(manager.getObjectRequestForAddress(members.get(3)), remote, local);
+      assertAccesses(manager.getObjectRequestForAddress(clusterSnapshot.get(3)), remote, local);
    }
 
    private void assertAccesses(ObjectRequest request, Map<Object, Long> remote, Map<Object, Long> local) {
@@ -257,12 +260,12 @@ public class AccessesAndPlacementTest {
       assert expectedOwners.containsAll(owners);
    }
 
-   private List<Address> createMembers(int size) {
+   private ClusterSnapshot createClusterSnapshot(int size) {
       List<Address> members = new ArrayList<Address>(size);
       for (int i = 0; i < size; ++i) {
          members.add(new TestAddress(i));
       }
-      return members;
+      return new ClusterSnapshot(members.toArray(new Address[size]), HASH);
    }
 
    private ObjectPlacementManager createObjectPlacementManager() {
