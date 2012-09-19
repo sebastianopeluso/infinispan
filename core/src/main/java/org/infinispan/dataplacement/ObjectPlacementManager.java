@@ -30,11 +30,7 @@ public class ObjectPlacementManager {
 
    private ClusterSnapshot clusterSnapshot;
 
-   //<node index, <key, number of accesses>
-   private final Map<Integer, Map<Object, Long>> remoteRequests;
-
-   //<node index, <key, number of accesses>
-   private final Map<Integer, Map<Object, Long>> localRequests;
+   private ObjectRequest[] objectRequests;
 
    private final BitSet requestReceived;
 
@@ -50,8 +46,6 @@ public class ObjectPlacementManager {
       this.hash = hash;
       this.defaultNumberOfOwners = defaultNumberOfOwners;
 
-      remoteRequests = new TreeMap<Integer, Map<Object, Long>>();
-      localRequests = new TreeMap<Integer, Map<Object, Long>>();
       requestReceived = new BitSet();
       allKeysMoved = new Object[0];
    }
@@ -63,8 +57,7 @@ public class ObjectPlacementManager {
     */
    public final synchronized void resetState(ClusterSnapshot roundClusterSnapshot) {
       clusterSnapshot = roundClusterSnapshot;
-      remoteRequests.clear();
-      localRequests.clear();
+      objectRequests = new ObjectRequest[clusterSnapshot.size()];
       requestReceived.clear();
    }
 
@@ -81,16 +74,15 @@ public class ObjectPlacementManager {
          return false;
       }
 
-      int senderID = clusterSnapshot.indexOf(member);
+      int senderIdx = clusterSnapshot.indexOf(member);
 
-      if (senderID < 0) {
+      if (senderIdx < 0) {
          log.warnf("Received request list from %s but it does not exits in%s", member, clusterSnapshot);
          return false;
       }
 
-      remoteRequests.put(senderID, objectRequest.getRemoteAccesses());
-      localRequests.put(senderID, objectRequest.getLocalAccesses());
-      requestReceived.set(senderID);
+      objectRequests[senderIdx] = objectRequest;
+      requestReceived.set(senderIdx);
 
       logRequestReceived(member, objectRequest);
 
@@ -106,11 +98,13 @@ public class ObjectPlacementManager {
       Map<Object, OwnersInfo> newOwnersMap = new HashMap<Object, OwnersInfo>();
 
       for (int requesterIdx = 0; requesterIdx < clusterSnapshot.size(); ++requesterIdx) {
-         Map<Object, Long> requestedObjects = remoteRequests.remove(requesterIdx);
+         ObjectRequest objectRequest = objectRequests[requesterIdx];
 
-         if (requestedObjects == null) {
+         if (objectRequest == null) {
             continue;
          }
+
+         Map<Object, Long> requestedObjects = objectRequest.getRemoteAccesses();
 
          for (Map.Entry<Object, Long> entry : requestedObjects.entrySet()) {
             calculateNewOwners(newOwnersMap, entry.getKey(), entry.getValue(), requesterIdx);
@@ -118,9 +112,6 @@ public class ObjectPlacementManager {
          //release memory asap
          requestedObjects.clear();
       }
-      //release memory asap
-      remoteRequests.clear();
-      localRequests.clear();
 
       removeNotMovedObjects(newOwnersMap);
 
@@ -196,14 +187,17 @@ public class ObjectPlacementManager {
    private Map<Integer, Long> getLocalAccesses(Object key) {
       Map<Integer, Long> localAccessesMap = new TreeMap<Integer, Long>();
 
-      for (Map.Entry<Integer, Map<Object, Long>> entry : localRequests.entrySet()) {
-         int localNodeIndex = entry.getKey();
-         Long localAccesses = entry.getValue().remove(key);
-
+      for (int memberIndex = 0; memberIndex < objectRequests.length; ++memberIndex) {
+         ObjectRequest request = objectRequests[memberIndex];
+         if (request == null) {
+            continue;
+         }
+         Long localAccesses = request.getLocalAccesses().remove(key);
          if (localAccesses != null) {
-            localAccessesMap.put(localNodeIndex, localAccesses);
+            localAccessesMap.put(memberIndex, localAccesses);
          }
       }
+
       return localAccessesMap;
    }
 
