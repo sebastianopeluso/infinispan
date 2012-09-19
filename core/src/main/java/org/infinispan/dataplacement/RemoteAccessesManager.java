@@ -26,8 +26,12 @@ public class RemoteAccessesManager {
 
    private final DistributionManager distributionManager;
 
-   private final Map<Address, Map<Object, Long>> remoteAccessPerAddress;
-   private final Map<Address, Map<Object, Long>> localAccessPerAddress;
+   private ClusterSnapshot clusterSnapshot;
+
+   //careful with this arrays!!
+   private Map[] remoteAccesses;
+   private Map[] localAccesses;
+
    private final StreamLibContainer streamLibContainer;
 
    private boolean hasAccessesCalculated;
@@ -36,16 +40,17 @@ public class RemoteAccessesManager {
       this.distributionManager = distributionManager;
 
       streamLibContainer = StreamLibContainer.getInstance();
-      remoteAccessPerAddress = new HashMap<Address, Map<Object, Long>>();
-      localAccessPerAddress = new HashMap<Address, Map<Object, Long>>();
    }
 
    /**
     * reset the state (before each round)
+    *
+    * @param clusterSnapshot  the current cluster snapshot
     */
-   public final synchronized void resetState() {
-      remoteAccessPerAddress.clear();
-      localAccessPerAddress.clear();
+   public final synchronized void resetState(ClusterSnapshot clusterSnapshot) {
+      this.clusterSnapshot = clusterSnapshot;
+      remoteAccesses = new Map[clusterSnapshot.size()];
+      localAccesses = new Map[clusterSnapshot.size()];
       hasAccessesCalculated = false;
    }
 
@@ -72,7 +77,7 @@ public class RemoteAccessesManager {
 
       // Only send statistics if there are enough objects
       if (tempAccesses.size() >= minSize) {
-         remoteAccessPerAddress.putAll(sortObjectsByPrimaryOwner(tempAccesses));
+         sortObjectsByPrimaryOwner(tempAccesses, remoteAccesses);
       }
 
       tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.LOCAL_GET);
@@ -82,9 +87,7 @@ public class RemoteAccessesManager {
                     minSize);
       }
 
-      if (tempAccesses.size() >= streamLibContainer.getCapacity() * 0.8) {
-         localAccessPerAddress.putAll(sortObjectsByPrimaryOwner(tempAccesses));
-      }
+      sortObjectsByPrimaryOwner(tempAccesses, localAccesses);
    }
 
    /**
@@ -93,9 +96,18 @@ public class RemoteAccessesManager {
     * @param member  the destination member
     * @return        the request object list. It can be empty if no requests are necessary
     */
+   @SuppressWarnings("unchecked")
    public synchronized final ObjectRequest getObjectRequestForAddress(Address member) {
       calculateAccessesIfNeeded();
-      ObjectRequest request = new ObjectRequest(remoteAccessPerAddress.remove(member), localAccessPerAddress.remove(member));
+      int addressIndex = clusterSnapshot.indexOf(member);
+
+      if (addressIndex == -1) {
+         log.warnf("Trying to get Object Requests to send to %s but it does not exists in cluster snapshot %s",
+                   member, clusterSnapshot);
+         return new ObjectRequest(null, null);
+      }
+
+      ObjectRequest request = new ObjectRequest(remoteAccesses[addressIndex], localAccesses[addressIndex]);
 
       if (log.isInfoEnabled()) {
          log.debugf("Getting request list for %s. Request is %s", member, request.toString(log.isDebugEnabled()));
@@ -107,11 +119,12 @@ public class RemoteAccessesManager {
    /**
     * sort the keys and number of access by primary owner
     *
-    * @param accesses   the remote accesses
-    * @return           the map between primary owner and object and number of accesses 
+    *
+    * @param accesses      the remote accesses
+    * @param membersAccess the array that in each position contains the entries to send to that member      
     */
-   private Map<Address, Map<Object, Long>> sortObjectsByPrimaryOwner(Map<Object, Long> accesses) {
-      Map<Address, Map<Object, Long>> objectLists = new HashMap<Address, Map<Object, Long>>();
+   @SuppressWarnings("unchecked")
+   private void sortObjectsByPrimaryOwner(Map<Object, Long> accesses, Map[] membersAccess) {
       Map<Object, List<Address>> primaryOwners = getDefaultConsistentHash().locateAll(accesses.keySet(), 1);
 
       if (log.isDebugEnabled()) {
@@ -121,22 +134,18 @@ public class RemoteAccessesManager {
       for (Entry<Object, Long> entry : accesses.entrySet()) {
          Object key = entry.getKey();
          Address primaryOwner = primaryOwners.remove(key).get(0);
+         int addressIndex = clusterSnapshot.indexOf(primaryOwner);
 
-         if (!objectLists.containsKey(primaryOwner)) {
-            objectLists.put(primaryOwner, new HashMap<Object, Long>());
+         if (addressIndex == -1) {
+            log.warnf("Primary owner [%s] does not exists in cluster snapshot %s", primaryOwner, clusterSnapshot);
+            continue;
          }
-         objectLists.get(primaryOwner).put(entry.getKey(), entry.getValue());
-      }
 
-      log.infof("List sorted. Number of primary owners is %s", objectLists.size());
-
-      if (log.isTraceEnabled()) {
-         log.tracef("Numbers of keys sent by primary owner");
-         for (Entry<Object, List<Address>> entry : primaryOwners.entrySet()) {
-            log.tracef("Primary Owner: %s, number of keys requested: %s", entry.getKey(), entry.getValue().size());
+         if (membersAccess[addressIndex] == null) {
+            membersAccess[addressIndex] = new HashMap<Object, Long>();
          }
+         membersAccess[addressIndex].put(entry.getKey(), entry.getValue());
       }
-      return objectLists;
    }
 
    /**

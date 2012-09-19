@@ -178,6 +178,7 @@ public class AccessesAndPlacementTest {
    public void testRemoteAccesses() {
       ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
       RemoteAccessesManager manager = createRemoteAccessManager();
+      manager.resetState(clusterSnapshot);
       StreamLibContainer container = StreamLibContainer.getInstance();
       container.setActive(true);
       container.setCapacity(2);

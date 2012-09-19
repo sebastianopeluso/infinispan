@@ -124,7 +124,7 @@ public class ClusterSnapshot {
 
       private InternalAddress(Address address) {
          this.address = address;
-         hashCode = hashFunction.hash(address);
+         hashCode = Math.abs(hashFunction.hash(address));
       }
 
       @Override

@@ -132,7 +132,7 @@ public class DataPlacementManager {
 
       objectPlacementManager.resetState(roundClusterSnapshot);
       objectLookupManager.resetState(roundClusterSnapshot);
-      remoteAccessesManager.resetState();
+      remoteAccessesManager.resetState(roundClusterSnapshot);
       roundManager.startNewRound(newRoundId);
       new Thread("Data-Placement-Thread") {
          @Override
