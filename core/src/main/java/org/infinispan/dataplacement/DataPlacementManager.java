@@ -58,7 +58,7 @@ public class DataPlacementManager {
 
    private Boolean expectPre = true;
 
-   private RemoteAccessesManager remoteAccessesManager;
+   private AccessesManager accessesManager;
    private ObjectPlacementManager objectPlacementManager;
    private ObjectLookupManager objectLookupManager;
 
@@ -95,7 +95,7 @@ public class DataPlacementManager {
       synchronized (this) {
          if (stateTransfer instanceof DistributedStateTransferManagerImpl && !roundManager.isEnabled()) {
             defaultNumberOfOwners = configuration.clustering().hash().numOwners();
-            remoteAccessesManager = new RemoteAccessesManager(distributionManager);
+            accessesManager = new AccessesManager(distributionManager);
             objectPlacementManager = new ObjectPlacementManager(distributionManager,
                                                                 configuration.clustering().hash().hash(),
                                                                 defaultNumberOfOwners);
@@ -131,7 +131,7 @@ public class DataPlacementManager {
 
       objectPlacementManager.resetState(roundClusterSnapshot);
       objectLookupManager.resetState(roundClusterSnapshot);
-      remoteAccessesManager.resetState(roundClusterSnapshot);
+      accessesManager.resetState(roundClusterSnapshot);
       if (!roundManager.startNewRound(newRoundId, roundClusterSnapshot, rpcManager.getAddress())) {
          log.info("Data placement not started!");
          return;
@@ -282,7 +282,7 @@ public class DataPlacementManager {
       }
 
       for (Address address : rpcManager.getTransport().getMembers()) {
-         ObjectRequest request = remoteAccessesManager.getObjectRequestForAddress(address);
+         ObjectRequest request = accessesManager.getObjectRequestForAddress(address);
 
          if (address.equals(rpcManager.getAddress())) {
             addRequest(address, request, roundManager.getCurrentRoundId());

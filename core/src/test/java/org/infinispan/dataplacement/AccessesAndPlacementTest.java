@@ -177,7 +177,7 @@ public class AccessesAndPlacementTest {
 
    public void testRemoteAccesses() {
       ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
-      RemoteAccessesManager manager = createRemoteAccessManager();
+      AccessesManager manager = createRemoteAccessManager();
       manager.resetState(clusterSnapshot);
       StreamLibContainer container = StreamLibContainer.getInstance();
       container.setActive(true);
@@ -273,8 +273,8 @@ public class AccessesAndPlacementTest {
       return new ObjectPlacementManager(getMockDistributionManager(), new MurmurHash3(), 2);
    }
 
-   private RemoteAccessesManager createRemoteAccessManager() {
-      return new RemoteAccessesManager(getMockDistributionManager());
+   private AccessesManager createRemoteAccessManager() {
+      return new AccessesManager(getMockDistributionManager());
    }
 
    private DistributionManager getMockDistributionManager() {

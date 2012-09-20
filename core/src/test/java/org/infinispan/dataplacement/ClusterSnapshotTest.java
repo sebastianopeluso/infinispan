@@ -168,7 +168,6 @@ public class ClusterSnapshotTest {
          String msg = String.format("Performance results[%s,%s]: Array List: %s ms, Cluster Snapshot: %s ms", iteration,
                                     title, arrayListDuration, clusterSnapshotDuration);
          log.info(msg);
-         System.out.println(msg);
       }
    }
 

@@ -119,7 +119,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
          return null;
       }
 
-      DecisionTreeParser parser = new DecisionTreeParser(INPUT_ML_TREE);
+      DecisionTreeParser parser = new DecisionTreeParser(machineLearnerPath + INPUT_ML_TREE);
 
       ParseTreeNode root;
       try {
@@ -189,13 +189,15 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    }
 
    /**
-    * it starts the machine learner and returns a reader to the output
+    * it starts the machine learner and blocks until the process ends
     *
-    * @return  the reader with the machine learner output or null if something went wrong
+    * @throws java.io.IOException   if an error occurs when launch the process
+    * @throws InterruptedException  if interrupted while waiting
     */
-   @SuppressWarnings("ResultOfMethodCallIgnored")
    private void runMachineLearner() throws IOException, InterruptedException {
-      new File(machineLearnerPath + INPUT_ML_TREE).delete();
+      if (!new File(machineLearnerPath + INPUT_ML_TREE).delete()) {
+         log.warnf("Tried to delete file '%s' but it failed", machineLearnerPath + INPUT_ML_TREE);
+      }
       Process process = Runtime.getRuntime()
             .exec(machineLearnerPath + File.separator + "c5.0 -f " + machineLearnerPath + INPUT);
       if (process != null) {

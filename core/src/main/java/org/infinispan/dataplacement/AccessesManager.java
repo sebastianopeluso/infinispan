@@ -21,24 +21,21 @@ import java.util.Map.Entry;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class RemoteAccessesManager {
-   private static final Log log = LogFactory.getLog(RemoteAccessesManager.class);
+public class AccessesManager {
+   private static final Log log = LogFactory.getLog(AccessesManager.class);
 
    private final DistributionManager distributionManager;
 
    private ClusterSnapshot clusterSnapshot;
 
-   //careful with this arrays!!
-   private Map[] remoteAccesses;
-   private Map[] localAccesses;
+   private Accesses[] accessesByPrimaryOwner;
 
    private final StreamLibContainer streamLibContainer;
 
    private boolean hasAccessesCalculated;
 
-   public RemoteAccessesManager(DistributionManager distributionManager) {
+   public AccessesManager(DistributionManager distributionManager) {
       this.distributionManager = distributionManager;
-
       streamLibContainer = StreamLibContainer.getInstance();
    }
 
@@ -49,8 +46,10 @@ public class RemoteAccessesManager {
     */
    public final synchronized void resetState(ClusterSnapshot clusterSnapshot) {
       this.clusterSnapshot = clusterSnapshot;
-      remoteAccesses = new Map[clusterSnapshot.size()];
-      localAccesses = new Map[clusterSnapshot.size()];
+      accessesByPrimaryOwner = new Accesses[clusterSnapshot.size()];
+      for (int i = 0; i < accessesByPrimaryOwner.length; ++i) {
+         accessesByPrimaryOwner[i] = new Accesses();
+      }
       hasAccessesCalculated = false;
    }
 
@@ -62,7 +61,6 @@ public class RemoteAccessesManager {
          return;
       }
       hasAccessesCalculated = true;
-      int minSize = (int) (streamLibContainer.getCapacity() * 0.8);
 
       if (log.isTraceEnabled()) {
          log.trace("Calculating accessed keys for data placement optimization");
@@ -70,24 +68,19 @@ public class RemoteAccessesManager {
 
       Map<Object, Long> tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.REMOTE_GET);
 
-      if (log.isDebugEnabled()) {
-         log.debugf("Size of remote accesses is %s and minimum size to send the request is %s ", tempAccesses.size(),
-                    minSize);
-      }
-
-      // Only send statistics if there are enough objects
-      if (tempAccesses.size() >= minSize) {
-         sortObjectsByPrimaryOwner(tempAccesses, remoteAccesses);
-      }
+      sortObjectsByPrimaryOwner(tempAccesses, true);
 
       tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.LOCAL_GET);
 
-      if (log.isDebugEnabled()) {
-         log.debugf("Size of local accesses is %s and minimum size to send the request is %s ", tempAccesses.size(),
-                    minSize);
-      }
+      sortObjectsByPrimaryOwner(tempAccesses, false);
 
-      sortObjectsByPrimaryOwner(tempAccesses, localAccesses);
+      if (log.isTraceEnabled()) {
+         StringBuilder stringBuilder = new StringBuilder("Accesses:\n");
+         for (int i = 0; i < accessesByPrimaryOwner.length; ++i) {
+            stringBuilder.append(clusterSnapshot.get(i)).append(" ==> ").append(accessesByPrimaryOwner[i]).append("\n");
+         }
+         log.debug(stringBuilder);
+      }
    }
 
    /**
@@ -96,7 +89,6 @@ public class RemoteAccessesManager {
     * @param member  the destination member
     * @return        the request object list. It can be empty if no requests are necessary
     */
-   @SuppressWarnings("unchecked")
    public synchronized final ObjectRequest getObjectRequestForAddress(Address member) {
       calculateAccessesIfNeeded();
       int addressIndex = clusterSnapshot.indexOf(member);
@@ -107,7 +99,7 @@ public class RemoteAccessesManager {
          return new ObjectRequest(null, null);
       }
 
-      ObjectRequest request = new ObjectRequest(remoteAccesses[addressIndex], localAccesses[addressIndex]);
+      ObjectRequest request = accessesByPrimaryOwner[addressIndex].toObjectRequest();
 
       if (log.isInfoEnabled()) {
          log.debugf("Getting request list for %s. Request is %s", member, request.toString(log.isDebugEnabled()));
@@ -120,11 +112,11 @@ public class RemoteAccessesManager {
     * sort the keys and number of access by primary owner
     *
     *
-    * @param accesses      the remote accesses
-    * @param membersAccess the array that in each position contains the entries to send to that member      
+    * @param accesses   the remote accesses
+    * @param remote     true if the accesses to process are from remote access, false otherwise      
     */
    @SuppressWarnings("unchecked")
-   private void sortObjectsByPrimaryOwner(Map<Object, Long> accesses, Map[] membersAccess) {
+   private void sortObjectsByPrimaryOwner(Map<Object, Long> accesses, boolean remote) {
       Map<Object, List<Address>> primaryOwners = getDefaultConsistentHash().locateAll(accesses.keySet(), 1);
 
       if (log.isDebugEnabled()) {
@@ -141,10 +133,7 @@ public class RemoteAccessesManager {
             continue;
          }
 
-         if (membersAccess[addressIndex] == null) {
-            membersAccess[addressIndex] = new HashMap<Object, Long>();
-         }
-         membersAccess[addressIndex].put(entry.getKey(), entry.getValue());
+         accessesByPrimaryOwner[addressIndex].add(entry.getKey(), entry.getValue(), remote);
       }
    }
 
@@ -158,5 +147,33 @@ public class RemoteAccessesManager {
       return hash instanceof DataPlacementConsistentHash ?
             ((DataPlacementConsistentHash) hash).getDefaultHash() :
             hash;
+   }
+
+   private class Accesses {
+      private final Map<Object, Long> localAccesses;
+      private final Map<Object, Long> remoteAccesses;
+
+      private Accesses() {
+         localAccesses = new HashMap<Object, Long>();
+         remoteAccesses = new HashMap<Object, Long>();
+      }
+
+      private void add(Object key, long accesses, boolean remote) {
+         Map<Object, Long> toPut = remote ? remoteAccesses : localAccesses;
+         toPut.put(key, accesses);
+      }
+
+      private ObjectRequest toObjectRequest() {
+         return new ObjectRequest(remoteAccesses.size() == 0 ? null : remoteAccesses,
+                                  localAccesses.size() == 0 ? null : localAccesses);
+      }
+
+      @Override
+      public String toString() {
+         return "Accesses{" +
+               "localAccesses=" + localAccesses.size() +
+               ", remoteAccesses=" + remoteAccesses.size() +
+               '}';
+      }
    }
 }
