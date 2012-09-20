@@ -3,48 +3,48 @@ package org.infinispan.dataplacement.c50.keyfeature;
 import java.io.Serializable;
 
 /**
- * Represents a value from a key feature
+ * Represents an interface for the key feature values
  *
  * @author Pedro Ruivo
  * @since 5.2
  */
 public interface FeatureValue extends Serializable {
 
-   //the possible conditions for the ML C5.0
-   public static enum Condition {
-      EQ,
-      LE,
-      GT;
-
-      public static Condition fromString(String condition) {
-         if (condition.equals("=")) {
-            return EQ;
-         } else if (condition.equals("<=")) {
-            return LE;
-         } else if (condition.equals(">")) {
-            return GT;
-         }
-         return null;
-      }
-   }
+   /**
+    * returns true if this is less or equals than {@code other}. Returns false otherwise or if the {@code other}
+    * is not comparable
+    *
+    * @param other   the other value
+    * @return        true if this is less or equals than {@code other}. Returns false otherwise or if the {@code other} 
+    *                is not comparable
+    */
+   boolean isLessOrEqualsThan(FeatureValue other);
 
    /**
-    * returns true if the parameter passed matches with this value, depending of the condition
+    * returns true if this is greater than {@code other}. Returns false otherwise or if the {@code other}
+    * is not comparable
     *
-    * Note:
-    *    this compares the otherValue with this value. eg. 1.valueMatch(2, LE) returns false!
     *
-    * @param otherValue the value
-    * @param condition  the condition
-    * @return           true if the value matches this value, false otherwise
+    * @param other   the other value
+    * @return        true if this is greater than {@code other}. Returns false otherwise or if the {@code other} 
+    *                is not comparable
     */
-   boolean valueMatch(FeatureValue otherValue, Condition condition);
+   boolean isGreaterThan(FeatureValue other);
 
    /**
-    * returns the value
-    * 
-    * @return  the value
+    * returns true if this is equals to {@code other}. Returns false otherwise or if the {@code other} is not comparable
+    *
+    * @param other   the other value
+    * @return        true if this is equals to {@code other}. Returns false otherwise or if the {@code other} 
+    *                is not comparable
     */
-   Object getValue();
+   boolean isEquals(FeatureValue other);
+
+   /**
+    * Returns the String representation of the value to write in the .data Machine Learner file
+    *
+    * @return  the String representation of the value
+    */
+   String getValueAsString();
 
 }

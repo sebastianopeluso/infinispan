@@ -1,5 +1,7 @@
 package org.infinispan.dataplacement.c50.keyfeature;
 
+import java.util.Arrays;
+
 /**
  * Implements a Feature that has as values a list of names
  *
@@ -12,11 +14,15 @@ public class NameListFeature implements Feature {
    private final String name;
 
    public NameListFeature(String name, String... classes) {
-      this.name = name;
+      this.name = name.replaceAll("\\s", "");
       if (classes == null || classes.length <= 1) {
          throw new IllegalArgumentException("Expected non-null and more than one classes");
       }
-      this.classes = classes;
+      this.classes = new String[classes.length];
+
+      for (int i = 0; i < classes.length; ++i) {
+         this.classes[i] = classes[i].replaceAll("\\s,[.]:[|]", "");
+      }
    }
 
    @Override
@@ -30,7 +36,7 @@ public class NameListFeature implements Feature {
    }
 
    @Override
-   public FeatureValueV2 createFeatureValue(Object value) {
+   public FeatureValue createFeatureValue(Object value) {
       if (value instanceof String) {
          return new StringValue((String) value);
       }
@@ -38,11 +44,19 @@ public class NameListFeature implements Feature {
    }
 
    @Override
-   public FeatureValueV2 featureValueFromParser(String value) {
+   public FeatureValue featureValueFromParser(String value) {
       return new StringValue(value);
    }
 
-   public static class StringValue implements FeatureValueV2 {
+   @Override
+   public String toString() {
+      return "NameListFeature{" +
+            "name='" + name + '\'' +
+            ", classes=" + (classes == null ? null : Arrays.asList(classes)) +
+            '}';
+   }
+
+   public static class StringValue implements FeatureValue {
 
       private final String value;
 
@@ -51,17 +65,17 @@ public class NameListFeature implements Feature {
       }
 
       @Override
-      public boolean isLessOrEqualsThan(FeatureValueV2 other) {
+      public boolean isLessOrEqualsThan(FeatureValue other) {
          return false;
       }
 
       @Override
-      public boolean isGreaterThan(FeatureValueV2 other) {
+      public boolean isGreaterThan(FeatureValue other) {
          return false;
       }
 
       @Override
-      public boolean isEquals(FeatureValueV2 other) {
+      public boolean isEquals(FeatureValue other) {
          return other instanceof StringValue && value.equals(((StringValue) other).value);
       }
 

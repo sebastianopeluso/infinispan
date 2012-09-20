@@ -1,7 +1,7 @@
 package org.infinispan.dataplacement.c50.tree;
 
 import org.infinispan.dataplacement.c50.keyfeature.Feature;
-import org.infinispan.dataplacement.c50.keyfeature.FeatureValueV2;
+import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 
 import java.util.Collection;
 import java.util.Map;
@@ -25,7 +25,7 @@ public class DecisionTreeBuilder {
 
    /**
     * returns a queryable decision tree that represents the parsed tree
-    * 
+    *
     * @param root the root node
     * @return     the queryable decision tree
     */
@@ -82,7 +82,7 @@ public class DecisionTreeBuilder {
    /*
    Decision tree nodes. Each type node has it own find rules and each node has it own attribute (except the leaf node)
     */
-   
+
    private DecisionTreeNode[] getForks(ParseTreeNode node) {
       DecisionTreeNode[] forks = new DecisionTreeNode[node.getNumberOfForks()];
       ParseTreeNode[] parseForks = node.getForks();
@@ -94,7 +94,7 @@ public class DecisionTreeBuilder {
       return forks;
    }
 
-   private FeatureValueV2 getCut(ParseTreeNode node, Feature feature) {
+   private FeatureValue getCut(ParseTreeNode node, Feature feature) {
       String cut = node.getCut();
       return feature.featureValueFromParser(cut);
    }
@@ -109,7 +109,7 @@ public class DecisionTreeBuilder {
       }
 
       @Override
-      public DecisionTreeNode find(Map<Feature, FeatureValueV2> keyFeatures) {
+      public DecisionTreeNode find(Map<Feature, FeatureValue> keyFeatures) {
          return null; //it is a leaf node
       }
 
@@ -124,7 +124,7 @@ public class DecisionTreeBuilder {
       private final int value;
       private final Feature feature;
       private final DecisionTreeNode[] forks;
-      private final FeatureValueV2[] attributeValues;
+      private final FeatureValue[] attributeValues;
 
       private Type1Node(int value, Feature feature, DecisionTreeNode[] forks) {
          this.value = value;
@@ -140,7 +140,7 @@ public class DecisionTreeBuilder {
          }
 
          this.forks = forks;
-         attributeValues = new FeatureValueV2[forks.length - 1];
+         attributeValues = new FeatureValue[forks.length - 1];
 
          for (int i = 0; i < attributeValues.length; ++i) {
             attributeValues[i] = feature.featureValueFromParser(possibleValues[i]);
@@ -148,8 +148,8 @@ public class DecisionTreeBuilder {
       }
 
       @Override
-      public DecisionTreeNode find(Map<Feature, FeatureValueV2> keyFeatures) {
-         FeatureValueV2 keyValue = keyFeatures.get(feature);
+      public DecisionTreeNode find(Map<Feature, FeatureValue> keyFeatures) {
+         FeatureValue keyValue = keyFeatures.get(feature);
          if (keyValue == null) { //N/A
             return forks[0];
          }
@@ -174,9 +174,9 @@ public class DecisionTreeBuilder {
       private final int value;
       private final Feature feature;
       private final DecisionTreeNode[] forks;
-      private final FeatureValueV2 cut;
+      private final FeatureValue cut;
 
-      private Type2Node(int value, Feature feature, DecisionTreeNode[] forks, FeatureValueV2 cut) {
+      private Type2Node(int value, Feature feature, DecisionTreeNode[] forks, FeatureValue cut) {
          this.value = value;
          this.feature = feature;
          this.cut = cut;
@@ -192,8 +192,8 @@ public class DecisionTreeBuilder {
       }
 
       @Override
-      public DecisionTreeNode find(Map<Feature, FeatureValueV2> keyFeatures) {
-         FeatureValueV2 keyValue = keyFeatures.get(feature);
+      public DecisionTreeNode find(Map<Feature, FeatureValue> keyFeatures) {
+         FeatureValue keyValue = keyFeatures.get(feature);
          if (keyValue == null) { //N/A
             return forks[0];
          }
@@ -242,8 +242,8 @@ public class DecisionTreeBuilder {
       }
 
       @Override
-      public DecisionTreeNode find(Map<Feature, FeatureValueV2> keyFeatures) {
-         FeatureValueV2 keyValue = keyFeatures.get(feature);
+      public DecisionTreeNode find(Map<Feature, FeatureValue> keyFeatures) {
+         FeatureValue keyValue = keyFeatures.get(feature);
          if (keyValue == null) { //N/A
             return forks[0];
          }
@@ -264,18 +264,18 @@ public class DecisionTreeBuilder {
    }
 
    private class InternalEltsValues {
-      private final FeatureValueV2[] values;
+      private final FeatureValue[] values;
 
       private InternalEltsValues(Collection<String> eltsValues, Feature feature) {
-         values = new FeatureValueV2[eltsValues.size()];
+         values = new FeatureValue[eltsValues.size()];
          int index = 0;
          for (String value : eltsValues) {
             values[index++] = feature.featureValueFromParser(value);
          }
       }
 
-      private boolean match(FeatureValueV2 keyValue) {
-         for (FeatureValueV2 value : values) {
+      private boolean match(FeatureValue keyValue) {
+         for (FeatureValue value : values) {
             if (value.isEquals(keyValue)) {
                return true;
             }

@@ -1,7 +1,7 @@
 package org.infinispan.dataplacement;
 
 import org.infinispan.dataplacement.c50.keyfeature.Feature;
-import org.infinispan.dataplacement.c50.keyfeature.FeatureValueV2;
+import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 import org.infinispan.dataplacement.c50.keyfeature.NameListFeature;
 import org.infinispan.dataplacement.c50.keyfeature.NumericFeature;
 import org.infinispan.dataplacement.c50.tree.DecisionTree;
@@ -86,9 +86,9 @@ public class DecisionTreeTest {
       DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
       DecisionTree tree = builder.build(root);
 
-      assert tree.query(Collections.<Feature, FeatureValueV2>emptyMap()) == 1;
+      assert tree.query(Collections.<Feature, FeatureValue>emptyMap()) == 1;
 
-      Map<Feature, FeatureValueV2> keyFeature = new HashMap<Feature, FeatureValueV2>();
+      Map<Feature, FeatureValue> keyFeature = new HashMap<Feature, FeatureValue>();
       keyFeature.put(feature, feature.createFeatureValue("peter"));
       assert tree.query(keyFeature) == 2;
 
@@ -114,9 +114,9 @@ public class DecisionTreeTest {
       DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
       DecisionTree tree = builder.build(root);
 
-      assert tree.query(Collections.<Feature, FeatureValueV2>emptyMap()) == 2;
+      assert tree.query(Collections.<Feature, FeatureValue>emptyMap()) == 2;
 
-      Map<Feature, FeatureValueV2> keyFeature = new HashMap<Feature, FeatureValueV2>();
+      Map<Feature, FeatureValue> keyFeature = new HashMap<Feature, FeatureValue>();
       keyFeature.put(feature, feature.createFeatureValue("name1"));
       assert tree.query(keyFeature) == 3;
 
@@ -136,9 +136,9 @@ public class DecisionTreeTest {
       DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
       DecisionTree tree = builder.build(root);
 
-      assert tree.query(Collections.<Feature, FeatureValueV2>emptyMap()) == 5;
+      assert tree.query(Collections.<Feature, FeatureValue>emptyMap()) == 5;
 
-      Map<Feature, FeatureValueV2> keyFeature = new HashMap<Feature, FeatureValueV2>();
+      Map<Feature, FeatureValue> keyFeature = new HashMap<Feature, FeatureValue>();
       keyFeature.put(feature, feature.createFeatureValue(27));
       assert tree.query(keyFeature) == 3;
 
@@ -161,7 +161,7 @@ public class DecisionTreeTest {
       DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
       DecisionTree tree = builder.build(root);
 
-      Map<Feature, FeatureValueV2> keyFeature = new HashMap<Feature, FeatureValueV2>();
+      Map<Feature, FeatureValue> keyFeature = new HashMap<Feature, FeatureValue>();
 
       assert tree.query(keyFeature) == 5;
 

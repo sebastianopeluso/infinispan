@@ -1,7 +1,7 @@
 package org.infinispan.dataplacement.c50.tree;
 
 import org.infinispan.dataplacement.c50.keyfeature.Feature;
-import org.infinispan.dataplacement.c50.keyfeature.FeatureValueV2;
+import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 
 import java.io.Serializable;
 import java.util.Map;
@@ -26,7 +26,7 @@ public class DecisionTree {
     * @param keyFeature the feature values
     * @return           the index of the new owner
     */
-   public final int query(Map<Feature, FeatureValueV2> keyFeature) {
+   public final int query(Map<Feature, FeatureValue> keyFeature) {
       DecisionTreeNode node = root.find(keyFeature);
       DecisionTreeNode result = node;
 
@@ -50,7 +50,7 @@ public class DecisionTree {
        * @param keyFeatures   the feature values
        * @return              the best node
        */
-      DecisionTreeNode find(Map<Feature, FeatureValueV2> keyFeatures);
+      DecisionTreeNode find(Map<Feature, FeatureValue> keyFeatures);
 
       /**
        * returns the value of the node (i.e. the new owner)

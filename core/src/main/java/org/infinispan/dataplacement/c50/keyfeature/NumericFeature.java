@@ -18,7 +18,7 @@ public class NumericFeature implements Feature {
    private final String name;
 
    public NumericFeature(String name) {
-      this.name = name;
+      this.name = name.replaceAll("\\s", "");
    }
 
    @Override
@@ -32,7 +32,7 @@ public class NumericFeature implements Feature {
    }
 
    @Override
-   public FeatureValueV2 createFeatureValue(Object value) {
+   public FeatureValue createFeatureValue(Object value) {
       if (value instanceof Number) {
          return new NumericValue((Number) value);
       }
@@ -40,7 +40,7 @@ public class NumericFeature implements Feature {
    }
 
    @Override
-   public FeatureValueV2 featureValueFromParser(String value) {
+   public FeatureValue featureValueFromParser(String value) {
       try {
          Number number = NumberFormat.getNumberInstance().parse(value);
          return new NumericValue(number);
@@ -49,7 +49,14 @@ public class NumericFeature implements Feature {
       }
    }
 
-   public static class NumericValue implements FeatureValueV2 {
+   @Override
+   public String toString() {
+      return "NumericFeature{" +
+            "name='" + name + '\'' +
+            '}';
+   }
+
+   public static class NumericValue implements FeatureValue {
 
       private final Number value;
 
@@ -58,19 +65,19 @@ public class NumericFeature implements Feature {
       }
 
       @Override
-      public boolean isLessOrEqualsThan(FeatureValueV2 other) {
+      public boolean isLessOrEqualsThan(FeatureValue other) {
          return other instanceof NumericValue &&
                compare(value.doubleValue(), ((NumericValue) other).value.doubleValue()) <= 0;
       }
 
       @Override
-      public boolean isGreaterThan(FeatureValueV2 other) {
+      public boolean isGreaterThan(FeatureValue other) {
          return other instanceof NumericValue &&
                compare(value.doubleValue(), ((NumericValue) other).value.doubleValue()) > 0;
       }
 
       @Override
-      public boolean isEquals(FeatureValueV2 other) {
+      public boolean isEquals(FeatureValue other) {
          return other instanceof NumericValue &&
                compare(value.doubleValue(), ((NumericValue) other).value.doubleValue()) == 0;
       }

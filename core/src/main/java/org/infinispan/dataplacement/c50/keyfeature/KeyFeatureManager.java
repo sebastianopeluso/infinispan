@@ -13,22 +13,22 @@ public interface KeyFeatureManager {
 
    /**
     * returns an array with all the features that a key can have
-    * 
+    *
     * Note: this information should be static!
-    * 
+    *
     * @return  an array with all the features that a key can have
     */
-   AbstractFeature[] getAllKeyFeatures();
+   Feature[] getAllKeyFeatures();
 
    /**
     * returns the features of this particular key.
-    * 
+    *
     * Note: a key don't need to have all the features.
     * Note2: if you put a feature that was no returned by the method above, it will be ignored
-    * 
+    *
     * @param key  the key
     * @return     the features of this particular key.
     */
-   Map<AbstractFeature, FeatureValue> getFeatures(Object key);
-   
+   Map<Feature, FeatureValue> getFeatures(Object key);
+
 }

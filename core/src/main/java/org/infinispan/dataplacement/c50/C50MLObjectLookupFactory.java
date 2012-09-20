@@ -1,11 +1,14 @@
 package org.infinispan.dataplacement.c50;
 
 import org.infinispan.configuration.cache.Configuration;
-import org.infinispan.dataplacement.c50.lookup.BloomFilter;
-import org.infinispan.dataplacement.c50.lookup.C50MLTree;
-import org.infinispan.dataplacement.c50.keyfeature.AbstractFeature;
+import org.infinispan.dataplacement.c50.keyfeature.Feature;
 import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 import org.infinispan.dataplacement.c50.keyfeature.KeyFeatureManager;
+import org.infinispan.dataplacement.c50.lookup.BloomFilter;
+import org.infinispan.dataplacement.c50.tree.DecisionTree;
+import org.infinispan.dataplacement.c50.tree.DecisionTreeBuilder;
+import org.infinispan.dataplacement.c50.tree.DecisionTreeParser;
+import org.infinispan.dataplacement.c50.tree.ParseTreeNode;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
 import org.infinispan.util.TypedProperties;
@@ -19,7 +22,6 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -45,17 +47,19 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    private static final String INPUT = File.separator + "input";
    private static final String INPUT_ML_DATA = INPUT + ".data";
    private static final String INPUT_ML_NAMES = INPUT + ".names";
+   private static final String INPUT_ML_TREE = INPUT + ".tree";
 
    private static final Log log = LogFactory.getLog(C50MLObjectLookupFactory.class);
 
    private KeyFeatureManager keyFeatureManager;
-   private final Map<String, AbstractFeature> featureMap;
+   private final Map<String, Feature> featureMap;
+   private DecisionTreeBuilder decisionTreeBuilder;
 
    private String machineLearnerPath = System.getProperty("user.dir");
    private double bloomFilterFalsePositiveProbability = 0.001;
 
    public C50MLObjectLookupFactory() {
-      featureMap = new HashMap<String, AbstractFeature>();
+      featureMap = new HashMap<String, Feature>();
    }
 
    @Override
@@ -76,16 +80,18 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
       }
 
       try {
-         String tmp =typedProperties.getProperty(BF_FALSE_POSITIVE, "0.001");
+         String tmp = typedProperties.getProperty(BF_FALSE_POSITIVE, "0.001");
          bloomFilterFalsePositiveProbability = Double.parseDouble(tmp);
       } catch (NumberFormatException nfe) {
          log.warnf("Error parsing bloom filter false positive probability. The value is %s. %s",
                    bloomFilterFalsePositiveProbability, nfe.getMessage());
       }
 
-      for (AbstractFeature feature : keyFeatureManager.getAllKeyFeatures()) {
+      for (Feature feature : keyFeatureManager.getAllKeyFeatures()) {
          featureMap.put(feature.getName(), feature);
       }
+
+      decisionTreeBuilder = new DecisionTreeBuilder(featureMap);
    }
 
    @Override
@@ -104,25 +110,31 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
          return null;
       }
 
-      BufferedReader reader = runMachineLearner();
-
-      if (reader == null) {
-         log.errorf("Cannot create Object Lookup. Error running the Machine Learner");
+      try {
+         runMachineLearner();
+      } catch (IOException e) {
+         log.errorf(e, "Error while trying to executing the Machine Learner");
+         return null;
+      } catch (InterruptedException e) {
+         Thread.currentThread().interrupt();
          return null;
       }
 
-      Collection<String> rules = getRulesFromMachineLearner(reader);
+      DecisionTreeParser parser = new DecisionTreeParser(INPUT_ML_TREE);
 
-      if (rules.isEmpty()) {
-         log.errorf("Cannot create Object Lookup. Machine Learner didn't return any rule");
+      ParseTreeNode root;
+      try {
+         root = parser.parse();
+      } catch (Exception e) {
+         log.errorf(e, "Error parsing Machine Learner tree");
          return null;
       }
 
-      C50MLTree c50MLTree = new C50MLRulesParser(rules, featureMap).parseMachineLearnerRules();
+      DecisionTree tree = decisionTreeBuilder.build(root);
 
       BloomFilter bloomFilter = createBloomFilter(toMoveObj.keySet());
 
-      return new C50MLObjectLookup(bloomFilter, c50MLTree, keyFeatureManager);
+      return new C50MLObjectLookup(bloomFilter, tree, keyFeatureManager);
    }
 
    @Override
@@ -135,7 +147,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
       for (ObjectLookup objectLookup : objectLookupCollection) {
          if (objectLookup instanceof C50MLObjectLookup) {
             objectList.add(((C50MLObjectLookup) objectLookup).bloomFilter);
-            objectList.add(((C50MLObjectLookup) objectLookup).c50MLTree);
+            objectList.add(((C50MLObjectLookup) objectLookup).tree);
          }
       }
 
@@ -155,7 +167,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
       while (iterator.hasNext()) {
          BloomFilter bloomFilter = (BloomFilter) iterator.next();
          if (iterator.hasNext()) {
-            C50MLTree tree = (C50MLTree) iterator.next();
+            DecisionTree tree = (DecisionTree) iterator.next();
             objectLookupList.add(new C50MLObjectLookup(bloomFilter, tree, keyFeatureManager));
          }
       }
@@ -163,7 +175,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
       return objectLookupList.isEmpty() ? null : objectLookupList;
    }
 
-   public Map<String, AbstractFeature> getFeatureMap() {
+   public Map<String, Feature> getFeatureMap() {
       return featureMap;
    }
 
@@ -224,17 +236,14 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
     *
     * @return  the reader with the machine learner output or null if something went wrong
     */
-   private BufferedReader runMachineLearner() {
-      try {
-         Process process = Runtime.getRuntime()
-               .exec(machineLearnerPath + File.separator + "c5.0 -f " + machineLearnerPath + INPUT);
-         if (process != null) {
-            return new BufferedReader(new InputStreamReader(process.getInputStream()));
-         }
-      } catch (IOException e) {
-         log.errorf("Error starting Machine Learner. %s", e.getMessage());
+   @SuppressWarnings("ResultOfMethodCallIgnored")
+   private void runMachineLearner() throws IOException, InterruptedException {
+      new File(machineLearnerPath + INPUT_ML_TREE).delete();
+      Process process = Runtime.getRuntime()
+            .exec(machineLearnerPath + File.separator + "c5.0 -f " + machineLearnerPath + INPUT);
+      if (process != null) {
+         process.waitFor();
       }
-      return null;
    }
 
    /**
@@ -256,7 +265,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
          writer.newLine();
          writer.newLine();
 
-         for (AbstractFeature feature : keyFeatureManager.getAllKeyFeatures()) {
+         for (Feature feature : keyFeatureManager.getAllKeyFeatures()) {
             writeInputNames(writer, feature);
          }
 
@@ -280,33 +289,27 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    /**
     * writes a single feature in the input.names 
     *
+    *
     * @param writer        the writer for the file          
     * @param feature       the feature instance (with type, etc...)
     * @throws IOException  if it cannot write in the file
     */
-   private void writeInputNames(BufferedWriter writer, AbstractFeature feature) throws IOException {
+   private void writeInputNames(BufferedWriter writer, Feature feature) throws IOException {
       writer.write(feature.getName());
       writer.write(": ");
-      AbstractFeature.FeatureType type = feature.getType();
-      if (type == AbstractFeature.FeatureType.NUMBER) {
-         writer.write(type.getNamesFileValue());
-      } else {
-         Collection<String> listOfNames = feature.getListOfNames();
-         if (listOfNames == null) {
-            writer.write("ignore.");
-         } else {
-            Iterator<String> iterator = listOfNames.iterator();
+      String[] listOfNames = feature.getMachineLearnerClasses();
 
-            while (iterator.hasNext()) {
-               writer.write(iterator.next().replaceAll("\\s,[.]:[|]", ""));
-               if (iterator.hasNext()) {
-                  writer.write(", ");
-               } else {
-                  writer.write(".");
-               }
-            }
+      if (listOfNames.length == 1) {
+         writer.write(listOfNames[0]);
+      } else {
+         writer.write(listOfNames[0]);
+         for (int i = 1; i < listOfNames.length; ++i) {
+            writer.write(",");
+            writer.write(listOfNames[i]);
          }
       }
+
+      writer.write(".");
       writer.newLine();
       writer.flush();
    }
@@ -347,15 +350,15 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
     * @throws IOException  if it cannot write on it
     */
    private void writeInputData(Object key, Integer nodeIndex, BufferedWriter writer) throws IOException {
-      Map<AbstractFeature, FeatureValue> keyFeatures = keyFeatureManager.getFeatures(key);
+      Map<Feature, FeatureValue> keyFeatures = keyFeatureManager.getFeatures(key);
 
-      for (AbstractFeature feature : keyFeatureManager.getAllKeyFeatures()) {
+      for (Feature feature : keyFeatureManager.getAllKeyFeatures()) {
          FeatureValue keyFeatureValue = keyFeatures.get(feature);
          String value;
-         if (keyFeatureValue == null || keyFeatureValue.getValue() == null) {
+         if (keyFeatureValue == null) {
             value = "N/A";
          } else {
-            value = keyFeatureValue.getValue().toString();
+            value = keyFeatureValue.getValueAsString();
          }
          writer.write(value);
          writer.write(",");
@@ -401,13 +404,13 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    private class C50MLObjectLookup implements ObjectLookup {
 
       private final BloomFilter bloomFilter;
-      private final C50MLTree c50MLTree;
+      private final DecisionTree tree;
       private final KeyFeatureManager keyFeatureManager;
 
-      public C50MLObjectLookup(BloomFilter bloomFilter, C50MLTree c50MLTree,
+      public C50MLObjectLookup(BloomFilter bloomFilter, DecisionTree tree,
                                KeyFeatureManager keyFeatureManager) {
          this.bloomFilter = bloomFilter;
-         this.c50MLTree = c50MLTree;
+         this.tree = tree;
          this.keyFeatureManager = keyFeatureManager;
       }
 
@@ -416,8 +419,8 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
          if (!bloomFilter.contains(key)) {
             return KEY_NOT_FOUND;
          } else {
-            Map<AbstractFeature, FeatureValue> keyFeatures = keyFeatureManager.getFeatures(key);
-            int ownerIndex = c50MLTree.getOwnerIndex(keyFeatures);
+            Map<Feature, FeatureValue> keyFeatures = keyFeatureManager.getFeatures(key);
+            int ownerIndex = tree.query(keyFeatures);
             if (ownerIndex < 0) {
                return KEY_NOT_FOUND;
             }
