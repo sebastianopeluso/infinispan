@@ -2,7 +2,7 @@ package org.infinispan.dataplacement.c50;
 
 import org.infinispan.dataplacement.c50.lookup.C50MLTree;
 import org.infinispan.dataplacement.c50.lookup.C50MLTreeElement;
-import org.infinispan.dataplacement.keyfeature.AbstractFeature;
+import org.infinispan.dataplacement.c50.keyfeature.AbstractFeature;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 

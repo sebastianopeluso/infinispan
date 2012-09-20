@@ -1,4 +1,4 @@
-package org.infinispan.dataplacement.keyfeature;
+package org.infinispan.dataplacement.c50.keyfeature;
 
 import java.io.Serializable;
 import java.text.NumberFormat;

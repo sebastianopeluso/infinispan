@@ -1,7 +1,7 @@
 package org.infinispan.dataplacement.c50.lookup;
 
-import org.infinispan.dataplacement.keyfeature.AbstractFeature;
-import org.infinispan.dataplacement.keyfeature.FeatureValue;
+import org.infinispan.dataplacement.c50.keyfeature.AbstractFeature;
+import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 
 import java.io.Serializable;

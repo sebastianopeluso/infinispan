@@ -1,8 +1,8 @@
 package org.infinispan.dataplacement;
 
-import org.infinispan.dataplacement.keyfeature.AbstractFeature;
-import org.infinispan.dataplacement.keyfeature.FeatureValue;
-import org.infinispan.dataplacement.keyfeature.KeyFeatureManager;
+import org.infinispan.dataplacement.c50.keyfeature.AbstractFeature;
+import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
+import org.infinispan.dataplacement.c50.keyfeature.KeyFeatureManager;
 
 import java.util.Collections;
 import java.util.HashMap;
