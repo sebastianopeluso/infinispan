@@ -2,8 +2,8 @@ package org.infinispan.dataplacement.c50.tree;
 
 import org.infinispan.dataplacement.c50.keyfeature.Feature;
 import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
+import org.infinispan.dataplacement.c50.tree.node.DecisionTreeNode;
 
-import java.io.Serializable;
 import java.util.Map;
 
 /**
@@ -41,24 +41,4 @@ public class DecisionTree {
 
       return result.getValue();
    }
-
-   public static interface DecisionTreeNode extends Serializable {
-
-      /**
-       * find and return the best node that respect the feature values
-       *
-       * @param keyFeatures   the feature values
-       * @return              the best node
-       */
-      DecisionTreeNode find(Map<Feature, FeatureValue> keyFeatures);
-
-      /**
-       * returns the value of the node (i.e. the new owner)
-       *
-       * @return  the value of the node (i.e. the new owner)
-       */
-      int getValue();
-
-   }
-
 }

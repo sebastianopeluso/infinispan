@@ -16,7 +16,6 @@ import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.Closeable;
 import java.io.File;
@@ -175,14 +174,6 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
       return objectLookupList.isEmpty() ? null : objectLookupList;
    }
 
-   public Map<String, Feature> getFeatureMap() {
-      return featureMap;
-   }
-
-   public KeyFeatureManager getKeyFeatureManager() {
-      return keyFeatureManager;
-   }
-
    /**
     * returns the bloom filter with the objects to move encoding on it
     *
@@ -195,40 +186,6 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
          bloomFilter.add(key);
       }
       return bloomFilter;
-   }
-
-   /**
-    * reads the Machine Learner output and retrieve only the rules part
-    *
-    * @param reader  the machine learner output
-    * @return        each line of the output with the rules
-    */
-   public final Collection<String> getRulesFromMachineLearner(BufferedReader reader) {
-      List<String> rules = new LinkedList<String>();
-      boolean beforeTree = true, afterTree = false;
-      String line;
-      try {
-         while ((line = reader.readLine()) != null) {
-            if (beforeTree) {
-               if (line.startsWith("Decision tree:")) {
-                  beforeTree = false;
-                  continue;
-               }
-            } else if (!afterTree) {
-               if (line.startsWith("Evaluation")) {
-                  afterTree = true;
-                  continue;
-               }
-            }
-
-            if (!beforeTree && !afterTree && !line.isEmpty()) {
-               rules.add(line);
-            }
-         }
-      } catch (IOException e) {
-         log.errorf("Error reading the Machine Learner rules. %s", e.getMessage());
-      }
-      return rules;
    }
 
    /**
