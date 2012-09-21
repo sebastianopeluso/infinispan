@@ -48,26 +48,30 @@ public class DecisionTreeParser {
       if (inputStream == null) {
          throw new IllegalArgumentException("File '" + filePath + "' not found");
       }
+      BufferedReader reader = null;
+      try {
+         reader = new BufferedReader(new InputStreamReader(inputStream));
 
-      BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+         ParseTreeNode root = new ParseTreeNode();
+         root.parse(reader);
 
-      ParseTreeNode root = new ParseTreeNode();
-      root.parse(reader);
+         if (log.isTraceEnabled()) {
+            StringBuilder stringBuilder = new StringBuilder("Tree parsed:\n");
+            root.toString(0, stringBuilder);
+            log.trace(stringBuilder);
+         }
 
-      if (log.isTraceEnabled()) {
-         StringBuilder stringBuilder = new StringBuilder("Tree parsed:\n");
-         root.toString(0, stringBuilder);
-         log.trace(stringBuilder);
+         return root;
+      } finally {
+         safeClose(reader);
       }
-
-      safeClose(reader);
-
-      return root;
    }
 
    private void safeClose(Closeable closeable) {
       try {
-         closeable.close();
+         if (closeable != null) {
+            closeable.close();
+         }
       } catch (IOException e) {
          //just ignore
       }

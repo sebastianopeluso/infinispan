@@ -2,6 +2,8 @@ package org.infinispan.dataplacement.c50.tree.node;
 
 import org.infinispan.dataplacement.c50.keyfeature.Feature;
 import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.Map;
 
@@ -12,6 +14,8 @@ import java.util.Map;
  * @since 5.2
  */
 public class Type2Node implements DecisionTreeNode {
+
+   private static final Log log = LogFactory.getLog(Type2Node.class);
 
    private final int value;
    private final Feature feature;
@@ -35,14 +39,31 @@ public class Type2Node implements DecisionTreeNode {
 
    @Override
    public DecisionTreeNode find(Map<Feature, FeatureValue> keyFeatures) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Try to find key [%s] with feature %s", keyFeatures, feature);
+      }
+
       FeatureValue keyValue = keyFeatures.get(feature);
       if (keyValue == null) { //N/A
+         if (log.isTraceEnabled()) {
+            log.tracef("Feature Not Available...");
+         }
          return forks[0];
       }
 
+      if (log.isTraceEnabled()) {
+         log.tracef("Comparing key value [%s] with cut %s", keyValue, cut);
+      }
+
       if (keyValue.isLessOrEqualsThan(cut)) {
+         if (log.isTraceEnabled()) {
+            log.tracef("Next decision tree found. The value is less or equals than cut");
+         }
          return forks[1];
       } else if (keyValue.isGreaterThan(cut)) {
+         if (log.isTraceEnabled()) {
+            log.tracef("Next decision tree found. The value is greater than cut");
+         }
          return forks[2];
       }
 

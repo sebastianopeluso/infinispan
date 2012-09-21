@@ -8,8 +8,15 @@ import org.infinispan.dataplacement.c50.tree.DecisionTree;
 import org.infinispan.dataplacement.c50.tree.DecisionTreeBuilder;
 import org.infinispan.dataplacement.c50.tree.DecisionTreeParser;
 import org.infinispan.dataplacement.c50.tree.ParseTreeNode;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 import org.testng.annotations.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -24,6 +31,8 @@ import java.util.Map;
 @Test(groups = "functional", testName = "dataplacement.DecisionTreeTest")
 public class DecisionTreeTest {
 
+   private static final Log log = LogFactory.getLog(DecisionTreeTest.class);
+
    public void testEx1() throws Exception {
       DecisionTreeParser parser = new DecisionTreeParser("ex1.tree");
       ParseTreeNode root = parser.parse();
@@ -34,6 +43,7 @@ public class DecisionTreeTest {
                                  new String[] {"per"},
                                  new String[] {"por"},
                                  new String[] {"par\\,","pir \\\"na"}});
+
       ParseTreeNode[] forks = root.getForks();
 
       assertNode(forks[0], 0, "1", null, null, 0, null, null);
@@ -49,6 +59,7 @@ public class DecisionTreeTest {
       ParseTreeNode root = parser.parse();
 
       assertNode(root, 1, "2", new int[] {0,0,0,3,2,3,0,0,0,0}, "name", 4, null, null);
+
       ParseTreeNode[] forks = root.getForks();
 
       assertNode(forks[0], 0, "2", null, null, 0, null, null);
@@ -62,6 +73,7 @@ public class DecisionTreeTest {
       ParseTreeNode root = parser.parse();
 
       assertNode(root, 2, "5", new int[] {0,0,0,0,1,1,2,2,0,1}, "key_index", 3, "27", null);
+
       ParseTreeNode[] forks = root.getForks();
 
       assertNode(forks[0], 0, "5", null, null, 0, null, null);
@@ -79,13 +91,141 @@ public class DecisionTreeTest {
 
    public void testEx1Decision() throws Exception {
       ParseTreeNode root = new DecisionTreeParser("ex1").parse();
+
+      Map<String, Feature> featureMap = new HashMap<String, Feature>();
+
+      Feature feature = new NameListFeature("name", "peter", "per", "por", "par\\,", "pir \\\"na");
+
+      featureMap.put(feature.getName(), feature);
+
+      DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
+      DecisionTree tree = builder.build(root);
+
+      assertDecisionInEx1(tree, feature);
+   }
+
+   public void testEx2Decision() throws Exception {
+      ParseTreeNode root = new DecisionTreeParser("ex2").parse();
+
+      Map<String, Feature> featureMap = new HashMap<String, Feature>();
+
+      Feature feature = new NameListFeature("name", "name1", "name2", "name3");
+
+      featureMap.put(feature.getName(), feature);
+
+      DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
+      DecisionTree tree = builder.build(root);
+
+      assertDecisionInEx2(tree, feature);
+   }
+
+   public void testEx3Decision() throws Exception {
+      ParseTreeNode root = new DecisionTreeParser("ex3").parse();
+
+      Map<String, Feature> featureMap = new HashMap<String, Feature>();
+
+      Feature feature = new NumericFeature("key_index");
+
+      featureMap.put(feature.getName(), feature);
+
+      DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
+      DecisionTree tree = builder.build(root);
+
+      assertDecisionInEx3(tree, feature);
+   }
+
+   public void testBigDecision() throws Exception {
+      ParseTreeNode root = new DecisionTreeParser("big").parse();
+
+      Map<String, Feature> featureMap = new HashMap<String, Feature>();
+
+      Feature keyIndex = new NumericFeature("key_index");
+      Feature threadIndex = new NumericFeature("thread_index");
+
+      featureMap.put(keyIndex.getName(), keyIndex);
+      featureMap.put(threadIndex.getName(), threadIndex);
+
+      DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
+      DecisionTree tree = builder.build(root);
+
+      assertDecisionInBig(tree, keyIndex, threadIndex);
+   }
+
+   public void testSerializable() throws Exception {
+      ParseTreeNode root = new DecisionTreeParser("ex1").parse();
       Map<String, Feature> featureMap = new HashMap<String, Feature>();
       Feature feature = new NameListFeature("name", "peter", "per", "por", "par\\,", "pir \\\"na");
       featureMap.put(feature.getName(), feature);
 
       DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
       DecisionTree tree = builder.build(root);
+      DecisionTree readTree = serializeAndClone(tree, "Example 1");
 
+      assertDecisionInEx1(tree, feature);
+      assertDecisionInEx1(readTree, feature);
+
+      root = new DecisionTreeParser("ex2").parse();
+      featureMap = new HashMap<String, Feature>();
+      feature = new NameListFeature("name", "name1", "name2", "name3");
+      featureMap.put(feature.getName(), feature);
+
+      builder = new DecisionTreeBuilder(featureMap);
+      tree = builder.build(root);
+      readTree = serializeAndClone(tree, "Example 2");
+
+      assertDecisionInEx2(tree, feature);
+      assertDecisionInEx2(readTree, feature);
+
+      root = new DecisionTreeParser("ex3").parse();
+      featureMap = new HashMap<String, Feature>();
+      feature = new NumericFeature("key_index");
+      featureMap.put(feature.getName(), feature);
+
+      builder = new DecisionTreeBuilder(featureMap);
+      tree = builder.build(root);
+      readTree = serializeAndClone(tree, "Example 3");
+
+      assertDecisionInEx3(tree, feature);
+      assertDecisionInEx3(readTree, feature);
+
+      root = new DecisionTreeParser("big").parse();
+
+      featureMap = new HashMap<String, Feature>();
+      Feature keyIndex = new NumericFeature("key_index");
+      Feature threadIndex = new NumericFeature("thread_index");
+
+      featureMap.put(keyIndex.getName(), keyIndex);
+      featureMap.put(threadIndex.getName(), threadIndex);
+
+      builder = new DecisionTreeBuilder(featureMap);
+      tree = builder.build(root);
+      readTree = serializeAndClone(tree, "Big Example");
+
+      assertDecisionInBig(tree, keyIndex, threadIndex);
+      assertDecisionInBig(readTree, keyIndex, threadIndex);
+   }
+
+   private DecisionTree serializeAndClone(DecisionTree tree, String where) throws IOException, ClassNotFoundException {
+      ByteArrayOutputStream arrayOutputStream = new ByteArrayOutputStream();
+      ObjectOutputStream oos = new ObjectOutputStream(arrayOutputStream);
+
+      oos.writeObject(tree);
+      oos.flush();
+      oos.close();
+
+      byte[] bytes = arrayOutputStream.toByteArray();
+
+      log.infof("Size of tree for %s is %s bytes", where, bytes.length);
+
+      ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes));
+
+      DecisionTree readTree = (DecisionTree) ois.readObject();
+      ois.close();
+
+      return readTree;
+   }
+
+   private void assertDecisionInEx1(DecisionTree tree, Feature feature) {
       assert tree.query(Collections.<Feature, FeatureValue>emptyMap()) == 1;
 
       Map<Feature, FeatureValue> keyFeature = new HashMap<Feature, FeatureValue>();
@@ -105,15 +245,7 @@ public class DecisionTreeTest {
       assert tree.query(keyFeature) == 5;
    }
 
-   public void testEx2Decision() throws Exception {
-      ParseTreeNode root = new DecisionTreeParser("ex2").parse();
-      Map<String, Feature> featureMap = new HashMap<String, Feature>();
-      Feature feature = new NameListFeature("name", "name1", "name2", "name3");
-      featureMap.put(feature.getName(), feature);
-
-      DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
-      DecisionTree tree = builder.build(root);
-
+   private void assertDecisionInEx2(DecisionTree tree, Feature feature) {
       assert tree.query(Collections.<Feature, FeatureValue>emptyMap()) == 2;
 
       Map<Feature, FeatureValue> keyFeature = new HashMap<Feature, FeatureValue>();
@@ -127,15 +259,7 @@ public class DecisionTreeTest {
       assert tree.query(keyFeature) == 5;
    }
 
-   public void testEx3Decision() throws Exception {
-      ParseTreeNode root = new DecisionTreeParser("ex3").parse();
-      Map<String, Feature> featureMap = new HashMap<String, Feature>();
-      Feature feature = new NumericFeature("key_index");
-      featureMap.put(feature.getName(), feature);
-
-      DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
-      DecisionTree tree = builder.build(root);
-
+   private void assertDecisionInEx3(DecisionTree tree, Feature feature) {
       assert tree.query(Collections.<Feature, FeatureValue>emptyMap()) == 5;
 
       Map<Feature, FeatureValue> keyFeature = new HashMap<Feature, FeatureValue>();
@@ -144,26 +268,12 @@ public class DecisionTreeTest {
 
       keyFeature.put(feature, feature.createFeatureValue(28));
       assert tree.query(keyFeature) == 2;
-
    }
 
-   public void testBigDecision() throws Exception {
-      DecisionTreeParser parser = new DecisionTreeParser("big");
-      ParseTreeNode root = parser.parse();
-
-      Map<String, Feature> featureMap = new HashMap<String, Feature>();
-      Feature keyIndex = new NumericFeature("key_index");
-      Feature threadIndex = new NumericFeature("thread_index");
-
-      featureMap.put(keyIndex.getName(), keyIndex);
-      featureMap.put(threadIndex.getName(), threadIndex);
-
-      DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
-      DecisionTree tree = builder.build(root);
+   private void assertDecisionInBig(DecisionTree tree, Feature keyIndex, Feature threadIndex) {
+      assert tree.query(Collections.<Feature, FeatureValue>emptyMap()) == 5;
 
       Map<Feature, FeatureValue> keyFeature = new HashMap<Feature, FeatureValue>();
-
-      assert tree.query(keyFeature) == 5;
 
       keyFeature.put(keyIndex, keyIndex.createFeatureValue(2));
 

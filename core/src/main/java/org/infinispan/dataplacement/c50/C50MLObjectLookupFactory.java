@@ -53,6 +53,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    private KeyFeatureManager keyFeatureManager;
    private final Map<String, Feature> featureMap;
    private DecisionTreeBuilder decisionTreeBuilder;
+   private DecisionTreeParser decisionTreeParser;
 
    private String machineLearnerPath = System.getProperty("user.dir");
    private double bloomFilterFalsePositiveProbability = 0.001;
@@ -91,6 +92,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
       }
 
       decisionTreeBuilder = new DecisionTreeBuilder(featureMap);
+      decisionTreeParser = new DecisionTreeParser(machineLearnerPath + INPUT_ML_TREE);
    }
 
    @Override
@@ -119,11 +121,9 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
          return null;
       }
 
-      DecisionTreeParser parser = new DecisionTreeParser(machineLearnerPath + INPUT_ML_TREE);
-
       ParseTreeNode root;
       try {
-         root = parser.parse();
+         root = decisionTreeParser.parse();
       } catch (Exception e) {
          log.errorf(e, "Error parsing Machine Learner tree");
          return null;

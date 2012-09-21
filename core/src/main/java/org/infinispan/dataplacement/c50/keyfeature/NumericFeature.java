@@ -18,6 +18,9 @@ public class NumericFeature implements Feature {
    private final String name;
 
    public NumericFeature(String name) {
+      if (name == null) {
+         throw new IllegalArgumentException("Null is not a valid Feature name");
+      }
       this.name = name.replaceAll("\\s", "");
    }
 
@@ -56,6 +59,22 @@ public class NumericFeature implements Feature {
             '}';
    }
 
+   @Override
+   public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+
+      NumericFeature that = (NumericFeature) o;
+
+      return name != null ? name.equals(that.name) : that.name == null;
+
+   }
+
+   @Override
+   public int hashCode() {
+      return name != null ? name.hashCode() : 0;
+   }
+
    public static class NumericValue implements FeatureValue {
 
       private final Number value;
@@ -85,6 +104,13 @@ public class NumericFeature implements Feature {
       @Override
       public String getValueAsString() {
          return value.toString();
+      }
+
+      @Override
+      public String toString() {
+         return "NumericValue{" +
+               "value=" + value +
+               '}';
       }
    }
 }

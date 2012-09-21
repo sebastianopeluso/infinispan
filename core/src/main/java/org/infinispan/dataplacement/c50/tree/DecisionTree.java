@@ -4,6 +4,7 @@ import org.infinispan.dataplacement.c50.keyfeature.Feature;
 import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 import org.infinispan.dataplacement.c50.tree.node.DecisionTreeNode;
 
+import java.io.Serializable;
 import java.util.Map;
 
 /**
@@ -12,7 +13,7 @@ import java.util.Map;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class DecisionTree {
+public class DecisionTree implements Serializable {
 
    private final DecisionTreeNode root;
 

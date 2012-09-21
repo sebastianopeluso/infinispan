@@ -3,8 +3,11 @@ package org.infinispan.dataplacement.c50.tree.node;
 import org.infinispan.dataplacement.c50.keyfeature.Feature;
 import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 import org.infinispan.dataplacement.c50.tree.ParseTreeNode;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 
@@ -15,6 +18,8 @@ import java.util.Map;
  * @since 5.2
  */
 public class Type3Node implements DecisionTreeNode {
+
+   private static final Log log = LogFactory.getLog(Type3Node.class);
 
    private final int value;
    private final Feature feature;
@@ -44,13 +49,27 @@ public class Type3Node implements DecisionTreeNode {
 
    @Override
    public DecisionTreeNode find(Map<Feature, FeatureValue> keyFeatures) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Try to find key [%s] with feature %s", keyFeatures, feature);
+      }
+
       FeatureValue keyValue = keyFeatures.get(feature);
       if (keyValue == null) { //N/A
+         if (log.isTraceEnabled()) {
+            log.tracef("Feature Not Available...");
+         }
          return forks[0];
+      }
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Comparing key value [%s]  with possible values %s", keyValue, values);
       }
 
       for (int i = 0; i < values.length; ++i) {
          if (values[i].match(keyValue)) {
+            if (log.isTraceEnabled()) {
+               log.tracef("Next decision tree found. The value in %s matched", i);
+            }
             return forks[i + 1];
          }
       }
@@ -81,6 +100,13 @@ public class Type3Node implements DecisionTreeNode {
             }
          }
          return false;
+      }
+
+      @Override
+      public String toString() {
+         return "InternalEltsValues{" +
+               "values=" + (values == null ? null : Arrays.asList(values)) +
+               '}';
       }
    }
 }
