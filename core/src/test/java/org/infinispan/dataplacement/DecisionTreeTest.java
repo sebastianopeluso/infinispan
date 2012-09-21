@@ -33,6 +33,16 @@ public class DecisionTreeTest {
 
    private static final Log log = LogFactory.getLog(DecisionTreeTest.class);
 
+   public void testEx0() throws Exception {
+      DecisionTreeParser parser = new DecisionTreeParser("ex0");
+      ParseTreeNode root = parser.parse();
+
+      assertNode(root, 0, "1", new int[] {0,0,2000}, null, 0, null, null);
+
+      ParseTreeNode[] forks = root.getForks();
+      assert forks == null;
+   }
+
    public void testEx1() throws Exception {
       DecisionTreeParser parser = new DecisionTreeParser("ex1.tree");
       ParseTreeNode root = parser.parse();
@@ -87,6 +97,21 @@ public class DecisionTreeTest {
 
       //too big to do all the cases. test only the root      
       assertNode(root, 2, "5", new int[] {0,0,39,34,45,5,46,31,25,13}, "thread_index", 3, "8", null);
+   }
+
+   public void testEx0Decision() throws Exception {
+      ParseTreeNode root = new DecisionTreeParser("ex0").parse();
+
+      Map<String, Feature> featureMap = new HashMap<String, Feature>();
+
+      Feature feature = new NumericFeature("ola");
+
+      featureMap.put(feature.getName(), feature);
+
+      DecisionTreeBuilder builder = new DecisionTreeBuilder(featureMap);
+      DecisionTree tree = builder.build(root);
+
+      assertDecisionInEx0(tree, feature);
    }
 
    public void testEx1Decision() throws Exception {
@@ -164,6 +189,18 @@ public class DecisionTreeTest {
       assertDecisionInEx1(tree, feature);
       assertDecisionInEx1(readTree, feature);
 
+      root = new DecisionTreeParser("ex0").parse();
+      featureMap = new HashMap<String, Feature>();
+      feature = new NumericFeature("name");
+      featureMap.put(feature.getName(), feature);
+
+      builder = new DecisionTreeBuilder(featureMap);
+      tree = builder.build(root);
+      readTree = serializeAndClone(tree, "Example 0");
+
+      assertDecisionInEx0(tree, feature);
+      assertDecisionInEx0(readTree, feature);
+
       root = new DecisionTreeParser("ex2").parse();
       featureMap = new HashMap<String, Feature>();
       feature = new NameListFeature("name", "name1", "name2", "name3");
@@ -223,6 +260,17 @@ public class DecisionTreeTest {
       ois.close();
 
       return readTree;
+   }
+
+   private void assertDecisionInEx0(DecisionTree tree, Feature feature) {
+      assert tree.query(Collections.<Feature, FeatureValue>emptyMap()) == 1;
+
+      Map<Feature, FeatureValue> keyFeature = new HashMap<Feature, FeatureValue>();
+      keyFeature.put(feature, feature.createFeatureValue(3));
+      assert tree.query(keyFeature) == 1;
+
+      keyFeature.put(feature, feature.createFeatureValue(4));
+      assert tree.query(keyFeature) == 1;
    }
 
    private void assertDecisionInEx1(DecisionTree tree, Feature feature) {

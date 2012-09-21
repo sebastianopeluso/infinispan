@@ -28,16 +28,20 @@ public class DecisionTree implements Serializable {
     * @return           the index of the new owner
     */
    public final int query(Map<Feature, FeatureValue> keyFeature) {
+      if (root == null) {
+         throw new IllegalStateException("Expected to find a root node to start");
+      }
       DecisionTreeNode node = root.find(keyFeature);
+
+      if (node == null) {
+         return root.getValue();
+      }
+
       DecisionTreeNode result = node;
 
       while (node != null) {
          result = node;
          node = node.find(keyFeature);
-      }
-
-      if (result == null) {
-         throw new IllegalStateException("Expected to find a decision");
       }
 
       return result.getValue();
