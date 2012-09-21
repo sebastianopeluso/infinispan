@@ -118,7 +118,7 @@ public class AccessesManager {
 
       sortObjectsByPrimaryOwner(tempAccesses, true);
 
-      tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.LOCAL_GET, maxNumberOfKeysToRequest);
+      tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.LOCAL_GET);
 
       sortObjectsByPrimaryOwner(tempAccesses, false);
 
