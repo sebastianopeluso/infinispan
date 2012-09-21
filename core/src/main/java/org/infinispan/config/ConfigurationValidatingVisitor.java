@@ -227,6 +227,9 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
          if (dataPlacementType.coolDowntime < 1000) {
             throw new ConfigurationException("Expected a cool down time higher or equal than 1000");
          }
+         if (dataPlacementType.maxNumberOfKeysToRequest < 1) {
+            throw new ConfigurationException("The max number of keys to request should be higher than 0");
+         }
       }
    }
 }

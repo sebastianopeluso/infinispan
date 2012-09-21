@@ -1539,6 +1539,10 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       return dataPlacement.coolDowntime;
    }
 
+   public int getMaxNumberOfKeyToRequest() {
+      return dataPlacement.maxNumberOfKeysToRequest;
+   }
+
    // ------------------------------------------------------------------------------------------------------------
    //   HELPERS
    // ------------------------------------------------------------------------------------------------------------
@@ -4844,10 +4848,19 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       @ConfigurationDocRef(bean = Configuration.class, targetElement = "setDataPlacementObjectLookupFactory")
       protected int coolDowntime = 30000;
 
+      protected int maxNumberOfKeysToRequest = 500;
+
       @Override
       public DataPlacementConfig coolDowntime(int milliseconds) {
          testImmutability("coolDowntime");
          coolDowntime = milliseconds;
+         return this;
+      }
+
+      @Override
+      public DataPlacementConfig maxNumberOfKeysToRequest(int maxNumberOfKeysToRequest) {
+         testImmutability("maxNumberOfKeysToRequest");
+         maxNumberOfKeysToRequest = maxNumberOfKeysToRequest;
          return this;
       }
 
@@ -4906,6 +4919,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          DataPlacementType that = (DataPlacementType) o;
 
          if (coolDowntime != that.coolDowntime) return false;
+         if (maxNumberOfKeysToRequest != that.maxNumberOfKeysToRequest) return false;
          if (enabled != that.enabled) return false;
          if (objectLookupFactory != null ? !objectLookupFactory.equals(that.objectLookupFactory) : that.objectLookupFactory != null)
             return false;
@@ -4920,6 +4934,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          result = 31 * result + (objectLookupFactory != null ? objectLookupFactory.hashCode() : 0);
          result = 31 * result + (properties != null ? properties.hashCode() : 0);
          result = 31 * result + coolDowntime;
+         result = 31 * result + maxNumberOfKeysToRequest;
          return result;
       }
    }

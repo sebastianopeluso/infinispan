@@ -15,13 +15,15 @@ public class DataPlacementConfiguration extends AbstractTypedPropertiesConfigura
    private final boolean enabled;
    private final int coolDownTime;
    private final ObjectLookupFactory objectLookupFactory;
+   private final int maxNumberOfKeysToRequest;
 
    protected DataPlacementConfiguration(TypedProperties properties, boolean enabled, int coolDownTime,
-                                        ObjectLookupFactory objectLookupFactory) {
+                                        ObjectLookupFactory objectLookupFactory, int maxNumberOfKeysToRequest) {
       super(properties);
       this.enabled = enabled;
       this.coolDownTime = coolDownTime;
       this.objectLookupFactory = objectLookupFactory;
+      this.maxNumberOfKeysToRequest = maxNumberOfKeysToRequest;
    }
 
    public ObjectLookupFactory objectLookupFactory() {
@@ -36,12 +38,17 @@ public class DataPlacementConfiguration extends AbstractTypedPropertiesConfigura
       return coolDownTime;
    }
 
+   public int maxNumberOfKeysToRequest() {
+      return maxNumberOfKeysToRequest;
+   }
+
    @Override
    public String toString() {
       return "DataPlacementConfiguration{" +
             "enabled=" + enabled +
             ", coolDownTime=" + coolDownTime +
             ", objectLookupFactory=" + objectLookupFactory +
+            ", maxNumberOfKeysToRequest=" + maxNumberOfKeysToRequest +
             '}';
    }
 
@@ -54,6 +61,7 @@ public class DataPlacementConfiguration extends AbstractTypedPropertiesConfigura
       DataPlacementConfiguration that = (DataPlacementConfiguration) o;
 
       if (coolDownTime != that.coolDownTime) return false;
+      if (maxNumberOfKeysToRequest != that.maxNumberOfKeysToRequest) return false;
       if (enabled != that.enabled) return false;
       if (objectLookupFactory != null ? !objectLookupFactory.equals(that.objectLookupFactory) : that.objectLookupFactory != null)
          return false;
@@ -66,6 +74,7 @@ public class DataPlacementConfiguration extends AbstractTypedPropertiesConfigura
       int result = super.hashCode();
       result = 31 * result + (enabled ? 1 : 0);
       result = 31 * result + coolDownTime;
+      result = 31 * result + maxNumberOfKeysToRequest;
       result = 31 * result + (objectLookupFactory != null ? objectLookupFactory.hashCode() : 0);
       return result;
    }

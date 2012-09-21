@@ -17,6 +17,7 @@ public class DataPlacementConfigurationBuilder extends AbstractConfigurationChil
    private boolean enabled = false;
    private ObjectLookupFactory objectLookupFactory;
    private int coolDownTime = 30000; //30 seconds by default
+   private int maxNumberOfKeysToRequest = 500; //500 keys by default? is too high? too low?
    private Properties properties = new Properties();
 
    protected DataPlacementConfigurationBuilder(ConfigurationBuilder builder) {
@@ -58,6 +59,11 @@ public class DataPlacementConfigurationBuilder extends AbstractConfigurationChil
       return this;
    }
 
+   public DataPlacementConfigurationBuilder maxNumberOfKeysToRequest(int maxNumberOfKeysToRequest) {
+      this.maxNumberOfKeysToRequest = maxNumberOfKeysToRequest;
+      return this;
+   }
+
    @Override
    void validate() {
       if (!enabled) {
@@ -69,17 +75,22 @@ public class DataPlacementConfigurationBuilder extends AbstractConfigurationChil
       if (coolDownTime < 1000) {
          throw new ConfigurationException("Cool Down time must be higher or equals to 1000 milliseconds");
       }
+      if (maxNumberOfKeysToRequest < 1) {
+         throw new ConfigurationException("The max number of keys to request should be higher than 0");
+      }
    }
 
    @Override
    DataPlacementConfiguration create() {
-      return new DataPlacementConfiguration(TypedProperties.toTypedProperties(properties), enabled, coolDownTime, objectLookupFactory);
+      return new DataPlacementConfiguration(TypedProperties.toTypedProperties(properties), enabled, coolDownTime,
+                                            objectLookupFactory, maxNumberOfKeysToRequest);
    }
 
    @Override
    public ConfigurationChildBuilder read(DataPlacementConfiguration template) {
       this.enabled = template.enabled();
       this.coolDownTime = template.coolDownTime();
+      this.maxNumberOfKeysToRequest = template.maxNumberOfKeysToRequest();
       this.objectLookupFactory = template.objectLookupFactory();
       this.properties = template.properties();
       return this;

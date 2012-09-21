@@ -34,8 +34,11 @@ public class AccessesManager {
 
    private boolean hasAccessesCalculated;
 
-   public AccessesManager(DistributionManager distributionManager) {
+   private int maxNumberOfKeysToRequest;
+
+   public AccessesManager(DistributionManager distributionManager, int maxNumberOfKeysToRequest) {
       this.distributionManager = distributionManager;
+      this.maxNumberOfKeysToRequest = maxNumberOfKeysToRequest;
       streamLibContainer = StreamLibContainer.getInstance();
    }
 
@@ -51,36 +54,6 @@ public class AccessesManager {
          accessesByPrimaryOwner[i] = new Accesses();
       }
       hasAccessesCalculated = false;
-   }
-
-   /**
-    * calculates the object request list to request to each member
-    */
-   private void calculateAccessesIfNeeded(){
-      if (hasAccessesCalculated) {
-         return;
-      }
-      hasAccessesCalculated = true;
-
-      if (log.isTraceEnabled()) {
-         log.trace("Calculating accessed keys for data placement optimization");
-      }
-
-      Map<Object, Long> tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.REMOTE_GET);
-
-      sortObjectsByPrimaryOwner(tempAccesses, true);
-
-      tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.LOCAL_GET);
-
-      sortObjectsByPrimaryOwner(tempAccesses, false);
-
-      if (log.isTraceEnabled()) {
-         StringBuilder stringBuilder = new StringBuilder("Accesses:\n");
-         for (int i = 0; i < accessesByPrimaryOwner.length; ++i) {
-            stringBuilder.append(clusterSnapshot.get(i)).append(" ==> ").append(accessesByPrimaryOwner[i]).append("\n");
-         }
-         log.debug(stringBuilder);
-      }
    }
 
    /**
@@ -109,6 +82,59 @@ public class AccessesManager {
    }
 
    /**
+    * sets the max number of keys to request to a new value, only if is higher than zero
+    *
+    * @param maxNumberOfKeysToRequest  the new value  
+    */
+   public synchronized final void setMaxNumberOfKeysToRequest(int maxNumberOfKeysToRequest) {
+      if (maxNumberOfKeysToRequest > 0) {
+         this.maxNumberOfKeysToRequest = maxNumberOfKeysToRequest;
+      }
+   }
+
+   /**
+    * returns the max number of keys to request
+    *
+    * @return  returns the max number of keys to request
+    */
+   public int getMaxNumberOfKeysToRequest() {
+      return maxNumberOfKeysToRequest;
+   }
+
+   /**
+    * calculates the object request list to request to each member
+    */
+   private void calculateAccessesIfNeeded(){
+      if (hasAccessesCalculated) {
+         return;
+      }
+      hasAccessesCalculated = true;
+
+      if (log.isTraceEnabled()) {
+         log.trace("Calculating accessed keys for data placement optimization");
+      }
+
+      Map<Object, Long> tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.REMOTE_GET, maxNumberOfKeysToRequest);
+
+      sortObjectsByPrimaryOwner(tempAccesses, true);
+
+      tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.LOCAL_GET, maxNumberOfKeysToRequest);
+
+      sortObjectsByPrimaryOwner(tempAccesses, false);
+
+      if (log.isTraceEnabled()) {
+         StringBuilder stringBuilder = new StringBuilder("Accesses:\n");
+         for (int i = 0; i < accessesByPrimaryOwner.length; ++i) {
+            stringBuilder.append(clusterSnapshot.get(i)).append(" ==> ").append(accessesByPrimaryOwner[i]).append("\n");
+         }
+         log.debug(stringBuilder);
+      }
+
+      streamLibContainer.resetStat(StreamLibContainer.Stat.REMOTE_GET);
+      streamLibContainer.resetStat(StreamLibContainer.Stat.LOCAL_GET);
+   }
+
+   /**
     * sort the keys and number of access by primary owner
     *
     *
@@ -118,10 +144,6 @@ public class AccessesManager {
    @SuppressWarnings("unchecked")
    private void sortObjectsByPrimaryOwner(Map<Object, Long> accesses, boolean remote) {
       Map<Object, List<Address>> primaryOwners = getDefaultConsistentHash().locateAll(accesses.keySet(), 1);
-
-      if (log.isDebugEnabled()) {
-         log.debugf("Accesses are %s and primary owners are %s", accesses, primaryOwners);
-      }
 
       for (Entry<Object, Long> entry : accesses.entrySet()) {
          Object key = entry.getKey();

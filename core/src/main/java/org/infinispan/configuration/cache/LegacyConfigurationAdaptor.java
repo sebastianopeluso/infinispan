@@ -286,7 +286,8 @@ public class LegacyConfigurationAdaptor {
          legacy.dataPlacement().enable()
                .coolDowntime(config.dataPlacement().coolDownTime())
                .objectLookupFactory(config.dataPlacement().objectLookupFactory())
-               .withProperties(config.dataPlacement().properties());
+               .withProperties(config.dataPlacement().properties())
+               .maxNumberOfKeysToRequest(config.dataPlacement().maxNumberOfKeysToRequest());
       }
 
       return legacy.build();
@@ -517,8 +518,9 @@ public class LegacyConfigurationAdaptor {
       builder.dataPlacement().enabled(legacy.isDataPlacementEnabled())
             .objectLookupFactory(legacy.getObjectLookupFactory())
             .coolDownTime(legacy.getCoolDownTime())
-            .withProperties(legacy.getDataPlacementProperties());
-      
+            .withProperties(legacy.getDataPlacementProperties())
+            .maxNumberOfKeysToRequest(legacy.getMaxNumberOfKeyToRequest());
+
       return builder.build();
    }
 }

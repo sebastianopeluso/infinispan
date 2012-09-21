@@ -274,7 +274,7 @@ public class AccessesAndPlacementTest {
    }
 
    private AccessesManager createRemoteAccessManager() {
-      return new AccessesManager(getMockDistributionManager());
+      return new AccessesManager(getMockDistributionManager(), 1000);
    }
 
    private DistributionManager getMockDistributionManager() {

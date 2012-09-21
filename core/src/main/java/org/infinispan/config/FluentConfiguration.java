@@ -836,6 +836,7 @@ public class FluentConfiguration extends AbstractFluentConfigurationBean {
       DataPlacementConfig objectLookupFactory(ObjectLookupFactory factory);
       DataPlacementConfig withProperties(Properties properties);
       DataPlacementConfig addProperty(String key, String value);
+      DataPlacementConfig maxNumberOfKeysToRequest(int maxNumberOfKeysToRequest);
    }
 }
 

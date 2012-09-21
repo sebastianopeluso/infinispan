@@ -95,7 +95,8 @@ public class DataPlacementManager {
       synchronized (this) {
          if (stateTransfer instanceof DistributedStateTransferManagerImpl && !roundManager.isEnabled()) {
             defaultNumberOfOwners = configuration.clustering().hash().numOwners();
-            accessesManager = new AccessesManager(distributionManager);
+            accessesManager = new AccessesManager(distributionManager,
+                                                  configuration.dataPlacement().maxNumberOfKeysToRequest());
             objectPlacementManager = new ObjectPlacementManager(distributionManager,
                                                                 configuration.clustering().hash().hash(),
                                                                 defaultNumberOfOwners);
@@ -357,6 +358,12 @@ public class DataPlacementManager {
       internalSetCoolDownTime(milliseconds);
    }
 
+   @ManagedOperation(description = "Sets a new value (if higher than zero) for the max number of keys to request in " +
+         "each round")
+   public final void setMaxNumberOfKeysToRequest(int value) {
+      accessesManager.setMaxNumberOfKeysToRequest(value);
+   }
+
    @ManagedAttribute(description = "The cache name", writable = false)
    public final String getCacheName() {
       return cacheName;
@@ -385,5 +392,10 @@ public class DataPlacementManager {
    @ManagedAttribute(description = "The Object Lookup Factory class name", writable = false)
    public final String getObjectLookupFactoryClassName() {
       return objectLookupFactory.getClass().getCanonicalName();
+   }
+
+   @ManagedAttribute(description = "The max number of keys to request in each round", writable = false)
+   public final int getMaxNumberOfKeysToRequest() {
+      return accessesManager.getMaxNumberOfKeysToRequest();
    }
 }
