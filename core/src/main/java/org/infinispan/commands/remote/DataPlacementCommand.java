@@ -3,6 +3,7 @@ package org.infinispan.commands.remote;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.dataplacement.DataPlacementManager;
 import org.infinispan.dataplacement.ObjectRequest;
+import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -58,7 +59,7 @@ public class DataPlacementCommand extends BaseRpcCommand {
    private long roundId;
    private int coolDownTime;
    private ObjectRequest objectRequest;
-   private Object[] objectLookupParameters;
+   private ObjectLookup objectLookup;
    private Address[] members;
 
 
@@ -80,8 +81,8 @@ public class DataPlacementCommand extends BaseRpcCommand {
       this.objectRequest = objectRequest;
    }
 
-   public void setObjectLookup(Object[] objectLookupParameters) {
-      this.objectLookupParameters = objectLookupParameters;
+   public void setObjectLookup(ObjectLookup objectLookup) {
+      this.objectLookup = objectLookup;
    }
 
    public void setCoolDownTime(int coolDownTime) {
@@ -106,7 +107,7 @@ public class DataPlacementCommand extends BaseRpcCommand {
                dataPlacementManager.addRequest(getOrigin(), objectRequest, roundId);
                break;
             case OBJECT_LOOKUP_PHASE:
-               dataPlacementManager.addObjectLookup(getOrigin(), objectLookupParameters, roundId);
+               dataPlacementManager.addObjectLookup(getOrigin(), objectLookup, roundId);
                break;
             case ACK_COORDINATOR_PHASE:
                dataPlacementManager.addAck(roundId, getOrigin());
@@ -144,13 +145,7 @@ public class DataPlacementCommand extends BaseRpcCommand {
          case REMOTE_TOP_LIST_PHASE:
             return new Object[] {(byte) type.ordinal(), roundId, objectRequest};
          case OBJECT_LOOKUP_PHASE:
-            retVal = new Object[2 + (objectLookupParameters == null ? 0 : objectLookupParameters.length)];
-            retVal[0] = (byte) type.ordinal();
-            retVal[1] = roundId;
-            if (objectLookupParameters != null && objectLookupParameters.length != 0)  {
-               System.arraycopy(objectLookupParameters, 0, retVal, 2, objectLookupParameters.length);
-            }
-            return retVal;
+            return new Object[] {(byte) type.ordinal(), roundId, objectLookup};
          case SET_COOL_DOWN_TIME:
             return new Object[] {(byte) type.ordinal(), coolDownTime};
       }
@@ -181,8 +176,7 @@ public class DataPlacementCommand extends BaseRpcCommand {
             break;
          case OBJECT_LOOKUP_PHASE:
             roundId = (Long) parameters[1];
-            objectLookupParameters = new Object[parameters.length - 2];
-            System.arraycopy(parameters, 2, objectLookupParameters, 0, objectLookupParameters.length);
+            objectLookup = (ObjectLookup) parameters[2];
             break;
          case SET_COOL_DOWN_TIME:
             coolDownTime = (Integer) parameters[1];

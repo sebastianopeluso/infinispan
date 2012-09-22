@@ -102,7 +102,7 @@ public class DistributedStateTransferManagerImpl extends BaseStateTransferManage
       super.commitView(viewId);
    }
 
-   public void addObjectLookup(Address address, Collection<ObjectLookup> objectLookup){
+   public void addObjectLookup(Address address, ObjectLookup objectLookup){
       if (dataPlacementConsistentHash == null) {
          log.errorf("Trying to add the Object Lookup from %s but the Data Placement Consistent Hash is null", address);
          return;

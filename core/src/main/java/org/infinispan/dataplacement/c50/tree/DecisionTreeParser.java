@@ -22,22 +22,18 @@ public class DecisionTreeParser {
 
    private static final String FILE_EXTENSION = ".tree";
 
-   private final String filePath;
-
-   public DecisionTreeParser(String filePath) {
-      if (!filePath.endsWith(FILE_EXTENSION)) {
-         filePath += FILE_EXTENSION;
-      }
-      this.filePath = filePath;
-   }
-
    /**
     * parses the tree represented in this instance
     *
+    * @param filePath   the file path to the .tree file
     * @return           the root of the decision tree
     * @throws Exception if some errors occurs during the parser
     */
-   public final ParseTreeNode parse() throws Exception {
+   public static ParseTreeNode parse(String filePath) throws Exception {
+      if (!filePath.endsWith(FILE_EXTENSION)) {
+         filePath += FILE_EXTENSION;
+      }
+
       if (log.isTraceEnabled()) {
          log.tracef("Starting to parse file %s", filePath);
       }
@@ -67,7 +63,7 @@ public class DecisionTreeParser {
       }
    }
 
-   private void safeClose(Closeable closeable) {
+   private static void safeClose(Closeable closeable) {
       try {
          if (closeable != null) {
             closeable.close();

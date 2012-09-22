@@ -7,7 +7,6 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.BitSet;
-import java.util.Collection;
 
 /**
  * Collects all the Object Lookup from all the members. In the coordinator side, it collects all the acks before
@@ -53,12 +52,11 @@ public class ObjectLookupManager {
     * Note: it only returns true on the first time that it is ready to the stat transfer. the following
     *       invocations return false
     *
-    *
     * @param from          the creator member
     * @param objectLookup  the Object Lookup instance
     * @return              true if it has all the object lookup, false otherwise (see Note)
     */
-   public final synchronized boolean addObjectLookup(Address from, Collection<ObjectLookup> objectLookup) {
+   public final synchronized boolean addObjectLookup(Address from, ObjectLookup objectLookup) {
       if (hasAllObjectLookup()) {
          return false;
       }
@@ -123,7 +121,7 @@ public class ObjectLookupManager {
       return clusterSnapshot.size() == acksReceived.cardinality();
    }
 
-   private void logObjectLookupReceived(Address from, Collection<ObjectLookup> objectLookup) {
+   private void logObjectLookupReceived(Address from, ObjectLookup objectLookup) {
       if (log.isTraceEnabled()) {
          StringBuilder missingMembers = new StringBuilder();
 
@@ -132,7 +130,7 @@ public class ObjectLookupManager {
                missingMembers.append(clusterSnapshot.get(i)).append(" ");
             }
          }
-         log.debugf("Objects lookup received from %s. Missing objects lookup are %s. Objects lookup received are %s",
+         log.debugf("Objects lookup received from %s. Missing objects lookup are %s. Objects lookup received is %s",
                     from, missingMembers, objectLookup);
       } else if (log.isDebugEnabled()) {
          log.debugf("Objects lookup received from %s. Missing objects lookup are %s",

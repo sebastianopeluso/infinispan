@@ -8,8 +8,12 @@ import org.infinispan.test.AbstractCacheTest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * // TODO: Document this
@@ -22,7 +26,7 @@ public class C50MLTest extends AbstractCacheTest{
 
    private static final String C_50_ML_LOCATION = "/tmp/ml";
    private static final String BLOOM_FILTER_FALSE_POSITIVE_PROBABILITY = "0.001";
-   private static final boolean SKIP_ML_RUNNING = true;
+   private static final boolean SKIP_ML_RUNNING = false;
 
    private C50MLObjectLookupFactory objectLookupFactory;
 
@@ -42,32 +46,55 @@ public class C50MLTest extends AbstractCacheTest{
          return;
       }
 
-      Map<Object, Integer> movingKeys = new HashMap<Object, Integer>();
-      movingKeys.put("1", 1);
-      movingKeys.put("2_2", 2);
-      movingKeys.put("2_3", 2);
-      movingKeys.put("3_12344", 3);
-      movingKeys.put("12", 1);
-      movingKeys.put("4_4", 4);
-      movingKeys.put("5_4", 4);
-
-      ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(movingKeys);
-
-      checkOwnerIndex("1", objectLookup, 1);
-      checkOwnerIndex("2_2", objectLookup, 2);
-      checkOwnerIndex("2_3", objectLookup, 2);
-      checkOwnerIndex("3_12344", objectLookup, 3);
-      checkOwnerIndex("12", objectLookup, 1);
-      checkOwnerIndex("4_4", objectLookup, 4);
-      checkOwnerIndex("5_4", objectLookup, 4);
+      for (int numberOfKeys = 1000; numberOfKeys < 10000; numberOfKeys *= 2) {
+         for (int replicationDegree = 1; replicationDegree < 10; replicationDegree *= 2) {
+            Map<Object, OwnersInfo> ownersInfoMap = createRandomMovements(numberOfKeys, replicationDegree);
+            ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(ownersInfoMap, replicationDegree);
+            assert objectLookup != null;
+            checkOwnerIndex(ownersInfoMap, objectLookup, "key:" + numberOfKeys + ",replication degree=" + replicationDegree);
+         }
+      }
    }
 
-   private void checkOwnerIndex(Object key, ObjectLookup objectLookup, int expectedOwnerIndex) {
-      int ownerIndex = objectLookup.query(key);
-      if (ownerIndex != expectedOwnerIndex) {
-         log.warnf("Error in Machine Learner + Bloom Filter technique for key " + key + ". Expected owner index is " +
-                         expectedOwnerIndex + " returned owner index is " + ownerIndex);
+   private void checkOwnerIndex(Map<Object, OwnersInfo> ownersInfoMap, ObjectLookup objectLookup, String test) {
+      int errors = 0, wrongReplicationDegree = 0;
+      long start, end, duration = 0;
+      for (Map.Entry<Object, OwnersInfo> entry : ownersInfoMap.entrySet()) {
+         Set<Integer> expectedOwners = new TreeSet<Integer>(entry.getValue().getNewOwnersIndexes());
+         start = System.currentTimeMillis();
+         Collection<Integer> owners = objectLookup.query(entry.getKey());
+         end = System.currentTimeMillis();
+         Set<Integer> ownersQuery = new TreeSet<Integer>(owners);
+
+         wrongReplicationDegree += expectedOwners.size() == ownersQuery.size() ? 0 : 1;
+         errors += expectedOwners.containsAll(ownersQuery) ? 0 : 1;
+         duration += (end - start);
       }
-      assert ownerIndex != -1 : "KEY_NOT_FOUND is not possible";
+      log.warnf("[%s], wrong keys moved: %s, wrong replication degree %s, total query duration: %s ms",
+                test, errors, wrongReplicationDegree, duration);
+   }
+
+   private Map<Object, OwnersInfo> createRandomMovements(int numberOfKeys, int replicationDegree) {
+      Random random = new Random();
+      Map<Object, OwnersInfo> ownersInfoMap = new HashMap<Object, OwnersInfo>();
+      while (ownersInfoMap.size() < numberOfKeys) {
+         Object key;
+         if (random.nextInt(100) < 50) {
+            key = DummyKeyFeatureManager.getKey(random.nextInt(1000));
+         } else {
+            key = DummyKeyFeatureManager.getKey(random.nextInt(100), random.nextInt(1000));
+         }
+         OwnersInfo ownersInfo = new OwnersInfo(replicationDegree);
+         Set<Integer> owners = new TreeSet<Integer>();
+         while (owners.size() < replicationDegree) {
+            owners.add(random.nextInt(replicationDegree * 3));
+         }
+
+         for (int ownerIndex : owners) {
+            ownersInfo.add(ownerIndex, 0);
+         }
+         ownersInfoMap.put(key, ownersInfo);
+      }
+      return ownersInfoMap;
    }
 }

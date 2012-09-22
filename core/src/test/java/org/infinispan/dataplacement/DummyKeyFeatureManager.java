@@ -36,18 +36,26 @@ public class DummyKeyFeatureManager implements KeyFeatureManager{
       String[] split = ((String) key).split("_");
       Map<Feature, FeatureValue> features = new HashMap<Feature, FeatureValue>();
 
-      if (split.length == 2) {
-         int b = Integer.parseInt(split[0]);
-         int c = Integer.parseInt(split[1]);
+      if (split.length == 3) {
+         int b = Integer.parseInt(split[1]);
+         int c = Integer.parseInt(split[2]);
 
          features.put(this.features[0], this.features[0].createFeatureValue(b));
          features.put(this.features[1], this.features[1].createFeatureValue(c));
-      } else if (split.length == 1) {
-         int c = Integer.parseInt(split[0]);
+      } else if (split.length == 2) {
+         int c = Integer.parseInt(split[1]);
 
          features.put(this.features[1], this.features[1].createFeatureValue(c));
       }
 
       return features;
+   }
+
+   public static Object getKey(int c) {
+      return String.format("KEY_%s", c);
+   }
+
+   public static Object getKey(int b, int c) {
+      return String.format("KEY_%s_%s", b, c);
    }
 }

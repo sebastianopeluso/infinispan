@@ -1,8 +1,8 @@
 package org.infinispan.dataplacement.lookup;
 
 import org.infinispan.configuration.cache.Configuration;
+import org.infinispan.dataplacement.OwnersInfo;
 
-import java.util.Collection;
 import java.util.Map;
 
 /**
@@ -21,29 +21,18 @@ public interface ObjectLookupFactory {
    void setConfiguration(Configuration configuration);
 
    /**
-    * creates the {@link ObjectLookup} corresponding to the keys to be moved
+    * creates the {@link ObjectLookup} corresponding to the keys to be moved       
     *
-    * @param keysToMove the keys to move (Object) and the new owner (Integer)
-    * @return           the object lookup or null if it is not possible to create it    
+    * @param keysToMove       the keys to move and the new owners
+    * @param numberOfOwners   the number of owners (a.k.a. replication degree)
+    * @return                 the object lookup or null if it is not possible to create it    
     */
-   ObjectLookup createObjectLookup(Map<Object, Integer> keysToMove);
+   ObjectLookup createObjectLookup(Map<Object, OwnersInfo> keysToMove, int numberOfOwners);
 
    /**
-    * Serializes in a array of objects the information to send for other nodes 
+    * init the object lookup
     *
-    *
-    * @param objectLookupCollection a collection of objects lookup to serialize
-    * @return                       the array of objects
+    * @param objectLookup  the object lookup
     */
-   Object[] serializeObjectLookup(Collection<ObjectLookup> objectLookupCollection);
-
-   /**
-    * Creates the object lookup from the parameters from other nodes
-    *
-    *
-    * @param parameters the parameters
-    * @return           the object lookup instance (or null if it is not possible to create it)                          
-    */
-   Collection<ObjectLookup> deSerializeObjectLookup(Object[] parameters);
-
+   void init(ObjectLookup objectLookup);
 }

@@ -4,7 +4,6 @@ import org.infinispan.dataplacement.ClusterSnapshot;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.remoting.transport.Address;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -22,15 +21,15 @@ import java.util.Set;
 public class DataPlacementConsistentHash extends AbstractConsistentHash {
 
    private ConsistentHash defaultConsistentHash;
-   private final InternalLookup[] internalLookup;
+   private final ObjectLookup[] objectsLookup;
    private final ClusterSnapshot clusterSnapshot;
 
    public DataPlacementConsistentHash(ClusterSnapshot clusterSnapshot) {
       this.clusterSnapshot = clusterSnapshot;
-      internalLookup = new InternalLookup[clusterSnapshot.size()];
+      objectsLookup = new ObjectLookup[clusterSnapshot.size()];
    }
 
-   public void addObjectLookup(Address address, Collection<ObjectLookup> objectLookup) {
+   public void addObjectLookup(Address address, ObjectLookup objectLookup) {
       if (objectLookup == null) {
          return;
       }
@@ -38,7 +37,7 @@ public class DataPlacementConsistentHash extends AbstractConsistentHash {
       if (index == -1) {
          return;
       }
-      internalLookup[index] = new InternalLookup(objectLookup);
+      objectsLookup[index] = objectLookup;
    }
 
    @Override
@@ -60,15 +59,28 @@ public class DataPlacementConsistentHash extends AbstractConsistentHash {
          return defaultOwners;
       }
 
-      InternalLookup lookup = internalLookup[primaryOwnerIndex];
+      ObjectLookup lookup = objectsLookup[primaryOwnerIndex];
 
       if (lookup == null) {
          return defaultOwners;
       }
 
-      List<Address> newOwners = lookup.query(key);
+      List<Integer> newOwners = lookup.query(key);
 
-      return newOwners.size() == replCount ? newOwners : defaultOwners;
+      if (newOwners == null || newOwners.size() != defaultOwners.size()) {
+         return defaultOwners;
+      }
+
+      List<Address> ownersAddress = new LinkedList<Address>();
+      for (int index : newOwners) {
+         Address owner = clusterSnapshot.get(index);
+         if (owner == null) {
+            return defaultOwners;
+         }
+         ownersAddress.add(owner);
+      }
+
+      return ownersAddress;
    }
 
    @Override
@@ -83,25 +95,5 @@ public class DataPlacementConsistentHash extends AbstractConsistentHash {
 
    public ConsistentHash getDefaultHash() {
       return defaultConsistentHash;
-   }
-
-   private class InternalLookup {
-      private final Collection<ObjectLookup> objectsLookup;
-
-      private InternalLookup(Collection<ObjectLookup> objectsLookup) {
-         this.objectsLookup = objectsLookup;
-      }
-
-      public List<Address> query(Object key) {
-         List<Address> owners = new LinkedList<Address>();
-         for (ObjectLookup lookup : objectsLookup) {
-            int owner = lookup.query(key);
-            if (owner != -1) {
-               owners.add(clusterSnapshot.get(owner));
-            }
-         }
-         return owners;
-      }
-
    }
 }

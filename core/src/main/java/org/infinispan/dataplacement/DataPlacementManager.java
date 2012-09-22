@@ -26,9 +26,6 @@ import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 
 
@@ -174,37 +171,18 @@ public class DataPlacementManager {
             log.tracef("All keys request list received. Object to move are " + objectsToMove);
          }
 
-         List<ObjectLookup> objectLookupList = new LinkedList<ObjectLookup>();
-         int maxNumberOfOwners = defaultNumberOfOwners;
-
-         for (int replicaCounter = 0; replicaCounter < maxNumberOfOwners; ++replicaCounter) {
-            Map<Object, Integer> newOwner = new HashMap<Object, Integer>();
-            for (Map.Entry<Object, OwnersInfo> entry : objectsToMove.entrySet()) {
-               OwnersInfo ownersInfo = entry.getValue();
-               maxNumberOfOwners = Math.max(ownersInfo.getReplicationCount(), maxNumberOfOwners);
-               int newOwnerIndex = ownersInfo.getOwner(replicaCounter);
-               if (newOwnerIndex != -1) {
-                  newOwner.put(entry.getKey(), newOwnerIndex);
-               }
-            }
-
-            if (!newOwner.isEmpty()) {
-               ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(newOwner);
-               objectLookupList.add(objectLookup);
-            }
-
-         }
+         ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(objectsToMove, defaultNumberOfOwners);
 
          if (log.isDebugEnabled()) {
-            log.debugf("Created %s bloom filters and machine learner rules for each key", maxNumberOfOwners);
+            log.debugf("Created %s bloom filters and machine learner rules for each key", defaultNumberOfOwners);
          }
 
          DataPlacementCommand command = commandsFactory.buildDataPlacementCommand(DataPlacementCommand.Type.OBJECT_LOOKUP_PHASE,
                                                                                   roundManager.getCurrentRoundId());
-         command.setObjectLookup(objectLookupFactory.serializeObjectLookup(objectLookupList));
+         command.setObjectLookup(objectLookup);
 
          rpcManager.broadcastRpcCommand(command, false, false);
-         addObjectLookup(rpcManager.getAddress(), objectLookupFactory.serializeObjectLookup(objectLookupList), roundId);
+         addObjectLookup(rpcManager.getAddress(), objectLookup, roundId);
       }
    }
 
@@ -213,10 +191,10 @@ public class DataPlacementManager {
     * coordinator
     *
     * @param sender                 the sender
-    * @param objectLookupParameters the serialize form of the Object Lookup
+    * @param objectLookup           the object lookup
     * @param roundId                the round id
     */
-   public final void addObjectLookup(Address sender, Object[] objectLookupParameters, long roundId) {
+   public final void addObjectLookup(Address sender, ObjectLookup objectLookup, long roundId) {
       if (log.isDebugEnabled()) {
          log.debugf("Remote Object Lookup received from %s in round %s", sender, roundId);
       }
@@ -226,8 +204,7 @@ public class DataPlacementManager {
          return;
       }
 
-      Collection<ObjectLookup> objectLookupCollection = objectLookupFactory.deSerializeObjectLookup(objectLookupParameters);
-      if (objectLookupManager.addObjectLookup(sender, objectLookupCollection)) {
+      if (objectLookupManager.addObjectLookup(sender, objectLookup)) {
          if (log.isTraceEnabled()) {
             log.tracef("All remote Object Lookup received. Send Ack to coordinator");
          }
