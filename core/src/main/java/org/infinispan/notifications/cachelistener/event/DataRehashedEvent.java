@@ -46,4 +46,9 @@ public interface DataRehashedEvent<K, V> extends Event<K, V> {
     * @return Retrieves the new view id after rehashing was triggered.
     */
    long getNewViewId();
+
+   /**    
+    * @return  the keys moved by the rehash event. Only non-null is the event is not pre
+    */
+   Collection<Object> getKeysMoved();
 }

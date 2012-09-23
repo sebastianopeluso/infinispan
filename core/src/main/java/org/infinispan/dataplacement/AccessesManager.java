@@ -63,7 +63,6 @@ public class AccessesManager {
     * @return        the request object list. It can be empty if no requests are necessary
     */
    public synchronized final ObjectRequest getObjectRequestForAddress(Address member) {
-      calculateAccessesIfNeeded();
       int addressIndex = clusterSnapshot.indexOf(member);
 
       if (addressIndex == -1) {
@@ -104,7 +103,7 @@ public class AccessesManager {
    /**
     * calculates the object request list to request to each member
     */
-   private void calculateAccessesIfNeeded(){
+   public synchronized final void calculateAccesses(){
       if (hasAccessesCalculated) {
          return;
       }
@@ -132,6 +131,14 @@ public class AccessesManager {
 
       streamLibContainer.resetStat(StreamLibContainer.Stat.REMOTE_GET);
       streamLibContainer.resetStat(StreamLibContainer.Stat.LOCAL_GET);
+   }
+
+   public final ObjectRequest[] getAccesses() {
+      ObjectRequest[] objectRequests = new ObjectRequest[accessesByPrimaryOwner.length];
+      for (int i = 0; i < objectRequests.length; ++i) {
+         objectRequests[i] = accessesByPrimaryOwner[i].toObjectRequest();
+      }
+      return objectRequests;
    }
 
    /**

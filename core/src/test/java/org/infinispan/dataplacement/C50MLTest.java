@@ -26,7 +26,7 @@ public class C50MLTest extends AbstractCacheTest{
 
    private static final String C_50_ML_LOCATION = "/tmp/ml";
    private static final String BLOOM_FILTER_FALSE_POSITIVE_PROBABILITY = "0.001";
-   private static final boolean SKIP_ML_RUNNING = false;
+   private static final boolean SKIP_ML_RUNNING = true;
 
    private C50MLObjectLookupFactory objectLookupFactory;
 

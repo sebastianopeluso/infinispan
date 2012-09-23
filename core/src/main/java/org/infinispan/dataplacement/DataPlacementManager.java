@@ -8,6 +8,11 @@ import org.infinispan.commons.hash.Hash;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
+import org.infinispan.dataplacement.stats.AccessesMessageSizeTask;
+import org.infinispan.dataplacement.stats.CheckKeysMovedTask;
+import org.infinispan.dataplacement.stats.ObjectLookupTask;
+import org.infinispan.dataplacement.stats.SaveStatsTask;
+import org.infinispan.dataplacement.stats.Stats;
 import org.infinispan.distribution.DistributionManager;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.jmx.annotations.MBean;
@@ -27,6 +32,8 @@ import org.infinispan.util.logging.LogFactory;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 
 /**
@@ -62,9 +69,13 @@ public class DataPlacementManager {
    private ObjectLookupFactory objectLookupFactory;
 
    private final RoundManager roundManager;
+   private final ExecutorService statsAsync = Executors.newSingleThreadExecutor();
+
+   private Stats stats;
 
    public DataPlacementManager() {
       roundManager = new RoundManager(INITIAL_COOL_DOWN_TIME);
+      stats = new Stats(0);
    }
 
    @Inject
@@ -118,6 +129,7 @@ public class DataPlacementManager {
       if (log.isTraceEnabled()) {
          log.tracef("Start data placement protocol with round %s", newRoundId);
       }
+      stats = new Stats(newRoundId);
 
       ClusterSnapshot roundClusterSnapshot = new ClusterSnapshot(members, hashFunction);
 
@@ -165,6 +177,7 @@ public class DataPlacementManager {
       }
 
       if(objectPlacementManager.aggregateRequest(sender, objectRequest)){
+         stats.receivedAccesses();
          Map<Object, OwnersInfo> objectsToMove = objectPlacementManager.calculateObjectsToMove();
 
          if (log.isTraceEnabled()) {
@@ -173,10 +186,13 @@ public class DataPlacementManager {
 
          ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(objectsToMove, defaultNumberOfOwners);
 
+         statsAsync.submit(new ObjectLookupTask(objectsToMove, objectLookup, stats));
+
          if (log.isDebugEnabled()) {
             log.debugf("Created %s bloom filters and machine learner rules for each key", defaultNumberOfOwners);
          }
 
+         stats.calculatedNewOwners();
          DataPlacementCommand command = commandsFactory.buildDataPlacementCommand(DataPlacementCommand.Type.OBJECT_LOOKUP_PHASE,
                                                                                   roundManager.getCurrentRoundId());
          command.setObjectLookup(objectLookup);
@@ -205,6 +221,7 @@ public class DataPlacementManager {
       }
 
       if (objectLookupManager.addObjectLookup(sender, objectLookup)) {
+         stats.receivedObjectLookup();
          if (log.isTraceEnabled()) {
             log.tracef("All remote Object Lookup received. Send Ack to coordinator");
          }
@@ -235,6 +252,7 @@ public class DataPlacementManager {
       }
 
       if (objectLookupManager.addAck(sender)) {
+         stats.receivedAcks();
          if (log.isTraceEnabled()) {
             log.tracef("All Acks received. Trigger state transfer");
          }
@@ -259,6 +277,10 @@ public class DataPlacementManager {
          log.trace("Start sending keys request");
       }
 
+      accessesManager.calculateAccesses();
+      statsAsync.submit(new AccessesMessageSizeTask(stats, accessesManager));
+
+      stats.collectedAccesses();
       for (Address address : rpcManager.getTransport().getMembers()) {
          ObjectRequest request = accessesManager.getObjectRequestForAddress(address);
 
@@ -276,6 +298,7 @@ public class DataPlacementManager {
       }
    }
 
+   @SuppressWarnings("unchecked")
    @DataRehashed
    public final void keyMovementTest(DataRehashedEvent event) {
       if (log.isTraceEnabled()) {
@@ -283,8 +306,12 @@ public class DataPlacementManager {
       }
       if (event.getMembersAtEnd().size() == event.getMembersAtStart().size()) {
          if (event.isPre() && expectPre) {
+            stats.startStateTransfer();
             expectPre = false;
          } else if(!event.isPre() && !expectPre) {
+            stats.endStateTransfer();
+            statsAsync.submit(new CheckKeysMovedTask(event.getKeysMoved(), objectPlacementManager, stats));
+            statsAsync.submit(new SaveStatsTask(stats));
             expectPre = true;
             roundManager.markRoundFinished();
          }

@@ -8,6 +8,7 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
@@ -126,6 +127,15 @@ public class ObjectPlacementManager {
       allKeysMoved = newOwnersMap.keySet().toArray(new Object[newOwnersMap.size()]);
 
       return newOwnersMap;
+   }
+
+   /**
+    * returns all keys moved so far
+    *
+    * @return  all keys moved so far
+    */
+   public final Collection<Object> getKeysToMove() {
+      return Arrays.asList(allKeysMoved);
    }
 
    /**

@@ -194,6 +194,8 @@ public class AccessesAndPlacementTest {
       addKey(key3, true, 15, container);
       addKey(key4, false, 2, container);
 
+      manager.calculateAccesses();
+
       Map<Object, Long> remote = new HashMap<Object, Long>();
       Map<Object, Long> local = new HashMap<Object, Long>();
 
@@ -287,6 +289,7 @@ public class AccessesAndPlacementTest {
       });
 
       when(consistentHash.locateAll(anyCollectionOf(Object.class), anyInt())).thenAnswer(new Answer<Object>() {
+         @SuppressWarnings("unchecked")
          @Override
          public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
             Collection<Object> keys = (Collection<Object>) invocationOnMock.getArguments()[0];
