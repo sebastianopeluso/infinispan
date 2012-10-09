@@ -199,6 +199,11 @@ public class OptimisticLockingInterceptor extends AbstractTxLockingInterceptor {
 
    @Override
    public Object visitLockControlCommand(TxInvocationContext ctx, LockControlCommand command) throws Throwable {
+      //TODO: HACK! in state transfer, the lock control command is invoked to release the keys of moved out
+      //TODO:       transactions. however, it is never processed. this way, we avoid live locks. (by Pedro)
+      if (command.isUnlock()) {
+         lockManager.unlockAll(ctx);
+      }
       throw new CacheException("Explicit locking is not allowed with optimistic caches!");
    }
 
