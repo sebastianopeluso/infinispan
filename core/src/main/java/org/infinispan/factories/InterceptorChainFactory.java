@@ -252,9 +252,6 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             //Nothing...
       }
 
-      //Create interceptor here! 
-      interceptorChain.appendInterceptor(createInterceptor(new DistributionInterceptor(), DataPlacementInterceptor.class), false);
-
       CommandInterceptor callInterceptor = createInterceptor(new CallInterceptor(), CallInterceptor.class);
       interceptorChain.appendInterceptor(callInterceptor, false);
       log.trace("Finished building default interceptor chain.");
