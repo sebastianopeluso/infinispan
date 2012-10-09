@@ -259,10 +259,13 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
                remoteTx = transactionTable.createRemoteTransaction(lock.getGlobalTransaction(), null);
                remoteTx.setMissingModifications(true);
             }
-            Object result = lockContainer.acquireLock(remoteTx.getGlobalTransaction(), lock.getKey(), 0, TimeUnit.SECONDS);
-            if (result == null) {
-               throw new IllegalStateException("Could not acquire lock for key " + lock.getKey());
-            }
+            //TODO ==> HACK! it is possible to deliver the commit/rollback before this is invoked. avoid lock acquisition
+            //TODO           to avoid live locks.
+            //TODO ==> WARNING: this can leave the data inconsistent (by Pedro)
+            //Object result = lockContainer.acquireLock(remoteTx.getGlobalTransaction(), lock.getKey(), 0, TimeUnit.SECONDS);
+            //if (result == null) {
+            //   throw new IllegalStateException("Could not acquire lock for key " + lock.getKey());
+            //}
          }
       }
    }
