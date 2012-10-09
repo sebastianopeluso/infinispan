@@ -26,6 +26,7 @@ import org.infinispan.Cache;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.marshall.StreamingMarshaller;
 
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -108,4 +109,18 @@ public interface CacheLoader {
     *         implementation of {@link org.infinispan.loaders.CacheLoader}.
     */
    Class<? extends CacheLoaderConfig> getConfigurationClass();
+
+   /**
+    * TODO
+    * 
+    * @return
+    */
+   Iterator<Set<InternalCacheEntry>> loadAllIterator();
+
+   /**
+    * TODO: verificar se pode usar o iterator
+    * 
+    * @return
+    */
+   boolean supportsLoadAllIterator();
 }

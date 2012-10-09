@@ -46,6 +46,7 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -160,31 +161,60 @@ public class CacheLoaderManagerImpl implements CacheLoaderManager {
                start = System.nanoTime();
                log.debugf("Preloading transient state from cache loader %s", loader);
             }
-            Set<InternalCacheEntry> state;
-            try {
-               state = loadState();
-            } catch (CacheLoaderException e) {
-               throw new CacheException("Unable to preload!", e);
-            }
 
-            for (InternalCacheEntry e : state) {
-               if (clmConfig.isShared() || !(loader instanceof ChainingCacheStore)) {
-                  cache.getAdvancedCache()
-                       .withFlags(SKIP_CACHE_STATUS_CHECK, CACHE_MODE_LOCAL, SKIP_OWNERSHIP_CHECK, SKIP_CACHE_STORE, SKIP_REMOTE_LOOKUP, SKIP_INDEXING)
-                       .put(e.getKey(), e.getValue(), e.getLifespan(), MILLISECONDS, e.getMaxIdle(), MILLISECONDS);
-               } else {
-                  cache.getAdvancedCache()
-                       .withFlags(SKIP_CACHE_STATUS_CHECK, CACHE_MODE_LOCAL, SKIP_OWNERSHIP_CHECK, SKIP_REMOTE_LOOKUP, SKIP_INDEXING)
-                       .put(e.getKey(), e.getValue(), e.getLifespan(), MILLISECONDS, e.getMaxIdle(), MILLISECONDS);
+            int size;
+            if (loader.supportsLoadAllIterator()) {
+               size = memoryOptimizedPreload();
+            } else {
+               Set<InternalCacheEntry> state;
+               try {
+                  state = loadState();
+               } catch (CacheLoaderException e) {
+                  throw new CacheException("Unable to preload!", e);
                }
+
+               for (InternalCacheEntry e : state) {
+                  if (clmConfig.isShared() || !(loader instanceof ChainingCacheStore)) {
+                     cache.getAdvancedCache()
+                           .withFlags(SKIP_CACHE_STATUS_CHECK, CACHE_MODE_LOCAL, SKIP_OWNERSHIP_CHECK, SKIP_CACHE_STORE, SKIP_REMOTE_LOOKUP, SKIP_INDEXING)
+                           .put(e.getKey(), e.getValue(), e.getLifespan(), MILLISECONDS, e.getMaxIdle(), MILLISECONDS);
+                  } else {
+                     cache.getAdvancedCache()
+                           .withFlags(SKIP_CACHE_STATUS_CHECK, CACHE_MODE_LOCAL, SKIP_OWNERSHIP_CHECK, SKIP_REMOTE_LOOKUP, SKIP_INDEXING)
+                           .put(e.getKey(), e.getValue(), e.getLifespan(), MILLISECONDS, e.getMaxIdle(), MILLISECONDS);
+                  }
+               }
+               size = state.size();
             }
 
             if (debugTiming) {
                final long stop = System.nanoTime();
-               log.debugf("Preloaded %s keys in %s", state.size(), Util.prettyPrintTime(stop - start, TimeUnit.NANOSECONDS));
+               log.debugf("Preloaded %s keys in %s", size, Util.prettyPrintTime(stop - start, TimeUnit.NANOSECONDS));
             }
          }
       }
+   }
+
+   private int memoryOptimizedPreload() {
+      int counter = 0;
+      Iterator<Set<InternalCacheEntry>> iterator = loader.loadAllIterator();
+
+      while (iterator.hasNext()) {
+         Set<InternalCacheEntry> state = iterator.next();
+         for (InternalCacheEntry e : state) {
+            if (clmConfig.isShared() || !(loader instanceof ChainingCacheStore)) {
+               cache.getAdvancedCache()
+                     .withFlags(SKIP_CACHE_STATUS_CHECK, CACHE_MODE_LOCAL, SKIP_OWNERSHIP_CHECK, SKIP_CACHE_STORE, SKIP_REMOTE_LOOKUP, SKIP_INDEXING)
+                     .put(e.getKey(), e.getValue(), e.getLifespan(), MILLISECONDS, e.getMaxIdle(), MILLISECONDS);
+            } else {
+               cache.getAdvancedCache()
+                     .withFlags(SKIP_CACHE_STATUS_CHECK, CACHE_MODE_LOCAL, SKIP_OWNERSHIP_CHECK, SKIP_REMOTE_LOOKUP, SKIP_INDEXING)
+                     .put(e.getKey(), e.getValue(), e.getLifespan(), MILLISECONDS, e.getMaxIdle(), MILLISECONDS);
+            }
+         }
+         counter += state.size();
+      }
+      return counter;
    }
 
    private Set<InternalCacheEntry> loadState() throws CacheLoaderException {
@@ -255,7 +285,7 @@ public class CacheLoaderManagerImpl implements CacheLoaderManager {
          if (cfg != null) {
             tmpLoader = createCacheLoader(cfg, cache);
             if (cfg instanceof CacheStoreConfig)
-            assertNotSingletonAndShared(((CacheStoreConfig) cfg));
+               assertNotSingletonAndShared(((CacheStoreConfig) cfg));
          } else {
             return null;
          }

@@ -34,6 +34,7 @@ import org.infinispan.loaders.modifications.Modification;
 
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -158,5 +159,15 @@ public class AbstractDelegatingStore implements CacheStore {
    @Override
    public CacheStoreConfig getCacheStoreConfig() {
       return delegate.getCacheStoreConfig();
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadAllIterator() {
+      return delegate.loadAllIterator();
+   }
+
+   @Override
+   public boolean supportsLoadAllIterator() {
+      return delegate.supportsLoadAllIterator();
    }
 }

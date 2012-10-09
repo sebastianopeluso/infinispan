@@ -23,7 +23,11 @@
 package org.infinispan.loaders;
 
 import org.infinispan.Cache;
+import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.marshall.StreamingMarshaller;
+
+import java.util.Iterator;
+import java.util.Set;
 
 /**
  * An abstract {@link org.infinispan.loaders.CacheLoader} that holds common implementations for some methods
@@ -51,5 +55,16 @@ public abstract class AbstractCacheLoader implements CacheLoader {
       this.marshaller = m;
       if (config == null) throw new IllegalStateException("Null config!!!");
       this.cache = (Cache<Object, Object>) cache;
+   }
+
+   @Override
+   public boolean supportsLoadAllIterator() {
+      //by default, not supported
+      return false;
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadAllIterator() {
+      return null;
    }
 }
