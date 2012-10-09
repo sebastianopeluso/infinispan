@@ -512,4 +512,19 @@ public class JdbcBinaryCacheStore extends BucketBasedCacheStore {
    protected StreamingMarshaller getMarshaller() {
       return super.getMarshaller();
    }
+
+   @Override
+   public boolean supportsLoadIterator() {
+      return true;
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadAllIterator() throws CacheLoaderException {
+      return dmHelper.loadAllIterator(true);
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadSomeIterator(int maxEntries) throws CacheLoaderException {
+      return dmHelper.loadSomeIterator(maxEntries);
+   }
 }

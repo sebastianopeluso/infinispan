@@ -217,4 +217,19 @@ public class ChainingCacheStore implements CacheStore {
    public CacheStoreConfig getCacheStoreConfig() {
       return null;
    }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadAllIterator() {
+      return null;
+   }
+
+   @Override
+   public boolean supportsLoadIterator() {
+      return false;
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadSomeIterator(int maxEntries) throws CacheLoaderException {
+      return null;
+   }
 }

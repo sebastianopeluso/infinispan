@@ -31,6 +31,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.infinispan.container.entries.InternalCacheEntry;
@@ -259,6 +261,57 @@ public abstract class DataManipulationHelper {
       }
    }
 
+   public final Iterator<Set<InternalCacheEntry>> loadAllIterator(boolean filterExpired) throws CacheLoaderException {
+      Connection conn;
+      PreparedStatement ps;
+      ResultSet rs;
+      try {
+         String sql = filterExpired ? tableManipulation.getLoadNonExpiredAllRowsSql() : 
+               tableManipulation.getLoadAllRowsSql();         
+         if (log.isTraceEnabled()) {
+            log.tracef("Running sql %s", sql);
+         }
+         conn = connectionFactory.getConnection();
+         ps = conn.prepareStatement(sql);
+         if (filterExpired) {
+            ps.setLong(1, System.currentTimeMillis());
+         }
+         ps.setFetchSize(tableManipulation.getFetchSize());
+         rs = ps.executeQuery();
+         rs.setFetchSize(tableManipulation.getFetchSize());         
+         return new LoadAllIterator(rs, ps, conn, tableManipulation.getFetchSize());
+      } catch (SQLException e) {
+         log.sqlFailureFetchingAllStoredEntries(e);
+         throw new CacheLoaderException("SQL error while fetching all StoredEntries", e);
+      }
+   }
+
+   public final Iterator<Set<InternalCacheEntry>> loadSomeIterator(int maxEntries) throws CacheLoaderException {
+      Connection conn;
+      PreparedStatement ps;
+      ResultSet rs;
+      try {
+         String sql = tableManipulation.getLoadSomeRowsSql();
+         if (log.isTraceEnabled()) {
+            log.trace("Running sql '" + sql);
+         }
+         conn = connectionFactory.getConnection();
+         if (tableManipulation.isVariableLimitSupported()) {
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, maxEntries);
+         } else {
+            ps = conn.prepareStatement(sql.replace("?", String.valueOf(maxEntries)));
+         }
+         ps.setFetchSize(tableManipulation.getFetchSize());
+         rs = ps.executeQuery();
+         rs.setFetchSize(tableManipulation.getFetchSize());
+         return new LoadAllIterator(rs, ps, conn, tableManipulation.getFetchSize());
+      } catch (SQLException e) {
+         log.sqlFailureFetchingAllStoredEntries(e);
+         throw new CacheLoaderException("SQL error while fetching all StoredEntries", e);
+      }
+   }
+
    protected boolean includeKey(Object key, Set<Object> keysToExclude) {
       return keysToExclude == null || !keysToExclude.contains(key);
    }
@@ -275,5 +328,79 @@ public abstract class DataManipulationHelper {
 
    protected abstract boolean fromStreamProcess(Object objFromStream, PreparedStatement ps, ObjectInput objectInput)
          throws SQLException, CacheLoaderException, IOException, ClassNotFoundException, InterruptedException;
+
+   private class LoadAllIterator implements Iterator<Set<InternalCacheEntry>> {
+
+      private final ResultSet resultSet;
+      private final PreparedStatement preparedStatement;
+      private final Connection connection;
+      private final int fetchSize;
+      private boolean hasNext; 
+
+      private LoadAllIterator(ResultSet resultSet, PreparedStatement preparedStatement, Connection connection, int fetchSize) {
+         this.resultSet = resultSet;
+         this.preparedStatement = preparedStatement;
+         this.connection = connection;
+         this.fetchSize = fetchSize;         
+         iterateResultSet();
+      }
+
+      @Override
+      public boolean hasNext() {
+         return hasNext;
+      }
+
+      @Override
+      public Set<InternalCacheEntry> next() {
+         if (!hasNext) {
+            close();
+            throw new NoSuchElementException();
+         }
+         
+         Set<InternalCacheEntry> internalCacheEntries = new HashSet<InternalCacheEntry>();
+         
+         do {
+            if (!add(internalCacheEntries)) {               
+               return internalCacheEntries;
+            }
+            iterateResultSet();
+         } while (hasNext && internalCacheEntries.size() < fetchSize);
+         
+         return internalCacheEntries;
+      }
+
+      @Override
+      public void remove() {
+         throw new UnsupportedOperationException();
+      }
+      
+      private boolean add(Set<InternalCacheEntry> result) {
+         try {
+            loadAllProcess(resultSet, result);
+            return true;
+         } catch (Exception e) {
+            hasNext = false;
+            close();
+            return false;
+         } 
+      }
+      
+      private void iterateResultSet() {
+         try {
+            hasNext = resultSet.next();
+         } catch (SQLException e) {
+            hasNext = false;            
+         }
+         if (!hasNext) {
+            close();
+         }
+      }
+      
+      private void close() {
+         JdbcUtil.safeClose(resultSet);
+         JdbcUtil.safeClose(preparedStatement);
+         connectionFactory.releaseConnection(connection);
+      }
+   }
 
 }
