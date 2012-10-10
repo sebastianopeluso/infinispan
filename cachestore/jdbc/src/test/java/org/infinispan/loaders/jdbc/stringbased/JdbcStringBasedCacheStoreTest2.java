@@ -22,19 +22,17 @@
  */
 package org.infinispan.loaders.jdbc.stringbased;
 
-import static org.mockito.Mockito.*;
 import org.infinispan.Cache;
 import org.infinispan.container.entries.InternalCacheEntry;
-import org.infinispan.test.fwk.TestInternalCacheEntryFactory;
 import org.infinispan.loaders.CacheLoaderException;
 import org.infinispan.loaders.CacheStore;
 import org.infinispan.loaders.jdbc.TableManipulation;
 import org.infinispan.loaders.jdbc.connectionfactory.ConnectionFactory;
 import org.infinispan.loaders.jdbc.connectionfactory.ConnectionFactoryConfig;
-import org.infinispan.loaders.keymappers.TwoWayKey2StringMapper;
 import org.infinispan.loaders.keymappers.UnsupportedKeyTypeException;
 import org.infinispan.marshall.StreamingMarshaller;
 import org.infinispan.marshall.TestObjectStreamMarshaller;
+import org.infinispan.test.fwk.TestInternalCacheEntryFactory;
 import org.infinispan.test.fwk.UnitTestDatabaseManager;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.AfterTest;
@@ -44,6 +42,9 @@ import org.testng.annotations.Test;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tester for {@link JdbcStringBasedCacheStore} with an alternative {@link org.infinispan.loaders.keymappers.Key2StringMapper}.
@@ -64,7 +65,7 @@ public class JdbcStringBasedCacheStoreTest2 {
       tableManipulation = UnitTestDatabaseManager.buildDefaultTableManipulation();
       cfc = UnitTestDatabaseManager.getUniqueConnectionFactoryConfig();
       JdbcStringBasedCacheStoreConfig config = new JdbcStringBasedCacheStoreConfig(cfc, tableManipulation);
-      config.setKey2StringMapperClass(TwoWayKey2StringMapper.class.getName());
+      config.setKey2StringMapperClass(TwoWayPersonKey2StringMapper.class.getName());
       config.setPurgeSynchronously(true);
       cacheStore = new JdbcStringBasedCacheStore();
       Cache<?, ?> mockCache = mock(Cache.class);
