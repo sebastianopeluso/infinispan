@@ -163,8 +163,12 @@ public class CacheLoaderManagerImpl implements CacheLoaderManager {
             }
 
             int size;
-            if (loader.supportsLoadAllIterator()) {
-               size = memoryOptimizedPreload();
+            if (loader.supportsLoadIterator()) {
+               try {
+                  size = memoryOptimizedPreload();
+               } catch (CacheLoaderException e) {
+                  throw new CacheException("Unable to preload!", e);
+               }
             } else {
                Set<InternalCacheEntry> state;
                try {
@@ -195,10 +199,14 @@ public class CacheLoaderManagerImpl implements CacheLoaderManager {
       }
    }
 
-   private int memoryOptimizedPreload() {
+   private int memoryOptimizedPreload() throws CacheLoaderException {
       int counter = 0;
-      Iterator<Set<InternalCacheEntry>> iterator = loader.loadAllIterator();
+      Iterator<Set<InternalCacheEntry>> iterator = loadIteratorState();
 
+      if (iterator == null) {
+         return 0;
+      }
+      
       while (iterator.hasNext()) {
          Set<InternalCacheEntry> state = iterator.next();
          for (InternalCacheEntry e : state) {
@@ -230,6 +238,24 @@ public class CacheLoaderManagerImpl implements CacheLoaderManager {
             break;
          default:
             state = loader.load(ne);
+            break;
+      }
+      return state;
+   }
+
+   private Iterator<Set<InternalCacheEntry>> loadIteratorState() throws CacheLoaderException {
+      int ne = -1;
+      if (configuration.getEvictionStrategy().isEnabled()) ne = configuration.getEvictionMaxEntries();
+      Iterator<Set<InternalCacheEntry>> state;
+      switch (ne) {
+         case -1:
+            state = loader.loadAllIterator();
+            break;
+         case 0:
+            state = null;
+            break;
+         default:
+            state = loader.loadSomeIterator(ne);
             break;
       }
       return state;

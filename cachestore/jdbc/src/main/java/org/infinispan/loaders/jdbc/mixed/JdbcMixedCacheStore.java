@@ -39,6 +39,9 @@ import org.infinispan.util.logging.LogFactory;
 
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 /**
@@ -215,5 +218,82 @@ public class JdbcMixedCacheStore extends AbstractCacheStore {
 
    public JdbcStringBasedCacheStore getStringBasedCacheStore() {
       return stringBasedCacheStore;
+   }
+
+   @Override
+   public boolean supportsLoadIterator() {
+      return true;
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadAllIterator() throws CacheLoaderException {
+      return new JoinIterator(stringBasedCacheStore.loadAllIterator(), binaryCacheStore.loadAllIterator(), -1);
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadSomeIterator(int maxEntries) throws CacheLoaderException {
+      return new JoinIterator(stringBasedCacheStore.loadSomeIterator(maxEntries),
+                              binaryCacheStore.loadSomeIterator(maxEntries),
+                              maxEntries);
+   }
+
+   private class JoinIterator implements Iterator<Set<InternalCacheEntry>> {
+
+      private final Iterator<Set<InternalCacheEntry>> stringBasedIterator;
+      private final Iterator<Set<InternalCacheEntry>> binaryBasedIterator;
+      private final int maxEntries;
+      private int counter;
+
+      private JoinIterator(Iterator<Set<InternalCacheEntry>> stringBasedIterator, Iterator<Set<InternalCacheEntry>> binaryBasedIterator, int maxEntries) {
+         this.stringBasedIterator = stringBasedIterator;
+         this.binaryBasedIterator = binaryBasedIterator;
+         this.maxEntries = maxEntries;
+         counter = 0;
+      }
+
+
+      @Override
+      public boolean hasNext() {
+         return (stringBasedIterator.hasNext() || binaryBasedIterator.hasNext()) &&
+               (maxEntries < 0 || counter < maxEntries );
+      }
+
+      @Override
+      public Set<InternalCacheEntry> next() {
+         Set<InternalCacheEntry> result = null;
+         if (stringBasedIterator.hasNext()) {
+            result = stringBasedIterator.next();
+         } else if (binaryBasedIterator.hasNext()) {
+            result = binaryBasedIterator.next();
+         }
+                 
+         if (result == null) {
+            throw new NoSuchElementException();
+         }
+         
+         if (maxEntries > 0) {
+            if (counter + result.size() > maxEntries) {
+               Set<InternalCacheEntry> realResult = new HashSet<InternalCacheEntry>();
+               
+               for (InternalCacheEntry internalCacheEntry : result) {
+                  if (counter >= maxEntries) {
+                     return realResult;
+                  }
+                  realResult.add(internalCacheEntry);
+                  counter++;
+               }
+            } else {
+               counter += result.size();
+            }
+            
+         }
+         
+         return result;
+      }
+
+      @Override
+      public void remove() {
+         throw new UnsupportedOperationException();
+      }
    }
 }

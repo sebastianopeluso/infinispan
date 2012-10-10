@@ -115,12 +115,19 @@ public interface CacheLoader {
     * 
     * @return
     */
-   Iterator<Set<InternalCacheEntry>> loadAllIterator();
+   Iterator<Set<InternalCacheEntry>> loadAllIterator() throws CacheLoaderException;
+
+   /**
+    * TODO
+    *
+    * @return
+    */
+   Iterator<Set<InternalCacheEntry>> loadSomeIterator(int maxEntries) throws CacheLoaderException;
 
    /**
     * TODO: verificar se pode usar o iterator
     * 
     * @return
     */
-   boolean supportsLoadAllIterator();
+   boolean supportsLoadIterator();
 }

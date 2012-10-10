@@ -162,12 +162,17 @@ public class AbstractDelegatingStore implements CacheStore {
    }
 
    @Override
-   public Iterator<Set<InternalCacheEntry>> loadAllIterator() {
+   public Iterator<Set<InternalCacheEntry>> loadAllIterator() throws CacheLoaderException {
       return delegate.loadAllIterator();
    }
 
    @Override
-   public boolean supportsLoadAllIterator() {
-      return delegate.supportsLoadAllIterator();
+   public Iterator<Set<InternalCacheEntry>> loadSomeIterator(int maxEntries) throws CacheLoaderException {
+      return delegate.loadSomeIterator(maxEntries);
+   }
+
+   @Override
+   public boolean supportsLoadIterator() {
+      return delegate.supportsLoadIterator();
    }
 }

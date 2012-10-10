@@ -49,6 +49,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -417,5 +418,20 @@ public class JdbcStringBasedCacheStore extends LockSupportCacheStore<String> {
          connectionFactory.releaseConnection(conn);
       }
       return storedEntry;
+   }
+
+   @Override
+   public boolean supportsLoadIterator() {
+      return true;
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadAllIterator() throws CacheLoaderException {
+      return dmHelper.loadAllIterator(true);
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadSomeIterator(int maxEntries) throws CacheLoaderException {
+      return dmHelper.loadSomeIterator(maxEntries);
    }
 }

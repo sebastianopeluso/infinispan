@@ -224,7 +224,12 @@ public class ChainingCacheStore implements CacheStore {
    }
 
    @Override
-   public boolean supportsLoadAllIterator() {
+   public boolean supportsLoadIterator() {
       return false;
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadSomeIterator(int maxEntries) throws CacheLoaderException {
+      return null;
    }
 }

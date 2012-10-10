@@ -58,13 +58,18 @@ public abstract class AbstractCacheLoader implements CacheLoader {
    }
 
    @Override
-   public boolean supportsLoadAllIterator() {
+   public boolean supportsLoadIterator() {
       //by default, not supported
       return false;
    }
 
    @Override
-   public Iterator<Set<InternalCacheEntry>> loadAllIterator() {
+   public Iterator<Set<InternalCacheEntry>> loadAllIterator() throws CacheLoaderException {
+      return null;
+   }
+
+   @Override
+   public Iterator<Set<InternalCacheEntry>> loadSomeIterator(int maxEntries) throws CacheLoaderException {
       return null;
    }
 }
