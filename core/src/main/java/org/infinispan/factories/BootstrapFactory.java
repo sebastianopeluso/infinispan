@@ -26,6 +26,7 @@ import org.infinispan.AdvancedCache;
 import org.infinispan.Cache;
 import org.infinispan.CacheException;
 import org.infinispan.config.Configuration;
+import org.infinispan.configuration.cache.LegacyConfigurationAdaptor;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.factories.annotations.SurvivesRestarts;
 
@@ -35,7 +36,8 @@ import org.infinispan.factories.annotations.SurvivesRestarts;
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
  * @since 4.0
  */
-@DefaultFactoryFor(classes = {Cache.class, AdvancedCache.class, Configuration.class, ComponentRegistry.class})
+@DefaultFactoryFor(classes = {Cache.class, AdvancedCache.class, Configuration.class, ComponentRegistry.class,
+                              org.infinispan.configuration.cache.Configuration.class})
 @SurvivesRestarts
 public class BootstrapFactory extends AbstractNamedCacheComponentFactory {
    AdvancedCache<?, ?> advancedCache;
@@ -55,6 +57,8 @@ public class BootstrapFactory extends AbstractNamedCacheComponentFactory {
          comp = configuration;
       } else if (componentType.isAssignableFrom(ComponentRegistry.class)) {
          comp = componentRegistry;
+      } else if (componentType.isAssignableFrom(org.infinispan.configuration.cache.Configuration.class)) {
+         comp = LegacyConfigurationAdaptor.adapt(configuration);
       }
       if (comp == null) throw new CacheException("Don't know how to handle type " + componentType);
 
