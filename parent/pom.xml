@@ -25,7 +25,7 @@
    <modelVersion>4.0.0</modelVersion>
    <groupId>org.infinispan</groupId>
    <artifactId>infinispan-parent</artifactId>
-   <version>5.2.0-SNAPSHOT</version>
+   <version>5.2.0-cloudtm-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>Infinispan Common Parent</name>
    <description>Infinispan common parent POM module</description>
@@ -83,16 +83,10 @@
       </notifiers>
    </ciManagement>
    <distributionManagement>
-      <repository>
-         <id>jboss-releases-repository</id>
-         <name>JBoss Release Repository</name>
-         <url>${jboss.releases.repo.url}</url>
-      </repository>
-      <snapshotRepository>
-         <id>jboss-snapshots-repository</id>
-         <name>JBoss Snapshot Repository</name>
-         <url>${jboss.snapshots.repo.url}</url>
-      </snapshotRepository>
+       <repository>
+           <id>ssh-repository</id>
+           <url>scp://kyle.gsd.inesc-id.pt/home/pruivo/public_html/maven-repo</url>
+       </repository>
    </distributionManagement>
    <properties>
       <buildDirectory>target</buildDirectory>
@@ -858,6 +852,13 @@
       </pluginRepository>
    </pluginRepositories>
    <build>
+       <extensions>
+           <extension>
+               <groupId>org.apache.maven.wagon</groupId>
+               <artifactId>wagon-ssh</artifactId>
+               <version>1.0-beta-6</version>
+           </extension>
+       </extensions>
       <directory>${buildDirectory}</directory>
       <finalName>${project.artifactId}</finalName>
       <pluginManagement>
