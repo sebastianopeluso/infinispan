@@ -345,6 +345,14 @@ public class Parser {
                   log.warn("Cannot parse the cool down time value. Setting to default");
                }
                break;
+            case MAX_KEYS_TO_REQUEST:
+               try {
+                  int maxNumberOfKeys = Integer.parseInt(value);
+                  builder.dataPlacement().maxNumberOfKeysToRequest(maxNumberOfKeys);
+               }  catch (NumberFormatException nfe) {
+                  log.warn("Cannot parse the max number of key to request value. Setting to default");
+               }
+               break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
          }

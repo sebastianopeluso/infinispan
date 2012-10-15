@@ -64,7 +64,11 @@ public class Stats {
       /**
        * the number of keys that are moved but they aren+t supposed to be moved
        */
-      WRONG_MOVE
+      WRONG_MOVE,
+      /**
+       * the total number of keys to move
+       */
+      TOTAL_KEYS_TO_MOVE
    }
 
    private static enum Size {
@@ -80,9 +84,9 @@ public class Stats {
 
    private static enum Duration {
       /**
-       * the average time to query a key in the object lookup
+       * the total time to query all the keys moved in the object lookup
        */
-      AVG_QUERY
+      TOTAL_QUERY_DURATION
    }
 
    private final EnumMap<Counter, IncrementalInteger> counters;
@@ -141,6 +145,10 @@ public class Stats {
       counters.get(Counter.WRONG_MOVE).increment(value);
    }
 
+   public final void totalKeysMoved(int value) {
+      counters.get(Counter.TOTAL_KEYS_TO_MOVE).increment(value);
+   }
+
    public final void accessesSize(int value) {
       messageSizes.put(Size.ACCESSES, value);
    }
@@ -150,7 +158,7 @@ public class Stats {
    }
 
    public final void queryDuration(long value) {
-      durations.put(Duration.AVG_QUERY, value);
+      durations.put(Duration.TOTAL_QUERY_DURATION, value);
    }
 
    public final void saveTo(BufferedWriter writer, boolean printHeader) {

@@ -21,7 +21,7 @@ public class C50MLObjectLookup implements ObjectLookup {
 
    private final BloomFilter bloomFilter;
    private final DecisionTree[] decisionTreeArray;
-   private KeyFeatureManager keyFeatureManager;
+   private transient KeyFeatureManager keyFeatureManager;
 
    public C50MLObjectLookup(int numberOfOwners, BloomFilter bloomFilter) {
       this.bloomFilter = bloomFilter;

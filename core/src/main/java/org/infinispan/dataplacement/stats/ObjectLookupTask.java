@@ -49,7 +49,8 @@ public class ObjectLookupTask implements Runnable {
          duration += (end - start);
       }
       stats.wrongOwnersErrors(errors);
-      stats.queryDuration(duration / ownersInfoMap.size());
+      stats.totalKeysMoved(ownersInfoMap.size());
+      stats.queryDuration(duration);
 
       try {
          ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();

@@ -219,7 +219,8 @@ public class DataPlacementManager {
          log.warn("Not possible to process remote Object Lookup");
          return;
       }
-
+      
+      objectLookupFactory.init(objectLookup);
       if (objectLookupManager.addObjectLookup(sender, objectLookup)) {
          stats.receivedObjectLookup();
          if (log.isTraceEnabled()) {

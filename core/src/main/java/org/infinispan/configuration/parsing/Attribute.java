@@ -132,7 +132,8 @@ public enum Attribute {
    VERSIONING_SCHEME("versioningScheme"),
    TRANSACTION_PROTOCOL("transactionProtocol"),
    OBJECT_LOOKUP_FACTORY("objectLookupFactory"),
-   COOL_DOWN_TIME("coolDownTime")
+   COOL_DOWN_TIME("coolDownTime"),
+   MAX_KEYS_TO_REQUEST("maxNumberOfKeysToRequest")
    ;
 
    private final String name;
