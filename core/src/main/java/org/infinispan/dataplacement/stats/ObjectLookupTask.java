@@ -27,30 +27,28 @@ public class ObjectLookupTask implements Runnable {
    private final ObjectLookup objectLookup;
    private final Map<Object, OwnersInfo> ownersInfoMap;
    private final Stats stats;
+   private final IncrementableLong[] phaseDurations;
 
    public ObjectLookupTask(Map<Object, OwnersInfo> ownersInfoMap, ObjectLookup objectLookup, Stats stats) {
       this.ownersInfoMap = ownersInfoMap;
       this.objectLookup = objectLookup;
       this.stats = stats;
+      this.phaseDurations = stats.createQueryPhaseDurationsArray();
    }
 
    @Override
    public void run() {
       int errors = 0;
-      long start, end, duration = 0;
       for (Map.Entry<Object, OwnersInfo> entry : ownersInfoMap.entrySet()) {
          Set<Integer> expectedOwners = new TreeSet<Integer>(entry.getValue().getNewOwnersIndexes());
-         start = System.currentTimeMillis();
-         Collection<Integer> owners = objectLookup.query(entry.getKey());
-         end = System.currentTimeMillis();
-         Set<Integer> ownersQuery = new TreeSet<Integer>(owners);
+         Collection<Integer> result = objectLookup.queryWithProfiling(entry.getKey(), phaseDurations);
+         Set<Integer> ownersQuery = new TreeSet<Integer>(result);
 
          errors += expectedOwners.containsAll(ownersQuery) ? 0 : 1;
-         duration += (end - start);
       }
       stats.wrongOwnersErrors(errors);
       stats.totalKeysMoved(ownersInfoMap.size());
-      stats.queryDuration(duration);
+      stats.queryDuration(phaseDurations);
 
       try {
          ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();

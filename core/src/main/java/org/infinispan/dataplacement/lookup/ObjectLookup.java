@@ -1,5 +1,7 @@
 package org.infinispan.dataplacement.lookup;
 
+import org.infinispan.dataplacement.stats.IncrementableLong;
+
 import java.io.Serializable;
 import java.util.List;
 
@@ -18,4 +20,14 @@ public interface ObjectLookup extends Serializable {
     * @return     the owners index where the key is or null if the key was not moved
     */
    List<Integer> query(Object key);
+
+   /**
+    * the same as {@link #query(Object)} but it profiling information
+    *
+    *
+    * @param key              the key to find
+    * @param phaseDurations   the array with the duration of the phase (in nanoseconds)
+    * @return                 the owners index where the key is or null if the key was not moved
+    */
+   List<Integer> queryWithProfiling(Object key, IncrementableLong[] phaseDurations);
 }

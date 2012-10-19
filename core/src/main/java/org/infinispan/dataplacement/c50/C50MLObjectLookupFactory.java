@@ -150,6 +150,11 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
       return objectLookup;
    }
 
+   @Override
+   public int getNumberOfQueryProfilingPhases() {
+      return 3;
+   }
+
    /**
     * returns the bloom filter with the objects to move encoding on it
     *

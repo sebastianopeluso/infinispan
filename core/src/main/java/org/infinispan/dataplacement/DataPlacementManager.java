@@ -75,7 +75,6 @@ public class DataPlacementManager {
 
    public DataPlacementManager() {
       roundManager = new RoundManager(INITIAL_COOL_DOWN_TIME);
-      stats = new Stats(0);
    }
 
    @Inject
@@ -129,7 +128,7 @@ public class DataPlacementManager {
       if (log.isTraceEnabled()) {
          log.tracef("Start data placement protocol with round %s", newRoundId);
       }
-      stats = new Stats(newRoundId);
+      stats = new Stats(newRoundId, objectLookupFactory.getNumberOfQueryProfilingPhases());
 
       ClusterSnapshot roundClusterSnapshot = new ClusterSnapshot(members, hashFunction);
 
@@ -219,7 +218,7 @@ public class DataPlacementManager {
          log.warn("Not possible to process remote Object Lookup");
          return;
       }
-      
+
       objectLookupFactory.init(objectLookup);
       if (objectLookupManager.addObjectLookup(sender, objectLookup)) {
          stats.receivedObjectLookup();

@@ -2,6 +2,7 @@ package org.infinispan.dataplacement.hm;
 
 import org.infinispan.dataplacement.OwnersInfo;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
+import org.infinispan.dataplacement.stats.IncrementableLong;
 
 import java.util.HashMap;
 import java.util.List;
@@ -28,5 +29,18 @@ public class HashMapObjectLookup implements ObjectLookup {
    @Override
    public List<Integer> query(Object key) {
       return lookup.get(key);
+   }
+
+   @Override
+   public List<Integer> queryWithProfiling(Object key, IncrementableLong[] phaseDurations) {
+      long start = System.nanoTime();
+      List<Integer> result = lookup.get(key);
+      long end = System.nanoTime();
+
+      if (phaseDurations.length == 1) {
+         phaseDurations[0].add(end - start);
+      }
+
+      return result;
    }
 }

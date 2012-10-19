@@ -35,4 +35,11 @@ public interface ObjectLookupFactory {
     * @param objectLookup  the object lookup
     */
    void init(ObjectLookup objectLookup);
+
+   /**
+    * returns the number of phases when the query profiling
+    *
+    * @return  the number of phases when the query profiling
+    */
+   int getNumberOfQueryProfilingPhases();
 }

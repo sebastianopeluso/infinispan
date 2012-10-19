@@ -29,4 +29,9 @@ public class HashMapObjectLookupFactory implements ObjectLookupFactory {
    public void init(ObjectLookup objectLookup) {
       //nothing to init
    }
+
+   @Override
+   public int getNumberOfQueryProfilingPhases() {
+      return 1;
+   }
 }

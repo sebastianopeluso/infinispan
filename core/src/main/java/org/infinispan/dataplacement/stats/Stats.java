@@ -82,19 +82,13 @@ public class Stats {
       OBJECT_LOOKUP
    }
 
-   private static enum Duration {
-      /**
-       * the total time to query all the keys moved in the object lookup
-       */
-      TOTAL_QUERY_DURATION
-   }
+   private final IncrementableLong[] durations;
 
    private final EnumMap<Counter, IncrementalInteger> counters;
    private final EnumMap<TimeStamp, Long> timestamps;
    private final EnumMap<Size, Integer> messageSizes;
-   private final EnumMap<Duration, Long> durations;
 
-   public Stats(long roundId) {
+   public Stats(long roundId, int size) {
       this.roundId = roundId;
       counters = new EnumMap<Counter, IncrementalInteger>(Counter.class);
 
@@ -106,7 +100,19 @@ public class Stats {
       timestamps.put(TimeStamp.START, currentTimeMillis());
 
       messageSizes = new EnumMap<Size, Integer>(Size.class);
-      durations = new EnumMap<Duration, Long>(Duration.class);
+      durations = new IncrementableLong[size];
+
+      for (int i = 0; i < size; ++i) {
+         durations[i] = new IncrementableLong();
+      }
+   }
+
+   public final IncrementableLong[] createQueryPhaseDurationsArray() {
+      IncrementableLong[] array = new IncrementableLong[durations.length];
+      for (int i = 0; i < array.length; ++i) {
+         array[i] = new IncrementableLong();
+      }
+      return array;
    }
 
    public final void collectedAccesses() {
@@ -157,8 +163,12 @@ public class Stats {
       messageSizes.put(Size.OBJECT_LOOKUP, value);
    }
 
-   public final void queryDuration(long value) {
-      durations.put(Duration.TOTAL_QUERY_DURATION, value);
+   public final void queryDuration(IncrementableLong[] values) {
+      int size = Math.min(values.length, durations.length);
+
+      for (int i = 0; i < size; ++i) {
+         durations[i].add(values[i]);
+      }
    }
 
    public final void saveTo(BufferedWriter writer, boolean printHeader) {
@@ -177,9 +187,9 @@ public class Stats {
                writer.write(",");
                writer.write(size.toString());
             }
-            for (Duration duration : Duration.values()) {
+            for (int i = 0; i < durations.length; ++i) {
                writer.write(",");
-               writer.write(duration.toString());
+               writer.write("QUERY_DURATION_PHASE_" + i);
             }
             writer.newLine();
          }
@@ -197,9 +207,9 @@ public class Stats {
             writer.write(",");
             writer.write(messageSizes.get(size).toString());
          }
-         for (Duration duration : Duration.values()) {
+         for (IncrementableLong duration : durations) {
             writer.write(",");
-            writer.write(durations.get(duration).toString());
+            writer.write(duration.toString());
          }
          writer.newLine();
          writer.flush();
