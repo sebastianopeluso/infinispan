@@ -10,6 +10,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
 
 /**
  * // TODO: Document this
@@ -23,13 +26,14 @@ public class BloomFilterTest {
    private static final Log log = LogFactory.getLog(BloomFilterTest.class);
 
    private static final int START = 10;
-   private static final int END = 10000000;
+   private static final int END = 100000;
    private static final double PROB = 0.001;
 
    public void testBloomFilter() {
 
       for (int iteration = START; iteration <= END; iteration *= 10) {
          BloomFilter bloomFilter = new BloomFilter(PROB, iteration);
+
          for (int key = 0; key < iteration; ++key) {
             bloomFilter.add(getKey(key));
          }
@@ -44,6 +48,32 @@ public class BloomFilterTest {
          long end = System.currentTimeMillis();
 
          log.infof("Query duration:\n\ttotal=%s ms\n\tper-key=%s ms", end - begin, (end - begin) / iteration);
+
+         log.infof("[%s] Bloom Filter serialized size (bytes) = %s", iteration, serializedSize(bloomFilter));
+
+         bloomFilter.clear();
+
+         LinkedList<Object> linkedList = new LinkedList<Object>();
+         ArrayList<Object> arrayList = new ArrayList<Object>();
+         HashSet<Object> hashSet = new HashSet<Object>();
+
+         for (int key = 0; key < iteration; ++key) {
+            linkedList.add(getKey(key));
+         }
+         log.infof("[%s] Linked List serialized size (bytes) = %s", iteration, serializedSize(linkedList));
+         linkedList.clear();
+
+         for (int key = 0; key < iteration; ++key) {
+            arrayList.add(getKey(key));
+         }
+         log.infof("[%s] Array List serialized size (bytes) = %s", iteration, serializedSize(arrayList));
+         arrayList.clear();
+
+         for (int key = 0; key < iteration; ++key) {
+            hashSet.add(getKey(key));
+         }
+         log.infof("[%s] Hash Set serialized size (bytes) = %s", iteration, serializedSize(hashSet));
+         hashSet.clear();
       }
 
    }
@@ -81,7 +111,22 @@ public class BloomFilterTest {
    }
 
    private String getKey(int index) {
-      return "KEY_" + index;
+      return "KEY_" + index + "_" + (index * 2) + "_" + (index * 3);
+   }
+
+   private int serializedSize(Object object) {
+      ByteArrayOutputStream arrayOutputStream = new ByteArrayOutputStream();
+
+      try {
+         ObjectOutputStream oos = new ObjectOutputStream(arrayOutputStream);
+         oos.writeObject(object);
+         oos.flush();
+         oos.close();
+      } catch (IOException e) {
+         return -1;
+      }
+
+      return arrayOutputStream.toByteArray().length;
    }
 
 }
