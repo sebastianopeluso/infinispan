@@ -18,7 +18,9 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.infinispan.dataplacement.AccessesManager.*;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -33,6 +35,7 @@ import static org.mockito.Mockito.when;
 public class AccessesAndPlacementTest {
 
    private static final Hash HASH = new MurmurHash3();
+   private final AtomicInteger KEY_NEXT_ID = new AtomicInteger(0);
 
    public void testNoMovement() {
       ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
@@ -223,6 +226,197 @@ public class AccessesAndPlacementTest {
       local.put(key4, 2L);
 
       assertAccesses(manager.getObjectRequestForAddress(clusterSnapshot.get(3)), remote, local);
+   }
+
+   public void testRemoteTopKeyRequest() {
+      RemoteTopKeyRequest request = new RemoteTopKeyRequest(10);
+
+      TestKey key1 = createRandomKey();
+      TestKey key2 = createRandomKey();
+      TestKey key3 = createRandomKey();
+      TestKey key4 = createRandomKey();
+
+      Map<Object, Long> counter = new HashMap<Object, Long>();
+      counter.put(key1, 1L);
+      counter.put(key2, 1L);
+      counter.put(key3, 1L);
+      counter.put(key4, 1L);
+
+      request.merge(counter, 1);
+
+      assertKeyAccess(key1, request, 1);
+      assertKeyAccess(key2, request, 1);
+      assertKeyAccess(key3, request, 1);
+      assertKeyAccess(key4, request, 1);
+
+      counter.put(key1, 1L);
+      counter.put(key2, 2L);
+      counter.put(key3, 3L);
+      counter.put(key4, 4L);
+
+      request.merge(counter, 2);
+
+      assertKeyAccess(key1, request, 3);
+      assertKeyAccess(key2, request, 5);
+      assertKeyAccess(key3, request, 7);
+      assertKeyAccess(key4, request, 9);
+
+      assertSortedKeyAccess(key1, request, 3, 3);
+      assertSortedKeyAccess(key2, request, 5, 2);
+      assertSortedKeyAccess(key3, request, 7, 1);
+      assertSortedKeyAccess(key4, request, 9, 0);
+
+      assertSortedKeyAccess(request);
+
+      counter.clear();
+
+      TestKey[] keys = new TestKey[11];
+
+      for (int i = 0; i < keys.length; ++i) {
+         TestKey key = createRandomKey();
+         keys[i] = key;
+         counter.put(key, (long) i);
+      }
+
+      request.merge(counter, 1);
+
+      assertKeyAccess(key1, request, 3);
+      assertKeyAccess(key2, request, 5);
+      assertKeyAccess(key3, request, 7);
+      assertKeyAccess(key4, request, 9);
+
+      for (int i = 1; i < keys.length; ++i) {
+         assertKeyAccess(keys[i], request, i);
+      }
+
+      int idx = 0;
+      assertSortedKeyAccess(keys[10], request, 10, idx++);
+      assertSortedKeyAccess(keys[9], request, 9, idx++);
+      assertSortedKeyAccess(key4, request, 9, idx++);
+      assertSortedKeyAccess(keys[8], request, 8, idx++);
+      assertSortedKeyAccess(keys[7], request, 7, idx++);
+      assertSortedKeyAccess(key3, request, 7, idx++);
+      assertSortedKeyAccess(keys[6], request, 6, idx++);
+      assertSortedKeyAccess(keys[5], request, 5, idx++);
+      assertSortedKeyAccess(key2, request, 5, idx++);
+      assertSortedKeyAccess(keys[4], request, 4, idx++);
+      assertSortedKeyAccess(keys[3], request, 3, idx++);
+      assertSortedKeyAccess(key1, request, 3, idx++);
+      assertSortedKeyAccess(keys[2], request, 2, idx++);
+      assertSortedKeyAccess(keys[1], request, 1, idx);
+
+      assertSortedKeyAccess(request);
+
+      assertNoKeyAccess(keys[0], request);
+   }
+
+   public void testLocalTopKeyRequest() {
+      LocalTopKeyRequest request = new LocalTopKeyRequest();
+
+      TestKey key1 = createRandomKey();
+      TestKey key2 = createRandomKey();
+      TestKey key3 = createRandomKey();
+      TestKey key4 = createRandomKey();
+
+      Map<Object, Long> counter = new HashMap<Object, Long>();
+      counter.put(key1, 1L);
+      counter.put(key2, 1L);
+      counter.put(key3, 1L);
+      counter.put(key4, 1L);
+
+      request.merge(counter, 1);
+
+      assertKeyAccess(key1, request, 1);
+      assertKeyAccess(key2, request, 1);
+      assertKeyAccess(key3, request, 1);
+      assertKeyAccess(key4, request, 1);
+
+      counter.put(key1, 1L);
+      counter.put(key2, 2L);
+      counter.put(key3, 3L);
+      counter.put(key4, 4L);
+
+      request.merge(counter, 2);
+
+      assertKeyAccess(key1, request, 3);
+      assertKeyAccess(key2, request, 5);
+      assertKeyAccess(key3, request, 7);
+      assertKeyAccess(key4, request, 9);
+
+      counter.clear();
+
+      TestKey[] keys = new TestKey[11];
+
+      for (int i = 0; i < keys.length; ++i) {
+         TestKey key = createRandomKey();
+         keys[i] = key;
+         counter.put(key, (long) i);
+      }
+
+      request.merge(counter, 1);
+
+      assertKeyAccess(key1, request, 3);
+      assertKeyAccess(key2, request, 5);
+      assertKeyAccess(key3, request, 7);
+      assertKeyAccess(key4, request, 9);
+
+      for (int i = 1; i < keys.length; ++i) {
+         assertKeyAccess(keys[i], request, i);
+      }
+
+      assertNoKeyAccess(keys[0], request);
+   }
+
+   private void assertNoKeyAccess(Object key, RemoteTopKeyRequest request) {
+      assert !request.contains(key) : "Key " + key + " has found in map";
+      for (KeyAccess keyAccess : request.getSortedKeyAccess()) {
+         assert !keyAccess.getKey().equals(key)  : "Key " + key + " has found in list";
+      }
+   }
+
+   private void assertNoKeyAccess(Object key, LocalTopKeyRequest request) {
+      assert !request.contains(key) : "Key " + key + " has found";
+   }
+
+   private void assertKeyAccess(Object key, RemoteTopKeyRequest request, long accesses) {
+      assert request.contains(key) :  "Key " + key + " not found";
+      KeyAccess keyAccess = request.get(key);
+      assert keyAccess.getAccesses() == accesses : "Number of accesses: " + keyAccess.getAccesses() + " != " + accesses;
+      assert keyAccess.getKey().equals(key) : "Key is different: " + keyAccess.getKey() + " != " + key;
+   }
+
+   private void assertKeyAccess(Object key, LocalTopKeyRequest request, long accesses) {
+      assert request.contains(key) :  "Key " + key + " not found";
+      KeyAccess keyAccess = request.get(key);
+      assert keyAccess.getAccesses() == accesses : "Number of accesses: " + keyAccess.getAccesses() + " != " + accesses;
+      assert keyAccess.getKey().equals(key) : "Key is different: " + keyAccess.getKey() + " != " + key;
+   }
+
+   private void assertSortedKeyAccess(Object key, RemoteTopKeyRequest request, long accesses, int pos) {
+      List<KeyAccess> keyAccessList = request.getSortedKeyAccess();
+      assert keyAccessList.size() > pos : "Size (" + keyAccessList.size() + ") is smaller than " + pos;
+      assert keyAccessList.get(pos).getKey().equals(key) : "Key is different [" + pos + "]: " +
+            keyAccessList.get(pos).getKey() + " != " + key;
+      assert keyAccessList.get(pos).getAccesses() == accesses : "Number of accesses [" + pos + "]: " +
+            keyAccessList.get(pos).getAccesses() + " != " + accesses;
+   }
+
+   private void assertSortedKeyAccess(RemoteTopKeyRequest request) {
+      List<KeyAccess> keyAccessList = request.getSortedKeyAccess();
+      if (keyAccessList.isEmpty()) {
+         return;
+      }
+
+      long maxValue = keyAccessList.get(0).getAccesses();
+
+      for (KeyAccess keyAccess : keyAccessList) {
+         assert keyAccess.getAccesses() <= maxValue : "Different order: " + keyAccess.getAccesses()  + " > " + maxValue;
+         maxValue = keyAccess.getAccesses();
+      }
+   }
+
+   private TestKey createRandomKey() {
+      return new TestKey(KEY_NEXT_ID.incrementAndGet(), new TestAddress(0), new TestAddress(1));
    }
 
    private void assertAccesses(ObjectRequest request, Map<Object, Long> remote, Map<Object, Long> local) {

@@ -8,10 +8,13 @@ import org.infinispan.stats.topK.StreamLibContainer;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import static org.infinispan.stats.topK.StreamLibContainer.Stat.*;
 
 /**
  * Manages all the remote access and creates the request list to send to each other member
@@ -113,13 +116,23 @@ public class AccessesManager {
          log.trace("Calculating accessed keys for data placement optimization");
       }
 
-      Map<Object, Long> tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.REMOTE_GET, maxNumberOfKeysToRequest);
+      RemoteTopKeyRequest request = new RemoteTopKeyRequest(streamLibContainer.getCapacity() * 2);
 
-      sortObjectsByPrimaryOwner(tempAccesses, true);
+      request.merge(streamLibContainer.getTopKFrom(REMOTE_PUT, maxNumberOfKeysToRequest), 1);
+      request.merge(streamLibContainer.getTopKFrom(REMOTE_GET, maxNumberOfKeysToRequest), 1);
 
-      tempAccesses = streamLibContainer.getTopKFrom(StreamLibContainer.Stat.LOCAL_GET);
+      sortObjectsByPrimaryOwner(request.toRequestMap(maxNumberOfKeysToRequest), true);
 
-      sortObjectsByPrimaryOwner(tempAccesses, false);
+      request.clear();
+
+      LocalTopKeyRequest localTopKeyRequest = new LocalTopKeyRequest();
+
+      localTopKeyRequest.merge(streamLibContainer.getTopKFrom(LOCAL_PUT), 1);
+      localTopKeyRequest.merge(streamLibContainer.getTopKFrom(LOCAL_GET), 1);
+
+      sortObjectsByPrimaryOwner(localTopKeyRequest.toRequestMap(), false);
+
+      request.clear();
 
       if (log.isTraceEnabled()) {
          StringBuilder stringBuilder = new StringBuilder("Accesses:\n");
@@ -129,8 +142,10 @@ public class AccessesManager {
          log.debug(stringBuilder);
       }
 
-      streamLibContainer.resetStat(StreamLibContainer.Stat.REMOTE_GET);
-      streamLibContainer.resetStat(StreamLibContainer.Stat.LOCAL_GET);
+      streamLibContainer.resetStat(REMOTE_GET);
+      streamLibContainer.resetStat(LOCAL_GET);
+      streamLibContainer.resetStat(REMOTE_PUT);
+      streamLibContainer.resetStat(LOCAL_PUT);
    }
 
    public final ObjectRequest[] getAccesses() {
@@ -202,6 +217,201 @@ public class AccessesManager {
          return "Accesses{" +
                "localAccesses=" + localAccesses.size() +
                ", remoteAccesses=" + remoteAccesses.size() +
+               '}';
+      }
+   }
+
+   public static class RemoteTopKeyRequest {
+
+      private final Map<Object, Integer> keyAccessIndexMap;
+      private final ArrayList<KeyAccess> sortedKeyAccess;
+
+      public RemoteTopKeyRequest(int expectedSize) {
+         keyAccessIndexMap = new HashMap<Object, Integer>();
+         sortedKeyAccess = new ArrayList<KeyAccess>(expectedSize * 2);
+      }
+
+      private void add(Object key, long accesses) {
+         if (accesses <= 0) {
+            return;
+         }
+
+         Integer index = keyAccessIndexMap.get(key);
+
+         if (index == null) {
+            KeyAccess keyAccess = new KeyAccess(key, accesses);
+            add(keyAccess);
+         } else {
+            KeyAccess keyAccess = sortedKeyAccess.get(index);
+            keyAccess.accesses += accesses;
+            update(index);
+         }
+      }
+
+      private void add(KeyAccess keyAccess) {
+         int indexToInsert = 0;
+         while (indexToInsert < sortedKeyAccess.size()) {
+            KeyAccess current = sortedKeyAccess.get(indexToInsert);
+            if (keyAccess.accesses >= current.accesses) {
+               addAndUpdateIndexes(keyAccess, indexToInsert);
+               return;
+            }
+            indexToInsert++;
+         }
+         addAndUpdateIndexes(keyAccess, indexToInsert);
+      }
+
+      private void update(int index) {
+         KeyAccess toUpdate = sortedKeyAccess.remove(index);
+         if (index == sortedKeyAccess.size()) {
+            index--;
+         }
+
+         while (index >= 0) {
+            KeyAccess current = sortedKeyAccess.get(index);
+            if (toUpdate.accesses <= current.accesses) {
+               addAndUpdateIndexes(toUpdate, index + 1);
+               return;
+            }
+            index--;
+         }
+         addAndUpdateIndexes(toUpdate, index + 1);
+      }
+
+      private void addAndUpdateIndexes(KeyAccess keyAccess, int index) {
+         sortedKeyAccess.add(index, keyAccess);
+         keyAccessIndexMap.put(keyAccess.key, index);
+         for (int i = index + 1; i < sortedKeyAccess.size(); ++i) {
+            keyAccessIndexMap.put(sortedKeyAccess.get(i).key, i);
+         }
+      }
+
+      public final boolean contains(Object key) {
+         return keyAccessIndexMap.containsKey(key);
+      }
+
+      public final KeyAccess get(Object key) {
+         Integer index = keyAccessIndexMap.get(key);
+         return index == null ? null : sortedKeyAccess.get(index);
+      }
+
+      public final ArrayList<KeyAccess> getSortedKeyAccess() {
+         return sortedKeyAccess;
+      }
+
+      public final void merge(Map<Object, Long> toMerge, double multiplierFactor) {
+         for (Entry<Object, Long> entry : toMerge.entrySet()) {
+            add(entry.getKey(), (long) (entry.getValue() * multiplierFactor));
+         }
+      }
+
+      public final Map<Object, Long> toRequestMap(int maxSize) {
+         Map<Object, Long> map = new HashMap<Object, Long>();
+         int size = 0;
+         for (KeyAccess keyAccess : sortedKeyAccess) {
+            if (size >= maxSize) {
+               return map;
+            }
+            map.put(keyAccess.key, keyAccess.accesses);
+            size++;
+         }
+         return map;
+      }
+
+      public final void clear() {
+         keyAccessIndexMap.clear();
+         sortedKeyAccess.clear();
+      }
+
+      @Override
+      public String toString() {
+         return "RemoteTopKeyRequest{" +
+               "keyAccessIndexMap=" + keyAccessIndexMap +
+               ", sortedKeyAccess=" + sortedKeyAccess +
+               '}';
+      }
+   }
+
+   public static class LocalTopKeyRequest {
+
+      private final Map<Object, KeyAccess> keyAccessMap;
+
+      public LocalTopKeyRequest() {
+         keyAccessMap = new HashMap<Object, KeyAccess>();
+      }
+
+      private void add(Object key, long accesses) {
+         if (accesses <= 0) {
+            return;
+         }
+
+         KeyAccess access = keyAccessMap.get(key);
+
+         if (access == null) {
+            access = new KeyAccess(key, accesses);
+            keyAccessMap.put(key, access);
+         } else {
+            access.accesses += accesses;
+         }
+      }
+
+      public final boolean contains(Object key) {
+         return keyAccessMap.containsKey(key);
+      }
+
+      public final KeyAccess get(Object key) {
+         return keyAccessMap.get(key);
+      }
+
+      public final void merge(Map<Object, Long> toMerge, double multiplierFactor) {
+         for (Entry<Object, Long> entry : toMerge.entrySet()) {
+            add(entry.getKey(), (long) (entry.getValue() * multiplierFactor));
+         }
+      }
+
+      public final Map<Object, Long> toRequestMap() {
+         Map<Object, Long> map = new HashMap<Object, Long>();
+         for (KeyAccess keyAccess : keyAccessMap.values()) {
+            map.put(keyAccess.key, keyAccess.accesses);
+         }
+         return map;
+      }
+
+      public final void clear() {
+         keyAccessMap.clear();
+      }
+
+      @Override
+      public String toString() {
+         return "LocalTopKeyRequest{" +
+               "keyAccessMap=" + keyAccessMap +
+               '}';
+      }
+   }
+
+   public static class KeyAccess {
+
+      private final Object key;
+      private long accesses;
+
+      public KeyAccess(Object key, long accesses) {
+         this.key = key;
+         this.accesses = accesses;
+      }
+
+      public final Object getKey() {
+         return key;
+      }
+
+      public final long getAccesses() {
+         return accesses;
+      }
+
+      @Override
+      public String toString() {
+         return "KeyAccess{" +
+               "key=" + key +
+               ", accesses=" + accesses +
                '}';
       }
    }
