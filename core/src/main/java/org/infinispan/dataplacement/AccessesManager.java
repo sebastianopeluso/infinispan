@@ -118,7 +118,7 @@ public class AccessesManager {
 
       RemoteTopKeyRequest request = new RemoteTopKeyRequest(streamLibContainer.getCapacity() * 2);
 
-      request.merge(streamLibContainer.getTopKFrom(REMOTE_PUT, maxNumberOfKeysToRequest), 1);
+      request.merge(streamLibContainer.getTopKFrom(REMOTE_PUT, maxNumberOfKeysToRequest), 2);
       request.merge(streamLibContainer.getTopKFrom(REMOTE_GET, maxNumberOfKeysToRequest), 1);
 
       sortObjectsByPrimaryOwner(request.toRequestMap(maxNumberOfKeysToRequest), true);
@@ -127,7 +127,7 @@ public class AccessesManager {
 
       LocalTopKeyRequest localTopKeyRequest = new LocalTopKeyRequest();
 
-      localTopKeyRequest.merge(streamLibContainer.getTopKFrom(LOCAL_PUT), 1);
+      localTopKeyRequest.merge(streamLibContainer.getTopKFrom(LOCAL_PUT), 2);
       localTopKeyRequest.merge(streamLibContainer.getTopKFrom(LOCAL_GET), 1);
 
       sortObjectsByPrimaryOwner(localTopKeyRequest.toRequestMap(), false);

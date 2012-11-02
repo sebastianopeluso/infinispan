@@ -21,9 +21,9 @@ import java.util.concurrent.locks.ReentrantLock;
 public class StreamLibContainer {
 
    private static final StreamLibContainer instance = new StreamLibContainer();
-   public static final int MAX_CAPACITY = 30000;
+   public static final int MAX_CAPACITY = 10000;
 
-   private int CAPACITY = 2000;
+   private int CAPACITY = 5000;
    private boolean active = false;
 
    private final Map<Stat, StreamSummary<Object>> streamSummaryEnumMap;
