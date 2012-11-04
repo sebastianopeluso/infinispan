@@ -183,7 +183,14 @@ public class DataPlacementManager {
             log.tracef("All keys request list received. Object to move are " + objectsToMove);
          }
 
+         long start = System.nanoTime();
          ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(objectsToMove, defaultNumberOfOwners);
+
+         if (objectLookup == null) {
+            log.errorf("Object lookup created is null");
+         }
+
+         stats.setObjectLookupCreationDuration(System.nanoTime() - start);
 
          statsAsync.submit(new ObjectLookupTask(objectsToMove, objectLookup, stats));
 
@@ -304,13 +311,20 @@ public class DataPlacementManager {
       if (log.isTraceEnabled()) {
          log.trace("Data rehashed event trigger");
       }
+      log.errorf("Data Rehash Event triggered");
       if (event.getMembersAtEnd().size() == event.getMembersAtStart().size()) {
+         if (log.isTraceEnabled()) {
+            log.tracef("Membership didn't change. may be key movement! Is pre? %s (%s)", event.isPre(), expectPre);
+         }
          if (event.isPre() && expectPre) {
+            log.errorf("Start State Transfer");
             stats.startStateTransfer();
             expectPre = false;
          } else if(!event.isPre() && !expectPre) {
+            log.errorf("End State Transfer");
             stats.endStateTransfer();
-            statsAsync.submit(new CheckKeysMovedTask(event.getKeysMoved(), objectPlacementManager, stats));
+            statsAsync.submit(new CheckKeysMovedTask(event.getKeysMoved(), objectPlacementManager, stats,
+                                                     accessesManager.getDefaultConsistentHash(), rpcManager.getAddress()));
             statsAsync.submit(new SaveStatsTask(stats));
             expectPre = true;
             roundManager.markRoundFinished();

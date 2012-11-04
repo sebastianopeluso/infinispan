@@ -1,6 +1,8 @@
 package org.infinispan.dataplacement.stats;
 
 import org.infinispan.dataplacement.ObjectPlacementManager;
+import org.infinispan.distribution.ch.ConsistentHash;
+import org.infinispan.remoting.transport.Address;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -17,8 +19,13 @@ public class CheckKeysMovedTask implements Runnable {
    private final Set<Object> keysMoved;
    private final Set<Object> keysToMove;
    private final Stats stats;
+   private final ConsistentHash consistentHash;
+   private final Address localAddress;
 
-   public CheckKeysMovedTask(Collection<Object> keysMoved, ObjectPlacementManager manager, Stats stats) {
+   public CheckKeysMovedTask(Collection<Object> keysMoved, ObjectPlacementManager manager, Stats stats,
+                             ConsistentHash consistentHash, Address localAddress) {
+      this.consistentHash = consistentHash;
+      this.localAddress = localAddress;
       this.keysMoved = new HashSet<Object>(keysMoved);
       this.keysToMove = new HashSet<Object>(manager.getKeysToMove());
       this.stats = stats;
@@ -28,6 +35,12 @@ public class CheckKeysMovedTask implements Runnable {
    @Override
    public void run() {
       keysMoved.removeAll(keysToMove);
-      stats.wrongKeyMovedErrors(keysMoved.size());
+      int errors = 0;
+      for (Object key : keysMoved) {
+         if (localAddress.equals(consistentHash.primaryLocation(key))) {
+            errors++;
+         }
+      }
+      stats.wrongKeyMovedErrors(errors);
    }
 }

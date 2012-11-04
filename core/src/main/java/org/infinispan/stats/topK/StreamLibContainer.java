@@ -21,9 +21,9 @@ import java.util.concurrent.locks.ReentrantLock;
 public class StreamLibContainer {
 
    private static final StreamLibContainer instance = new StreamLibContainer();
-   public static final int MAX_CAPACITY = 10000;
+   public static final int MAX_CAPACITY = 20000;
 
-   private int CAPACITY = 5000;
+   private int capacity = 100;
    private boolean active = false;
 
    private final Map<Stat, StreamSummary<Object>> streamSummaryEnumMap;
@@ -67,14 +67,14 @@ public class StreamLibContainer {
 
    public void setCapacity(int capacity) {
       if(capacity <= 0) {
-         this.CAPACITY = 1;
+         this.capacity = 1;
       } else {
-         this.CAPACITY = capacity;
+         this.capacity = capacity;
       }
    }
-   
+
    public int getCapacity(){
-	   return CAPACITY;
+	   return capacity;
    }
 
    public void addGet(Object key, boolean remote) {
@@ -112,7 +112,7 @@ public class StreamLibContainer {
    }
 
    public Map<Object, Long> getTopKFrom(Stat stat) {
-      return getTopKFrom(stat, CAPACITY);
+      return getTopKFrom(stat, capacity);
    }
 
    public Map<Object, Long> getTopKFrom(Stat stat, int topK) {
@@ -150,7 +150,7 @@ public class StreamLibContainer {
    }
 
    private StreamSummary<Object> createNewStreamSummary() {
-      return new StreamSummary<Object>(Math.max(MAX_CAPACITY, CAPACITY));
+      return new StreamSummary<Object>(Math.max(MAX_CAPACITY, capacity));
    }
 
    private void clearAll() {

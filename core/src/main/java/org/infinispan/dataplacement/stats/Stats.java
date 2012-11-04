@@ -39,11 +39,11 @@ public class Stats {
        */
       NEW_OWNERS,
       /**
-       * the timestamp when all objects lookup are received 
+       * the timestamp when all objects lookup are received
        */
       RECEIVED_OBJECT_LOOKUP,
       /**
-       * the timestamp when the acks are received 
+       * the timestamp when the acks are received
        */
       ACKS,
       /**
@@ -62,7 +62,7 @@ public class Stats {
        */
       WRONG_OWNER,
       /**
-       * the number of keys that are moved but they aren+t supposed to be moved
+       * the number of keys that are moved but they aren't supposed to be moved
        */
       WRONG_MOVE,
       /**
@@ -82,11 +82,19 @@ public class Stats {
       OBJECT_LOOKUP
    }
 
+   private static enum Duration {
+      /**
+       * time (in nanoseconds) to create the object lookup
+       */
+      OBJECT_LOOKUP_CREATION
+   }
+
    private final IncrementableLong[] durations;
 
    private final EnumMap<Counter, IncrementalInteger> counters;
    private final EnumMap<TimeStamp, Long> timestamps;
    private final EnumMap<Size, Integer> messageSizes;
+   private final EnumMap<Duration, Long> duration;
 
    public Stats(long roundId, int size) {
       this.roundId = roundId;
@@ -105,6 +113,8 @@ public class Stats {
       for (int i = 0; i < size; ++i) {
          durations[i] = new IncrementableLong();
       }
+
+      duration = new EnumMap<Duration, Long>(Duration.class);
    }
 
    public final IncrementableLong[] createQueryPhaseDurationsArray() {
@@ -171,7 +181,14 @@ public class Stats {
       }
    }
 
+   public final void setObjectLookupCreationDuration(long duration) {
+      this.duration.put(Duration.OBJECT_LOOKUP_CREATION, duration);
+   }
+
    public final void saveTo(BufferedWriter writer, boolean printHeader) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Saving statistics to %s. print headers? %s", writer, printHeader);
+      }
       try {
          if (printHeader) {
             writer.write("RoundId");
@@ -187,6 +204,10 @@ public class Stats {
                writer.write(",");
                writer.write(size.toString());
             }
+            for (Duration duration : Duration.values()) {
+               writer.write(",");
+               writer.write(duration.toString());
+            }
             for (int i = 0; i < durations.length; ++i) {
                writer.write(",");
                writer.write("QUERY_DURATION_PHASE_" + i);
@@ -195,25 +216,17 @@ public class Stats {
          }
 
          writer.write(Long.toString(roundId));
-         for (TimeStamp timeStamp : TimeStamp.values()) {
-            writer.write(",");
-            writer.write(timestamps.get(timeStamp).toString());
-         }
-         for (Counter counter : Counter.values()) {
-            writer.write(",");
-            writer.write(counters.get(counter).toString());
-         }
-         for (Size size : Size.values()) {
-            writer.write(",");
-            writer.write(messageSizes.get(size).toString());
-         }
+         write(writer, timestamps, TimeStamp.values());
+         write(writer, counters, Counter.values());
+         write(writer, messageSizes, Size.values());
+         write(writer, duration, Duration.values());
          for (IncrementableLong duration : durations) {
             writer.write(",");
-            writer.write(duration.toString());
+            writer.write(duration == null ? "N/A" : duration.toString());
          }
          writer.newLine();
          writer.flush();
-      } catch (IOException e) {
+      } catch (Exception e) {
          log.errorf(e, "Error saving stats %s.", this);
       }
    }
@@ -225,6 +238,14 @@ public class Stats {
             ", counters=" + counters +
             ", timestamps=" + timestamps +
             '}';
+   }
+
+   private void write(BufferedWriter writer, EnumMap map, Enum[] values) throws IOException {
+      for (Enum e : values) {
+         writer.write(",");
+         Object value = map.get(e);
+         writer.write(value == null ? "N/A" : value.toString());
+      }
    }
 
    private class IncrementalInteger {

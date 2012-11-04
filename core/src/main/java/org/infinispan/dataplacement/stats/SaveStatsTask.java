@@ -30,12 +30,13 @@ public class SaveStatsTask implements Runnable {
    @Override
    public void run() {
       try {
+         log.errorf("Save stats to %s, first time %s", PATH, FIRST_TIME.get());
          BufferedWriter writer = new BufferedWriter(new FileWriter(PATH, !FIRST_TIME.get()));
          stats.saveTo(writer, FIRST_TIME.compareAndSet(true, false));
          writer.flush();
          writer.close();
-      } catch (IOException e) {
-         log.warnf(e, "Error saving stats to %s", PATH);
+      } catch (Exception e) {
+         log.errorf(e, "Error saving stats to %s", PATH);
       }
    }
 }

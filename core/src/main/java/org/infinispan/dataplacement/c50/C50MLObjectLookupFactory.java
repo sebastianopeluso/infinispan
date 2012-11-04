@@ -174,7 +174,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
     *
     * @throws java.io.IOException   if an error occurs when launch the process
     * @param iteration              the iteration number
-    * @throws InterruptedException  if interrupted while waiting    
+    * @throws InterruptedException  if interrupted while waiting
     */
    private void runMachineLearner(int iteration) throws IOException, InterruptedException {
       Process process = Runtime.getRuntime()
@@ -193,7 +193,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
     *
     * @param possibleReturnValues   the possible values of the decision
     * @param iteration              the iteration number
-    * @return                       true if the file was correctly written, false otherwise 
+    * @return                       true if the file was correctly written, false otherwise
     */
    private boolean writeInputNames(Collection<Integer> possibleReturnValues, int iteration) {
       BufferedWriter writer = getBufferedWriter(String.format(INPUT_ML_NAMES_FORMAT,machineLearnerPath,iteration));
@@ -216,12 +216,13 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
             writer.write("home: -2,-1");
          } else if (possibleReturnValues.size() == 1) {
             writer.write("home: -1,");
+         } else {
+            writer.write("home: ");
          }
 
          Iterator<Integer> iterator = possibleReturnValues.iterator();
 
          if (iterator.hasNext()) {
-            writer.write("home: ");
             writer.write(Integer.toString(iterator.next()));
          }
 
@@ -241,10 +242,10 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    }
 
    /**
-    * writes a single feature in the input.names 
+    * writes a single feature in the input.names
     *
     *
-    * @param writer        the writer for the file          
+    * @param writer        the writer for the file
     * @param feature       the feature instance (with type, etc...)
     * @throws IOException  if it cannot write in the file
     */
@@ -303,7 +304,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
     * writes a single key in the input.data
     *
     * @param key           the key
-    * @param nodeIndex     the new owner index  
+    * @param nodeIndex     the new owner index
     * @param writer        the writer for input.data
     * @throws IOException  if it cannot write on it
     */
@@ -330,7 +331,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    /**
     * returns a buffered writer for the file in file path
     *
-    * @param filePath   the file path                       
+    * @param filePath   the file path
     * @return           the buffered writer or null if the file cannot be written
     */
    private BufferedWriter getBufferedWriter(String filePath) {

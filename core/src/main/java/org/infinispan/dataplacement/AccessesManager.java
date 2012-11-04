@@ -86,7 +86,7 @@ public class AccessesManager {
    /**
     * sets the max number of keys to request to a new value, only if is higher than zero
     *
-    * @param maxNumberOfKeysToRequest  the new value  
+    * @param maxNumberOfKeysToRequest  the new value
     */
    public synchronized final void setMaxNumberOfKeysToRequest(int maxNumberOfKeysToRequest) {
       if (maxNumberOfKeysToRequest > 0) {
@@ -161,7 +161,7 @@ public class AccessesManager {
     *
     *
     * @param accesses   the remote accesses
-    * @param remote     true if the accesses to process are from remote access, false otherwise      
+    * @param remote     true if the accesses to process are from remote access, false otherwise
     */
    @SuppressWarnings("unchecked")
    private void sortObjectsByPrimaryOwner(Map<Object, Long> accesses, boolean remote) {
@@ -186,7 +186,7 @@ public class AccessesManager {
     *
     * @return  the actual consistent hashing
     */
-   private ConsistentHash getDefaultConsistentHash() {
+   public final ConsistentHash getDefaultConsistentHash() {
       ConsistentHash hash = this.distributionManager.getConsistentHash();
       return hash instanceof DataPlacementConsistentHash ?
             ((DataPlacementConsistentHash) hash).getDefaultHash() :
