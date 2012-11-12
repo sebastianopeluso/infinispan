@@ -75,7 +75,7 @@ public class BloomierFilterObjectLookupFactory implements ObjectLookupFactory {
    }
 
    private ImmutableBloomierFilter<Object, Integer> createBloomierFilter(Map<Object, Integer> newOwners) throws TimeoutException {
-      int numberOfKeys = newOwners.size() * 3;
+      int numberOfKeys = newOwners.size() * 4;
       return new ImmutableBloomierFilter<Object, Integer>(newOwners, numberOfKeys, numberOfHashes, VALUE_SIZE,
                                                           Integer.class, timeout);
    }

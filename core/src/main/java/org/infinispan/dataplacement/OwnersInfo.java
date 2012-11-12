@@ -1,16 +1,17 @@
 package org.infinispan.dataplacement;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
 /**
- * Maintains information about the new owners and their number of accesses 
+ * Maintains information about the new owners and their number of accesses
  *
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class OwnersInfo {
+public class OwnersInfo implements Serializable {
    private final ArrayList<Integer> ownersIndexes;
    private final ArrayList<Long> ownersAccesses;
 

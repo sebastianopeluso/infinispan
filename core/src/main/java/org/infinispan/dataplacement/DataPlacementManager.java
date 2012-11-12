@@ -29,6 +29,8 @@ import org.infinispan.statetransfer.StateTransferManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -52,6 +54,7 @@ public class DataPlacementManager {
    private static final Log log = LogFactory.getLog(DataPlacementManager.class);
 
    private static final int INITIAL_COOL_DOWN_TIME = 30000; //30 seconds
+   private static final boolean SAVE = false;
 
    private RpcManager rpcManager;
    private CommandsFactory commandsFactory;
@@ -183,6 +186,8 @@ public class DataPlacementManager {
             log.tracef("All keys request list received. Object to move are " + objectsToMove);
          }
 
+         saveObjectsToMoveToFile(objectsToMove);
+
          long start = System.nanoTime();
          ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(objectsToMove, defaultNumberOfOwners);
 
@@ -274,6 +279,21 @@ public class DataPlacementManager {
     */
    public final void internalSetCoolDownTime(int milliseconds) {
       roundManager.setCoolDownTime(milliseconds);
+   }
+
+   private void saveObjectsToMoveToFile(Map<Object, OwnersInfo> ownersInfoMap) {
+      if (SAVE) {
+         try {
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(
+                  new FileOutputStream("round-" + roundManager.getCurrentRoundId()));
+            objectOutputStream.writeObject(ownersInfoMap);
+            objectOutputStream.flush();
+            objectOutputStream.close();
+         } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(-1);
+         }
+      }
    }
 
    /**
