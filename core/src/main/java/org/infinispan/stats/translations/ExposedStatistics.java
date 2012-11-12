@@ -28,8 +28,7 @@ public class ExposedStatistics {
       NUM_COMMITS(false, false),  //ONLY FOR QUERY
       NUM_LOCAL_COMMITS(false, false),  //ONLY FOR QUERY
 
-      NUM_PREPARES(true, false), // L
-      NUM_PUTS(true, true),               // C
+      NUM_PREPARES(true, false), // L      
       LOCAL_EXEC_NO_CONT(true, false),            // L
       LOCAL_CONTENTION_PROBABILITY(false, false),  // ONLY FOR QUERY, derived on the fly
       REMOTE_CONTENTION_PROBABILITY(false, false), //ONLY FOR QUERY, derived on the fly
@@ -41,15 +40,18 @@ public class ExposedStatistics {
       NUM_SUCCESSFUL_PUTS(true, false),   // L, this includes also repeated puts over the same item
       PUTS_PER_LOCAL_TX(false, false), // ONLY FOR QUERY, derived on the fly
       NUM_WAITED_FOR_LOCKS(true, true),   // C      
-      NUM_REMOTE_GET(true, true),         // C
-      NUM_GET(true,true),                  //C
-      NUM_SUCCESSFUL_GETS_RO_TX(true,true),   //C
-      NUM_SUCCESSFUL_GETS_WR_TX(true,true), //C
-      NUM_SUCCESSFUL_REMOTE_GETS_WR_TX(true,true), //C
-      NUM_SUCCESSFUL_REMOTE_GETS_RO_TX(true,true),//C
-      REMOTE_GET_EXECUTION(true, true),   // C
-      REMOTE_PUT_EXECUTION(true, true),   // C
-      NUM_REMOTE_PUT(true, true),         // C
+      NUM_REMOTE_GET(true, true),                  // C
+      NUM_GET(true,true),                          // C
+      NUM_SUCCESSFUL_GETS_RO_TX(true,true),        // C
+      NUM_SUCCESSFUL_GETS_WR_TX(true,true),        // C
+      NUM_SUCCESSFUL_REMOTE_GETS_WR_TX(true,true), // C
+      NUM_SUCCESSFUL_REMOTE_GETS_RO_TX(true,true), // C
+      REMOTE_GET_EXECUTION(true, true),            // C
+      REMOTE_PUT_EXECUTION(true, true),            // C
+      NUM_REMOTE_PUT(true, true),                  // C
+      NUM_PUT(true, true),                         // C      
+      NUM_SUCCESSFUL_PUTS_WR_TX(true,true),        // C
+      NUM_SUCCESSFUL_REMOTE_PUTS_WR_TX(true,true), // C
       TX_WRITE_PERCENTAGE(false, false),           // ONLY FOR QUERY, derived on the fly
       SUCCESSFUL_WRITE_PERCENTAGE(false, false),   // ONLY FOR QUERY, derived on the fly
       WR_TX_ABORTED_EXECUTION_TIME(true, true),    //C

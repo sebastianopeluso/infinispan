@@ -78,7 +78,7 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
          this.initStatsIfNecessary(ctx);
          TransactionsStatisticsRegistry.setUpdateTransaction();
          long currTime = System.nanoTime();
-         TransactionsStatisticsRegistry.incrementValue(IspnStats.NUM_PUTS);
+         TransactionsStatisticsRegistry.incrementValue(IspnStats.NUM_PUT);
          try {
             ret =  invokeNextInterceptor(ctx,command);
          } catch (TimeoutException e) {
@@ -609,6 +609,24 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
    @Operation(displayName = "Remote get cost")
    public long getRemoteGetExecutionTime(){
       return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.REMOTE_GET_EXECUTION);
+   }
+
+   @ManagedAttribute(description = "Average number of put operations per (local) read-write transaction")
+   @Operation(displayName = "Average number of put operations per (local) read-write transaction")
+   public long getAvgPutsPerWrTransaction(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.NUM_SUCCESSFUL_PUTS_WR_TX);
+   }
+
+   @ManagedAttribute(description = "Average number of remote put operations per (local) read-write transaction")
+   @Operation(displayName = "Average number of remote put operations per (local) read-write transaction")
+   public long getAvgRemotePutsPerWrTransaction(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.NUM_SUCCESSFUL_REMOTE_PUTS_WR_TX);
+   }
+
+   @ManagedAttribute(description = "Average cost of a remote put")
+   @Operation(displayName = "Remote put cost")
+   public long getRemotePutExecutionTime(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.REMOTE_PUT_EXECUTION);
    }
 
    @ManagedAttribute(description = "Number of committed transactions since last reset")

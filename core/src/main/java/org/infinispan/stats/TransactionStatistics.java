@@ -106,6 +106,8 @@ public abstract class TransactionStatistics implements InfinispanStat {
             this.addValue(IspnStats.WR_TX_SUCCESSFUL_EXECUTION_TIME,execTime);
             this.addValue(IspnStats.NUM_SUCCESSFUL_GETS_WR_TX, this.getValue(IspnStats.NUM_GET));
             this.addValue(IspnStats.NUM_SUCCESSFUL_REMOTE_GETS_WR_TX, this.getValue(IspnStats.NUM_REMOTE_GET));
+            this.addValue(IspnStats.NUM_SUCCESSFUL_PUTS_WR_TX, this.getValue(IspnStats.NUM_PUT));
+            this.addValue(IspnStats.NUM_SUCCESSFUL_REMOTE_PUTS_WR_TX, this.getValue(IspnStats.NUM_REMOTE_PUT));
          } else{
             this.incrementValue(IspnStats.NUM_ABORTED_WR_TX);
             this.addValue(IspnStats.WR_TX_ABORTED_EXECUTION_TIME,execTime);

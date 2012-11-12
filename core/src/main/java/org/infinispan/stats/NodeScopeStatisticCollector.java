@@ -164,7 +164,7 @@ public class NodeScopeStatisticCollector {
 
          }
          case LOCAL_CONTENTION_PROBABILITY:{
-            long numLocalPuts = localTransactionStatistics.getValue(IspnStats.NUM_PUTS);
+            long numLocalPuts = localTransactionStatistics.getValue(IspnStats.NUM_PUT);
             if(numLocalPuts != 0){
                long numLocalLocalContention = localTransactionStatistics.getValue(IspnStats.LOCK_CONTENTION_TO_LOCAL);
                long numLocalRemoteContention = localTransactionStatistics.getValue(IspnStats.LOCK_CONTENTION_TO_REMOTE);
@@ -173,7 +173,7 @@ public class NodeScopeStatisticCollector {
             return new Double(0);
          }
          case REMOTE_CONTENTION_PROBABILITY:{
-            long numRemotePuts = remoteTransactionStatistics.getValue(IspnStats.NUM_PUTS);
+            long numRemotePuts = remoteTransactionStatistics.getValue(IspnStats.NUM_PUT);
             if(numRemotePuts != 0){
                long numRemoteLocalContention = remoteTransactionStatistics.getValue(IspnStats.LOCK_CONTENTION_TO_LOCAL);
                long numRemoteRemoteContention = remoteTransactionStatistics.getValue(IspnStats.LOCK_CONTENTION_TO_REMOTE);
@@ -182,8 +182,8 @@ public class NodeScopeStatisticCollector {
             return new Double(0);
          }
          case LOCK_CONTENTION_PROBABILITY:{
-            long numLocalPuts = localTransactionStatistics.getValue(IspnStats.NUM_PUTS);
-            long numRemotePuts = remoteTransactionStatistics.getValue(IspnStats.NUM_PUTS);
+            long numLocalPuts = localTransactionStatistics.getValue(IspnStats.NUM_PUT);
+            long numRemotePuts = remoteTransactionStatistics.getValue(IspnStats.NUM_PUT);
             long totalPuts = numLocalPuts + numRemotePuts;
             if(totalPuts!=0){
                long localLocal = localTransactionStatistics.getValue(IspnStats.LOCK_CONTENTION_TO_LOCAL);
@@ -267,6 +267,12 @@ public class NodeScopeStatisticCollector {
             return avgLocal(IspnStats.NUM_COMMITTED_WR_TX,IspnStats.NUM_SUCCESSFUL_REMOTE_GETS_WR_TX);
          case REMOTE_GET_EXECUTION:
             return microAvgLocal(IspnStats.NUM_REMOTE_GET, IspnStats.REMOTE_GET_EXECUTION);
+         case NUM_SUCCESSFUL_PUTS_WR_TX:
+            return avgLocal(IspnStats.NUM_COMMITTED_WR_TX,IspnStats.NUM_SUCCESSFUL_PUTS_WR_TX);
+         case NUM_SUCCESSFUL_REMOTE_PUTS_WR_TX:
+            return avgLocal(IspnStats.NUM_COMMITTED_WR_TX,IspnStats.NUM_SUCCESSFUL_REMOTE_PUTS_WR_TX);
+         case REMOTE_PUT_EXECUTION:
+            return microAvgLocal(IspnStats.NUM_REMOTE_PUT, IspnStats.REMOTE_PUT_EXECUTION);
          case NUM_LOCK_FAILED_DEADLOCK:
          case NUM_LOCK_FAILED_TIMEOUT:
             return new Long(localTransactionStatistics.getValue(param));
