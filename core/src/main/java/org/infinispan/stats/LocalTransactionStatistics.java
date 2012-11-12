@@ -38,7 +38,7 @@ public class LocalTransactionStatistics extends TransactionStatistics {
    @Override
    protected final void terminate() {
       if (!isReadOnly() && isCommit()) {
-         long numPuts = this.getValue(IspnStats.NUM_PUTS);
+         long numPuts = this.getValue(IspnStats.NUM_PUT);
          this.addValue(IspnStats.NUM_SUCCESSFUL_PUTS, numPuts);
          this.addValue(IspnStats.NUM_HELD_LOCKS_SUCCESS_TX, getValue(IspnStats.NUM_HELD_LOCKS));
          if (isCommit()) {
