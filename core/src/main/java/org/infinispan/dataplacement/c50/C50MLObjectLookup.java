@@ -37,6 +37,14 @@ public class C50MLObjectLookup implements ObjectLookup {
       this.keyFeatureManager = keyFeatureManager;
    }
 
+   public BloomFilter getBloomFilter() {
+      return bloomFilter;
+   }
+
+   public DecisionTree[] getDecisionTreeArray() {
+      return decisionTreeArray;
+   }
+
    @Override
    public List<Integer> query(Object key) {
       if (!bloomFilter.contains(key)) {

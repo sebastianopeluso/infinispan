@@ -82,6 +82,15 @@ public class Type3Node implements DecisionTreeNode {
       return value;
    }
 
+   @Override
+   public int getDeep() {
+      int maxDeep = 0;
+      for (DecisionTreeNode decisionTreeNode : forks) {
+         maxDeep = Math.max(maxDeep, decisionTreeNode.getDeep());
+      }
+      return maxDeep + 1;
+   }
+
    public static class InternalEltsValues implements Serializable {
       private final FeatureValue[] values;
 

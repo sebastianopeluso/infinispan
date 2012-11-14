@@ -74,4 +74,13 @@ public class Type2Node implements DecisionTreeNode {
    public int getValue() {
       return value;
    }
+
+   @Override
+   public int getDeep() {
+      int maxDeep = 0;
+      for (DecisionTreeNode decisionTreeNode : forks) {
+         maxDeep = Math.max(maxDeep, decisionTreeNode.getDeep());
+      }
+      return maxDeep + 1;
+   }
 }

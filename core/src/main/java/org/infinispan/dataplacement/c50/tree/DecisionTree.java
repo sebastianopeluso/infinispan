@@ -46,4 +46,11 @@ public class DecisionTree implements Serializable {
 
       return result.getValue();
    }
+
+   /**
+    * @return  the deep of the tree
+    */
+   public final int getDeep() {
+      return root.getDeep();
+   }
 }

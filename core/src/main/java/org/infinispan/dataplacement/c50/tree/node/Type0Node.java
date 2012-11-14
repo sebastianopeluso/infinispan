@@ -35,4 +35,9 @@ public class Type0Node implements DecisionTreeNode {
    public int getValue() {
       return value;
    }
+
+   @Override
+   public int getDeep() {
+      return 0;
+   }
 }

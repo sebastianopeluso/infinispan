@@ -28,4 +28,9 @@ public interface DecisionTreeNode extends Serializable {
     * @return  the value of the node (i.e. the new owner)
     */
    int getValue();
+
+   /**
+    * @return  the deep of the sub-tree where this node is the root
+    */
+   int getDeep();
 }
