@@ -433,6 +433,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
       final RspFilter filter;
       final Map<Future<Object>, SenderContainer> futures = new HashMap<Future<Object>, SenderContainer>(4);
       final long timeout;
+      final long endTimeStamp;
       @GuardedBy("this")
       private RspList<Object> retval;
       @GuardedBy("this")
@@ -444,6 +445,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          this.filter = filter;
          this.expectedResponses = expectedResponses;
          this.timeout = timeout;
+         this.endTimeStamp = System.currentTimeMillis() + timeout;
       }
 
       public void watchFuture(NotifyingFuture<Object> f, Address address) {
@@ -452,7 +454,8 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
       }
 
       public synchronized RspList<Object> getResponseList() throws Exception {
-         while (expectedResponses > 0 && retval == null) {
+         //TODO, while is it blocking in here?!?! 
+         while (expectedResponses > 0 && retval == null && System.currentTimeMillis() <= endTimeStamp) {
             try {
                this.wait(timeout);
             } catch (InterruptedException e) {
