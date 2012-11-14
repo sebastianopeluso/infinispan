@@ -7,6 +7,8 @@ import org.infinispan.stats.translations.ExposedStatistics.IspnStats;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import static org.infinispan.stats.translations.ExposedStatistics.IspnStats.*;
+
 
 /**
  * Websiste: www.cloudtm.eu
@@ -227,9 +229,9 @@ public class NodeScopeStatisticCollector {
          }
          case TX_WRITE_PERCENTAGE:{     //computed on the locally born txs
             long readTx = localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_RO_TX) +
-                  localTransactionStatistics.getValue(IspnStats.NUM_ABORTED_RO_TX);
+                  localTransactionStatistics.getValue(NUM_ABORTED_RO_TX);
             long writeTx = localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_WR_TX) +
-                  localTransactionStatistics.getValue(IspnStats.NUM_ABORTED_WR_TX);
+                  localTransactionStatistics.getValue(NUM_ABORTED_WR_TX);
             long total = readTx + writeTx;
             if(total!=0)
                return new Double(writeTx * 1.0 / total);
@@ -258,9 +260,9 @@ public class NodeScopeStatisticCollector {
             return new Double(0);
          }
          case NUM_SUCCESSFUL_GETS_RO_TX:
-            return avgLocal(IspnStats.NUM_COMMITTED_RO_TX,IspnStats.NUM_SUCCESSFUL_GETS_RO_TX);
+            return avgLocal(IspnStats.NUM_COMMITTED_RO_TX, NUM_SUCCESSFUL_GETS_RO_TX);
          case NUM_SUCCESSFUL_GETS_WR_TX:
-            return avgLocal(IspnStats.NUM_COMMITTED_WR_TX,IspnStats.NUM_SUCCESSFUL_GETS_WR_TX);
+            return avgLocal(IspnStats.NUM_COMMITTED_WR_TX, NUM_SUCCESSFUL_GETS_WR_TX);
          case NUM_SUCCESSFUL_REMOTE_GETS_RO_TX:
             return avgLocal(IspnStats.NUM_COMMITTED_RO_TX,IspnStats.NUM_SUCCESSFUL_REMOTE_GETS_RO_TX);
          case NUM_SUCCESSFUL_REMOTE_GETS_WR_TX:
@@ -289,9 +291,9 @@ public class NodeScopeStatisticCollector {
          case CLUSTERED_GET_COMMAND_SIZE:
             return avgLocal(IspnStats.NUM_RTTS_GET, IspnStats.CLUSTERED_GET_COMMAND_SIZE);
          case NUM_LOCK_PER_LOCAL_TX:
-            return avgMultipleLocalCounters(IspnStats.NUM_HELD_LOCKS, IspnStats.NUM_COMMITTED_WR_TX, IspnStats.NUM_ABORTED_WR_TX);
+            return avgMultipleLocalCounters(IspnStats.NUM_HELD_LOCKS, IspnStats.NUM_COMMITTED_WR_TX, NUM_ABORTED_WR_TX);
          case NUM_LOCK_PER_REMOTE_TX:
-            return avgMultipleRemoteCounters(IspnStats.NUM_HELD_LOCKS, IspnStats.NUM_COMMITTED_WR_TX, IspnStats.NUM_ABORTED_WR_TX);
+            return avgMultipleRemoteCounters(IspnStats.NUM_HELD_LOCKS, IspnStats.NUM_COMMITTED_WR_TX, NUM_ABORTED_WR_TX);
          case NUM_LOCK_PER_SUCCESS_LOCAL_TX:
             return avgLocal(IspnStats.NUM_COMMITTED_WR_TX, IspnStats.NUM_HELD_LOCKS_SUCCESS_TX);
          case LOCAL_ROLLBACK_EXECUTION_TIME:
@@ -309,8 +311,8 @@ public class NodeScopeStatisticCollector {
          case TX_COMPLETE_NOTIFY_EXECUTION_TIME:
             return microAvgRemote(IspnStats.NUM_TX_COMPLETE_NOTIFY_COMMAND, IspnStats.TX_COMPLETE_NOTIFY_EXECUTION_TIME);
          case ABORT_RATE:
-            long totalAbort = localTransactionStatistics.getValue(IspnStats.NUM_ABORTED_RO_TX) +
-                  localTransactionStatistics.getValue(IspnStats.NUM_ABORTED_WR_TX);
+            long totalAbort = localTransactionStatistics.getValue(NUM_ABORTED_RO_TX) +
+                  localTransactionStatistics.getValue(NUM_ABORTED_WR_TX);
             long totalCommitAndAbort = localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_RO_TX) +
                   localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_WR_TX) + totalAbort;
             if (totalCommitAndAbort != 0) {
@@ -320,12 +322,12 @@ public class NodeScopeStatisticCollector {
          case ARRIVAL_RATE:
             long localCommittedTx = localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_RO_TX) +
                   localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_WR_TX);
-            long localAbortedTx = localTransactionStatistics.getValue(IspnStats.NUM_ABORTED_RO_TX) +
-                  localTransactionStatistics.getValue(IspnStats.NUM_ABORTED_WR_TX);
+            long localAbortedTx = localTransactionStatistics.getValue(NUM_ABORTED_RO_TX) +
+                  localTransactionStatistics.getValue(NUM_ABORTED_WR_TX);
             long remoteCommittedTx = remoteTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_RO_TX) +
                   remoteTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_WR_TX);
-            long remoteAbortedTx = remoteTransactionStatistics.getValue(IspnStats.NUM_ABORTED_RO_TX) +
-                  remoteTransactionStatistics.getValue(IspnStats.NUM_ABORTED_WR_TX);
+            long remoteAbortedTx = remoteTransactionStatistics.getValue(NUM_ABORTED_RO_TX) +
+                  remoteTransactionStatistics.getValue(NUM_ABORTED_WR_TX);
             long totalBornTx = localAbortedTx + localCommittedTx + remoteAbortedTx + remoteCommittedTx;
             return new Double(totalBornTx * 1.0 / convertNanosToSeconds(System.nanoTime() - this.lastResetTime));
          case THROUGHPUT:
@@ -347,13 +349,23 @@ public class NodeScopeStatisticCollector {
          case WRITE_SKEW_PROBABILITY:
             long totalTxs = localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_RO_TX) +
                   localTransactionStatistics.getValue(IspnStats.NUM_COMMITTED_WR_TX) +
-                  localTransactionStatistics.getValue(IspnStats.NUM_ABORTED_RO_TX) +
-                  localTransactionStatistics.getValue(IspnStats.NUM_ABORTED_WR_TX);
+                  localTransactionStatistics.getValue(NUM_ABORTED_RO_TX) +
+                  localTransactionStatistics.getValue(NUM_ABORTED_WR_TX);
             if (totalTxs != 0) {
                long writeSkew = localTransactionStatistics.getValue(IspnStats.NUM_WRITE_SKEW);
                return new Double(writeSkew * 1.0 / totalTxs);
             }
             return new Double(0);
+         case NUM_GET:
+            return localTransactionStatistics.getValue(NUM_SUCCESSFUL_GETS_WR_TX) +
+                  localTransactionStatistics.getValue(NUM_SUCCESSFUL_GETS_RO_TX);
+         case NUM_REMOTE_GET:
+            return localTransactionStatistics.getValue(NUM_SUCCESSFUL_REMOTE_GETS_WR_TX) +
+                  localTransactionStatistics.getValue(NUM_SUCCESSFUL_REMOTE_GETS_RO_TX);
+         case NUM_PUT:
+            return localTransactionStatistics.getValue(NUM_SUCCESSFUL_PUTS_WR_TX);
+         case NUM_REMOTE_PUT:
+            return localTransactionStatistics.getValue(NUM_SUCCESSFUL_REMOTE_PUTS_WR_TX);
          default:
             throw new NoIspnStatException("Invalid statistic "+param);
       }
