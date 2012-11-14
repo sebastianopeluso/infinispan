@@ -629,6 +629,30 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
       return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.REMOTE_PUT_EXECUTION);
    }
 
+   @ManagedAttribute(description = "Number of gets performed since last reset")
+   @Operation(displayName = "Number of Gets")
+   public long getNumberOfGets(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.NUM_GET);
+   }
+
+   @ManagedAttribute(description = "Number of remote gets performed since last reset")
+   @Operation(displayName = "Number of Remote Gets")
+   public long getNumberOfRemoteGets(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.NUM_REMOTE_GET);
+   }
+
+   @ManagedAttribute(description = "Number of puts performed since last reset")
+   @Operation(displayName = "Number of Puts")
+   public long getNumberOfPuts(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.NUM_PUT);
+   }
+
+   @ManagedAttribute(description = "Number of remote puts performed since last reset")
+   @Operation(displayName = "Number of Remote Puts")
+   public long getNumberOfRemotePuts(){
+      return (Long)TransactionsStatisticsRegistry.getAttribute(IspnStats.NUM_REMOTE_PUT);
+   }
+
    @ManagedAttribute(description = "Number of committed transactions since last reset")
    @Operation(displayName = "Number Of Commits")
    public long getNumberOfCommits() {
