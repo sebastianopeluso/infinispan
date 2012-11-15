@@ -292,7 +292,9 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
 
       for (Map.Entry<Object, OwnersInfo> entry : toMoveObj.entrySet()) {
          try {
-            int owner = entry.getValue().getOwner(iteration);
+            //TODO: hack
+            int owner = entry.getValue().getOwner(0) + iteration;
+            owner %= 40;
             writeInputData(entry.getKey(), owner, writer);
             ownersIndexes.add(owner);
          } catch (IOException e) {

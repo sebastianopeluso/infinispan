@@ -79,7 +79,13 @@ public class Stats {
       /**
        * the size of the object lookup
        */
-      OBJECT_LOOKUP
+      OBJECT_LOOKUP,
+      /**
+       * bloom filter size
+       */
+      BLOOM_FILTER,
+      MACHINE_LEARNER_1,
+      MACHINE_LEARNER_2
    }
 
    private static enum Duration {
@@ -171,6 +177,18 @@ public class Stats {
 
    public final void objectLookupSize(int value) {
       messageSizes.put(Size.OBJECT_LOOKUP, value);
+   }
+
+   public final void setBloomFilterSize(int value) {
+      messageSizes.put(Size.BLOOM_FILTER, value);
+   }
+
+   public final void setMachineLearner1(int value) {
+      messageSizes.put(Size.MACHINE_LEARNER_1, value);
+   }
+
+   public final void setMachineLearner2(int value) {
+      messageSizes.put(Size.MACHINE_LEARNER_2, value);
    }
 
    public final void queryDuration(IncrementableLong[] values) {

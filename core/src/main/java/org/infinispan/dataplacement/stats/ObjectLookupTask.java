@@ -1,6 +1,9 @@
 package org.infinispan.dataplacement.stats;
 
 import org.infinispan.dataplacement.OwnersInfo;
+import org.infinispan.dataplacement.c50.C50MLObjectLookup;
+import org.infinispan.dataplacement.c50.lookup.BloomFilter;
+import org.infinispan.dataplacement.c50.tree.DecisionTree;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -49,16 +52,36 @@ public class ObjectLookupTask implements Runnable {
       stats.wrongOwnersErrors(errors);
       stats.totalKeysMoved(ownersInfoMap.size());
       stats.queryDuration(phaseDurations);
+      stats.objectLookupSize(serializedSize(objectLookup));
+      if (objectLookup instanceof C50MLObjectLookup) {
+         C50MLObjectLookup c50MLObjectLookup = (C50MLObjectLookup) objectLookup;
+         BloomFilter bloomFilter = c50MLObjectLookup.getBloomFilter();
+         stats.setBloomFilterSize(serializedSize(bloomFilter));
+         DecisionTree[] trees = c50MLObjectLookup.getDecisionTreeArray();
+         if (trees.length == 1) {
+            stats.setMachineLearner1(serializedSize(trees[0]));
+         } else if (trees.length > 1) {
+            stats.setMachineLearner1(serializedSize(trees[0]));
+            stats.setMachineLearner2(serializedSize(trees[1]));
+            stats.setMachineLearner2(serializedSize(trees[1]));
+         }
+      }
+   }
 
+   private int serializedSize(Object object) {
+      int size = 0;
       try {
          ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
          ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-         objectOutputStream.writeObject(objectLookup);
+         objectOutputStream.writeObject(object);
          objectOutputStream.flush();
 
-         stats.objectLookupSize(byteArrayOutputStream.toByteArray().length);
+         size = byteArrayOutputStream.toByteArray().length;
+         objectOutputStream.close();
+         byteArrayOutputStream.close();
       } catch (IOException e) {
-         log.warn("Error calculating object lookup size", e);
+         log.warnf(e, "Error calculating object size of %s", object);
       }
+      return size;
    }
 }
