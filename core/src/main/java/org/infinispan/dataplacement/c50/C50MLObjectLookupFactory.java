@@ -6,6 +6,7 @@ import org.infinispan.dataplacement.c50.keyfeature.Feature;
 import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 import org.infinispan.dataplacement.c50.keyfeature.KeyFeatureManager;
 import org.infinispan.dataplacement.c50.lookup.BloomFilter;
+import org.infinispan.dataplacement.c50.lookup.BloomFilter2;
 import org.infinispan.dataplacement.c50.tree.DecisionTree;
 import org.infinispan.dataplacement.c50.tree.DecisionTreeBuilder;
 import org.infinispan.dataplacement.c50.tree.DecisionTreeParser;
@@ -104,7 +105,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
 
    @Override
    public ObjectLookup createObjectLookup(Map<Object, OwnersInfo> toMoveObj, int numberOfOwners) {
-      BloomFilter bloomFilter = createBloomFilter(toMoveObj.keySet());
+      BloomFilter2 bloomFilter = createBloomFilter2(toMoveObj.keySet());
       C50MLObjectLookup objectLookup = new C50MLObjectLookup(numberOfOwners, bloomFilter);
       objectLookup.setKeyFeatureManager(keyFeatureManager);
       deleteAll();
@@ -167,6 +168,10 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
          bloomFilter.add(key);
       }
       return bloomFilter;
+   }
+
+   private BloomFilter2 createBloomFilter2(Collection<Object> objectsToMove) {
+      return new BloomFilter2(objectsToMove, bloomFilterFalsePositiveProbability);
    }
 
    /**
