@@ -105,7 +105,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
 
    @Override
    public ObjectLookup createObjectLookup(Map<Object, OwnersInfo> toMoveObj, int numberOfOwners) {
-      BloomFilter2 bloomFilter = createBloomFilter2(toMoveObj.keySet());
+      BloomFilter bloomFilter = createBloomFilter(toMoveObj.keySet());
       C50MLObjectLookup objectLookup = new C50MLObjectLookup(numberOfOwners, bloomFilter);
       objectLookup.setKeyFeatureManager(keyFeatureManager);
       deleteAll();

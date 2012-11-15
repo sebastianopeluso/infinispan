@@ -3,7 +3,7 @@ package org.infinispan.dataplacement.c50;
 import org.infinispan.dataplacement.c50.keyfeature.Feature;
 import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 import org.infinispan.dataplacement.c50.keyfeature.KeyFeatureManager;
-import org.infinispan.dataplacement.c50.lookup.BloomFilter2;
+import org.infinispan.dataplacement.c50.lookup.BloomFilter;
 import org.infinispan.dataplacement.c50.tree.DecisionTree;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.dataplacement.stats.IncrementableLong;
@@ -20,11 +20,11 @@ import java.util.Map;
  */
 public class C50MLObjectLookup implements ObjectLookup {
 
-   private final BloomFilter2 bloomFilter;
+   private final BloomFilter bloomFilter;
    private final DecisionTree[] decisionTreeArray;
    private transient KeyFeatureManager keyFeatureManager;
 
-   public C50MLObjectLookup(int numberOfOwners, BloomFilter2 bloomFilter) {
+   public C50MLObjectLookup(int numberOfOwners, BloomFilter bloomFilter) {
       this.bloomFilter = bloomFilter;
       decisionTreeArray = new DecisionTree[numberOfOwners];
    }
@@ -37,7 +37,7 @@ public class C50MLObjectLookup implements ObjectLookup {
       this.keyFeatureManager = keyFeatureManager;
    }
 
-   public BloomFilter2 getBloomFilter() {
+   public BloomFilter getBloomFilter() {
       return bloomFilter;
    }
 
