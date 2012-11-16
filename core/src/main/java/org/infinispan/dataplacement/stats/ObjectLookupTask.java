@@ -63,7 +63,6 @@ public class ObjectLookupTask implements Runnable {
          } else if (trees.length > 1) {
             stats.setMachineLearner1(serializedSize(trees[0]));
             stats.setMachineLearner2(serializedSize(trees[1]));
-            stats.setMachineLearner2(serializedSize(trees[1]));
          }
       }
    }
