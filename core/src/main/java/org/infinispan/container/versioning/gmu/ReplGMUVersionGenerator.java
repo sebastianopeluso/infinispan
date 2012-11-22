@@ -7,7 +7,7 @@ import org.infinispan.container.versioning.IncrementableEntryVersion;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.notifications.Listener;
-import org.infinispan.notifications.cachelistener.CacheNotifier;
+import org.infinispan.notifications.cachemanagerlistener.CacheManagerNotifier;
 import org.infinispan.notifications.cachemanagerlistener.annotation.Merged;
 import org.infinispan.notifications.cachemanagerlistener.annotation.ViewChanged;
 import org.infinispan.notifications.cachemanagerlistener.event.ViewChangedEvent;
@@ -35,9 +35,9 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
    public ReplGMUVersionGenerator() {}
 
    @Inject
-   public final void init(RpcManager rpcManager, CacheNotifier cacheNotifier) {
+   public final void init(RpcManager rpcManager, CacheManagerNotifier cacheManagerNotifier) {
       this.rpcManager = rpcManager;
-      cacheNotifier.addListener(this);
+      cacheManagerNotifier.addListener(this);
    }
 
    @Start(priority = 11)
@@ -53,7 +53,7 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
    @Override
    public final IncrementableEntryVersion increment(IncrementableEntryVersion initialVersion) {
       GMUCacheEntryVersion gmuEntryVersion = toGMUEntryVersion(initialVersion);
-      return new GMUCacheEntryVersion(currentViewId, this, gmuEntryVersion.getThisNodeVersionValue());
+      return new GMUCacheEntryVersion(currentViewId, this, gmuEntryVersion.getThisNodeVersionValue() + 1);
    }
 
    @Override
@@ -78,21 +78,20 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
 
    @Override
    public final IncrementableEntryVersion convertVersionToWrite(EntryVersion version) {
-      return (IncrementableEntryVersion) version;
+      GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(version);
+      return new GMUCacheEntryVersion(currentViewId, this, gmuEntryVersion.getThisNodeVersionValue());
    }
 
    @Override
    public IncrementableEntryVersion calculateMaxVersionToRead(EntryVersion transactionVersion,
                                                               Collection<Address> alreadyReadFrom) {
-      //this methods has no meaning in full replicated caches
-      throw new UnsupportedOperationException();
+      return (IncrementableEntryVersion) transactionVersion;
    }
 
    @Override
    public IncrementableEntryVersion calculateMinVersionToRead(EntryVersion transactionVersion,
                                                               Collection<Address> alreadyReadFrom) {
-      //this methods has no meaning in full replicated caches
-      throw new UnsupportedOperationException();
+      return (IncrementableEntryVersion) transactionVersion;
    }
 
    @Override

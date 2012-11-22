@@ -30,6 +30,7 @@ import org.infinispan.loaders.CacheStoreConfig;
 import org.infinispan.loaders.decorators.SingletonStoreConfig;
 import org.infinispan.transaction.TransactionMode;
 import org.infinispan.transaction.TransactionProtocol;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -133,6 +134,10 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
 
    @Override
    public void visitVersioningConfigurationBean(Configuration.VersioningConfigurationBean config) {
+      if (cfg.getIsolationLevel() == IsolationLevel.SERIALIZABLE && 
+            (!cfg.isEnableVersioning() || cfg.getVersioningScheme() != VersioningScheme.GMU)) {
+         throw new ConfigurationException("Expected GMU versioning scheme when SERIALIZABLE is enabled");
+      }
    }
 
    @Override

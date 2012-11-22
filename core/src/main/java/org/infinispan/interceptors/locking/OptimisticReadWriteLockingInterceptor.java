@@ -3,6 +3,7 @@ package org.infinispan.interceptors.locking;
 import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.context.impl.TxInvocationContext;
+import org.infinispan.transaction.gmu.GMUHelper;
 import org.infinispan.util.TimSort;
 
 /**
@@ -13,7 +14,7 @@ public class OptimisticReadWriteLockingInterceptor extends OptimisticLockingInte
 
    @Override
    protected void afterWriteLocksAcquired(TxInvocationContext ctx, PrepareCommand command) throws InterruptedException {
-      GMUPrepareCommand spc = (GMUPrepareCommand) command;
+      GMUPrepareCommand spc = GMUHelper.convert(command, GMUPrepareCommand.class);
       Object[] readSet = spc.getReadSet();
       TimSort.sort(readSet, keyComparator);
       acquireReadLocks(ctx, readSet);
@@ -21,7 +22,7 @@ public class OptimisticReadWriteLockingInterceptor extends OptimisticLockingInte
 
    private void acquireReadLocks(TxInvocationContext ctx, Object[] readSet) throws InterruptedException {      
       for (Object key : readSet) {
-         internalLockAndRegisterBackupLock(ctx, key, true);
+         lockAndRegisterShareBackupLock(ctx, key);
          ctx.addAffectedKey(key);
       }
    }

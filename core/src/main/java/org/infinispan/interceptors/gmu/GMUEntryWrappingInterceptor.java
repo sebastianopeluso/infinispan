@@ -7,17 +7,19 @@ import org.infinispan.commands.tx.GMUCommitCommand;
 import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
+import org.infinispan.commands.write.ClearCommand;
 import org.infinispan.commands.write.PutKeyValueCommand;
 import org.infinispan.commands.write.RemoveCommand;
 import org.infinispan.commands.write.ReplaceCommand;
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
-import org.infinispan.container.versioning.gmu.GMUEntryVersion;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.EntryWrappingInterceptor;
@@ -70,8 +72,10 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
          EntryVersion commitVersion = calculateCommitVersion(localPrepareVersion, convert(retVal, EntryVersion.class),
                                                              versionGenerator, cll.getOwners(command.getAffectedKeys()));
          ctx.setTransactionVersion(commitVersion);
+         retVal = commitVersion;
       } else {
          ctx.setTransactionVersion(localPrepareVersion);
+         retVal = localPrepareVersion;
       }
 
       return retVal;
@@ -83,14 +87,14 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
 
       if (ctx.isOriginLocal()) {
          gmuCommitCommand.setCommitVersion(ctx.getTransactionVersion());
+      } else {
+         ctx.setTransactionVersion(gmuCommitCommand.getCommitVersion());
       }
 
       try {
          return invokeNextInterceptor(ctx, command);
       } finally {
-         commitQueue.commitTransaction(gmuCommitCommand.getGlobalTransaction(),
-                                       gmuCommitCommand.getCommitVersion(),
-                                       configuration.isSyncCommitPhase());
+         commitQueue.commitTransaction(ctx.getCacheTransaction(), configuration.isSyncCommitPhase());
       }
    }
 
@@ -99,7 +103,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
       try {
          return invokeNextInterceptor(ctx, command);
       } finally {
-         commitQueue.rollbackTransaction(command.getGlobalTransaction());
+         commitQueue.rollbackTransaction(ctx.getCacheTransaction());
       }
    }
 
@@ -141,7 +145,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
    }
 
    @Override
-   public void commitContextEntries(TxInvocationContext ctx, GMUEntryVersion commitVersion) {
+   public void commitTransaction(TxInvocationContext ctx) {
       commitContextEntries(ctx);
    }
 
@@ -163,9 +167,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
     * @throws InterruptedException  if interrupted
     */
    private EntryVersion performValidation(TxInvocationContext ctx, GMUPrepareCommand command) throws InterruptedException {
-      cll.performReadSetValidation(ctx, command);
-
       boolean hasToUpdateLocalKeys = false;
+      boolean isReadOnly = command.getModifications().length == 0;
 
       for (Object key : command.getAffectedKeys()) {
          if (cll.localNodeIsOwner(key)) {
@@ -173,10 +176,23 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
             break;
          }
       }
+      
+      if (!hasToUpdateLocalKeys) {
+         for (WriteCommand writeCommand : command.getModifications()) {
+            if (writeCommand instanceof ClearCommand) {
+               hasToUpdateLocalKeys = true;
+               break;
+            }
+         }
+      }
+
+      if (!isReadOnly) {
+         cll.performReadSetValidation(ctx, command);
+      }
 
       EntryVersion prepareVersion = hasToUpdateLocalKeys ?
-            commitQueue.prepareTransaction(command.getGlobalTransaction(), (TxInvocationContext) ctx.clone()) :
-            commitQueue.prepareReadOnlyTransaction((TxInvocationContext) ctx.clone());
+            commitQueue.prepareTransaction(ctx.getCacheTransaction()) :
+            commitQueue.prepareReadOnlyTransaction(ctx.getCacheTransaction());
 
       if(log.isDebugEnabled()) {
          log.debugf("Transaction %s can commit on this node and it is a %s transaction. Prepare Version is %s",
@@ -188,6 +204,13 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
 
    private void updateTransactionVersion(InvocationContext context) {
       if (!context.isInTxScope() && !context.isOriginLocal()) {
+         return;
+      }
+
+      if (context instanceof SingleKeyNonTxInvocationContext) {
+         if (log.isDebugEnabled()) {
+            log.debugf("Received a SingleKeyNonTxInvocationContext... This should be a single read operation");
+         }
          return;
       }
 

@@ -15,6 +15,10 @@ public class OwnableReentrantReadWriteLock extends OwnableReentrantLock {
 
    private transient final Map<Object, AtomicInteger> readCounters = new HashMap<Object, AtomicInteger>();
 
+   public final int getLockState() {
+      return getState(); 
+   }   
+   
    public final boolean tryShareLock(Object requestor, long time, TimeUnit unit) throws InterruptedException {
       setCurrentRequestor(requestor);
       try {

@@ -93,7 +93,19 @@ public class TransactionCoordinator {
    @Start
    public void start() {
 
-      if (configuration.isRequireVersioning()) {
+      if (configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
+         commandCreator = new CommandCreator() {
+            @Override
+            public CommitCommand createCommitCommand(GlobalTransaction gtx) {
+               return commandsFactory.buildSerializableCommitCommand(gtx);
+            }
+
+            @Override
+            public PrepareCommand createPrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications) {
+               return commandsFactory.buildSerializablePrepareCommand(gtx, modifications, false);
+            }
+         };
+      } else if (configuration.isRequireVersioning()) {
          // We need to create versioned variants of PrepareCommand and CommitCommand
          commandCreator = new CommandCreator() {
             @Override
@@ -104,18 +116,6 @@ public class TransactionCoordinator {
             @Override
             public PrepareCommand createPrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications) {
                return commandsFactory.buildVersionedPrepareCommand(gtx, modifications, false);
-            }
-         };
-      } else if (configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
-         commandCreator = new CommandCreator() {
-            @Override
-            public CommitCommand createCommitCommand(GlobalTransaction gtx) {
-               return commandsFactory.buildSerializableCommitCommand(gtx);
-            }
-
-            @Override
-            public PrepareCommand createPrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications) {
-               return commandsFactory.buildSerializablePrepareCommand(gtx, modifications, false);
             }
          };
       } else {

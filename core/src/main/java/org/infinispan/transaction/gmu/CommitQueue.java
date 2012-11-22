@@ -6,6 +6,7 @@ import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.GMUEntryVersion;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContextContainer;
+import org.infinispan.context.impl.LocalTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
@@ -13,6 +14,9 @@ import org.infinispan.factories.annotations.Stop;
 import org.infinispan.interceptors.EntryWrappingInterceptor;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.RemoteTransaction;
+import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -61,7 +65,7 @@ public class CommitQueue {
       this.commitLog = commitLog;
    }
 
-   //AFTER THE VersionVCFactory
+   //AFTER THE VersionGenerator
    @Start(priority = 31)
    public void start() {
       commitThread.start();
@@ -97,44 +101,41 @@ public class CommitQueue {
    /**
     * add a transaction to the queue. A temporary commit vector clock is associated
     * and with it, it order the transactions. this commit vector clocks is returned.
-    * @param context the context    
+    * @param cacheTransaction the transaction to be prepared    
     * @return the prepare vector clock
     */
-   public EntryVersion prepareTransaction(GlobalTransaction globalTransaction, TxInvocationContext context) {
-      return transactionQueue.addTransaction(globalTransaction, context);
+   public EntryVersion prepareTransaction(CacheTransaction cacheTransaction) {
+      return transactionQueue.addTransaction(cacheTransaction);
    }
 
-   public void rollbackTransaction(GlobalTransaction globalTransaction) {
-      transactionQueue.remove(globalTransaction);
+   public void rollbackTransaction(CacheTransaction cacheTransaction) {
+      transactionQueue.remove(cacheTransaction.getGlobalTransaction());
    }
 
-   public void commitTransaction(GlobalTransaction globalTransaction, EntryVersion commitVersion, boolean wait)
+   public void commitTransaction(CacheTransaction cacheTransaction, boolean wait)
          throws InterruptedException {
-      TransactionEntry entry = transactionQueue.updateTransaction(globalTransaction, commitVersion);
+      TransactionEntry entry = transactionQueue.updateTransaction(cacheTransaction);
       if (wait && entry != null) {
          entry.waitUntilCommitted();
       }
    }
 
-   public EntryVersion prepareReadOnlyTransaction(TxInvocationContext context) {
-      return currentVersion.getNextPrepareVersion(context.getTransactionVersion());
+   public EntryVersion prepareReadOnlyTransaction(CacheTransaction cacheTransaction) {
+      return currentVersion.getNextPrepareVersion(cacheTransaction.getTransactionVersion());
    }
 
    private static class TransactionEntry implements Comparable<TransactionEntry> {
       private int index;
-      private GMUEntryVersion version;
-      private final TxInvocationContext context;
-      private final GlobalTransaction globalTransaction;
+      private final CacheTransaction cacheTransaction;
+      private GMUEntryVersion entryVersion;
       private boolean ready;
       private boolean committed;
       private long headStartTs;
 
-      private TransactionEntry(TxInvocationContext context, GMUEntryVersion prepareVersion,
-                               GlobalTransaction globalTransaction) {
-         this.context = context;
-         this.globalTransaction = globalTransaction;
+      private TransactionEntry(CacheTransaction cacheTransaction) {
+         this.cacheTransaction = cacheTransaction;
+         this.entryVersion = toGMUEntryVersion(cacheTransaction.getTransactionVersion());
          this.index = 0;
-         this.version = prepareVersion;
          this.ready = false;
          this.committed = false;
          this.headStartTs = 0;
@@ -145,16 +146,25 @@ public class CommitQueue {
          if (index == 0) {
             setHeadStartTs();
          }
+         if (log.isTraceEnabled()) {
+            log.tracef("Updated transaction index in queue: %s", this);
+         }
       }
 
       public synchronized void incrementIndex() {
          index++;
+         if (log.isTraceEnabled()) {
+            log.tracef("Increment transaction index in queue: %s", this);
+         }
       }
 
       public synchronized void decrementIndex(int decrement) {
          index -= decrement;
          if (index == 0) {
             setHeadStartTs();
+         }
+         if (log.isTraceEnabled()) {
+            log.tracef("Decrement transaction index in queue: %s", this);
          }
       }
 
@@ -163,16 +173,19 @@ public class CommitQueue {
       }
 
       public synchronized void commitVersion(GMUEntryVersion entryVersion) {
-         version = entryVersion;
+         this.entryVersion = entryVersion; 
          ready = true;
+         if (log.isTraceEnabled()) {
+            log.tracef("Set transaction commit version: %s", this);
+         }
       }
 
       public synchronized GMUEntryVersion getVersion() {
-         return version;
+         return entryVersion;
       }
 
-      public TxInvocationContext getContext() {
-         return context;
+      public CacheTransaction getCacheTransaction() {
+         return cacheTransaction;
       }
 
       public synchronized boolean isReady() {
@@ -180,7 +193,7 @@ public class CommitQueue {
       }
 
       public GlobalTransaction getGlobalTransaction() {
-         return globalTransaction;
+         return cacheTransaction.getGlobalTransaction();
       }
 
       public void setHeadStartTs() {
@@ -194,11 +207,20 @@ public class CommitQueue {
       public synchronized void committed() {
          committed = true;
          notify();
+         if (log.isTraceEnabled()) {
+            log.tracef("Mark transaction committed: %s", this);
+         }
       }
 
       public synchronized void waitUntilCommitted() throws InterruptedException {
+         if (log.isTraceEnabled()) {
+            log.tracef("[%s] will wait until this [%s] is committed", Thread.currentThread().getName(), this);
+         }
          while (!committed) {
             wait();
+         }
+         if (log.isTraceEnabled()) {
+            log.tracef("[%s] finishes waiting. %s is committed", Thread.currentThread().getName(), this);
          }
       }
 
@@ -206,9 +228,10 @@ public class CommitQueue {
       public String toString() {
          return "TransactionEntry{" +
                "index=" + index +
-               ", version=" + version +
+               ", version=" + getVersion() +
                ", ready=" + ready +
                ", headStartTs=" + headStartTs +
+               ", gtx=" + cacheTransaction.getGlobalTransaction().prettyPrint() +
                '}';
       }
 
@@ -217,14 +240,21 @@ public class CommitQueue {
          if (transactionEntry == null) {
             return -1;
          }
-         Long my = version.getThisNodeVersionValue();
-         Long other = transactionEntry.version.getThisNodeVersionValue();
-         return my.compareTo(other);
+         Long my = getVersion().getThisNodeVersionValue();
+         Long other = transactionEntry.getVersion().getThisNodeVersionValue();
+         int compareResult = my.compareTo(other);
+         
+         if (log.isTraceEnabled()) {
+            log.tracef("Comparing this[%s] with other[%s]. compare(%s,%s) ==> %s", this, transactionEntry, my, other,
+                       compareResult);
+         }
+         
+         return compareResult;
       }
    }
 
    public static interface CommitInstance {
-      void commitContextEntries(TxInvocationContext ctx, GMUEntryVersion commitVersion);
+      void commitTransaction(TxInvocationContext ctx);
    }
 
    private class CurrentVersion {
@@ -233,21 +263,40 @@ public class CommitQueue {
       private CurrentVersion() {}
 
       public synchronized final void init() {
+         if (log.isTraceEnabled()) {
+            log.tracef("Init current version: %s", this);
+         }
          currentVersion = versionGenerator.generateNew();
       }
 
       public synchronized final EntryVersion getCurrentVersion() {
+         if (log.isTraceEnabled()) {
+            log.tracef("Get current version: %s", this);
+         }
          return currentVersion;
       }
 
       public synchronized final EntryVersion getNextPrepareVersion(EntryVersion prepareVersion) {
          update(prepareVersion);
          currentVersion = versionGenerator.increment(currentVersion);
+         if (log.isTraceEnabled()) {
+            log.tracef("[Prepare] Update current version: %s (with %s)", this, prepareVersion);
+         }
          return currentVersion;
       }
 
       public synchronized final void update(EntryVersion version) {
          currentVersion = versionGenerator.mergeAndMax(Arrays.asList(currentVersion, version));
+         if (log.isTraceEnabled()) {
+            log.tracef("Update current version: %s (with %s)", this, version);
+         }
+      }
+
+      @Override
+      public String toString() {
+         return "CurrentVersion{" +
+               "currentVersion=" + currentVersion +
+               '}';
       }
    }
 
@@ -261,32 +310,46 @@ public class CommitQueue {
          this.searchByIndex = new ArrayList<TransactionEntry>();
       }
 
-      public synchronized final EntryVersion addTransaction(GlobalTransaction globalTransaction,
-                                                            TxInvocationContext context) {
+      public synchronized final EntryVersion addTransaction(CacheTransaction cacheTransaction) {
+         GlobalTransaction globalTransaction = cacheTransaction.getGlobalTransaction();
          if (searchByTransaction.containsKey(globalTransaction)) {
             throw new IllegalStateException("Transaction " + globalTransaction.prettyPrint() + " already exists");
          }
-         EntryVersion preparedVersion = currentVersion.getNextPrepareVersion(context.getTransactionVersion());
-         TransactionEntry transactionEntry = new TransactionEntry(context, toGMUEntryVersion(preparedVersion),
-                                                                  globalTransaction);
+         EntryVersion preparedVersion = currentVersion.getNextPrepareVersion(cacheTransaction.getTransactionVersion());
+         cacheTransaction.setTransactionVersion(preparedVersion);
+         TransactionEntry transactionEntry = new TransactionEntry(cacheTransaction);
 
          searchByTransaction.put(globalTransaction, transactionEntry);
          sortInsert(transactionEntry);
+
+         if (log.isTraceEnabled()) {
+            log.tracef("Add %s to transaction queue: %s", globalTransaction.prettyPrint(), searchByIndex);
+         }
+
          return preparedVersion;
       }
 
-      public synchronized final TransactionEntry updateTransaction(GlobalTransaction globalTransaction,
-                                                                   EntryVersion commitVersion) {
+      public synchronized final TransactionEntry updateTransaction(CacheTransaction cacheTransaction) {
+         GlobalTransaction globalTransaction = cacheTransaction.getGlobalTransaction();
+         GMUEntryVersion commitVersion = toGMUEntryVersion(cacheTransaction.getTransactionVersion());
          currentVersion.update(commitVersion);
          TransactionEntry transactionEntry = searchByTransaction.get(globalTransaction);
          if (transactionEntry == null) {
             //read only?
+            if (log.isTraceEnabled()) {
+               log.tracef("Update %s in transaction queue but it was not found!", globalTransaction.prettyPrint());
+            }
             return null;
          }
 
-         transactionEntry.commitVersion(toGMUEntryVersion(commitVersion));
+         transactionEntry.commitVersion(commitVersion);
+         notify();
 
          if (!isOutOfOrder(transactionEntry)) {
+            if (log.isTraceEnabled()) {
+               log.tracef("Update %s in transaction queue and the order didn't changed: %s",
+                          globalTransaction.prettyPrint(), searchByIndex);
+            }
             return transactionEntry;
          }
 
@@ -294,14 +357,23 @@ public class CommitQueue {
          removeAndShift(transactionEntry);
          transactionEntry.incrementIndex();
          sortInsert(transactionEntry);
-         notify();
+         if (log.isTraceEnabled()) {
+            log.tracef("Update %s in transaction queue and the order has changed: %s",
+                       globalTransaction.prettyPrint(), searchByIndex);
+         }
          return transactionEntry;
       }
 
       public synchronized void getTransactionsReadyToCommit(List<TransactionEntry> commitList)
             throws InterruptedException {
+         if (log.isTraceEnabled()) {
+            log.tracef("Get next transactions to commit");
+         }
          if (searchByIndex.isEmpty()) {
-            wait();
+            if (log.isTraceEnabled()) {
+               log.tracef("Queue is empty. Returning...");
+            }
+            wait();            
             return;
          }
 
@@ -309,17 +381,32 @@ public class CommitQueue {
 
          TransactionEntry transactionEntry = searchByIndex.get(0);
          if (!transactionEntry.isReady()) {
-            wait();
+            if (log.isTraceEnabled()) {
+               log.tracef("First transaction [%s] is not ready to commit", transactionEntry);
+            }
+            wait();            
             return;
          }
 
          for (TransactionEntry other : searchByIndex) {
             boolean sameVersion = transactionEntry.compareTo(other) == 0;
             if (sameVersion && !other.isReady()) {
-               wait();
+               if (log.isTraceEnabled()) {
+                  log.tracef("Two or more transaction has the same version but one of them is not ready to commit (%s)",
+                             other);
+               }
+               wait();               
                return;
             } else if (sameVersion) {
+               if (log.isTraceEnabled()) {
+                  log.tracef("Next transaction has the same version and it is ready to commit (%s)",
+                             other);
+               }
                continue;
+            }
+            if (log.isTraceEnabled()) {
+               log.tracef("Next transaction has another version (%s)",
+                          other);
             }
             index = other.getIndex();
             break;
@@ -329,6 +416,9 @@ public class CommitQueue {
          commitList.addAll(subList);
          subList.clear();
          committingTransactions(commitList);
+         if (log.isTraceEnabled()) {
+            log.tracef("Transactions ready to commit are: %s\nQueue: %s", commitList, searchByIndex);
+         }
       }
 
       public synchronized void remove(GlobalTransaction globalTransaction) {
@@ -368,7 +458,7 @@ public class CommitQueue {
          int index = toRemove.getIndex();
          searchByIndex.remove(index);
          while (index < searchByIndex.size()) {
-            searchByIndex.get(index--).decrementIndex(1);
+            searchByIndex.get(index++).decrementIndex(1);
          }
       }
 
@@ -414,16 +504,30 @@ public class CommitQueue {
                }
 
                for(TransactionEntry transactionEntry : commitList) {
-                  icc.setContext(transactionEntry.getContext());
-                  commitInvocationInstance.commitContextEntries(transactionEntry.getContext(),
-                                                                transactionEntry.getVersion());
-                  transactionEntry.committed();
-                  committedVersions.add(transactionEntry.getVersion());
-                  icc.clearThreadLocal();
+                  try {
+                     if (log.isTraceEnabled()) {
+                        log.tracef("Committing transaction entries for %s", transactionEntry);
+                     }
+
+                     commitInvocationInstance.commitTransaction(createInvocationContext(transactionEntry));
+                     committedVersions.add(transactionEntry.getVersion());
+
+                     if (log.isTraceEnabled()) {
+                        log.tracef("Transaction entries committed for %s", transactionEntry);
+                     }
+                  } catch (Exception e) {
+                     log.warnf("Error occurs while committing transaction entries for %s", transactionEntry);
+                  } finally {
+                     icc.clearThreadLocal();
+                     transactionEntry.committed();
+                  }
                }
 
                commitLog.addNewVersion(versionGenerator.mergeAndMax(committedVersions));
             } catch (InterruptedException e) {
+               if (log.isTraceEnabled()) {
+                  log.tracef("%s was interrupted", getName());
+               }
                this.interrupt();
             } finally {
                committedVersions.clear();
@@ -436,6 +540,26 @@ public class CommitQueue {
       public void interrupt() {
          running = false;
          super.interrupt();
+      }
+
+      private TxInvocationContext createInvocationContext(TransactionEntry transactionEntry) {
+         CacheTransaction cacheTransaction = transactionEntry.getCacheTransaction();
+         
+         if (cacheTransaction instanceof LocalTransaction) {
+            LocalTransaction localTransaction = (LocalTransaction) cacheTransaction;
+            localTransaction.setTransactionVersion(transactionEntry.getVersion());
+            
+            LocalTxInvocationContext localTxInvocationContext = icc.createTxInvocationContext();
+            localTxInvocationContext.setLocalTransaction(localTransaction);
+            
+            return localTxInvocationContext;
+         } else if (cacheTransaction instanceof RemoteTransaction) {
+            RemoteTransaction remoteTransaction = (RemoteTransaction) cacheTransaction;
+            remoteTransaction.setTransactionVersion(transactionEntry.getVersion());
+            
+            return icc.createRemoteTxInvocationContext(remoteTransaction, null);
+         }
+         throw new IllegalStateException("Expected a remote or local transaction and not " + cacheTransaction);
       }
    }
 }

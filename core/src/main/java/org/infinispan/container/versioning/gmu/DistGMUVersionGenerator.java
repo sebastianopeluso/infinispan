@@ -7,7 +7,7 @@ import org.infinispan.container.versioning.IncrementableEntryVersion;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.notifications.Listener;
-import org.infinispan.notifications.cachelistener.CacheNotifier;
+import org.infinispan.notifications.cachemanagerlistener.CacheManagerNotifier;
 import org.infinispan.notifications.cachemanagerlistener.annotation.Merged;
 import org.infinispan.notifications.cachemanagerlistener.annotation.ViewChanged;
 import org.infinispan.notifications.cachemanagerlistener.event.ViewChangedEvent;
@@ -41,11 +41,10 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Inject
-   public final void init(RpcManager rpcManager, CacheNotifier cacheNotifier) {
+   public final void init(RpcManager rpcManager, CacheManagerNotifier cacheManagerNotifier) {
       this.rpcManager = rpcManager;
-      cacheNotifier.addListener(this);
+      cacheManagerNotifier.addListener(this);
    }
-
    @Start(priority = 11)
    public final void start() {
       updateMembers(rpcManager.getTransport().getMembers(), rpcManager.getTransport().getViewId());

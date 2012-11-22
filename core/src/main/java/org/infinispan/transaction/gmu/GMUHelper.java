@@ -16,8 +16,9 @@ import org.infinispan.remoting.responses.ExceptionResponse;
 import org.infinispan.remoting.responses.Response;
 import org.infinispan.remoting.responses.SuccessfulResponse;
 import org.infinispan.remoting.transport.Address;
-import org.infinispan.transaction.gmu.ValidationException;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -31,6 +32,8 @@ import java.util.List;
  * @since 5.2
  */
 public class GMUHelper {
+
+   private static final Log log = LogFactory.getLog(GMUHelper.class);
 
    public static void performReadSetValidation(GMUPrepareCommand prepareCommand,
                                                DataContainer dataContainer,
@@ -83,9 +86,13 @@ public class GMUHelper {
    }
 
    public static <T> T convert(Object object, Class<T> clazz) {
+      if (log.isDebugEnabled()) {
+         log.debugf("Convert object %s to class %s", object, clazz.getCanonicalName());
+      }
       try {
          return clazz.cast(object);
       } catch (ClassCastException cce) {
+         log.fatalf(cce, "Error converting object %s to class %s", object, clazz.getCanonicalName());
          throw new IllegalArgumentException("Expected " + clazz.getSimpleName() +
                                                   " and not " + object.getClass().getSimpleName());
       }
@@ -102,7 +109,9 @@ public class GMUHelper {
 
       //process all responses
       for (Response r : responses) {
-         if (r instanceof SuccessfulResponse) {
+         if (r == null) {
+            throw new IllegalStateException("Non-null response with new version is expected");
+         } else if (r instanceof SuccessfulResponse) {
             EntryVersion version = convert(((SuccessfulResponse) r).getResponseValue(), EntryVersion.class);
             allPreparedVersions.add(version);
          } else if(r instanceof ExceptionResponse) {

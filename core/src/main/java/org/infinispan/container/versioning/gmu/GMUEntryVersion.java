@@ -61,4 +61,10 @@ public abstract class GMUEntryVersion implements IncrementableEntryVersion, Seri
       return InequalVersionComparisonResult.AFTER;
    }
 
+   @Override
+   public String toString() {
+      return "viewId=" + viewId +
+            ", nodeIndex=" + nodeIndex +
+            '}';
+   }
 }

@@ -5037,6 +5037,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       boolean isTransactionalWithTotalOrder = isTotalOrder() &&
             locking.getIsolationLevel() == IsolationLevel.REPEATABLE_READ && locking.isWriteSkewCheck();
 
-      return (isOptimisticWithWSCheck || isTransactionalWithTotalOrder) && getCacheMode().isClustered();
+      return ((isOptimisticWithWSCheck || isTransactionalWithTotalOrder) && getCacheMode().isClustered()) ||
+            getIsolationLevel() == IsolationLevel.SERIALIZABLE;
    }
 }

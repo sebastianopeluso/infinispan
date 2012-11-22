@@ -7,9 +7,13 @@ import org.infinispan.container.entries.NullMarkerEntryForRemoval;
 import org.infinispan.container.entries.SerializableEntry;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.transaction.gmu.CommitLog;
+import org.infinispan.transaction.gmu.GMUHelper;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -23,12 +27,14 @@ import static org.infinispan.transaction.gmu.GMUHelper.toInternalGMUCacheEntry;
 public class GMUEntryFactoryImpl extends EntryFactoryImpl {
 
    private CommitLog commitLog;
+   private GMUVersionGenerator gmuVersionGenerator;
 
    private static final Log log = LogFactory.getLog(GMUEntryFactoryImpl.class);
 
    @Inject
-   public void injectDependencies(CommitLog commitLog) {
+   public void injectDependencies(CommitLog commitLog, VersionGenerator versionGenerator) {
       this.commitLog = commitLog;
+      this.gmuVersionGenerator = GMUHelper.toGMUVersionGenerator(versionGenerator);
    }
 
    public void start() {
@@ -46,7 +52,22 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
 
    @Override
    protected InternalCacheEntry getFromContainer(Object key, InvocationContext context) {
-      EntryVersion versionToRead = context.calculateVersionToRead(null);
+      boolean singleRead = context instanceof SingleKeyNonTxInvocationContext;
+      boolean remotePrepare = !context.isOriginLocal() && context.isInTxScope();
+
+      EntryVersion versionToRead;
+      if (singleRead || remotePrepare) {
+         //read the most recent version
+         //in the prepare, the value does not matter (it will be written or it is not read)
+         //                and the version does not matter either (it will be overwritten)
+         versionToRead = null;
+      } else {
+         versionToRead = context.calculateVersionToRead(gmuVersionGenerator);
+         if (versionToRead == null) {
+            throw new IllegalStateException("Version to read should be non-null");
+         }
+      }
+
       boolean hasAlreadyReadFromThisNode = context.hasAlreadyReadOnThisNode();
 
       EntryVersion realVersionToRead = hasAlreadyReadFromThisNode ? versionToRead :
@@ -55,6 +76,10 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
       InternalGMUCacheEntry entry = toInternalGMUCacheEntry(container.get(key, realVersionToRead));
 
       context.addKeyReadInCommand(key, entry);
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Retrieved from container %s", entry);
+      }
 
       return entry.getInternalCacheEntry();
    }

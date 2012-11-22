@@ -3,6 +3,8 @@ package org.infinispan.container.versioning.gmu;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.InequalVersionComparisonResult;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 /**
  * // TODO: Document this
@@ -12,6 +14,8 @@ import org.infinispan.remoting.transport.Address;
  */
 public class GMUCacheEntryVersion extends GMUEntryVersion {
 
+   private static final Log log = LogFactory.getLog(GMUCacheEntryVersion.class);
+   
    private final long version;
 
    public GMUCacheEntryVersion(long viewId, GMUVersionGenerator versionGenerator, long version) {
@@ -36,9 +40,12 @@ public class GMUCacheEntryVersion extends GMUEntryVersion {
          InequalVersionComparisonResult versionComparisonResult = compare(this.version, cacheEntryVersion.version);
 
          if (versionComparisonResult == InequalVersionComparisonResult.EQUAL) {
-            return compare(this.viewId, cacheEntryVersion.viewId);
+            versionComparisonResult = compare(this.viewId, cacheEntryVersion.viewId);
          }
 
+         if (log.isTraceEnabled()) {
+            log.tracef("Compare this[%s] with other[%s] => %s", this, other, versionComparisonResult);
+         }
          return versionComparisonResult;
       }
 
@@ -47,12 +54,24 @@ public class GMUCacheEntryVersion extends GMUEntryVersion {
          InequalVersionComparisonResult versionComparisonResult = compare(this.version, clusterEntryVersion.getThisNodeVersionValue());
 
          if (versionComparisonResult == InequalVersionComparisonResult.EQUAL) {
-            return compare(this.viewId, clusterEntryVersion.viewId);
+            versionComparisonResult = compare(this.viewId, clusterEntryVersion.viewId);
          }
 
+         if (log.isTraceEnabled()) {
+            log.tracef("Compare this[%s] with other[%s] => %s", this, other, versionComparisonResult);
+         }
+         
          return versionComparisonResult;
       }
 
-      throw new IllegalArgumentException("Cannot compare GMU entry versions with " + other.getClass().getSimpleName());
+      throw new IllegalArgumentException("Cannot compare GMU entry versions with " + (other == null ? "N/A" :
+                                                                                            other.getClass().getSimpleName()));
+   }
+
+   @Override
+   public String toString() {
+      return "GMUCacheEntryVersion{" +
+            "version=" + version +
+            ", " + super.toString();
    }
 }

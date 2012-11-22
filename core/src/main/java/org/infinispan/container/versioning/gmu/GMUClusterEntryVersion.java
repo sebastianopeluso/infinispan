@@ -101,4 +101,46 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
    private boolean validIndex(int index) {
       return index >= 0 && index < versions.length;
    }
+
+   private String versionsToString() {
+      if (versions == null || versions.length == 0) {
+         return "[]";
+      }
+
+      StringBuilder stringBuilder = new StringBuilder();
+      if (clusterSnapshot == null) {
+         if (versions.length == 1) {
+            return "[" + versions[0] + "]";
+         } else {
+            stringBuilder.append("[");
+            for (long v : versions) {
+               stringBuilder.append(v)
+                     .append(",");
+            }
+            stringBuilder.replace(stringBuilder.length() - 2, stringBuilder.length() - 1, "]");
+            return stringBuilder.toString();
+         }
+      }
+      if (versions.length == 1) {
+         return "[" + clusterSnapshot.get(0) + "=" + versions[0] + "]";
+      } else {
+         stringBuilder.append("[");
+         int idx = 0;
+         for (long v : versions) {
+            stringBuilder.append(clusterSnapshot.get(idx++))
+                  .append("=")
+                  .append(v)
+                  .append(",");
+         }
+         stringBuilder.replace(stringBuilder.length() - 2, stringBuilder.length() - 1, "]");
+         return stringBuilder.toString();
+      }
+   }
+
+   @Override
+   public String toString() {
+      return "GMUClusterEntryVersion{" +
+            "versions=" + versionsToString() +
+            ", " + super.toString();
+   }
 }

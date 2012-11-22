@@ -51,7 +51,8 @@ public class CommitLog {
    public EntryVersion getAvailableVersionLessThan(EntryVersion other) {
       VersionEntry iterator;
       synchronized (this) {
-         if (isLessOrEquals(currentVersion.getVersion(), other)) {
+         //if other is null, return the most recent version
+         if (other == null || isLessOrEquals(currentVersion.getVersion(), other)) {
             return currentVersion.getVersion();
          }
          iterator = currentVersion.getPrevious();

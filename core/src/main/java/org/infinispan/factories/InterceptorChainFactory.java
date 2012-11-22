@@ -179,7 +179,10 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          }
       }
 
-      if (needsVersionAwareComponents && configuration.getCacheMode().isClustered()) {
+      if (serializability) {
+         interceptorChain.appendInterceptor(createInterceptor(new GMUEntryWrappingInterceptor(),
+                                                              GMUEntryWrappingInterceptor.class), false);
+      } else if (needsVersionAwareComponents && configuration.getCacheMode().isClustered()) {
          //added custom entry wrapping interceptor for total order protocol
          if (configuration.isTotalOrder()) {
             interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedEntryWrappingInterceptor(),
@@ -187,9 +190,6 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          } else {
             interceptorChain.appendInterceptor(createInterceptor(new VersionedEntryWrappingInterceptor(), VersionedEntryWrappingInterceptor.class), false);
          }
-      } else if (serializability) {
-         interceptorChain.appendInterceptor(createInterceptor(new GMUEntryWrappingInterceptor(),
-                                                              GMUEntryWrappingInterceptor.class), false);
       } else {
          interceptorChain.appendInterceptor(createInterceptor(new EntryWrappingInterceptor(), EntryWrappingInterceptor.class), false);
       }
@@ -227,6 +227,7 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          case REPL_SYNC:
             if (serializability) {
                interceptorChain.appendInterceptor(createInterceptor(new GMUReplicationInterceptor(), GMUReplicationInterceptor.class), false);
+               break;
             } else if (needsVersionAwareComponents) {
                //added custom interceptor to replace the original
                if (configuration.isTotalOrder()) {
@@ -250,6 +251,7 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          case DIST_SYNC:
             if(serializability) {
                interceptorChain.appendInterceptor(createInterceptor(new GMUDistributionInterceptor(), GMUDistributionInterceptor.class), false);
+               break;
             } else if (needsVersionAwareComponents) {
                if (configuration.isTotalOrder()) {
                   interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedDistributionInterceptor(),

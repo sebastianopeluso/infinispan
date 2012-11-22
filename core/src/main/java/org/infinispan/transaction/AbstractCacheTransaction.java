@@ -23,15 +23,6 @@
 
 package org.infinispan.transaction;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
@@ -43,6 +34,15 @@ import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
 
@@ -218,12 +218,12 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
    public void setUpdatedEntryVersions(EntryVersionsMap updatedEntryVersions) {
       this.updatedEntryVersions = updatedEntryVersions;
    }
-   
+
    @Override
    public void addReadKey(Object key) {
       // No-op
    }
-   
+
    @Override
    public boolean keyRead(Object key) {
       return false;
@@ -239,35 +239,43 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
       return false;  // no-op
    }
 
+   @Override
    public EntryVersion calculateVersionToRead(VersionGenerator versionGenerator) {
       GMUVersionGenerator gmuVersionGenerator = toGMUVersionGenerator(versionGenerator);
       return gmuVersionGenerator.calculateMaxVersionToRead(transactionVersion, getReadFrom());
    }
 
+   @Override
    public Collection<Object> getReadKeys() {
       return Collections.emptyList();
    }
 
+   @Override
    public void addReadFrom(Address address) {
       //no-op
    }
 
+   @Override
    public Set<Address> getReadFrom() {
       return Collections.emptySet();
    }
 
+   @Override
    public void setTransactionVersion(EntryVersion version) {
       transactionVersion = version;
    }
 
+   @Override
    public EntryVersion getTransactionVersion() {
       return transactionVersion;
    }
 
+   @Override
    public boolean hasAlreadyReadOnThisNode() {
       return false;
    }
 
+   @Override
    public void setAlreadyReadOnThisNode(boolean value) {
       //no-op
    }

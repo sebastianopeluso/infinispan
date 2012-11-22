@@ -56,6 +56,8 @@ import org.infinispan.util.concurrent.locks.containers.OwnableReentrantStripedLo
 import org.infinispan.util.concurrent.locks.containers.ReentrantPerEntryLockContainer;
 import org.infinispan.util.concurrent.locks.containers.ReentrantStripedLockContainer;
 import org.infinispan.dataplacement.DataPlacementManager;
+import org.infinispan.util.concurrent.locks.containers.readwrite.OwnableReentrantPerEntryReadWriteLockContainer;
+import org.infinispan.util.concurrent.locks.containers.readwrite.OwnableReentrantStripedReadWriteLockContainer;
 
 import static org.infinispan.util.Util.getInstance;
 
@@ -119,6 +121,11 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          return (T) new EvictionManagerImpl();
       } else if (componentType.equals(LockContainer.class)) {
          boolean  notTransactional = !configuration.isTransactionalCache();
+         if (configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
+            return (T) (configuration.isUseLockStriping() ?
+                              new OwnableReentrantStripedReadWriteLockContainer(configuration.getConcurrencyLevel()) :
+                              new OwnableReentrantPerEntryReadWriteLockContainer(configuration.getConcurrencyLevel()));
+         }
          LockContainer<?> lockContainer = configuration.isUseLockStriping() ?
                notTransactional ? new ReentrantStripedLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantStripedLockContainer(configuration.getConcurrencyLevel()) :
                notTransactional ? new ReentrantPerEntryLockContainer(configuration.getConcurrencyLevel()) : new OwnableReentrantPerEntryLockContainer(configuration.getConcurrencyLevel());
@@ -129,11 +136,11 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
 
          return needsMultiThreadValidation ?
                (configuration.getCacheMode().isDistributed() ?
-                     (T) new DistParallelTotalOrderManager() :
-                     (T) new ParallelTotalOrderManager())
+                      (T) new DistParallelTotalOrderManager() :
+                      (T) new ParallelTotalOrderManager())
                : (T) new SequentialTotalOrderManager();
       } else if (componentType.equals(DataPlacementManager.class)){
-    	return (T) new DataPlacementManager(); 
+         return (T) new DataPlacementManager();
       }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());

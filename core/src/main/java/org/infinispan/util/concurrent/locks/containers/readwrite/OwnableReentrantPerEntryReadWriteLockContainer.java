@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 public class OwnableReentrantPerEntryReadWriteLockContainer extends AbstractPerEntryLockContainer<OwnableReentrantReadWriteLock> {
 
 
-   protected OwnableReentrantPerEntryReadWriteLockContainer(int concurrencyLevel) {
+   public OwnableReentrantPerEntryReadWriteLockContainer(int concurrencyLevel) {
       super(concurrencyLevel);
    }
 
@@ -69,7 +69,7 @@ public class OwnableReentrantPerEntryReadWriteLockContainer extends AbstractPerE
 
    @Override
    public OwnableReentrantReadWriteLock getExclusiveLock(Object key) {
-      return getLockFromMap(locks, true);
+      return getLockFromMap(key, true);
    }
 
    @Override

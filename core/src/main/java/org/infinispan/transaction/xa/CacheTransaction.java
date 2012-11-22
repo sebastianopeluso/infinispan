@@ -24,8 +24,12 @@ package org.infinispan.transaction.xa;
 
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
+import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.EntryVersionsMap;
+import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.remoting.transport.Address;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,7 +66,7 @@ public interface CacheTransaction {
    void clearLookedUpEntries();
 
    boolean ownsLock(Object key);
-   
+
    void clearLockedKeys();
 
    Set<Object> getLockedKeys();
@@ -88,8 +92,24 @@ public interface CacheTransaction {
    boolean keyRead(Object key);
 
    void addReadKey(Object key);
-   
+
    void markPrepareSent();
-   
+
    boolean wasPrepareSent();
+
+   EntryVersion calculateVersionToRead(VersionGenerator versionGenerator);
+
+   Collection<Object> getReadKeys();
+
+   void addReadFrom(Address address);
+
+   Set<Address> getReadFrom();
+
+   void setTransactionVersion(EntryVersion version);
+
+   EntryVersion getTransactionVersion();
+
+   boolean hasAlreadyReadOnThisNode();
+
+   void setAlreadyReadOnThisNode(boolean value);
 }
