@@ -64,6 +64,19 @@ public class InternalGMUNullCacheEntry extends InternalGMURemovedCacheEntry {
       return mostRecent;
    }
 
+   @Override
+   public String toString() {
+      return "InternalGMUNullCacheEntry{" +
+            "key=" + getKey() +
+            ", version=" + getVersion() +
+            ", value=" + getValue() +
+            ", creationVersion=" + creationVersion +
+            ", maxValidVersion=" + maxValidVersion +
+            ", maxTxVersion=" + maxTxVersion +
+            ", mostRecent=" + mostRecent +
+            "}";
+   }
+
    public static class Externalizer extends AbstractExternalizer<InternalGMUNullCacheEntry> {
 
       @Override

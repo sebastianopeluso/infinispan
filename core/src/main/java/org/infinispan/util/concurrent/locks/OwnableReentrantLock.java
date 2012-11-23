@@ -24,6 +24,8 @@ package org.infinispan.util.concurrent.locks;
 
 import net.jcip.annotations.ThreadSafe;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.AbstractQueuedSynchronizer;
@@ -46,6 +48,8 @@ import java.util.concurrent.locks.Lock;
  */
 @ThreadSafe
 public class OwnableReentrantLock extends AbstractQueuedSynchronizer implements Lock {
+
+   private static final Log log = LogFactory.getLog(OwnableReentrantLock.class);
 
    private static final long serialVersionUID = 4932974734462848792L;
    private transient Object owner;
@@ -82,11 +86,18 @@ public class OwnableReentrantLock extends AbstractQueuedSynchronizer implements 
    public void lock(GlobalTransaction requestor) {
       setCurrentRequestor(requestor);
       try {
+         if (log.isTraceEnabled()) {
+            log.tracef("%s lock(%s)", requestor, System.identityHashCode(this));
+         }
+
          if (compareAndSetState(0, 1))
             owner = requestor;
          else
             acquire(1);
       } finally {
+         if (log.isTraceEnabled()) {
+            log.tracef("%s lock(%s) => FINISH", requestor, System.identityHashCode(this));
+         }
          unsetCurrentRequestor();
       }
    }
@@ -107,21 +118,33 @@ public class OwnableReentrantLock extends AbstractQueuedSynchronizer implements 
    }
 
    public boolean tryLock(Object requestor, long time, TimeUnit unit) throws InterruptedException {
+      if (log.isTraceEnabled()) {
+         log.tracef("%s tryLock(%s)", requestor, System.identityHashCode(this));
+      }
       setCurrentRequestor(requestor);
       try {
          return tryAcquireNanos(1, unit.toNanos(time));
       } finally {
+         if (log.isTraceEnabled()) {
+            log.tracef("%s tryLock(%s) => FINISH", requestor, System.identityHashCode(this));
+         }
          unsetCurrentRequestor();
       }
    }
 
    public void unlock(Object requestor) {
+      if (log.isTraceEnabled()) {
+         log.tracef("%s unlock(%s)", requestor, System.identityHashCode(this));
+      }
       setCurrentRequestor(requestor);
       try {
          release(1);
       } catch (IllegalMonitorStateException imse) {
          // ignore?
       } finally {
+         if (log.isTraceEnabled()) {
+            log.tracef("%s unlock(%s) => FINISH", requestor, System.identityHashCode(this));
+         }
          unsetCurrentRequestor();
       }
    }
@@ -135,30 +158,51 @@ public class OwnableReentrantLock extends AbstractQueuedSynchronizer implements 
    protected final boolean tryAcquire(int acquires) {
       final Object current = currentRequestor();
       int c = getState();
+
+      if (log.isTraceEnabled()) {
+         log.tracef("%s tryAcquire(%s)", current, System.identityHashCode(this));
+      }
+
       if (c == 0) {
          if (compareAndSetState(0, acquires)) {
             owner = current;
+            if (log.isTraceEnabled()) {
+               log.tracef("%s tryAcquire(%s) => SUCCESS", current, System.identityHashCode(this));
+            }
             return true;
          }
       } else if (current.equals(owner)) {
          setState(c + acquires);
+         if (log.isTraceEnabled()) {
+            log.tracef("%s tryAcquire(%s) => SUCCESS (reentrant)", current, System.identityHashCode(this));
+         }
          return true;
+      }
+
+      if (log.isTraceEnabled()) {
+         log.tracef("%s tryAcquire(%s) => FAILED", current, System.identityHashCode(this));
       }
       return false;
    }
 
    @Override
    protected final boolean tryRelease(int releases) {
-      int c = getState() - releases;
       if (!currentRequestor().equals(owner)) {
          //throw new IllegalMonitorStateException(this.toString());
          // lets be quiet about this
+         if (log.isTraceEnabled()) {
+            log.tracef("%s tryRelease(%s) => FAILED (Not Owner)", currentRequestor(), System.identityHashCode(this));
+         }
          return false;
       }
+      int c = getState() - releases;
       boolean free = false;
       if (c == 0) {
          free = true;
          owner = null;
+      }
+      if (log.isTraceEnabled()) {
+         log.tracef("%s tryRelease(%s) => free? %s", currentRequestor(), System.identityHashCode(this), free);
       }
       setState(c);
       return free;

@@ -64,18 +64,16 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
       }
 
       wrapEntriesForPrepare(ctx, command);
-      EntryVersion localPrepareVersion = performValidation(ctx, spc);
+      performValidation(ctx, spc);
 
       Object retVal = invokeNextInterceptor(ctx, command);
 
       if (ctx.isOriginLocal()) {
-         EntryVersion commitVersion = calculateCommitVersion(localPrepareVersion, convert(retVal, EntryVersion.class),
-                                                             versionGenerator, cll.getOwners(command.getAffectedKeys()));
+         EntryVersion commitVersion = calculateCommitVersion(ctx.getTransactionVersion(), versionGenerator,
+                                                             cll.getOwners(command.getAffectedKeys()));
          ctx.setTransactionVersion(commitVersion);
-         retVal = commitVersion;
       } else {
-         ctx.setTransactionVersion(localPrepareVersion);
-         retVal = localPrepareVersion;
+         retVal = ctx.getTransactionVersion();
       }
 
       return retVal;
@@ -91,10 +89,14 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
          ctx.setTransactionVersion(gmuCommitCommand.getCommitVersion());
       }
 
+      commitQueue.commitTransaction(ctx.getCacheTransaction());
+
       try {
          return invokeNextInterceptor(ctx, command);
       } finally {
-         commitQueue.commitTransaction(ctx.getCacheTransaction(), configuration.isSyncCommitPhase());
+         if (configuration.isSyncCommitPhase()) {
+            commitQueue.waitUntilCommitted(ctx.getCacheTransaction());
+         }
       }
    }
 
@@ -166,7 +168,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
     * @return        the prepare version for the transaction
     * @throws InterruptedException  if interrupted
     */
-   private EntryVersion performValidation(TxInvocationContext ctx, GMUPrepareCommand command) throws InterruptedException {
+   private void performValidation(TxInvocationContext ctx, GMUPrepareCommand command) throws InterruptedException {
       boolean hasToUpdateLocalKeys = false;
       boolean isReadOnly = command.getModifications().length == 0;
 
@@ -176,7 +178,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
             break;
          }
       }
-      
+
       if (!hasToUpdateLocalKeys) {
          for (WriteCommand writeCommand : command.getModifications()) {
             if (writeCommand instanceof ClearCommand) {
@@ -190,16 +192,17 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
          cll.performReadSetValidation(ctx, command);
       }
 
-      EntryVersion prepareVersion = hasToUpdateLocalKeys ?
-            commitQueue.prepareTransaction(ctx.getCacheTransaction()) :
-            commitQueue.prepareReadOnlyTransaction(ctx.getCacheTransaction());
+      if (hasToUpdateLocalKeys) {
+         commitQueue.prepareTransaction(ctx.getCacheTransaction());
+      } else {
+         commitQueue.prepareReadOnlyTransaction(ctx.getCacheTransaction());
+      }
 
       if(log.isDebugEnabled()) {
          log.debugf("Transaction %s can commit on this node and it is a %s transaction. Prepare Version is %s",
                     command.getGlobalTransaction().prettyPrint(), hasToUpdateLocalKeys ? "Read-Write" : "Read-Only",
-                    prepareVersion);
+                    ctx.getTransactionVersion());
       }
-      return prepareVersion;
    }
 
    private void updateTransactionVersion(InvocationContext context) {

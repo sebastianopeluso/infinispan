@@ -236,4 +236,17 @@ public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
    public InternalCacheEntry getInternalCacheEntry() {
       return internalCacheEntry;
    }
+
+   @Override
+   public String toString() {
+      return "InternalGMUValueCacheEntry{" +
+            "key=" + internalCacheEntry.getKey() +
+            ", version=" + internalCacheEntry.getVersion() +
+            ", value=" + internalCacheEntry.getValue() +
+            ", creationVersion=" + creationVersion +
+            ", maxTxVersion=" + maxTxVersion +
+            ", maxValidVersion=" + maxValidVersion +
+            ", mostRecent=" + mostRecent +
+            '}';
+   }
 }

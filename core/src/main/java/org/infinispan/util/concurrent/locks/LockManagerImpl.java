@@ -27,7 +27,6 @@ import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.factories.annotations.Inject;
-import org.infinispan.factories.annotations.Start;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.marshall.MarshalledValue;
@@ -39,7 +38,6 @@ import org.infinispan.util.logging.LogFactory;
 import org.rhq.helpers.pluginAnnotations.agent.DataType;
 import org.rhq.helpers.pluginAnnotations.agent.Metric;
 
-import javax.transaction.TransactionManager;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -63,6 +61,7 @@ public class LockManagerImpl implements LockManager {
    private static final Log log = LogFactory.getLog(LockManagerImpl.class);
    protected static final boolean trace = log.isTraceEnabled();
    private static final String ANOTHER_THREAD = "(another thread)";
+   private static final String SHARED_LOCK = "(shared lock)";
    @Inject
    public void injectDependencies(Configuration configuration, LockContainer<?> lockContainer) {
       this.configuration = configuration;
@@ -125,7 +124,10 @@ public class LockManagerImpl implements LockManager {
             // cannot determine owner, JDK Reentrant locks only provide best-effort guesses.
             return ANOTHER_THREAD;
          }
-      } else return null;
+      } else if (lockContainer.isSharedLocked(key)) {
+         return SHARED_LOCK;
+      }
+      return null;
    }
 
    @Override
@@ -202,7 +204,7 @@ public class LockManagerImpl implements LockManager {
             key = ((MarshalledValue) key).get();
          }
          throw new TimeoutException("Unable to acquire lock after [" + Util.prettyPrintTime(getLockAcquisitionTimeout(ctx)) + "] on key [" + key + "] for requestor [" +
-               ctx.getLockOwner() + "]! Lock held by [" + owner + "]");
+                                          ctx.getLockOwner() + "]! Lock held by [" + owner + "]");
       }
    }
 

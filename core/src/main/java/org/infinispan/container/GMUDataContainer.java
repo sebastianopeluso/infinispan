@@ -503,7 +503,6 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
       public String toString() {
          return "VersionBody{" +
                "internalCacheEntry=" + internalCacheEntry +
-               ", previous=" + previous +
                '}';
       }
    }

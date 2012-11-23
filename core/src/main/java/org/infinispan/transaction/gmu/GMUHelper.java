@@ -20,7 +20,6 @@ import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -55,17 +54,8 @@ public class GMUHelper {
       }
    }
 
-   public static EntryVersion calculateCommitVersion(EntryVersion localPrepareVersion, EntryVersion remotePrepareVersion,
-                                                     GMUVersionGenerator versionGenerator, Collection<Address> affectedOwners) {
-      EntryVersion mergedVersion;
-      if (localPrepareVersion == null) {
-         mergedVersion = remotePrepareVersion;
-      } else if (remotePrepareVersion == null) {
-         mergedVersion = localPrepareVersion;
-      } else {
-         mergedVersion = versionGenerator.mergeAndMax(Arrays.asList(localPrepareVersion, remotePrepareVersion));
-      }
-
+   public static EntryVersion calculateCommitVersion(EntryVersion mergedVersion, GMUVersionGenerator versionGenerator,
+                                                     Collection<Address> affectedOwners) {
       if (mergedVersion == null) {
          throw new NullPointerException("Null merged version is not allowed to calculate commit view");
       }
@@ -121,6 +111,13 @@ public class GMUHelper {
          }
       }
 
-      ctx.setTransactionVersion(versionGenerator.mergeAndMax(allPreparedVersions));
+      EntryVersion commitVersion = versionGenerator.mergeAndMax(allPreparedVersions);
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Merging transaction [%s] prepare versions %s ==> %s", gtx.prettyPrint(), allPreparedVersions,
+                    commitVersion);
+      }
+
+      ctx.setTransactionVersion(commitVersion);
    }
 }

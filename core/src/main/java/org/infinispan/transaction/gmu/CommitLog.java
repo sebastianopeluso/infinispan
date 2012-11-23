@@ -62,6 +62,7 @@ public class CommitLog {
          if (isLessOrEquals(iterator.getVersion(), other)) {
             return iterator.getVersion();
          }
+         iterator = iterator.getPrevious();
       }
       throw new IllegalStateException("Version required no longer exists");
    }

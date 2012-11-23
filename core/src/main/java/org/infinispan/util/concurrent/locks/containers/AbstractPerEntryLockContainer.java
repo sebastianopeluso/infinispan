@@ -64,13 +64,13 @@ public abstract class AbstractPerEntryLockContainer<L extends Lock> extends Abst
 
    @Override
    public void releaseExclusiveLock(Object lockOwner, Object key) {
-      L l = locks.remove(key);
+      L l = locks.get(key);
       if (l != null) unlockExclusive(l, lockOwner);
    }
 
    @Override
    public void releaseShareLock(Object lockOwner, Object key) {
-      L l = locks.remove(key);
+      L l = locks.get(key);
       if (l != null) unlockShare(l, lockOwner);
    }
 

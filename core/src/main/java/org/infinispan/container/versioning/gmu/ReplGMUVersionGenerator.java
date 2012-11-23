@@ -71,9 +71,9 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public final IncrementableEntryVersion calculateCommitVersion(EntryVersion prepareVersion,
+   public final IncrementableEntryVersion calculateCommitVersion(EntryVersion mergedPrepareVersion,
                                                                  Collection<Address> affectedOwners) {
-      return (IncrementableEntryVersion) prepareVersion;
+      return (IncrementableEntryVersion) mergedPrepareVersion;
    }
 
    @Override
