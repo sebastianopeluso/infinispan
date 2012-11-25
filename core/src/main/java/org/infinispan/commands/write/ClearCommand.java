@@ -30,6 +30,7 @@ import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.lifecycle.ComponentStatus;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
+import org.jgroups.blocks.MessageRequest;
 
 import java.util.Collections;
 import java.util.Set;
@@ -39,9 +40,10 @@ import java.util.Set;
  * @since 4.0
  */
 public class ClearCommand extends AbstractFlagAffectedCommand implements WriteCommand {
-   
+
    public static final byte COMMAND_ID = 5;
    CacheNotifier notifier;
+   private MessageRequest messageRequest;
 
    public ClearCommand() {
    }
@@ -132,4 +134,16 @@ public class ClearCommand extends AbstractFlagAffectedCommand implements WriteCo
       return false;
    }
 
+   @Override
+   public void setMessageRequest(MessageRequest request) {
+      this.messageRequest = request;
+   }
+
+   @Override
+   public void sendReply(Object reply, boolean isExceptionThrown) {
+      if (messageRequest == null) {
+         throw new NullPointerException("Message Request is null");
+      }
+      messageRequest.sendReply(reply, isExceptionThrown);
+   }
 }

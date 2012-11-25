@@ -23,6 +23,7 @@
 package org.infinispan.commands;
 
 import org.infinispan.context.InvocationContext;
+import org.jgroups.blocks.MessageRequest;
 
 /**
  * The core of the command-based cache framework.  Commands correspond to specific areas of functionality in the cache,
@@ -73,4 +74,8 @@ public interface ReplicableCommand {
     * @return true or false
     */
    boolean isReturnValueExpected();
+
+   void setMessageRequest(MessageRequest request);
+
+   void sendReply(Object reply, boolean isExceptionThrown);
 }

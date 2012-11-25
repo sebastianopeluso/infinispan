@@ -145,7 +145,7 @@
       <version.jclouds>1.1.0</version.jclouds>
       <version.jetty>6.1.25</version.jetty>
       <version.jgoodies.forms>1.0.5</version.jgoodies.forms>
-      <version.jgroups>3.1.0.Beta2</version.jgroups>
+      <version.jgroups>3.3.0-cloudtm-SNAPSHOT</version.jgroups>
       <version.jsap>2.1</version.jsap>
       <version.json>20090211</version.json>
       <version.jstl>1.2</version.jstl>
@@ -176,8 +176,8 @@
       <version.org.codehaus.woodstox.stax2-api>3.1.1</version.org.codehaus.woodstox.stax2-api>
       <version.org.codehaus.woodstox.woodstox-core-asl>4.1.1</version.org.codehaus.woodstox.woodstox-core-asl>
       <version.org.jboss.staxmapper>1.0.0.Final</version.org.jboss.staxmapper>
-      <!-- 
-         The Felix Bundle plugin used has an incompatibility with Maven's Source plugin. 
+      <!--
+         The Felix Bundle plugin used has an incompatibility with Maven's Source plugin.
          Hence this workaround to use an older version of the Bundle plugin.  See
 
             http://comments.gmane.org/gmane.comp.apache.felix.devel/22887
@@ -809,7 +809,7 @@
          <scope>provided</scope>
       </dependency>
       <!-- As of v3.0.4, the RHQ annotations have a retention policy of COMPILE,
-           which means they are no longer required at runtime. However, 
+           which means they are no longer required at runtime. However,
            because of a Sun compiler bug http://bugs.sun.com/view_bug.do?bug_id=6550655
            it still needs to be present when using the Infinispan artifacts. This
            doesn't happen when using Java 7. Please add exclusions accordingly

@@ -28,6 +28,7 @@ import org.infinispan.commands.Visitor;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.distexec.DistributedCallable;
 import org.infinispan.lifecycle.ComponentStatus;
+import org.jgroups.blocks.MessageRequest;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -37,7 +38,7 @@ import java.util.concurrent.Callable;
 
 /**
  * DistributedExecuteCommand is used to migrate Callable and execute it in remote JVM.
- * 
+ *
  * @author Vladimir Blagojevic
  * @author Mircea Markus
  * @since 5.0
@@ -45,7 +46,7 @@ import java.util.concurrent.Callable;
 public class DistributedExecuteCommand<V> implements VisitableCommand {
 
    public static final int COMMAND_ID = 19;
-   
+
    private static final long serialVersionUID = -7828117401763700385L;
 
    private Cache<Object, Object> cache;
@@ -53,6 +54,8 @@ public class DistributedExecuteCommand<V> implements VisitableCommand {
    private Set<Object> keys;
 
    private Callable<V> callable;
+
+   private MessageRequest messageRequest;
 
 
    public DistributedExecuteCommand(Collection<Object> inputKeys, Callable<V> callable) {
@@ -83,7 +86,7 @@ public class DistributedExecuteCommand<V> implements VisitableCommand {
 
    /**
     * Performs invocation of Callable and returns result
-    * 
+    *
     * @param ctx
     *           invocation context
     * @return result of Callable invocations
@@ -95,7 +98,7 @@ public class DistributedExecuteCommand<V> implements VisitableCommand {
          DistributedCallable<Object, Object, Object> dc = (DistributedCallable<Object, Object, Object>) callable;
          dc.setEnvironment(cache, keys);
       }
-      return callable.call();      
+      return callable.call();
    }
 
    private Callable<V> getCallable() {
@@ -120,7 +123,7 @@ public class DistributedExecuteCommand<V> implements VisitableCommand {
       this.keys = (Set<Object>) args[i++];
       this.callable = (Callable<V>) args[i++];
    }
-   
+
    @Override
    public boolean equals(Object o) {
       if (this == o) {
@@ -160,5 +163,18 @@ public class DistributedExecuteCommand<V> implements VisitableCommand {
    @Override
    public boolean isReturnValueExpected() {
       return true;
+   }
+
+   @Override
+   public void setMessageRequest(MessageRequest request) {
+      this.messageRequest = request;
+   }
+
+   @Override
+   public void sendReply(Object reply, boolean isExceptionThrown) {
+      if (messageRequest == null) {
+         throw new NullPointerException("Message Request is null");
+      }
+      messageRequest.sendReply(reply, isExceptionThrown);
    }
 }

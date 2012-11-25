@@ -44,7 +44,7 @@ import java.util.Set;
  * @author <a href="http://gleamynode.net/">Trustin Lee</a>
  * @since 4.0
  */
-public class ValuesCommand extends AbstractLocalCommand implements VisitableCommand {
+public class ValuesCommand extends AbstractVisitableLocalCommand {
    private final DataContainer container;
 
    public ValuesCommand(DataContainer container) {

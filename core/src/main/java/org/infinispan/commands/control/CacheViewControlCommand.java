@@ -30,6 +30,7 @@ import org.infinispan.context.InvocationContext;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+import org.jgroups.blocks.MessageRequest;
 
 import java.util.List;
 
@@ -65,6 +66,8 @@ public class CacheViewControlCommand implements CacheRpcCommand {
    public static final int COMMAND_ID = 17;
 
    private CacheViewsManager cacheViewsManager;
+
+   private MessageRequest messageRequest;
 
    private final String cacheName;
    private Type type;
@@ -202,5 +205,18 @@ public class CacheViewControlCommand implements CacheRpcCommand {
    @Override
    public boolean isReturnValueExpected() {
       return true;
+   }
+
+   @Override
+   public void setMessageRequest(MessageRequest request) {
+      this.messageRequest = request;
+   }
+
+   @Override
+   public void sendReply(Object reply, boolean isExceptionThrown) {
+      if (messageRequest == null) {
+         throw new NullPointerException("Message Request is null");
+      }
+      messageRequest.sendReply(reply, isExceptionThrown);
    }
 }

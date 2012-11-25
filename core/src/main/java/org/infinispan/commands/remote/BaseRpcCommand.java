@@ -23,11 +23,13 @@
 package org.infinispan.commands.remote;
 
 import org.infinispan.remoting.transport.Address;
+import org.jgroups.blocks.MessageRequest;
 
 public abstract class BaseRpcCommand implements CacheRpcCommand {
    protected final String cacheName;
 
    private Address origin;
+   private MessageRequest messageRequest;
 
    protected BaseRpcCommand(String cacheName) {
       this.cacheName = cacheName;
@@ -44,14 +46,27 @@ public abstract class BaseRpcCommand implements CacheRpcCommand {
             "cacheName='" + cacheName + '\'' +
             '}';
    }
-   
+
    @Override
    public Address getOrigin() {
 	   return origin;
    }
-   
+
    @Override
    public void setOrigin(Address origin) {
 	   this.origin = origin;
+   }
+
+   @Override
+   public void setMessageRequest(MessageRequest request) {
+      this.messageRequest = request;
+   }
+
+   @Override
+   public void sendReply(Object reply, boolean isExceptionThrown) {
+      if (messageRequest == null) {
+         throw new NullPointerException("Message Request is null");
+      }
+      messageRequest.sendReply(reply, isExceptionThrown);
    }
 }

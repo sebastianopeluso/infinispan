@@ -36,7 +36,7 @@ import org.infinispan.context.InvocationContext;
  * @author <a href="http://gleamynode.net/">Trustin Lee</a>
  * @since 4.0
  */
-public class SizeCommand extends AbstractLocalCommand implements VisitableCommand {
+public class SizeCommand extends AbstractVisitableLocalCommand {
    private final DataContainer container;
 
    public SizeCommand(DataContainer container) {

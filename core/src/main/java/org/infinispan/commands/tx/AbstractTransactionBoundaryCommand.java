@@ -34,6 +34,7 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+import org.jgroups.blocks.MessageRequest;
 
 /**
  * An abstract transaction boundary command that holds a reference to a {@link org.infinispan.transaction.xa.GlobalTransaction}
@@ -55,6 +56,7 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    protected TransactionTable txTable;
    protected Configuration configuration;
    private Address origin;
+   private MessageRequest messageRequest;
 
    public AbstractTransactionBoundaryCommand(String cacheName) {
       this.cacheName = cacheName;
@@ -199,12 +201,12 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    private void markGtxAsRemote() {
       globalTx.setRemote(true);
    }
-   
+
    @Override
    public Address getOrigin() {
 	   return origin;
    }
-   
+
    @Override
    public void setOrigin(Address origin) {
 	   this.origin = origin;
@@ -213,5 +215,18 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    @Override
    public boolean isReturnValueExpected() {
       return true;
+   }
+
+   @Override
+   public void setMessageRequest(MessageRequest request) {
+      this.messageRequest = request;
+   }
+
+   @Override
+   public void sendReply(Object reply, boolean isExceptionThrown) {
+      if (messageRequest == null) {
+         throw new NullPointerException("Message Request is null");
+      }
+      messageRequest.sendReply(reply, isExceptionThrown);
    }
 }

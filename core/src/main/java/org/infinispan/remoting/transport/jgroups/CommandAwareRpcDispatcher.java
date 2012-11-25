@@ -42,6 +42,7 @@ import org.jgroups.Channel;
 import org.jgroups.Message;
 import org.jgroups.SuspectedException;
 import org.jgroups.UpHandler;
+import org.jgroups.blocks.MessageRequest;
 import org.jgroups.blocks.RequestOptions;
 import org.jgroups.blocks.ResponseMode;
 import org.jgroups.blocks.RpcDispatcher;
@@ -199,11 +200,13 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
     * Message contains a Command. Execute it against *this* object and return result.
     */
    @Override
-   public Object handle(Message req) {
+   public Object handle(MessageRequest request) {
+      Message req = request.getMessage();
       if (isValid(req)) {
          ReplicableCommand cmd = null;
          try {
             cmd = (ReplicableCommand) req_marshaller.objectFromBuffer(req.getRawBuffer(), req.getOffset(), req.getLength());
+            cmd.setMessageRequest(request);
             return executeCommand(cmd, req);
          } catch (InterruptedException e) {
             log.warnf("Shutdown while handling command %s", cmd);
@@ -454,7 +457,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
       }
 
       public synchronized RspList<Object> getResponseList() throws Exception {
-         //TODO, while is it blocking in here?!?! 
+         //TODO, while is it blocking in here?!?!
          while (expectedResponses > 0 && retval == null && System.currentTimeMillis() <= endTimeStamp) {
             try {
                this.wait(timeout);

@@ -27,6 +27,7 @@ import org.infinispan.commands.DataCommand;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.lifecycle.ComponentStatus;
+import org.jgroups.blocks.MessageRequest;
 
 import java.util.Set;
 
@@ -37,6 +38,7 @@ import java.util.Set;
  */
 public abstract class AbstractDataCommand extends AbstractFlagAffectedCommand implements DataCommand {
    protected Object key;
+   private MessageRequest messageRequest;
 
    @Override
    public Object getKey() {
@@ -92,12 +94,12 @@ public abstract class AbstractDataCommand extends AbstractFlagAffectedCommand im
          return false;
       return true;
    }
-   
+
    @Override
    public int hashCode() {
       return (key != null ? key.hashCode() : 0);
    }
-   
+
    @Override
    public String toString() {
       return new StringBuilder(getClass().getSimpleName())
@@ -111,5 +113,18 @@ public abstract class AbstractDataCommand extends AbstractFlagAffectedCommand im
    @Override
    public boolean isReturnValueExpected() {
       return true;
+   }
+
+   @Override
+   public void setMessageRequest(MessageRequest request) {
+      this.messageRequest = request;
+   }
+
+   @Override
+   public void sendReply(Object reply, boolean isExceptionThrown) {
+      if (messageRequest == null) {
+         throw new NullPointerException("Message Request is null");
+      }
+      messageRequest.sendReply(reply, isExceptionThrown);
    }
 }
