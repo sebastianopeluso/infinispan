@@ -21,6 +21,7 @@ package org.infinispan.topology;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.infinispan.distribution.ch.ConsistentHash;
@@ -44,6 +45,8 @@ class ClusterCacheStatus {
    // Cache topology. Its consistent hashes contain only members that did receive/are receiving state
    private volatile CacheTopology cacheTopology;
 
+   private final List<CacheTopology> history;
+
    private volatile RebalanceConfirmationCollector rebalanceStatus;
 
    public ClusterCacheStatus(String cacheName, CacheJoinInfo joinInfo) {
@@ -53,6 +56,7 @@ class ClusterCacheStatus {
       this.cacheTopology = new CacheTopology(-1, null, null);
       this.members = InfinispanCollections.emptyList();
       this.joiners = InfinispanCollections.emptyList();
+      this.history = new LinkedList<CacheTopology>();
    }
 
    public CacheJoinInfo getJoinInfo() {
@@ -137,12 +141,17 @@ class ClusterCacheStatus {
    public void updateCacheTopology(CacheTopology newTopology) {
       synchronized (this) {
          this.cacheTopology = newTopology;
+         history.add(newTopology);
 
          // update the joiners list
          if (newTopology.getCurrentCH() != null) {
             joiners = immutableRemoveAll(joiners, newTopology.getCurrentCH().getMembers());
          }
       }
+   }
+
+   public synchronized final LinkedList<CacheTopology> getHistory() {
+      return new LinkedList<CacheTopology>(history);
    }
 
    public boolean needConsistentHashUpdate() {

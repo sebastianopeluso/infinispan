@@ -24,7 +24,6 @@ package org.infinispan.util.concurrent.locks.containers;
 
 import net.jcip.annotations.ThreadSafe;
 import org.infinispan.util.concurrent.locks.OwnableReentrantLock;
-import org.infinispan.util.concurrent.locks.OwnableRefCountingReentrantLock;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -68,20 +67,35 @@ public class OwnableReentrantStripedLockContainer extends AbstractStripedLockCon
    }
 
    @Override
-   public final OwnableReentrantLock getLock(Object object) {
+   public final OwnableReentrantLock getExclusiveLock(Object object) {
       return sharedLocks[hashToIndex(object)];
    }
 
    @Override
-   public final boolean ownsLock(Object object, Object owner) {
-      OwnableReentrantLock lock = getLock(object);
+   public OwnableReentrantLock getShareLock(Object key) {
+      throw new UnsupportedOperationException();
+   }
+
+   @Override
+   public final boolean ownsExclusiveLock(Object object, Object owner) {
+      OwnableReentrantLock lock = getExclusiveLock(object);
       return owner.equals(lock.getOwner());
    }
 
    @Override
-   public final boolean isLocked(Object object) {
-      OwnableReentrantLock lock = getLock(object);
+   public boolean ownsShareLock(Object key, Object owner) {
+      return false;
+   }
+
+   @Override
+   public final boolean isExclusiveLocked(Object object) {
+      OwnableReentrantLock lock = getExclusiveLock(object);
       return lock.isLocked();
+   }
+
+   @Override
+   public boolean isSharedLocked(Object key) {
+      return false;
    }
 
    @Override
@@ -92,7 +106,7 @@ public class OwnableReentrantStripedLockContainer extends AbstractStripedLockCon
    }
 
    public String toString() {
-      return "OwnableReentrantStripedLockContainer{" +
+      return "OwnableReentrantStripedReadWriteLockContainer{" +
             "sharedLocks=" + (sharedLocks == null ? null : Arrays.asList(sharedLocks)) +
             '}';
    }
@@ -103,17 +117,32 @@ public class OwnableReentrantStripedLockContainer extends AbstractStripedLockCon
    }
 
    @Override
-   protected boolean tryLock(OwnableReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
+   protected boolean tryExclusiveLock(OwnableReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
       return lock.tryLock(lockOwner, timeout, unit);
    }
 
    @Override
-   protected void lock(OwnableReentrantLock lock, Object lockOwner) {
+   protected void exclusiveLock(OwnableReentrantLock lock, Object lockOwner) {
       lock.lock(lockOwner);
    }
 
    @Override
-   protected void unlock(OwnableReentrantLock l, Object owner) {
+   protected void shareLock(OwnableReentrantLock lock, Object lockOwner) {
+      throw new UnsupportedOperationException();
+   }
+
+   @Override
+   protected void unlockExclusive(OwnableReentrantLock l, Object owner) {
       l.unlock(owner);
+   }
+
+   @Override
+   protected void unlockShare(OwnableReentrantLock toRelease, Object owner) {
+      //no-o
+   }
+
+   @Override
+   protected boolean tryShareLock(OwnableReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
+      return false;
    }
 }

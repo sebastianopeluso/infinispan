@@ -50,6 +50,7 @@ import org.infinispan.distribution.L1Manager;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.base.BaseRpcInterceptor;
+import org.infinispan.interceptors.locking.ClusteringDependentLogic;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.remoting.transport.jgroups.SuspectException;
 import org.infinispan.transaction.LocalTransaction;
@@ -87,6 +88,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    private EntryFactory entryFactory;
    private L1Manager l1Manager;
    private LockManager lockManager;
+   ClusteringDependentLogic cdl;
 
    static final RecipientGenerator CLEAR_COMMAND_GENERATOR = new RecipientGenerator() {
       @Override
@@ -112,13 +114,14 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    @Inject
    public void injectDependencies(DistributionManager distributionManager,
                                   CommandsFactory cf, DataContainer dataContainer, EntryFactory entryFactory,
-                                  L1Manager l1Manager, LockManager lockManager) {
+                                  L1Manager l1Manager, LockManager lockManager, ClusteringDependentLogic cdl) {
       this.dm = distributionManager;
       this.cf = cf;
       this.dataContainer = dataContainer;
       this.entryFactory = entryFactory;
       this.l1Manager = l1Manager;
       this.lockManager = lockManager;
+      this.cdl = cdl;
    }
 
    @Start
@@ -254,7 +257,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    private void lockAndWrap(InvocationContext ctx, Object key, InternalCacheEntry ice, FlagAffectedCommand command) throws InterruptedException {
       boolean skipLocking = hasSkipLocking(command);
       long lockTimeout = getLockAcquisitionTimeout(command, skipLocking);
-      lockManager.acquireLock(ctx, key, lockTimeout, skipLocking);
+      lockManager.acquireLock(ctx, key, lockTimeout, skipLocking, false);
       entryFactory.wrapEntryForPut(ctx, key, ice, false, command);
    }
 
@@ -265,7 +268,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
     * @return true if the key is not in L1, or L1 caching is not enabled.  false the key is in L1.
     */
    private boolean isNotInL1(Object key) {
-      return !isL1CacheEnabled || !dataContainer.containsKey(key);
+      return !isL1CacheEnabled || !dataContainer.containsKey(key, null);
    }
 
    // ---- WRITE commands
@@ -280,7 +283,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
 
       return returnValue;
    }
-   
+
    @Override
    public Object visitPutMapCommand(InvocationContext ctx, PutMapCommand command) throws Throwable {
       // don't bother with a remote get for the PutMapCommand!
@@ -351,7 +354,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    }
 
    private void sendCommitCommand(TxInvocationContext ctx, CommitCommand command) throws TimeoutException, InterruptedException {
-      Collection<Address> recipients = getCommitNodes(ctx);
+      Collection<Address> recipients = cdl.getInvolvedNodes(ctx.getCacheTransaction());
       boolean syncCommitPhase = cacheConfiguration.transaction().syncCommitPhase();
       rpcManager.invokeRemotely(recipients, command, syncCommitPhase, true);
    }
@@ -363,10 +366,11 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
       if (shouldInvokeRemoteTxCommand(ctx)) {
          if (command.isOnePhaseCommit()) flushL1Caches(ctx); // if we are one-phase, don't block on this future.
 
-         Collection<Address> recipients = dm.getAffectedNodes(ctx.getAffectedKeys());
+         Collection<Address> recipients = cdl.getInvolvedNodes(ctx.getCacheTransaction());
          prepareOnAffectedNodes(ctx, command, recipients, defaultSynchronous);
 
-         ((LocalTxInvocationContext) ctx).remoteLocksAcquired(recipients);
+         ((LocalTxInvocationContext) ctx).remoteLocksAcquired(recipients == null ? dm.getConsistentHash().getMembers() :
+                                                                    recipients);
       } else if (isL1CacheEnabled && command.isOnePhaseCommit() && !ctx.isOriginLocal() && !ctx.getLockedKeys().isEmpty()) {
          // We fall into this block if we are a remote node, happen to be the primary data owner and have locked keys.
          // it is still our responsibility to invalidate L1 caches in the cluster.
@@ -383,7 +387,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
       if (shouldInvokeRemoteTxCommand(ctx)) {
-         rpcManager.invokeRemotely(getCommitNodes(ctx), command, cacheConfiguration.transaction().syncRollbackPhase(), true);
+         rpcManager.invokeRemotely(cdl.getInvolvedNodes(ctx.getCacheTransaction()), command, cacheConfiguration.transaction().syncRollbackPhase(), true);
       }
 
       return invokeNextInterceptor(ctx, command);

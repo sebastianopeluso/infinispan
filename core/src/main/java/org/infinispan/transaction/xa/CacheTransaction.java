@@ -24,8 +24,12 @@ package org.infinispan.transaction.xa;
 
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
+import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.EntryVersionsMap;
+import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.remoting.transport.Address;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,7 +66,7 @@ public interface CacheTransaction {
    void clearLookedUpEntries();
 
    boolean ownsLock(Object key);
-   
+
    void clearLockedKeys();
 
    Set<Object> getLockedKeys();
@@ -74,7 +78,7 @@ public interface CacheTransaction {
    void addBackupLockForKey(Object key);
 
    /**
-    * @see org.infinispan.interceptors.locking.AbstractTxLockingInterceptor#lockKeyAndCheckOwnership(org.infinispan.context.InvocationContext, Object)
+    * @see org.infinispan.interceptors.locking.AbstractTxLockingInterceptor#lockKeyAndCheckOwnership(org.infinispan.context.InvocationContext, Object, long, boolean, boolean)
     */
    void notifyOnTransactionFinished();
 
@@ -87,7 +91,7 @@ public interface CacheTransaction {
     * before the specified time has elapsed and without guaranteeing that this transaction is complete. The caller is
     * responsible to call the method again if transaction completion was not reached and the time budget was not spent.
     *
-    * @see org.infinispan.interceptors.locking.AbstractTxLockingInterceptor#lockKeyAndCheckOwnership(org.infinispan.context.InvocationContext, Object)
+    * @see org.infinispan.interceptors.locking.AbstractTxLockingInterceptor#lockKeyAndCheckOwnership(org.infinispan.context.InvocationContext, Object, long, boolean, boolean)
     */
    boolean waitForLockRelease(Object key, long lockAcquisitionTimeout) throws InterruptedException;
 
@@ -102,4 +106,24 @@ public interface CacheTransaction {
    boolean isMarkedForRollback();
 
    void markForRollback(boolean markForRollback);
+
+   void markPrepareSent();
+
+   boolean wasPrepareSent();
+
+   EntryVersion calculateVersionToRead(VersionGenerator versionGenerator);
+
+   Collection<Object> getReadKeys();
+
+   void addReadFrom(Address address);
+
+   Set<Address> getReadFrom();
+
+   void setTransactionVersion(EntryVersion version);
+
+   EntryVersion getTransactionVersion();
+
+   boolean hasAlreadyReadOnThisNode();
+
+   void setAlreadyReadOnThisNode(boolean value);
 }

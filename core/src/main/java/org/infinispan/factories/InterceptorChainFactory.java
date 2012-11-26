@@ -25,16 +25,20 @@ package org.infinispan.factories;
 
 import org.infinispan.CacheException;
 import org.infinispan.config.ConfigurationException;
+import org.infinispan.configuration.cache.CacheLoaderConfiguration;
+import org.infinispan.configuration.cache.CacheStoreConfiguration;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.cache.CustomInterceptorsConfiguration;
 import org.infinispan.configuration.cache.InterceptorConfiguration;
-import org.infinispan.configuration.cache.CacheLoaderConfiguration;
-import org.infinispan.configuration.cache.CacheStoreConfiguration;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.interceptors.*;
 import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.interceptors.gmu.GMUDistributionInterceptor;
+import org.infinispan.interceptors.gmu.GMUEntryWrappingInterceptor;
+import org.infinispan.interceptors.gmu.GMUReplicationInterceptor;
 import org.infinispan.interceptors.locking.NonTransactionalLockingInterceptor;
 import org.infinispan.interceptors.locking.OptimisticLockingInterceptor;
+import org.infinispan.interceptors.locking.OptimisticReadWriteLockingInterceptor;
 import org.infinispan.interceptors.locking.PessimisticLockingInterceptor;
 import org.infinispan.interceptors.xsite.NonTransactionalBackupInterceptor;
 import org.infinispan.interceptors.xsite.OptimisticBackupInterceptor;
@@ -54,6 +58,8 @@ import java.util.List;
  * @author <a href="mailto:manik@jboss.org">Manik Surtani (manik@jboss.org)</a>
  * @author Mircea.Markus@jboss.com
  * @author Marko Luksa
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @DefaultFactoryFor(classes = InterceptorChain.class)
@@ -95,6 +101,7 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       // add the interceptor chain to the registry first, since some interceptors may ask for it.
       componentRegistry.registerComponent(interceptorChain, InterceptorChain.class);
 
+      boolean serializability = configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE;
       boolean invocationBatching = configuration.invocationBatching().enabled();
       // load the icInterceptor first
       if (invocationBatching) {
@@ -137,7 +144,10 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       }
 
       if (configuration.transaction().transactionMode().isTransactional()) {
-         if (configuration.transaction().lockingMode() == LockingMode.PESSIMISTIC) {
+         if (serializability) {
+            interceptorChain.appendInterceptor(createInterceptor(new OptimisticReadWriteLockingInterceptor(),
+                                                                 OptimisticReadWriteLockingInterceptor.class), false);
+         } else if (configuration.transaction().lockingMode() == LockingMode.PESSIMISTIC) {
             interceptorChain.appendInterceptor(createInterceptor(new PessimisticLockingInterceptor(), PessimisticLockingInterceptor.class), false);
          } else {
             interceptorChain.appendInterceptor(createInterceptor(new OptimisticLockingInterceptor(), OptimisticLockingInterceptor.class), false);
@@ -159,7 +169,10 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          }
       }
 
-      if (needsVersionAwareComponents && configuration.clustering().cacheMode().isClustered())
+      if (serializability) {
+         interceptorChain.appendInterceptor(createInterceptor(new GMUEntryWrappingInterceptor(),
+                                                              GMUEntryWrappingInterceptor.class), false);
+      } else if (needsVersionAwareComponents && configuration.clustering().cacheMode().isClustered())
          interceptorChain.appendInterceptor(createInterceptor(new VersionedEntryWrappingInterceptor(), VersionedEntryWrappingInterceptor.class), false);
       else
          interceptorChain.appendInterceptor(createInterceptor(new EntryWrappingInterceptor(), EntryWrappingInterceptor.class), false);
@@ -194,7 +207,10 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
 
       switch (configuration.clustering().cacheMode()) {
          case REPL_SYNC:
-            if (needsVersionAwareComponents) {
+            if (serializability) {
+               interceptorChain.appendInterceptor(createInterceptor(new GMUReplicationInterceptor(), GMUReplicationInterceptor.class), false);
+               break;
+            } else if (needsVersionAwareComponents) {
                interceptorChain.appendInterceptor(createInterceptor(new VersionedReplicationInterceptor(), VersionedReplicationInterceptor.class), false);
                break;
             }
@@ -206,7 +222,10 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             interceptorChain.appendInterceptor(createInterceptor(new InvalidationInterceptor(), InvalidationInterceptor.class), false);
             break;
          case DIST_SYNC:
-            if (needsVersionAwareComponents) {
+            if(serializability) {
+               interceptorChain.appendInterceptor(createInterceptor(new GMUDistributionInterceptor(), GMUDistributionInterceptor.class), false);
+               break;
+            } else if (needsVersionAwareComponents) {
                interceptorChain.appendInterceptor(createInterceptor(new VersionedDistributionInterceptor(), VersionedDistributionInterceptor.class), false);
                break;
             }

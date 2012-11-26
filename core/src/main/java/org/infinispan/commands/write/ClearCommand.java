@@ -40,7 +40,7 @@ import java.util.Set;
  * @since 4.0
  */
 public class ClearCommand extends AbstractFlagAffectedCommand implements WriteCommand {
-   
+
    public static final byte COMMAND_ID = 5;
    CacheNotifier notifier;
 
@@ -102,10 +102,10 @@ public class ClearCommand extends AbstractFlagAffectedCommand implements WriteCo
    @Override
    public String toString() {
       return new StringBuilder()
-         .append("ClearCommand{flags=")
-         .append(flags)
-         .append("}")
-         .toString();
+            .append("ClearCommand{flags=")
+            .append(flags)
+            .append("}")
+            .toString();
    }
 
    @Override
@@ -132,5 +132,4 @@ public class ClearCommand extends AbstractFlagAffectedCommand implements WriteCo
    public boolean ignoreCommandOnStatus(ComponentStatus status) {
       return false;
    }
-
 }

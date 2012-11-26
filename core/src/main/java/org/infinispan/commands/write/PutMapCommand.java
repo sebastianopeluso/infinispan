@@ -157,9 +157,9 @@ public class PutMapCommand extends AbstractFlagAffectedCommand implements WriteC
          }
       }
       sb.append("}, flags=").append(flags)
-         .append(", lifespanMillis=").append(lifespanMillis)
-         .append(", maxIdleTimeMillis=").append(maxIdleTimeMillis)
-         .append("}");
+            .append(", lifespanMillis=").append(lifespanMillis)
+            .append(", maxIdleTimeMillis=").append(maxIdleTimeMillis)
+            .append("}");
       return sb.toString();
    }
 
@@ -200,5 +200,4 @@ public class PutMapCommand extends AbstractFlagAffectedCommand implements WriteC
    public boolean ignoreCommandOnStatus(ComponentStatus status) {
       return false;
    }
-
 }

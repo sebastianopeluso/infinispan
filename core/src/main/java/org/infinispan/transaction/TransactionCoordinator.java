@@ -36,6 +36,7 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -90,7 +91,19 @@ public class TransactionCoordinator {
 
    @Start
    public void start() {
-      if (configuration.locking().writeSkewCheck() && configuration.transaction().lockingMode() == LockingMode.OPTIMISTIC
+      if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+         commandCreator = new CommandCreator() {
+            @Override
+            public CommitCommand createCommitCommand(GlobalTransaction gtx) {
+               return commandsFactory.buildSerializableCommitCommand(gtx);
+            }
+
+            @Override
+            public PrepareCommand createPrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications) {
+               return commandsFactory.buildSerializablePrepareCommand(gtx, modifications, false);
+            }
+         };
+      } else if (configuration.locking().writeSkewCheck() && configuration.transaction().lockingMode() == LockingMode.OPTIMISTIC
             && configuration.versioning().enabled()) {
          // We need to create versioned variants of PrepareCommand and CommitCommand
          commandCreator = new CommandCreator() {

@@ -30,6 +30,8 @@ import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.marshall.jboss.ExternalizerTable;
+import org.infinispan.transaction.gmu.CommitLog;
+import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.InboundInvocationHandlerImpl;
 import org.infinispan.topology.ClusterTopologyManager;
@@ -46,11 +48,14 @@ import org.infinispan.xsite.BackupReceiverRepositoryImpl;
  *
  * @author Manik Surtani
  * @author <a href="mailto:galder.zamarreno@jboss.com">Galder Zamarreno</a>
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 
 @DefaultFactoryFor(classes = {InboundInvocationHandler.class, RemoteCommandsFactory.class, ExternalizerTable.class,
-                              RebalancePolicy.class, BackupReceiverRepository.class, CancellationService.class })
+                              RebalancePolicy.class, BackupReceiverRepository.class, CancellationService.class,
+                              CommitLog.class, TransactionCommitManager.class})
 @Scope(Scopes.GLOBAL)
 public class EmptyConstructorFactory extends AbstractComponentFactory implements AutoInstantiableFactory {
 
@@ -73,6 +78,11 @@ public class EmptyConstructorFactory extends AbstractComponentFactory implements
          return (T) new BackupReceiverRepositoryImpl();
       else if (componentType.equals(CancellationService.class))
          return (T) new CancellationServiceImpl();
+      else if (componentType.equals(CommitLog.class)) {
+         return (T) new CommitLog();
+      } else if (componentType.equals(TransactionCommitManager.class)) {
+         return (T) new TransactionCommitManager();
+      }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());
    }

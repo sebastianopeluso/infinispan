@@ -22,12 +22,17 @@
  */
 package org.infinispan.commands.remote;
 
+import org.infinispan.remoting.responses.ExceptionResponse;
+import org.infinispan.remoting.responses.ResponseGenerator;
 import org.infinispan.remoting.transport.Address;
+import org.jgroups.blocks.MessageRequest;
 
 public abstract class BaseRpcCommand implements CacheRpcCommand {
    protected final String cacheName;
 
    private Address origin;
+   private MessageRequest messageRequest;
+   private ResponseGenerator responseGenerator;
 
    protected BaseRpcCommand(String cacheName) {
       this.cacheName = cacheName;
@@ -44,14 +49,45 @@ public abstract class BaseRpcCommand implements CacheRpcCommand {
             "cacheName='" + cacheName + '\'' +
             '}';
    }
-   
+
    @Override
    public Address getOrigin() {
 	   return origin;
    }
-   
+
    @Override
    public void setOrigin(Address origin) {
 	   this.origin = origin;
+   }
+
+   @Override
+   public final void setMessageRequest(MessageRequest request) {
+      this.messageRequest = request;
+   }
+
+   @Override
+   public final void setResponseGenerator(ResponseGenerator responseGenerator) {
+      this.responseGenerator = responseGenerator;
+   }
+
+   @Override
+   public final void sendReply(Object reply, boolean threwException) {
+      sendReply(messageRequest, responseGenerator, this, reply, threwException);
+   }
+
+   public static void sendReply(MessageRequest messageRequest, ResponseGenerator responseGenerator,
+                                CacheRpcCommand command, Object reply, boolean threwException) {
+      if (messageRequest == null) {
+         return;
+      }
+      Object realReply;
+      if (threwException) {
+         realReply = new ExceptionResponse((Exception) reply);
+      } else if (responseGenerator == null) {
+         realReply = reply;
+      } else {
+         realReply = responseGenerator.getResponse(command, reply);
+      }
+      messageRequest.sendReply(realReply, false);
    }
 }

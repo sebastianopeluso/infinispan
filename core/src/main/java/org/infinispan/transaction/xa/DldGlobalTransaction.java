@@ -39,6 +39,8 @@ import java.util.Set;
  * This class is used when deadlock detection is enabled.
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  */
 public class DldGlobalTransaction extends GlobalTransaction {
 
@@ -55,6 +57,9 @@ public class DldGlobalTransaction extends GlobalTransaction {
 
    protected volatile Set<Object> locksAtOrigin =
          InfinispanCollections.emptySet();
+   protected volatile Collection<Object> remoteReadLockIntention = InfinispanCollections.emptySet();
+
+   protected volatile Set<Object> readLocksAtOrigin = InfinispanCollections.emptySet();
 
    public DldGlobalTransaction() {
    }
@@ -106,7 +111,7 @@ public class DldGlobalTransaction extends GlobalTransaction {
    }
 
    /**
-    * Returns the key this transaction intends to lock. 
+    * Returns the key this transaction intends to lock.
     */
    public Object getLockIntention() {
       return localLockIntention;
@@ -152,6 +157,20 @@ public class DldGlobalTransaction extends GlobalTransaction {
       return this.locksAtOrigin;
    }
 
+   public void setReadLocksHeldAtOrigin(Set<Object> readLocksAtOrigin) {
+      if (trace) {
+         log.tracef("Setting *read* locks at origin for (%s) to %s", this, locksAtOrigin);
+      }
+      this.readLocksAtOrigin = readLocksAtOrigin;
+   }
+
+   public void setRemoteReadLockIntention(Set<Object> remoteReadLockIntention) {
+      if (trace) {
+         log.tracef("Setting the remote read lock intention for (%s) to %s", this, remoteReadLockIntention);
+      }
+      this.remoteReadLockIntention = remoteReadLockIntention;
+   }
+
    public static class Externalizer extends GlobalTransaction.AbstractGlobalTxExternalizer<DldGlobalTransaction> {
 
       @Override
@@ -168,6 +187,11 @@ public class DldGlobalTransaction extends GlobalTransaction {
          } else {
             output.writeObject(ddGt.locksAtOrigin);
          }
+         if(ddGt.readLocksAtOrigin.isEmpty()) {
+            output.writeObject(null);
+         } else {
+            output.writeObject(ddGt.readLocksAtOrigin);
+         }
       }
 
       @Override
@@ -176,10 +200,16 @@ public class DldGlobalTransaction extends GlobalTransaction {
          DldGlobalTransaction ddGt = super.readObject(input);
          ddGt.setCoinToss(input.readLong());
          Object locksAtOriginObj = input.readObject();
+         Object readLockAtOriginObj = input.readObject();
          if (locksAtOriginObj == null) {
             ddGt.setLocksHeldAtOrigin(InfinispanCollections.emptySet());
          } else {
             ddGt.setLocksHeldAtOrigin((Set<Object>) locksAtOriginObj);
+         }
+         if(readLockAtOriginObj == null) {
+            ddGt.setReadLocksHeldAtOrigin(InfinispanCollections.emptySet());
+         } else {
+            ddGt.setReadLocksHeldAtOrigin((Set<Object>) readLockAtOriginObj);
          }
          return ddGt;
       }

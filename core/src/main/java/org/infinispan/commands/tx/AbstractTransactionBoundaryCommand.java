@@ -22,17 +22,20 @@
  */
 package org.infinispan.commands.tx;
 
+import org.infinispan.commands.remote.BaseRpcCommand;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.impl.RemoteTxInvocationContext;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.lifecycle.ComponentStatus;
+import org.infinispan.remoting.responses.ResponseGenerator;
+import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
-import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+import org.jgroups.blocks.MessageRequest;
 
 /**
  * An abstract transaction boundary command that holds a reference to a {@link org.infinispan.transaction.xa.GlobalTransaction}
@@ -53,6 +56,8 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    protected TransactionTable txTable;
    private Address origin;
    private int topologyId = -1;
+   private MessageRequest messageRequest;
+   private ResponseGenerator responseGenerator;
 
    public AbstractTransactionBoundaryCommand(String cacheName) {
       this.cacheName = cacheName;
@@ -165,19 +170,34 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    private void markGtxAsRemote() {
       globalTx.setRemote(true);
    }
-   
+
    @Override
    public Address getOrigin() {
-	   return origin;
+      return origin;
    }
-   
+
    @Override
    public void setOrigin(Address origin) {
-	   this.origin = origin;
+      this.origin = origin;
    }
 
    @Override
    public boolean isReturnValueExpected() {
       return true;
+   }
+
+   @Override
+   public void sendReply(Object reply, boolean threwException) {
+      BaseRpcCommand.sendReply(messageRequest, responseGenerator, this, reply, threwException);
+   }
+
+   @Override
+   public void setResponseGenerator(ResponseGenerator responseGenerator) {
+      this.responseGenerator = responseGenerator;
+   }
+
+   @Override
+   public void setMessageRequest(MessageRequest request) {
+      this.messageRequest = request;
    }
 }

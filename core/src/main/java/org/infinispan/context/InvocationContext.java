@@ -22,9 +22,13 @@
  */
 package org.infinispan.context;
 
-import java.util.Set;
-
+import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
+import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.remoting.transport.Address;
+
+import java.util.Map;
+import java.util.Set;
 
 /**
  * A context that contains information pertaining to a given invocation.  These contexts typically have the lifespan of
@@ -32,6 +36,8 @@ import org.infinispan.remoting.transport.Address;
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public interface InvocationContext extends EntryLookup, Cloneable {
@@ -115,4 +121,45 @@ public interface InvocationContext extends EntryLookup, Cloneable {
     * @param key lock to test
     */
    boolean hasLockedKey(Object key);
+
+   /**
+    * add the key to a map between key and {@link InternalGMUCacheEntry}. This entry has all the information needed to calculate
+    * the new transaction version. This is a temporary map and should be clear before (or after) each command
+    *
+    * @param entry   the entry read
+    */
+   void addKeyReadInCommand(Object key, InternalGMUCacheEntry entry);
+
+   /**
+    * clears the map between key and internal gmu entry
+    */
+   void clearKeyReadInCommand();
+
+   /**
+    * @return  all the key read since last clear
+    */
+   Map<Object, InternalGMUCacheEntry> getKeysReadInCommand();
+
+   /**
+    * @param versionGenerator the version generator
+    * @return  the maximum {@link EntryVersion} to read     
+    */
+   EntryVersion calculateVersionToRead(VersionGenerator versionGenerator);
+
+   /**
+    * sets the version to read
+    *
+    * @param entryVersion  the version to read
+    */
+   void setVersionToRead(EntryVersion entryVersion);
+
+   /**    
+    * @return true if it has already read from this node
+    */
+   boolean hasAlreadyReadOnThisNode();
+
+   /**    
+    * @param value   true or false if it has already read from this node
+    */
+   void setAlreadyReadOnThisNode(boolean value);
 }

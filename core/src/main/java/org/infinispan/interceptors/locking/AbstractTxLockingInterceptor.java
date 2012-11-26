@@ -23,9 +23,7 @@
 
 package org.infinispan.interceptors.locking;
 
-import org.infinispan.CacheException;
 import org.infinispan.commands.read.GetKeyValueCommand;
-import org.infinispan.commands.tx.AbstractTransactionBoundaryCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
@@ -36,7 +34,6 @@ import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.remoting.rpc.RpcManager;
-import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
@@ -122,8 +119,16 @@ public abstract class AbstractTxLockingInterceptor extends AbstractLockingInterc
     * the originator leaving the cluster (if recovery is disabled).
     */
    protected final void lockAndRegisterBackupLock(TxInvocationContext ctx, Object key, long lockTimeout, boolean skipLocking) throws InterruptedException {
+      internalLockAndRegisterBackupLock(ctx, key, lockTimeout, skipLocking, false);
+   }
+
+   protected final void lockAndRegisterShareBackupLock(TxInvocationContext ctx, Object key, long lockTimeout, boolean skipLocking) throws InterruptedException {
+      internalLockAndRegisterBackupLock(ctx, key, lockTimeout, skipLocking, true);
+   }
+
+   protected void internalLockAndRegisterBackupLock(TxInvocationContext ctx, Object key, long lockTimeout, boolean skipLocking, boolean share) throws InterruptedException {
       if (cdl.localNodeIsPrimaryOwner(key)) {
-         lockKeyAndCheckOwnership(ctx, key, lockTimeout, skipLocking);
+         lockKeyAndCheckOwnership(ctx, key, lockTimeout, skipLocking, share);
       } else if (cdl.localNodeIsOwner(key)) {
          ctx.getCacheTransaction().addBackupLockForKey(key);
       }
@@ -149,10 +154,10 @@ public abstract class AbstractTxLockingInterceptor extends AbstractLockingInterc
     * Note: The algorithm described below only when nodes leave the cluster, so it doesn't add a performance burden
     * when the cluster is stable.
     */
-   protected final void lockKeyAndCheckOwnership(InvocationContext ctx, Object key, long lockTimeout, boolean skipLocking) throws InterruptedException {
+   protected final void lockKeyAndCheckOwnership(InvocationContext ctx, Object key, long lockTimeout, boolean skipLocking, boolean share) throws InterruptedException {
       //this is possible when the put is originated as a result of a state transfer
       if (!ctx.isInTxScope()) {
-         lockManager.acquireLock(ctx, key, lockTimeout, skipLocking);
+         lockManager.acquireLock(ctx, key, lockTimeout, skipLocking, share);
          return;
       }
       TxInvocationContext txContext = (TxInvocationContext) ctx;
@@ -184,11 +189,11 @@ public abstract class AbstractTxLockingInterceptor extends AbstractLockingInterc
             throw newTimeoutException(key, txContext);
          } else {
             getLog().tracef("Finished waiting for other potential lockers, trying to acquire the lock on %s", key);
-            lockManager.acquireLock(ctx, key, remaining, skipLocking);
+            lockManager.acquireLock(ctx, key, remaining, skipLocking, share);
          }
       } else {
          getLog().tracef("Locking key %s, no need to check for pending locks.", key);
-         lockManager.acquireLock(ctx, key, lockTimeout, skipLocking);
+         lockManager.acquireLock(ctx, key, lockTimeout, skipLocking, share);
       }
    }
 

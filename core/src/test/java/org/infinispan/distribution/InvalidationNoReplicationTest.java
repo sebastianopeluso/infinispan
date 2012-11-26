@@ -22,16 +22,11 @@
  */
 package org.infinispan.distribution;
 
-import org.infinispan.affinity.KeyAffinityService;
-import org.infinispan.affinity.KeyAffinityServiceFactory;
-import org.infinispan.affinity.RndKeyGenerator;
 import org.infinispan.config.Configuration;
 import org.infinispan.test.MultipleCacheManagersTest;
-import org.infinispan.test.TestingUtil;
 import org.testng.annotations.Test;
 
 import java.util.Collections;
-import java.util.concurrent.Executors;
 
 import static org.testng.Assert.assertEquals;
 
@@ -61,14 +56,14 @@ public class InvalidationNoReplicationTest extends MultipleCacheManagersTest {
       assert advancedCache(1).getDistributionManager().locate(k0).equals(Collections.singletonList(address(0)));
 
       advancedCache(1).put(k0, "k1");
-      assert advancedCache(1).getDataContainer().containsKey(k0);
-      assert advancedCache(0).getDataContainer().containsKey(k0);
+      assert advancedCache(1).getDataContainer().containsKey(k0, null);
+      assert advancedCache(0).getDataContainer().containsKey(k0, null);
 
       tm(0).begin();
       cache(0).put(k0, "v2");
       tm(0).commit();
 
-      assert !advancedCache(1).getDataContainer().containsKey(k0);
+      assert !advancedCache(1).getDataContainer().containsKey(k0, null);
    }
 
 }

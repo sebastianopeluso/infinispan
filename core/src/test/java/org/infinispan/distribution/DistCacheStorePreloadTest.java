@@ -67,7 +67,7 @@ public class DistCacheStorePreloadTest extends BaseDistCacheStoreTest {
          c1.put("k" + i, "v" + i);
       }
       DataContainer dc1 = c1.getAdvancedCache().getDataContainer();
-      assert dc1.size() == NUM_KEYS;
+      assert dc1.size(null) == NUM_KEYS;
 
       DummyInMemoryCacheStore cs = (DummyInMemoryCacheStore) TestingUtil.extractComponent(c1, CacheLoaderManager.class).getCacheStore();
       assert cs.loadAllKeys(Collections.emptySet()).size() == NUM_KEYS;
@@ -80,6 +80,10 @@ public class DistCacheStorePreloadTest extends BaseDistCacheStoreTest {
       caches.add(c2);
 
       DataContainer dc2 = c2.getAdvancedCache().getDataContainer();
-      assertEquals("No keys should be preloaded on the second cache", 0, dc2.size());
+      assert dc2.size(null) == NUM_KEYS : "Expected all the cache store entries to be preloaded on the second cache";
+
+      for (int i = 0; i < NUM_KEYS; i++) {
+         assertOwnershipAndNonOwnership("k" + i, true);
+      }
    }
 }

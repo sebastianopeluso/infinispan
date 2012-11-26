@@ -1,4 +1,4 @@
-/* 
+/*
  * JBoss, Home of Professional Open Source
  * Copyright 2011 Red Hat Inc. and/or its affiliates and other contributors
  * as indicated by the @authors tag. All rights reserved.
@@ -21,6 +21,9 @@ package org.infinispan.context.impl;
 
 import org.infinispan.CacheException;
 import org.infinispan.container.entries.CacheEntry;
+import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
+import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.InfinispanCollections;
@@ -32,13 +35,15 @@ import java.util.Set;
 /**
  * This context is a non-context for operations such as eviction which are not related
  * to the method invocation which caused them.
- * 
+ *
  * @author Sanne Grinovero <sanne@infinispan.org> (C) 2011 Red Hat Inc.
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  */
 public final class ImmutableContext implements InvocationContext {
-   
+
    public static final ImmutableContext INSTANCE = new ImmutableContext();
-   
+
    private ImmutableContext() {
       //don't create multiple instances
    }
@@ -142,5 +147,40 @@ public final class ImmutableContext implements InvocationContext {
    @Override
    public void clearLockedKeys() {
       throw new CacheException("This context is immutable");
+   }
+
+   @Override
+   public void addKeyReadInCommand(Object key, InternalGMUCacheEntry entry) {
+      //no-op
+   }
+
+   @Override
+   public void clearKeyReadInCommand() {
+      //no-op
+   }
+
+   @Override
+   public Map<Object, InternalGMUCacheEntry> getKeysReadInCommand() {
+      return Collections.emptyMap();
+   }
+
+   @Override
+   public EntryVersion calculateVersionToRead(VersionGenerator versionGenerator) {
+      return null;
+   }
+
+   @Override
+   public void setVersionToRead(EntryVersion entryVersion) {
+      //no-op
+   }
+
+   @Override
+   public boolean hasAlreadyReadOnThisNode() {
+      return false;
+   }
+
+   @Override
+   public void setAlreadyReadOnThisNode(boolean value) {
+      //no-op
    }
 }

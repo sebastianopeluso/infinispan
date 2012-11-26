@@ -83,7 +83,7 @@
       <packaging>jar</packaging>
       <module.skipComponentMetaDataProcessing>true</module.skipComponentMetaDataProcessing>
       <module.metadata.isCoreModule>false</module.metadata.isCoreModule>
-      
+
       <version.antlr>3.4</version.antlr>
       <version.apacheds.jdbm>1.5.7</version.apacheds.jdbm>
       <version.arquillian>1.0.0.CR5</version.arquillian>
@@ -125,7 +125,7 @@
       <version.jclouds>1.4.1</version.jclouds>
       <version.jetty>6.1.25</version.jetty>
       <version.jgoodies.forms>1.0.5</version.jgoodies.forms>
-      <version.jgroups>3.2.1.Final</version.jgroups>
+      <version.jgroups>3.3.0-cloudtm-SNAPSHOT</version.jgroups>
       <version.jreadline>0.16</version.jreadline>
       <version.jsap>2.1</version.jsap>
       <version.json>20090211</version.json>
@@ -199,7 +199,7 @@
             <version>${project.version}</version>
             <type>test-jar</type>
          </dependency>
-         
+
          <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>infinispan-core</artifactId>
@@ -766,7 +766,7 @@
       </dependencies>
    </dependencyManagement>
    <dependencies>
-      
+
       <dependency>
          <groupId>com.thoughtworks.xstream</groupId>
          <artifactId>xstream</artifactId>
@@ -948,7 +948,7 @@
          <version>${version.jboss.logging.processor}</version>
          <scope>provided</scope>
       </dependency>
-      
+
       <dependency>
          <groupId>org.rhq.helpers</groupId>
          <artifactId>rhq-pluginAnnotations</artifactId>
@@ -1043,7 +1043,7 @@
             <plugin>
                <groupId>org.apache.maven.plugins</groupId>
                <artifactId>maven-pmd-plugin</artifactId>
-               
+
                <version>2.7.1</version>
                <configuration>
                   <minimumTokens>100</minimumTokens>
@@ -1079,7 +1079,7 @@
                <artifactId>ideauidesigner-maven-plugin</artifactId>
                <version>1.0-beta-1</version>
             </plugin>
-            
+
             <plugin>
                <groupId>org.eclipse.m2e</groupId>
                <artifactId>lifecycle-mapping</artifactId>
@@ -1252,7 +1252,7 @@
                </instructions>
             </configuration>
          </plugin>
-         
+
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-antrun-plugin</artifactId>
@@ -1273,7 +1273,7 @@
                </execution>
             </executions>
          </plugin>
-         
+
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-compiler-plugin</artifactId>
@@ -1285,7 +1285,7 @@
                <compilerArgument>-AtranslationFilesPath=${project.basedir}/target/generated-translation-files</compilerArgument>
             </configuration>
          </plugin>
-         
+
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-eclipse-plugin</artifactId>
@@ -1295,7 +1295,7 @@
                <buildOutputDirectory>${basedir}/eclipse-output</buildOutputDirectory>
             </configuration>
          </plugin>
-         
+
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-idea-plugin</artifactId>
@@ -1356,7 +1356,7 @@
                <encoding>UTF-8</encoding>
             </configuration>
          </plugin>
-         
+
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
@@ -1393,7 +1393,7 @@
                <argLine>-Xmx1024m -XX:MaxPermSize=1024m</argLine>
             </configuration>
          </plugin>
-         
+
          <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>exec-maven-plugin</artifactId>
@@ -1425,11 +1425,11 @@
    </build>
    <reporting>
       <plugins>
-         
+
          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-pmd-plugin</artifactId>
-            
+
             <version>2.7.1</version>
          </plugin>
          <plugin>
@@ -1437,7 +1437,7 @@
             <artifactId>maven-surefire-report-plugin</artifactId>
             <version>2.12.2</version>
          </plugin>
-         
+
          <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>findbugs-maven-plugin</artifactId>
@@ -1459,7 +1459,7 @@
 
          <build>
             <plugins>
-               
+
                <plugin>
                   <groupId>org.apache.maven.plugins</groupId>
                   <artifactId>maven-dependency-plugin</artifactId>
@@ -1473,7 +1473,7 @@
                         <configuration>
                            <includeScope>runtime</includeScope>
                            <excludeScope>test</excludeScope>
-                           
+
                            <prefix>$ISPN_HOME/lib</prefix>
                            <outputFile>${project.build.directory}/runtime-classpath.txt</outputFile>
                         </configuration>
@@ -1491,7 +1491,7 @@
          </activation>
          <build>
             <plugins>
-               
+
                <plugin>
                   <groupId>org.apache.maven.plugins</groupId>
                   <artifactId>maven-enforcer-plugin</artifactId>
@@ -1515,7 +1515,7 @@
                      </execution>
                   </executions>
                </plugin>
-               
+
                <plugin>
                   <groupId>org.apache.maven.plugins</groupId>
                   <artifactId>maven-source-plugin</artifactId>
@@ -1534,7 +1534,7 @@
             </plugins>
          </build>
          <properties>
-            
+
             <packaging>bundle</packaging>
          </properties>
       </profile>
@@ -1588,7 +1588,7 @@
          </properties>
       </profile>
       <profile>
-         
+
          <id>useOlderLuceneVersion</id>
          <activation>
             <activeByDefault>false</activeByDefault>
@@ -1614,7 +1614,7 @@
          </activation>
          <build>
             <plugins>
-               
+
                <plugin>
                   <groupId>org.apache.maven.plugins</groupId>
                   <artifactId>maven-surefire-plugin</artifactId>
@@ -1676,7 +1676,7 @@
                   <groupId>org.apache.maven.plugins</groupId>
                   <artifactId>maven-dependency-plugin</artifactId>
                   <executions>
-                     
+
                      <execution>
                         <id>jacoco-dependency-ant</id>
                         <goals>
@@ -1714,7 +1714,7 @@
                   </executions>
                </plugin>
 
-               
+
                <plugin>
                   <groupId>org.jacoco</groupId>
                   <artifactId>jacoco-maven-plugin</artifactId>
@@ -1730,7 +1730,7 @@
                   </configuration>
                </plugin>
 
-               
+
                <plugin>
                   <groupId>org.apache.maven.plugins</groupId>
                   <artifactId>maven-surefire-plugin</artifactId>
@@ -1787,7 +1787,7 @@
                         </goals>
                         <configuration combine.self="override">
                            <target>
-                              
+
                               <taskdef classname="org.jacoco.ant.ReportTask" name="report">
                                  <classpath path="${basedir}/target/jacoco-jars/org.jacoco.ant.jar" />
                                  <classpath path="target/jacoco-jars/org.jacoco.core.jar" />
@@ -1803,12 +1803,12 @@
 
                               <echo message="Generating JaCoCo Reports" />
                               <report>
-                                 
+
                                  <executiondata>
                                     <fileset dir="${dir.ispn}" includes="**/target/jacoco.exec" />
                                  </executiondata>
 
-                                 
+
                                  <structure name="${reportTitle}">
                                     <classfiles>
                                        <fileset dir="${dir.ispn}">
@@ -1824,7 +1824,7 @@
 
                                  </structure>
 
-                                 
+
                                  <html destdir="${dir.report}" />
                               </report>
                            </target>

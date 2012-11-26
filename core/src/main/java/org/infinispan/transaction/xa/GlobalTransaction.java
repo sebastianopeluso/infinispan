@@ -127,6 +127,11 @@ public class GlobalTransaction implements Cloneable {
       }
    }
 
+   public String prettyPrint() {
+      return addr + ":" + id;
+   }
+
+
    protected abstract static class AbstractGlobalTxExternalizer<T extends GlobalTransaction> extends AbstractExternalizer<T> {
       @Override
       public void writeObject(ObjectOutput output, T gtx) throws IOException {

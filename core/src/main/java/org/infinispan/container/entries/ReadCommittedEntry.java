@@ -197,7 +197,7 @@ public class ReadCommittedEntry implements MVCCEntry {
          }
 
          if (isRemoved()) {
-            container.remove(key);
+            container.remove(key, newVersion);
          } else if (value != null) {
             container.put(key, value, newVersion, lifespan, maxIdle);
          }
@@ -317,4 +317,5 @@ public class ReadCommittedEntry implements MVCCEntry {
       }
       return false;
    }
+
 }

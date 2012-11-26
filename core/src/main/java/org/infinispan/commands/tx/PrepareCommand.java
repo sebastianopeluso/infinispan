@@ -63,8 +63,10 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
    protected CacheNotifier notifier;
    protected RecoveryManager recoveryManager;
    private transient boolean replayEntryWrapping  = false;
-   
+
    private static final WriteCommand[] EMPTY_WRITE_COMMAND_ARRAY = new WriteCommand[0];
+
+   private transient boolean wasInvoked;
 
    public void initialize(CacheNotifier notifier, RecoveryManager recoveryManager) {
       this.notifier = notifier;
@@ -112,8 +114,8 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
          /*
           * remote tx was already created by Cache#lock() API call
           * set the proper modifications since lock has none
-          * 
-          * @see LockControlCommand.java 
+          *
+          * @see LockControlCommand.java
           * https://jira.jboss.org/jira/browse/ISPN-48
           */
          remoteTransaction.setModifications(getModifications());
@@ -226,5 +228,24 @@ public class PrepareCommand extends AbstractTransactionBoundaryCommand {
    @Override
    public boolean isReturnValueExpected() {
       return false;
+   }
+
+
+   /**
+    * set the prepare command as one phase commit (when the commit or rollback commands
+    * are received before the prepare command in total order protocol)
+    *
+    * @param onePhaseCommit true for one phase commit, false otherwise
+    */
+   public void setOnePhaseCommit(boolean onePhaseCommit) {
+      this.onePhaseCommit = onePhaseCommit;
+   }
+
+   public boolean wasInvoked() {
+      return wasInvoked;
+   }
+
+   public void setWasInvoked(boolean wasInvoked) {
+      this.wasInvoked = wasInvoked;
    }
 }

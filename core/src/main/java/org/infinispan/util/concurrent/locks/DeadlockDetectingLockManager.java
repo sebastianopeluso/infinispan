@@ -76,7 +76,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
    }
 
    @Override
-   public boolean lockAndRecord(Object key, InvocationContext ctx, long lockTimeout) throws InterruptedException {
+   protected boolean internalLockAndRecord(Object key, InvocationContext ctx, long lockTimeout, boolean share) throws InterruptedException {
       if (trace) log.tracef("Attempting to lock %s with acquisition timeout of %s millis", key, lockTimeout);
 
       if (ctx.isInTxScope()) {
@@ -87,7 +87,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
          if (trace) log.tracef("Setting lock intention to %s for %s (%s)", key, thisTx, System.identityHashCode(thisTx));
 
          while (System.nanoTime() < timeoutNanoTime) {
-            if (lockContainer.acquireLock(ctx.getLockOwner(), key, spinDuration, MILLISECONDS) != null) {
+            if (tryAcquire(ctx.getLockOwner(), key, spinDuration, share)) {
                thisTx.setLockIntention(null); //clear lock intention
                if (trace) log.tracef("Successfully acquired lock on %s on behalf of %s.", key, ctx.getLockOwner());
                return true;
@@ -110,7 +110,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
             }
          }
       } else {
-         return super.lockAndRecord(key, ctx, lockTimeout);
+         return super.internalLockAndRecord(key, ctx, lockTimeout, share);
       }
       // couldn't acquire lock!
       return false;
@@ -128,7 +128,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
    }
 
    private boolean isSameKeyDeadlock(Object key, DldGlobalTransaction thisTx, DldGlobalTransaction lockOwnerTx) {
-      boolean iHaveRemoteLock = !thisTx.isRemote(); //this relies on the fact that when DLD is enabled a lock is first acquired remotely and then locally 
+      boolean iHaveRemoteLock = !thisTx.isRemote(); //this relies on the fact that when DLD is enabled a lock is first acquired remotely and then locally
       boolean otherHasLocalLock = lockOwnerTx.isRemote();
 
       //if we are here then 1) the other tx has a lock on this local key AND 2) I have a lock on the same key remotely
@@ -146,7 +146,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
       boolean localLockOwner = !lockOwnerTx.isRemote();
       if (localLockOwner) {
          // I've already acquired lock on this key before replicating here, so this mean we are in deadlock. This assumes the fact that
-         // if trying to acquire a remote lock, a tx first acquires a local lock. 
+         // if trying to acquire a remote lock, a tx first acquires a local lock.
          if (thisTx.hasLockAtOrigin(lockOwnerTx.getRemoteLockIntention())) {
             if (trace)
                log.tracef("Same key deadlock detected: lock owner tries to acquire lock remotely on %s but we have it!", key);
@@ -180,7 +180,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
    public void resetStatistics() {
       localTxStopped.set(0);
       remoteTxStopped.set(0);
-      cannotRunDld.set(0); 
+      cannotRunDld.set(0);
    }
 
    @ManagedAttribute(description = "Number of remote transaction that were roll backed due to deadlocks")

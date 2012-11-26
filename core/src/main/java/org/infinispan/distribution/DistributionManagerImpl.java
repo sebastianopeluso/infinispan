@@ -71,9 +71,9 @@ public class DistributionManagerImpl implements DistributionManager {
    private static final boolean trace = log.isTraceEnabled();
 
    // Injected components
-   private Configuration configuration;
-   private RpcManager rpcManager;
-   private CommandsFactory cf;
+   protected Configuration configuration;
+   protected RpcManager rpcManager;
+   protected CommandsFactory cf;
    private StateTransferManager stateTransferManager;
 
    /**
@@ -97,7 +97,7 @@ public class DistributionManagerImpl implements DistributionManager {
       if (trace) log.tracef("starting distribution manager on %s", getAddress());
    }
 
-   private Address getAddress() {
+   protected Address getAddress() {
       return rpcManager.getAddress();
    }
 

@@ -34,6 +34,7 @@ import org.infinispan.commands.read.ReduceCommand;
 import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
@@ -41,6 +42,8 @@ import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
+import org.infinispan.commands.tx.GMUCommitCommand;
+import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
@@ -59,6 +62,7 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
 import javax.transaction.xa.Xid;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +78,8 @@ import java.util.concurrent.Callable;
  * @author Manik Surtani
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @Scope(Scopes.NAMED_CACHE)
@@ -326,20 +332,20 @@ public interface CommandsFactory {
     * Builds a {@link org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand}.
     */
    TxCompletionNotificationCommand buildTxCompletionNotificationCommand(Xid xid, GlobalTransaction globalTransaction);
-   
+
    /**
-    * Builds a DistributedExecuteCommand used for migration and execution of distributed Callables and Runnables. 
-    * 
+    * Builds a DistributedExecuteCommand used for migration and execution of distributed Callables and Runnables.
+    *
     * @param callable the callable task
     * @param sender sender's Address
-    * @param keys keys used in Callable 
+    * @param keys keys used in Callable
     * @return a DistributedExecuteCommand
     */
    <T>DistributedExecuteCommand<T> buildDistributedExecuteCommand(Callable<T> callable, Address sender, Collection keys);
-   
+
    /**
     * Builds a MapCombineCommand used for migration and map phase execution of MapReduce tasks.
-    * 
+    *
     * @param m Mapper for MapReduceTask
     * @param r Combiner for MapReduceTask
     * @param keys keys used in MapReduceTask
@@ -348,10 +354,10 @@ public interface CommandsFactory {
    <KIn, VIn, KOut, VOut> MapCombineCommand<KIn, VIn, KOut, VOut> buildMapCombineCommand(
             String taskId, Mapper<KIn, VIn, KOut, VOut> m, Reducer<KOut, VOut> r,
             Collection<KIn> keys);
-   
+
    /**
     * Builds a ReduceCommand used for migration and reduce phase execution of MapReduce tasks.
-    * 
+    *
     * @param r Reducer for MapReduceTask
     * @param keys keys used in MapReduceTask
     * @return created ReduceCommand
@@ -376,31 +382,57 @@ public interface CommandsFactory {
     * @see org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand
     */
    TxCompletionNotificationCommand buildTxCompletionNotificationCommand(long internalId);
-   
-   
+
+
    /**
-    * Builds a ApplyDeltaCommand used for applying Delta objects to DeltaAware containers stored in cache 
-    * 
+    * Builds a ApplyDeltaCommand used for applying Delta objects to DeltaAware containers stored in cache
+    *
     * @return ApplyDeltaCommand instance
     * @see ApplyDeltaCommand
     */
    ApplyDeltaCommand buildApplyDeltaCommand(Object deltaAwareValueKey, Delta delta, Collection keys);
-   
+
    /**
     * Builds a CreateCacheCommand used to create/start cache around Infinispan cluster
-    * 
+    *
     * @param cacheName name of the cache to construct and start
     * @param cacheConfigurationName configuration name for the cache to create/start
-    * @return created CreateCacheCommand 
+    * @return created CreateCacheCommand
     */
    CreateCacheCommand buildCreateCacheCommand(String cacheName, String cacheConfigurationName);
-   
- 
+
+
    /**
     * Builds CancelCommandCommand used to cancel other commands executing on Infinispan cluster
-    * 
+    *
     * @param commandUUID UUID for command to cancel
     * @return created CancelCommandCommand
     */
    CancelCommand buildCancelCommandCommand(UUID commandUUID);
+
+   /**
+    *
+    * @param gtx
+    * @param modifications
+    * @param onePhaseCommit
+    * @return
+    */
+   GMUPrepareCommand buildSerializablePrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications,
+                                      boolean onePhaseCommit);
+
+   /**
+    *
+    * @param gtx
+    * @return
+    */
+   GMUCommitCommand buildSerializableCommitCommand(GlobalTransaction gtx);
+
+   /**
+    * Builds a ClusteredGetCommand, which is a remote lookup command
+    * @param key key to look up
+    * @return a ClusteredGetCommand
+    */
+   GMUClusteredGetCommand buildGMUClusteredGetCommand(Object key, Set<Flag> flags, boolean acquireRemoteLock,
+                                                      GlobalTransaction gtx, EntryVersion minVersion,
+                                                      EntryVersion maxVersion, BitSet alreadyReadFromMask);
 }

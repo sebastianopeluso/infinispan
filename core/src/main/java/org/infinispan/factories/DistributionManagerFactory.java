@@ -24,14 +24,18 @@ package org.infinispan.factories;
 
 import org.infinispan.distribution.DistributionManager;
 import org.infinispan.distribution.DistributionManagerImpl;
+import org.infinispan.distribution.GMUDistributionManagerImpl;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
+import org.infinispan.util.concurrent.IsolationLevel;
 
 @DefaultFactoryFor(classes = DistributionManager.class)
 public class DistributionManagerFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
    @Override
    @SuppressWarnings("unchecked")
    public <T> T construct(Class<T> componentType) {
-      if (configuration.clustering().cacheMode().isDistributed())
+      if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+         return (T) new GMUDistributionManagerImpl();
+      } else if (configuration.clustering().cacheMode().isDistributed())
          return (T) new DistributionManagerImpl();
       else
          return null;

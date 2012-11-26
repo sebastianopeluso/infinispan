@@ -46,6 +46,8 @@ import java.util.Set;
  * Object that holds transaction's state on the node where it originated; as opposed to {@link RemoteTransaction}.
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.0
  */
 public abstract class LocalTransaction extends AbstractCacheTransaction {
@@ -61,6 +63,9 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    private final boolean implicitTransaction;
 
    private volatile boolean isFromRemoteSite;
+
+   private boolean alreadyReadOnThisNode;
+   private Set<Address> readFrom;
 
    public LocalTransaction(Transaction transaction, GlobalTransaction tx, boolean implicitTransaction, int topologyId) {
       super(tx, topologyId);
@@ -207,4 +212,48 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       if (trace) log.tracef("The merged list of nodes to send commit/rollback is %s", allRecipients);
       return allRecipients;
    }
+
+   @Override
+   public void setAlreadyReadOnThisNode(boolean value) {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] set already read on this node to %s", tx.prettyPrint(), value);
+      }
+      alreadyReadOnThisNode = value;
+   }
+
+   @Override
+   public boolean hasAlreadyReadOnThisNode() {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] has already read on this node? %s", tx.prettyPrint(), alreadyReadOnThisNode);
+      }
+      return alreadyReadOnThisNode;
+   }
+
+   @Override
+   public Set<Address> getReadFrom() {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] get read from %s", tx.prettyPrint(), readFrom);
+      }
+      return readFrom;
+   }
+
+   @Override
+   public void addReadFrom(Address address) {
+      if (readFrom == null) {
+         readFrom = new HashSet<Address>(16);
+      }
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] add read from %s to %s", tx.prettyPrint(), address, readFrom);
+      }
+      readFrom.add(address);
+   }
+
+   @Override
+   public Collection<Object> getReadKeys() {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] get read keys %s", tx.prettyPrint(), readKeys);
+      }
+      return readKeys;
+   }
+
 }

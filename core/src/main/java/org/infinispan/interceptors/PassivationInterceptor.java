@@ -65,7 +65,7 @@ public class PassivationInterceptor extends JmxStatsCommandInterceptor {
    @Override
    public Object visitEvictCommand(InvocationContext ctx, EvictCommand command) throws Throwable {
       Object key = command.getKey();
-      passivator.passivate(dataContainer.get(key));
+      passivator.passivate(dataContainer.get(key, null));
       return invokeNextInterceptor(ctx, command);
    }
 

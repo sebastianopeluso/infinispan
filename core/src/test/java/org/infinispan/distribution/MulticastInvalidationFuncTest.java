@@ -52,8 +52,8 @@ public class MulticastInvalidationFuncTest extends BaseDistFunctionalTest {
       // Put an object in from a non-owner, this will cause an L1 record to be created there
       
       nonOwner.put(KEY1, "foo");
-      Assert.assertEquals(nonOwner.getAdvancedCache().getDataContainer().get(KEY1).getValue(), "foo");
-      Assert.assertEquals(owner.getAdvancedCache().getDataContainer().get(KEY1).getValue(), "foo");
+      Assert.assertEquals(nonOwner.getAdvancedCache().getDataContainer().get(KEY1, null).getValue(), "foo");
+      Assert.assertEquals(owner.getAdvancedCache().getDataContainer().get(KEY1, null).getValue(), "foo");
       
       // Check that all nodes (except the one we put to) are notified
       // but only if the transport is multicast-capable
@@ -77,7 +77,7 @@ public class MulticastInvalidationFuncTest extends BaseDistFunctionalTest {
       	rl.waitForRpc();
       }
       
-      Assert.assertNull(nonOwner.getAdvancedCache().getDataContainer().get(KEY1));
+      Assert.assertNull(nonOwner.getAdvancedCache().getDataContainer().get(KEY1, null));
    }
    
 }

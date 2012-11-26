@@ -22,6 +22,7 @@ package org.infinispan.topology;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -136,7 +137,7 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
    }
 
    @Override
-   public CacheTopology handleJoin(String cacheName, Address joiner, CacheJoinInfo joinInfo, int viewId) throws Exception {
+   public LinkedList<CacheTopology> handleJoin(String cacheName, Address joiner, CacheJoinInfo joinInfo, int viewId) throws Exception {
       waitForView(viewId);
       if (isShuttingDown) {
          log.debugf("Ignoring join request from %s for cache %s, the local cache manager is shutting down",
@@ -168,7 +169,7 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
          rebalancePolicy.updateCacheStatus(cacheName, cacheStatus);
       }
 
-      return cacheStatus.getCacheTopology();
+      return cacheStatus.getHistory();
    }
 
    @Override

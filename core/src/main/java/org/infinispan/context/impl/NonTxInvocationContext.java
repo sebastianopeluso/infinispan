@@ -35,6 +35,8 @@ import java.util.Set;
  * Context to be used for non transactional calls, both remote and local.
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public class NonTxInvocationContext extends AbstractInvocationContext {

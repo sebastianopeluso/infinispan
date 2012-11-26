@@ -38,7 +38,7 @@ public class ClusteredRepeatableReadEntry extends RepeatableReadEntry {
    }
 
    public boolean performWriteSkewCheck(DataContainer container) {
-      InternalCacheEntry ice = container.get(key);
+      InternalCacheEntry ice = container.get(key, null);
       if (ice == null) return version == null;
       if (ice.getVersion() == null)
          throw new IllegalStateException("Entries cannot have null versions!");

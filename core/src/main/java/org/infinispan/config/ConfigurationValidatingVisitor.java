@@ -24,9 +24,11 @@ package org.infinispan.config;
 
 import org.infinispan.config.Configuration.EvictionType;
 import org.infinispan.config.GlobalConfiguration.TransportType;
+import org.infinispan.configuration.cache.VersioningScheme;
 import org.infinispan.loaders.CacheLoaderConfig;
 import org.infinispan.loaders.CacheStoreConfig;
 import org.infinispan.loaders.decorators.SingletonStoreConfig;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -129,6 +131,10 @@ public class ConfigurationValidatingVisitor extends AbstractConfigurationBeanVis
 
    @Override
    public void visitVersioningConfigurationBean(Configuration.VersioningConfigurationBean config) {
+      if (cfg.getIsolationLevel() == IsolationLevel.SERIALIZABLE &&
+            (!cfg.isEnableVersioning() || cfg.getVersioningScheme() != VersioningScheme.GMU)) {
+         throw new ConfigurationException("Expected GMU versioning scheme when SERIALIZABLE is enabled");
+      }
    }
 
    @Override

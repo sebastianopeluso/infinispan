@@ -26,6 +26,9 @@ import org.infinispan.notifications.Listener;
 import org.infinispan.notifications.cachemanagerlistener.annotation.ViewChanged;
 import org.infinispan.notifications.cachemanagerlistener.event.ViewChangedEvent;
 import org.infinispan.remoting.transport.Transport;
+import org.infinispan.topology.CacheTopology;
+
+import java.util.List;
 
 /**
  * A version generator implementation for SimpleClusteredVersions
@@ -77,5 +80,15 @@ public class SimpleClusteredVersionGenerator implements VersionGenerator {
       public void handleViewChange(ViewChangedEvent e) {
          viewId = e.getViewId();
       }
+   }
+
+   @Override
+   public void updateCacheTopologyHistory(List<CacheTopology> viewHistory) {
+      //no-op
+   }
+
+   @Override
+   public void updateCacheTopology(CacheTopology cacheTopology) {
+      //no-op
    }
 }

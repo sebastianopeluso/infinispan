@@ -28,12 +28,12 @@ import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.factories.GlobalComponentRegistry;
-import org.infinispan.statetransfer.StateRequestCommand;
-import org.infinispan.statetransfer.StateResponseCommand;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.RpcException;
 import org.infinispan.remoting.responses.ExceptionResponse;
 import org.infinispan.remoting.responses.Response;
+import org.infinispan.statetransfer.StateRequestCommand;
+import org.infinispan.statetransfer.StateResponseCommand;
 import org.infinispan.topology.CacheTopologyControlCommand;
 import org.infinispan.util.Util;
 import org.infinispan.util.concurrent.TimeoutException;
@@ -45,11 +45,11 @@ import org.jgroups.Channel;
 import org.jgroups.Message;
 import org.jgroups.SuspectedException;
 import org.jgroups.UpHandler;
+import org.jgroups.blocks.MessageRequest;
 import org.jgroups.blocks.RequestOptions;
 import org.jgroups.blocks.ResponseMode;
 import org.jgroups.blocks.RpcDispatcher;
 import org.jgroups.blocks.RspFilter;
-import org.jgroups.blocks.UnicastRequest;
 import org.jgroups.blocks.mux.Muxer;
 import org.jgroups.protocols.relay.SiteAddress;
 import org.jgroups.util.Buffer;
@@ -207,7 +207,8 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
     * Message contains a Command. Execute it against *this* object and return result.
     */
    @Override
-   public Object handle(Message req) {
+   public Object handle(MessageRequest request) {
+      Message req = request.getMessage();
       if (isValid(req)) {
          ReplicableCommand cmd = null;
          try {
@@ -216,7 +217,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
             if (req.getSrc() instanceof SiteAddress) {
                return executeCommandFromRemoteSite(cmd, (SiteAddress)req.getSrc());
             } else {
-               return executeCommandFromLocalCluster(cmd, req);
+               return executeCommandFromLocalCluster(cmd, request);
             }
          } catch (InterruptedException e) {
             log.warnf("Shutdown while handling command %s", cmd);
@@ -240,8 +241,11 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
       return backupReceiverRepository.handleRemoteCommand((SingleRpcCommand) cmd, src);
    }
 
-   private Object executeCommandFromLocalCluster(ReplicableCommand cmd, Message req) throws Throwable {
+   private Object executeCommandFromLocalCluster(ReplicableCommand cmd, MessageRequest request) throws Throwable {
+      Message req = request.getMessage();
+      if (cmd == null) throw new NullPointerException("Unable to execute a null command!  Message was " + req);
       if (cmd instanceof CacheRpcCommand) {
+         ((CacheRpcCommand) cmd).setMessageRequest(request);
          if (trace) log.tracef("Attempting to execute command: %s [sender=%s]", cmd, req.getSrc());
          return inboundInvocationHandler.handle((CacheRpcCommand) cmd, fromJGroupsAddress(req.getSrc()));
       } else {
@@ -433,7 +437,9 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
       }
 
       public synchronized RspList<Object> getResponseList() throws Exception {
-         while (expectedResponses > 0 && retval == null) {
+         long endTimeStamp = System.currentTimeMillis() + timeout;
+         //TODO, while is it blocking in here?!?!
+         while (expectedResponses > 0 && retval == null && System.currentTimeMillis() <= endTimeStamp) {
             try {
                this.wait(timeout);
             } catch (InterruptedException e) {

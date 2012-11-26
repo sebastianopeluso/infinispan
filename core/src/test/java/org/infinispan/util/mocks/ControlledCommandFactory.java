@@ -37,6 +37,7 @@ import org.infinispan.commands.read.ReduceCommand;
 import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
@@ -44,6 +45,8 @@ import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
+import org.infinispan.commands.tx.GMUCommitCommand;
+import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
@@ -67,6 +70,7 @@ import org.infinispan.util.logging.LogFactory;
 
 import javax.transaction.xa.Xid;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -344,5 +348,20 @@ public class ControlledCommandFactory implements CommandsFactory {
    @Override
    public CancelCommand buildCancelCommandCommand(UUID commandUUID) {
       return actual.buildCancelCommandCommand(commandUUID);
+   }
+
+   @Override
+   public GMUPrepareCommand buildSerializablePrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications, boolean onePhaseCommit) {
+      return actual.buildSerializablePrepareCommand(gtx, modifications, onePhaseCommit);
+   }
+
+   @Override
+   public GMUCommitCommand buildSerializableCommitCommand(GlobalTransaction gtx) {
+      return actual.buildSerializableCommitCommand(gtx);
+   }
+
+   @Override
+   public GMUClusteredGetCommand buildGMUClusteredGetCommand(Object key, Set<Flag> flags, boolean acquireRemoteLock, GlobalTransaction gtx, EntryVersion minVersion, EntryVersion maxVersion, BitSet alreadyReadFromMask) {
+      return actual.buildGMUClusteredGetCommand(key, flags, acquireRemoteLock, gtx, minVersion, maxVersion, alreadyReadFromMask);
    }
 }

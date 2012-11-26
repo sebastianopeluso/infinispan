@@ -87,7 +87,7 @@ public class PessimisticLockingInterceptor extends AbstractTxLockingInterceptor 
          if (command.hasFlag(Flag.FORCE_WRITE_LOCK)) {
             boolean skipLocking = hasSkipLocking(command);
             long lockTimeout = getLockAcquisitionTimeout(command, skipLocking);
-            lockKeyAndCheckOwnership(ctx, command.getKey(), lockTimeout, skipLocking);
+            lockKeyAndCheckOwnership(ctx, command.getKey(), lockTimeout, skipLocking, false);
          }
          return invokeNextInterceptor(ctx, command);
       } catch (Throwable t) {
@@ -117,7 +117,7 @@ public class PessimisticLockingInterceptor extends AbstractTxLockingInterceptor 
          if (command.hasFlag(Flag.SKIP_OWNERSHIP_CHECK) || localNodeOwnsLock) {
             boolean skipLocking = hasSkipLocking(command);
             long lockTimeout = getLockAcquisitionTimeout(command, skipLocking);
-            lockKeyAndCheckOwnership(ctx, command.getKey(), lockTimeout, skipLocking);
+            lockKeyAndCheckOwnership(ctx, command.getKey(), lockTimeout, skipLocking, false);
          } else if (cdl.localNodeIsOwner(command.getKey())) {
             txContext.getCacheTransaction().addBackupLockForKey(command.getKey());
          }
@@ -161,7 +161,7 @@ public class PessimisticLockingInterceptor extends AbstractTxLockingInterceptor 
          throw te;
       }
    }
-   
+
    @Override
    public Object visitApplyDeltaCommand(InvocationContext ctx, ApplyDeltaCommand command) throws Throwable {
       Object[] compositeKeys = command.getCompositeKeys();
@@ -173,7 +173,7 @@ public class PessimisticLockingInterceptor extends AbstractTxLockingInterceptor 
          if (cdl.localNodeIsOwner(command.getDeltaAwareKey())) {
             for (Object key : compositeKeys) {
                lockKey(ctx, key, lockTimeout, skipLocking);
-            }      
+            }
          }
          return invokeNextInterceptor(ctx, command);
       } catch (Throwable te) {
@@ -203,7 +203,7 @@ public class PessimisticLockingInterceptor extends AbstractTxLockingInterceptor 
       try {
          boolean skipLocking = hasSkipLocking(command);
          long lockTimeout = getLockAcquisitionTimeout(command, skipLocking);
-         for (InternalCacheEntry entry : dataContainer.entrySet())
+         for (InternalCacheEntry entry : dataContainer.entrySet(null))
             lockAndRegisterBackupLock((TxInvocationContext) ctx,
                   entry.getKey(), lockTimeout, skipLocking);
 
@@ -301,7 +301,7 @@ public class PessimisticLockingInterceptor extends AbstractTxLockingInterceptor 
    protected final void lockAndRegisterBackupLock(TxInvocationContext ctx,
          Object key, boolean isLockOwner, long lockTimeout, boolean skipLocking) throws InterruptedException {
       if (isLockOwner) {
-         lockKeyAndCheckOwnership(ctx, key, lockTimeout, skipLocking);
+         lockKeyAndCheckOwnership(ctx, key, lockTimeout, skipLocking, false);
       } else if (cdl.localNodeIsOwner(key)) {
          ctx.getCacheTransaction().addBackupLockForKey(key);
       }

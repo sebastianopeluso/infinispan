@@ -291,12 +291,12 @@ public class AsyncStoreStressTest {
          }
       };
    }
-   
+
    private boolean withStore(String key, Callable<Boolean> call) {
       Lock lock = null;
       boolean result = false;
       try {
-         lock = locks.acquireLock(Thread.currentThread(), key, 30, TimeUnit.SECONDS);
+         lock = locks.acquireExclusiveLock(Thread.currentThread(), key, 30, TimeUnit.SECONDS);
          if (lock != null) {
             result = call.call().booleanValue();
          }

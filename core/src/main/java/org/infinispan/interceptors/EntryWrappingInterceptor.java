@@ -86,11 +86,7 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-      if (!ctx.isOriginLocal() || command.isReplayEntryWrapping()) {
-         for (WriteCommand c : command.getModifications()) {
-            c.acceptVisitor(ctx, entryWrappingVisitor);
-         }
-      }
+      wrapEntriesForPrepare(ctx, command);
       Object result = invokeNextInterceptor(ctx, command);
       if (command.isOnePhaseCommit()) {
          commitContextEntries(ctx, false);
@@ -108,7 +104,7 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
    }
 
    @Override
-   public final Object visitGetKeyValueCommand(InvocationContext ctx, GetKeyValueCommand command) throws Throwable {
+   public Object visitGetKeyValueCommand(InvocationContext ctx, GetKeyValueCommand command) throws Throwable {
       try {
          entryFactory.wrapEntryForReading(ctx, command.getKey());
          return invokeNextInterceptor(ctx, command);
@@ -120,7 +116,7 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
    }
 
    @Override
-   public final Object visitInvalidateCommand(InvocationContext ctx, InvalidateCommand command) throws Throwable {
+   public Object visitInvalidateCommand(InvocationContext ctx, InvalidateCommand command) throws Throwable {
       if (command.getKeys() != null) {
          for (Object key : command.getKeys())
             entryFactory.wrapEntryForReplace(ctx, key);
@@ -129,8 +125,8 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
    }
 
    @Override
-   public final Object visitClearCommand(InvocationContext ctx, ClearCommand command) throws Throwable {
-      for (InternalCacheEntry entry : dataContainer.entrySet())
+   public Object visitClearCommand(InvocationContext ctx, ClearCommand command) throws Throwable {
+      for (InternalCacheEntry entry : dataContainer.entrySet(null))
          entryFactory.wrapEntryForClear(ctx, entry.getKey());
       return invokeNextAndApplyChanges(ctx, command);
    }
@@ -144,25 +140,25 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
    }
 
    @Override
-   public final Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
+   public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
       entryFactory.wrapEntryForPut(ctx, command.getKey(), null, !command.isPutIfAbsent(), command);
       return invokeNextAndApplyChanges(ctx, command);
    }
-   
+
    @Override
-   public Object visitApplyDeltaCommand(InvocationContext ctx, ApplyDeltaCommand command) throws Throwable {      
-      entryFactory.wrapEntryForDelta(ctx, command.getDeltaAwareKey(), command.getDelta());  
+   public Object visitApplyDeltaCommand(InvocationContext ctx, ApplyDeltaCommand command) throws Throwable {
+      entryFactory.wrapEntryForDelta(ctx, command.getDeltaAwareKey(), command.getDelta());
       return invokeNextInterceptor(ctx, command);
    }
 
    @Override
-   public final Object visitRemoveCommand(InvocationContext ctx, RemoveCommand command) throws Throwable {
+   public Object visitRemoveCommand(InvocationContext ctx, RemoveCommand command) throws Throwable {
       entryFactory.wrapEntryForRemove(ctx, command.getKey());
       return invokeNextAndApplyChanges(ctx, command);
    }
 
    @Override
-   public final Object visitReplaceCommand(InvocationContext ctx, ReplaceCommand command) throws Throwable {
+   public Object visitReplaceCommand(InvocationContext ctx, ReplaceCommand command) throws Throwable {
       entryFactory.wrapEntryForReplace(ctx, command.getKey());
       return invokeNextAndApplyChanges(ctx, command);
    }
@@ -207,6 +203,14 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
       cll.commitEntry(entry, null, skipOwnershipCheck);
    }
 
+   protected final void wrapEntriesForPrepare(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
+      if (!ctx.isOriginLocal() || command.isReplayEntryWrapping()) {
+         for (WriteCommand c : command.getModifications()) {
+            c.acceptVisitor(ctx, entryWrappingVisitor);
+         }
+      }
+   }
+
    private Object invokeNextAndApplyChanges(InvocationContext ctx, FlagAffectedCommand command) throws Throwable {
       final Object result = invokeNextInterceptor(ctx, command);
       if (!ctx.isInTxScope())
@@ -219,7 +223,7 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
       @Override
       public Object visitClearCommand(InvocationContext ctx, ClearCommand command) throws Throwable {
          boolean notWrapped = false;
-         for (Object key : dataContainer.keySet()) {
+         for (Object key : dataContainer.keySet(null)) {
             entryFactory.wrapEntryForClear(ctx, key);
             notWrapped = true;
          }
@@ -262,10 +266,10 @@ public class EntryWrappingInterceptor extends CommandInterceptor {
          }
          return null;
       }
-      
+
       @Override
       public Object visitApplyDeltaCommand(InvocationContext ctx, ApplyDeltaCommand command) throws Throwable {
-         if (cll.localNodeIsOwner(command.getKey())) {              
+         if (cll.localNodeIsOwner(command.getKey())) {
             entryFactory.wrapEntryForDelta(ctx, command.getDeltaAwareKey(), command.getDelta());
             invokeNextInterceptor(ctx, command);
          }

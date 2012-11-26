@@ -68,7 +68,7 @@ public class ReentrantStripedLockContainer extends AbstractStripedLockContainer<
    }
 
    @Override
-   public final VisibleOwnerReentrantLock getLock(Object object) {
+   public final VisibleOwnerReentrantLock getExclusiveLock(Object object) {
       return sharedLocks[hashToIndex(object)];
    }
 
@@ -88,14 +88,14 @@ public class ReentrantStripedLockContainer extends AbstractStripedLockContainer<
    }
 
    @Override
-   public final boolean ownsLock(Object object, Object ignored) {
-      ReentrantLock lock = getLock(object);
+   public final boolean ownsExclusiveLock(Object object, Object ignored) {
+      ReentrantLock lock = getExclusiveLock(object);
       return lock.isHeldByCurrentThread();
    }
 
    @Override
-   public final boolean isLocked(Object object) {
-      ReentrantLock lock = getLock(object);
+   public final boolean isExclusiveLocked(Object object) {
+      ReentrantLock lock = getExclusiveLock(object);
       return lock.isLocked();
    }
 
@@ -106,17 +106,47 @@ public class ReentrantStripedLockContainer extends AbstractStripedLockContainer<
    }
 
    @Override
-   protected void unlock(VisibleOwnerReentrantLock l, Object unused) {
+   protected void unlockExclusive(VisibleOwnerReentrantLock l, Object unused) {
       l.unlock();
    }
 
    @Override
-   protected boolean tryLock(VisibleOwnerReentrantLock lock, long timeout, TimeUnit unit, Object unused) throws InterruptedException {
+   protected boolean tryExclusiveLock(VisibleOwnerReentrantLock lock, long timeout, TimeUnit unit, Object unused) throws InterruptedException {
       return lock.tryLock(timeout, unit);
    }
 
    @Override
-   protected void lock(VisibleOwnerReentrantLock lock, Object lockOwner) {
+   protected void exclusiveLock(VisibleOwnerReentrantLock lock, Object lockOwner) {
       lock.lock();
+   }
+
+   @Override
+   protected void unlockShare(VisibleOwnerReentrantLock toRelease, Object owner) {
+      //no-op
+   }
+
+   @Override
+   protected boolean tryShareLock(VisibleOwnerReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
+      return false;
+   }
+
+   @Override
+   protected void shareLock(VisibleOwnerReentrantLock lock, Object lockOwner) {
+      throw new UnsupportedOperationException();
+   }
+
+   @Override
+   public boolean ownsShareLock(Object key, Object owner) {
+      return false;
+   }
+
+   @Override
+   public boolean isSharedLocked(Object key) {
+      return false;
+   }
+
+   @Override
+   public VisibleOwnerReentrantLock getShareLock(Object key) {
+      throw new UnsupportedOperationException();
    }
 }

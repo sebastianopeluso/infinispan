@@ -44,6 +44,7 @@ import org.infinispan.notifications.cachelistener.annotation.TopologyChanged;
 import org.infinispan.notifications.cachelistener.event.TopologyChangedEvent;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.synchronization.SyncLocalTransaction;
 import org.infinispan.transaction.synchronization.SynchronizationAdapter;
 import org.infinispan.transaction.xa.CacheTransaction;
@@ -71,6 +72,11 @@ import static org.infinispan.util.Util.currentMillisFromNanotime;
  *
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
+<<<<<<< HEAD
+=======
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
+>>>>>>> fecd039...  * Initial implementation of GMU (intil commit ba7f2be5ec88a98a9eb1c91456579880c0485923)
  * @since 4.0
  */
 @Listener
@@ -108,12 +114,15 @@ public class TransactionTable {
    private volatile boolean useStrictTopologyIdComparison = true;
    private String cacheName;
 
+   protected CommitLog commitLog;
+
    @Inject
    public void initialize(RpcManager rpcManager, Configuration configuration,
                           InvocationContextContainer icc, InterceptorChain invoker, CacheNotifier notifier,
                           TransactionFactory gtf, TransactionCoordinator txCoordinator,
                           TransactionSynchronizationRegistry transactionSynchronizationRegistry,
-                          CommandsFactory commandsFactory, ClusteringDependentLogic clusteringDependentLogic, Cache cache) {
+                          CommandsFactory commandsFactory, ClusteringDependentLogic clusteringDependentLogic, Cache cache,
+                          CommitLog commitLog) {
       this.rpcManager = rpcManager;
       this.configuration = configuration;
       this.icc = icc;
@@ -125,6 +134,7 @@ public class TransactionTable {
       this.commandsFactory = commandsFactory;
       this.clusteringLogic = clusteringDependentLogic;
       this.cacheName = cache.getName();
+      this.commitLog = commitLog;
    }
 
    @Start(priority = 9) // Start before cache loader manager
@@ -193,6 +203,8 @@ public class TransactionTable {
                throw new CacheException(e);
             }
          }
+         //init the transaction vector clock. it is only used for Serializability
+         localTransaction.setTransactionVersion(commitLog.getCurrentVersion());
          ((SyncLocalTransaction) localTransaction).setEnlisted(true);
       }
    }

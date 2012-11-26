@@ -48,11 +48,14 @@ import org.infinispan.statetransfer.StateTransferLockImpl;
 import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.xa.TransactionFactory;
 import org.infinispan.transaction.xa.recovery.RecoveryAdminOperations;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.concurrent.locks.containers.LockContainer;
 import org.infinispan.util.concurrent.locks.containers.OwnableReentrantPerEntryLockContainer;
 import org.infinispan.util.concurrent.locks.containers.OwnableReentrantStripedLockContainer;
 import org.infinispan.util.concurrent.locks.containers.ReentrantPerEntryLockContainer;
 import org.infinispan.util.concurrent.locks.containers.ReentrantStripedLockContainer;
+import org.infinispan.util.concurrent.locks.containers.readwrite.OwnableReentrantPerEntryReadWriteLockContainer;
+import org.infinispan.util.concurrent.locks.containers.readwrite.OwnableReentrantStripedReadWriteLockContainer;
 import org.infinispan.xsite.BackupSender;
 import org.infinispan.xsite.BackupSenderImpl;
 
@@ -109,6 +112,11 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
             return (T) new EvictionManagerImpl();
          } else if (componentType.equals(LockContainer.class)) {
             boolean  notTransactional = !isTransactional;
+            if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+               return (T) (configuration.locking().useLockStriping() ?
+                                 new OwnableReentrantStripedReadWriteLockContainer(configuration.locking().concurrencyLevel()  ) :
+                                 new OwnableReentrantPerEntryReadWriteLockContainer(configuration.locking().concurrencyLevel()));
+            }
             LockContainer<?> lockContainer = configuration.locking().useLockStriping() ?
                   notTransactional ? new ReentrantStripedLockContainer(configuration.locking().concurrencyLevel())
                         : new OwnableReentrantStripedLockContainer(configuration.locking().concurrencyLevel()) :

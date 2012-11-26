@@ -21,6 +21,8 @@ package org.infinispan.factories;
 
 import org.infinispan.container.versioning.SimpleClusteredVersionGenerator;
 import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.DistGMUVersionGenerator;
+import org.infinispan.container.versioning.gmu.ReplGMUVersionGenerator;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
 
 @DefaultFactoryFor(classes = VersionGenerator.class)
@@ -38,6 +40,12 @@ public class VersioningMetaFactory extends AbstractNamedCacheComponentFactory im
             else
                return null;
          }
+         case GMU:
+            if (configuration.clustering().cacheMode().isReplicated()) {
+               return (T) new ReplGMUVersionGenerator();
+            } else if (configuration.clustering().cacheMode().isDistributed()) {
+               return (T) new DistGMUVersionGenerator();
+            }
          default:
             return null;
       }

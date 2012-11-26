@@ -53,8 +53,8 @@ public class UnicastInvalidationFuncTest extends BaseDistFunctionalTest {
       // Put an object in from a non-owner, this will cause an L1 record to be created there
       
       nonOwner.put(KEY1, "foo");
-      Assert.assertEquals(nonOwner.getAdvancedCache().getDataContainer().get(KEY1).getValue(), "foo");
-      Assert.assertEquals(owner.getAdvancedCache().getDataContainer().get(KEY1).getValue(), "foo");
+      Assert.assertEquals(nonOwner.getAdvancedCache().getDataContainer().get(KEY1, null).getValue(), "foo");
+      Assert.assertEquals(owner.getAdvancedCache().getDataContainer().get(KEY1, null).getValue(), "foo");
       
       // Request from another non-owner so that we can get an invalidation command there
       secondNonOwner.get(KEY1);
@@ -74,8 +74,8 @@ public class UnicastInvalidationFuncTest extends BaseDistFunctionalTest {
       	r.waitForRpc();
       }
       
-      Assert.assertNull(secondNonOwner.getAdvancedCache().getDataContainer().get(KEY1));
-      Assert.assertNull(nonOwner.getAdvancedCache().getDataContainer().get(KEY1));
+      Assert.assertNull(secondNonOwner.getAdvancedCache().getDataContainer().get(KEY1, null));
+      Assert.assertNull(nonOwner.getAdvancedCache().getDataContainer().get(KEY1, null));
       
       
    }
