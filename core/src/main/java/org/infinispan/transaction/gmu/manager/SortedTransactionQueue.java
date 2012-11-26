@@ -181,8 +181,15 @@ public class SortedTransactionQueue {
 
    public final synchronized void populateToCommit(List<TransactionEntry> transactionEntryList) throws InterruptedException {
       while (!firstEntry.getNext().isReady()) {
+         if (log.isTraceEnabled()) {
+            log.tracef("get transactions to commit. First is not ready! %s", firstEntry.getNext());
+         }
          wait();
       }
+
+      //if (log.isDebugEnabled()) {
+      //   log.debugf("Try to commit transaction. Queue is %s", queueToString());
+      //}
 
       Node firstTransaction = firstEntry.getNext();
 
@@ -195,7 +202,9 @@ public class SortedTransactionQueue {
             commitUntil(transactionToCheck, transactionEntryList);
             return;
          } else if (!transactionToCheck.isReady()) {
-            //has the same version and it is not ready
+            if (log.isTraceEnabled()) {
+               log.tracef("Transaction with the same version not ready. %s and %s", firstTransaction, transactionToCheck);
+            }
             wait();
             return;
          }
@@ -206,6 +215,23 @@ public class SortedTransactionQueue {
 
    public final TransactionEntry getTransactionEntry(GlobalTransaction globalTransaction) {
       return concurrentHashMap.get(globalTransaction);
+   }
+
+   public final synchronized String queueToString() {
+      Node node = firstEntry.getNext();
+      if (node == lastEntry) {
+         return "[]";
+      }
+      StringBuilder builder = new StringBuilder("[");
+      builder.append(node);
+
+      node = node.getNext();
+      while (node != lastEntry) {
+         builder.append(",").append(node);
+         node.getNext();
+      }
+      builder.append("]");
+      return builder.toString();
    }
 
    private void commitUntil(Node exclusive, List<TransactionEntry> transactionEntryList) {
@@ -225,6 +251,10 @@ public class SortedTransactionQueue {
    }
 
    private synchronized void update(Node entry, GMUEntryVersion commitVersion) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Update %s with %s", entry, commitVersion);
+      }
+
       entry.commitVersion(commitVersion);
       if (entry.compareTo(entry.getNext()) > 0) {
          Node insertBefore = entry.getNext().getNext();
@@ -237,6 +267,9 @@ public class SortedTransactionQueue {
    }
 
    private synchronized void addNew(Node entry) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Add new entry: %s", entry);
+      }
       Node insertAfter = lastEntry.getPrevious();
 
       while (insertAfter != firstEntry) {
@@ -246,12 +279,20 @@ public class SortedTransactionQueue {
          insertAfter = insertAfter.getPrevious();
       }
       addAfter(insertAfter, entry);
+      if (log.isTraceEnabled()) {
+         log.tracef("After add, first entry is %s", firstEntry.getNext());
+      }
    }
 
    private synchronized void remove(Node entry) {
       if (entry == null) {
          return;
       }
+
+      if (log.isTraceEnabled()) {
+         log.tracef("remove entry: %s", entry);
+      }
+
       Node previous = entry.getPrevious();
       Node next = entry.getNext();
       entry.setPrevious(null);
@@ -259,6 +300,9 @@ public class SortedTransactionQueue {
 
       previous.setNext(next);
       next.setPrevious(previous);
+      if (log.isTraceEnabled()) {
+         log.tracef("After remove, first entry is %s", firstEntry.getNext());
+      }
    }
 
    private synchronized void addAfter(Node insertAfter, Node entry) {
@@ -267,6 +311,10 @@ public class SortedTransactionQueue {
 
       entry.setPrevious(insertAfter);
       insertAfter.setNext(entry);
+
+      if (log.isTraceEnabled()) {
+         log.tracef("add after: %s --> [%s] --> %s", insertAfter, entry, entry.getNext());
+      }
    }
 
    private void addBefore(Node insertBefore, Node entry) {
@@ -275,6 +323,9 @@ public class SortedTransactionQueue {
 
       entry.setNext(insertBefore);
       insertBefore.setPrevious(entry);
+      if (log.isTraceEnabled()) {
+         log.tracef("add before: %s --> [%s] --> %s", entry.getPrevious(), entry, insertBefore);
+      }
    }
 
    private synchronized void notifyIfNeeded() {
@@ -357,7 +408,7 @@ public class SortedTransactionQueue {
       @Override
       public String toString() {
          return "TransactionEntry{" +
-               ", version=" + getVersion() +
+               "version=" + getVersion() +
                ", ready=" + isReady() +
                ", gtx=" + cacheTransaction.getGlobalTransaction().prettyPrint() +
                '}';

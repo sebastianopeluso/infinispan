@@ -3,6 +3,7 @@ package org.infinispan.tx.gmu;
 import org.infinispan.Cache;
 import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
+import org.jgroups.util.Util;
 import org.testng.annotations.Test;
 
 import javax.transaction.Transaction;
@@ -120,6 +121,7 @@ public class ConsistencyTest extends AbstractGMUTest {
       assertNoTransactions();
    }
 
+   @Test(enabled = false)
    public void testConcurrentWritesAndReads() throws InterruptedException {
       assertAtLeastCaches(2);
       assertCacheValuesNull(COUNTER_1, COUNTER_2);
@@ -130,13 +132,8 @@ public class ConsistencyTest extends AbstractGMUTest {
       readWriteThreads[0] = new ReadWriteThread("Writer-0", cache(0));
       readWriteThreads[1] = new ReadWriteThread("Writer-1", cache(1));
 
-      ReadOnlyThread[] readOnlyThreads = new ReadOnlyThread[2];
-      readOnlyThreads[0] = new ReadOnlyThread("Reader-0", cache(0));
-      readOnlyThreads[1] = new ReadOnlyThread("Reader-1", cache(1));
-
-      for (ReadOnlyThread readOnlyThread : readOnlyThreads) {
-         readOnlyThread.start();
-      }
+      ReadOnlyThread readOnlyThread = new ReadOnlyThread("Reader");
+      readOnlyThread.start();
 
       for (ReadWriteThread readWriteThread : readWriteThreads) {
          readWriteThread.start();
@@ -146,17 +143,14 @@ public class ConsistencyTest extends AbstractGMUTest {
          readWriteThread.join();
       }
 
-      for (ReadOnlyThread readOnlyThread : readOnlyThreads) {
-         readOnlyThread.join();
-      }
+      readOnlyThread.silentInterrupt();
+      readOnlyThread.join(10000);
 
       for (ReadWriteThread readWriteThread : readWriteThreads) {
          assert !readWriteThread.error : "Error occurred in " + readWriteThread.getName();
       }
 
-      for (ReadOnlyThread readOnlyThread : readOnlyThreads) {
-         assert !readOnlyThread.error : "Error occurred in " + readOnlyThread.getName();
-      }
+      assert !readOnlyThread.error : "Error occurred in " + readOnlyThread.getName();
 
       printDataContainer();
       assertNoTransactions();
@@ -188,15 +182,11 @@ public class ConsistencyTest extends AbstractGMUTest {
 
    private class ReadOnlyThread extends Thread {
 
-      private final Cache cache;
-      private final TransactionManager transactionManager;
       private boolean run;
       private boolean error;
 
-      private ReadOnlyThread(String threadName, Cache cache) {
+      private ReadOnlyThread(String threadName) {
          super(threadName);
-         this.cache = cache;
-         this.transactionManager = cache.getAdvancedCache().getTransactionManager();
          this.run = true;
          this.error = false;
       }
@@ -204,10 +194,13 @@ public class ConsistencyTest extends AbstractGMUTest {
       @Override
       public void run() {
          while (run) {
-            if (!consistentRead()) {
-               error = false;
-               break;
+            for (Cache cache : caches()) {
+               if (!consistentRead(cache)) {
+                  error = false;
+                  break;
+               }
             }
+            Util.sleep(1000);
          }
       }
 
@@ -217,7 +210,12 @@ public class ConsistencyTest extends AbstractGMUTest {
          super.interrupt();
       }
 
-      private boolean consistentRead() {
+      public void silentInterrupt() {
+         run = false;
+      }
+
+      private boolean consistentRead(Cache cache) {
+         TransactionManager transactionManager = cache.getAdvancedCache().getTransactionManager();
          try {
             transactionManager.begin();
             Integer c1 = (Integer) cache.get(COUNTER_1);
@@ -225,6 +223,7 @@ public class ConsistencyTest extends AbstractGMUTest {
             transactionManager.commit();
             return isEquals(c1, c2);
          } catch (Exception e) {
+            safeRollback(transactionManager);
             return false;
          }
       }

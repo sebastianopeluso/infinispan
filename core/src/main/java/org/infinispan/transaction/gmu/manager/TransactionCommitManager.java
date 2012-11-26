@@ -1,5 +1,6 @@
 package org.infinispan.transaction.gmu.manager;
 
+import org.infinispan.Cache;
 import org.infinispan.commands.tx.GMUCommitCommand;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.IncrementableEntryVersion;
@@ -15,6 +16,7 @@ import org.infinispan.factories.annotations.Stop;
 import org.infinispan.interceptors.EntryWrappingInterceptor;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.remoting.transport.Transport;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.gmu.CommitLog;
@@ -40,32 +42,36 @@ public class TransactionCommitManager {
    private final static Log log = LogFactory.getLog(TransactionCommitManager.class);
 
    private final CurrentVersion currentVersion;
-   private final CommitThread commitThread;
+   private CommitThread commitThread;
    private final SortedTransactionQueue sortedTransactionQueue;
    private CommitInstance commitInvocationInstance;
    private InterceptorChain ic;
    private InvocationContextContainer icc;
    private GMUVersionGenerator versionGenerator;
    private CommitLog commitLog;
+   private Transport transport;
+   private Cache cache;
 
    public TransactionCommitManager() {
-      commitThread = new CommitThread();
       currentVersion = new CurrentVersion();
       sortedTransactionQueue = new SortedTransactionQueue();
    }
 
    @Inject
    public void inject(InterceptorChain ic, InvocationContextContainer icc, VersionGenerator versionGenerator,
-                      CommitLog commitLog) {
+                      CommitLog commitLog, Transport transport, Cache cache) {
       this.ic = ic;
       this.icc = icc;
       this.versionGenerator = toGMUVersionGenerator(versionGenerator);
       this.commitLog = commitLog;
+      this.transport = transport;
+      this.cache = cache;
    }
 
    //AFTER THE VersionGenerator
    @Start(priority = 31)
    public void start() {
+      commitThread = new CommitThread(transport.getAddress() + "-" + cache.getName() + "-GMU-Commit");
       commitThread.start();
       currentVersion.init();
 
@@ -109,6 +115,7 @@ public class TransactionCommitManager {
    }
 
    public void rollbackTransaction(CacheTransaction cacheTransaction) {
+      currentVersion.update(cacheTransaction.getTransactionVersion());
       sortedTransactionQueue.rollback(cacheTransaction);
    }
 
@@ -167,6 +174,9 @@ public class TransactionCommitManager {
       }
 
       public synchronized final void update(EntryVersion version) {
+         if (version == null) {
+            return;
+         }
          currentVersion = versionGenerator.mergeAndMax(Arrays.asList(currentVersion, version));
          if (log.isTraceEnabled()) {
             log.tracef("Update current version: %s (with %s)", this, version);
@@ -186,8 +196,8 @@ public class TransactionCommitManager {
       private final List<GMUEntryVersion> committedVersions;
       private final List<SortedTransactionQueue.TransactionEntry> commitList;
 
-      private CommitThread() {
-         super("GMU-Commit-Thread");
+      private CommitThread(String threadName) {
+         super(threadName);
          running = false;
          committedVersions = new LinkedList<GMUEntryVersion>();
          commitList = new LinkedList<SortedTransactionQueue.TransactionEntry>();
@@ -226,10 +236,13 @@ public class TransactionCommitManager {
 
                commitLog.addNewVersion(versionGenerator.mergeAndMax(committedVersions));
             } catch (InterruptedException e) {
+               running = false;
                if (log.isTraceEnabled()) {
                   log.tracef("%s was interrupted", getName());
                }
                this.interrupt();
+            } catch (Throwable throwable) {
+               log.fatalf(throwable, "Exception caught in commit. This should not happen");
             } finally {
                committedVersions.clear();
                commitList.clear();
