@@ -100,8 +100,8 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       }
 
       String cacheName = cmd.getCacheName();
-      ComponentRegistry cr = gcr.getNamedComponentRegistry(cacheName);
-
+      ComponentRegistry cr = gcr.getNamedComponentRegistry(cacheName);      
+      
       if (cr == null) {
          if (!globalConfiguration.isStrictPeerToPeer()) {
             if (trace) log.tracef("Strict peer to peer off, so silently ignoring that %s cache is not defined", cacheName);
@@ -125,6 +125,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       try {
          if (trace) log.tracef("Calling perform() on %s", cmd);
          ResponseGenerator respGen = cr.getResponseGenerator();
+         cmd.setResponseGenerator(respGen);
          Object retval = cmd.perform(null);
          if (retval == RequestHandler.DO_NOT_REPLY) {
             return retval;

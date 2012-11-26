@@ -25,6 +25,7 @@ package org.infinispan.commands.control;
 import org.infinispan.CacheException;
 import org.infinispan.cacheviews.CacheView;
 import org.infinispan.cacheviews.CacheViewsManager;
+import org.infinispan.commands.remote.BaseRpcCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.remoting.responses.ResponseGenerator;
@@ -68,8 +69,6 @@ public class CacheViewControlCommand implements CacheRpcCommand {
 
    private CacheViewsManager cacheViewsManager;
 
-   private MessageRequest messageRequest;
-
    private final String cacheName;
    private Type type;
    private Address sender;
@@ -77,6 +76,8 @@ public class CacheViewControlCommand implements CacheRpcCommand {
    private List<Address> newMembers;
    private int oldViewId;
    private List<Address> oldMembers;
+   private MessageRequest messageRequest;
+   private ResponseGenerator responseGenerator;
 
    // For CommandIdUniquenessTest only
    public CacheViewControlCommand() {
@@ -125,10 +126,10 @@ public class CacheViewControlCommand implements CacheRpcCommand {
                return null;
             case REQUEST_LEAVE:
                cacheViewsManager.handleRequestLeave(sender, cacheName);
-              return null;
+               return null;
             case PREPARE_VIEW:
                cacheViewsManager.handlePrepareView(cacheName, new CacheView(newViewId, newMembers),
-                     new CacheView(oldViewId, oldMembers));
+                                                   new CacheView(oldViewId, oldMembers));
                return null;
             case COMMIT_VIEW:
                cacheViewsManager.handleCommitView(cacheName, newViewId);
@@ -209,15 +210,17 @@ public class CacheViewControlCommand implements CacheRpcCommand {
    }
 
    @Override
-   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
+   public void setMessageRequest(MessageRequest request) {
       this.messageRequest = request;
    }
 
    @Override
-   public void sendReply(Object reply, boolean isExceptionThrown) {
-      if (messageRequest == null) {
-         throw new NullPointerException("Message Request is null");
-      }
-      messageRequest.sendReply(reply, isExceptionThrown);
+   public void setResponseGenerator(ResponseGenerator responseGenerator) {
+      this.responseGenerator = responseGenerator;
+   }
+
+   @Override
+   public void sendReply(Object reply, boolean threwException) {
+      BaseRpcCommand.sendReply(messageRequest, responseGenerator, this, reply, threwException);
    }
 }

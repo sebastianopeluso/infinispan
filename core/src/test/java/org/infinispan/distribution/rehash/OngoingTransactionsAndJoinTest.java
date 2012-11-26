@@ -324,7 +324,7 @@ public class OngoingTransactionsAndJoinTest extends MultipleCacheManagersTest {
             }
          }
 
-         Response r = delegate.handle(cmd, origin);
+         Object r = delegate.handle(cmd, origin);
          if (notifyRehashStarted) rehashStarted.countDown();
          return r;
       }

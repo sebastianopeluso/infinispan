@@ -23,7 +23,9 @@
 package org.infinispan.commands.remote;
 
 import org.infinispan.commands.ReplicableCommand;
+import org.infinispan.remoting.responses.ResponseGenerator;
 import org.infinispan.remoting.transport.Address;
+import org.jgroups.blocks.MessageRequest;
 
 /**
  * The {@link org.infinispan.remoting.rpc.RpcManager} only replicates commands wrapped in a {@link CacheRpcCommand}.
@@ -52,4 +54,9 @@ public interface CacheRpcCommand extends ReplicableCommand {
     */
    Address getOrigin();
    
+   void setMessageRequest(MessageRequest request);
+   
+   void setResponseGenerator(ResponseGenerator responseGenerator);
+   
+   void sendReply(Object reply, boolean threwException);
 }

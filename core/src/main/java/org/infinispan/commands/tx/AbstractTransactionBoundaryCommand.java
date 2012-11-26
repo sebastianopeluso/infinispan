@@ -22,6 +22,7 @@
  */
 package org.infinispan.commands.tx;
 
+import org.infinispan.commands.remote.BaseRpcCommand;
 import org.infinispan.config.Configuration;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.InvocationContextContainer;
@@ -29,9 +30,9 @@ import org.infinispan.context.impl.RemoteTxInvocationContext;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.lifecycle.ComponentStatus;
 import org.infinispan.remoting.responses.ResponseGenerator;
+import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
-import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -206,12 +207,12 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
 
    @Override
    public Address getOrigin() {
-	   return origin;
+      return origin;
    }
 
    @Override
    public void setOrigin(Address origin) {
-	   this.origin = origin;
+      this.origin = origin;
    }
 
    @Override
@@ -220,16 +221,17 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    }
 
    @Override
-   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
-      this.messageRequest = request;
+   public void sendReply(Object reply, boolean threwException) {
+      BaseRpcCommand.sendReply(messageRequest, responseGenerator, this, reply, threwException);
+   }
+
+   @Override
+   public void setResponseGenerator(ResponseGenerator responseGenerator) {
       this.responseGenerator = responseGenerator;
    }
 
    @Override
-   public void sendReply(Object reply, boolean isExceptionThrown) {
-      if (messageRequest == null || responseGenerator == null) {
-         throw new NullPointerException("Message Request is null");
-      }
-      messageRequest.sendReply(responseGenerator.getResponse(this, reply), isExceptionThrown);
+   public void setMessageRequest(MessageRequest request) {
+      this.messageRequest = request;
    }
 }

@@ -46,7 +46,7 @@ import static org.infinispan.util.Immutables.immutableInternalCacheEntry;
  * @author <a href="http://gleamynode.net/">Trustin Lee</a>
  * @since 4.0
  */
-public class EntrySetCommand extends AbstractVisitableLocalCommand {
+public class EntrySetCommand extends AbstractLocalCommand implements VisitableCommand {
    private final DataContainer container;
    private final InternalEntryFactory entryFactory;
 

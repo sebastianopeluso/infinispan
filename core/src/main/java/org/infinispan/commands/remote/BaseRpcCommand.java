@@ -22,6 +22,7 @@
  */
 package org.infinispan.commands.remote;
 
+import org.infinispan.remoting.responses.ExceptionResponse;
 import org.infinispan.remoting.responses.ResponseGenerator;
 import org.infinispan.remoting.transport.Address;
 import org.jgroups.blocks.MessageRequest;
@@ -31,6 +32,7 @@ public abstract class BaseRpcCommand implements CacheRpcCommand {
 
    private Address origin;
    private MessageRequest messageRequest;
+   private ResponseGenerator responseGenerator;
 
    protected BaseRpcCommand(String cacheName) {
       this.cacheName = cacheName;
@@ -59,15 +61,33 @@ public abstract class BaseRpcCommand implements CacheRpcCommand {
    }
 
    @Override
-   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
+   public final void setMessageRequest(MessageRequest request) {
       this.messageRequest = request;
    }
 
    @Override
-   public void sendReply(Object reply, boolean isExceptionThrown) {
+   public final void setResponseGenerator(ResponseGenerator responseGenerator) {
+      this.responseGenerator = responseGenerator;
+   }
+
+   @Override
+   public final void sendReply(Object reply, boolean threwException) {
+      sendReply(messageRequest, responseGenerator, this, reply, threwException);
+   }
+
+   public static void sendReply(MessageRequest messageRequest, ResponseGenerator responseGenerator,
+                                CacheRpcCommand command, Object reply, boolean threwException) {
       if (messageRequest == null) {
-         throw new NullPointerException("Message Request is null");
+         return;
       }
-      messageRequest.sendReply(reply, isExceptionThrown);
+      Object realReply;
+      if (threwException) {
+         realReply = new ExceptionResponse((Exception) reply);
+      } else if (responseGenerator == null) {
+         realReply = reply;
+      } else {
+         realReply = responseGenerator.getResponse(command, reply);
+      }
+      messageRequest.sendReply(realReply, false);
    }
 }

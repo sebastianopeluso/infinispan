@@ -167,7 +167,15 @@ public class SortedTransactionQueue {
    }
 
    public final void commit(CacheTransaction cacheTransaction, GMUEntryVersion commitVersion) {
-      update(concurrentHashMap.get(cacheTransaction.getGlobalTransaction()), commitVersion);
+      Node entry = concurrentHashMap.get(cacheTransaction.getGlobalTransaction());
+      if (entry == null) {
+         if (log.isDebugEnabled()) {
+            log.debugf("Cannot commit transaction %s. Maybe it is a read-only on this node",
+                       cacheTransaction.getGlobalTransaction().prettyPrint());
+         }
+         return;
+      }
+      update(entry, commitVersion);
       notifyIfNeeded();
    }
 
@@ -217,9 +225,6 @@ public class SortedTransactionQueue {
    }
 
    private synchronized void update(Node entry, GMUEntryVersion commitVersion) {
-      if (entry == null) {
-         throw new IllegalStateException("Trying to commit a transaction but it does not exists in commit queue");
-      }
       entry.commitVersion(commitVersion);
       if (entry.compareTo(entry.getNext()) > 0) {
          Node insertBefore = entry.getNext().getNext();

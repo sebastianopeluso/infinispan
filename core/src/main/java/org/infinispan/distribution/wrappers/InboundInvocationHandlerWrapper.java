@@ -52,7 +52,7 @@ public class InboundInvocationHandlerWrapper implements InboundInvocationHandler
             currTime = System.nanoTime();
          }
 
-         Response ret = actual.handle(command,origin);
+         Object ret = actual.handle(command,origin);
 
          if (txCompleteNotify) {
             TransactionsStatisticsRegistry.addValueAndFlushIfNeeded(IspnStats.TX_COMPLETE_NOTIFY_EXECUTION_TIME,

@@ -27,8 +27,6 @@ import org.infinispan.commands.DataCommand;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.lifecycle.ComponentStatus;
-import org.infinispan.remoting.responses.ResponseGenerator;
-import org.jgroups.blocks.MessageRequest;
 
 import java.util.Set;
 
@@ -39,7 +37,6 @@ import java.util.Set;
  */
 public abstract class AbstractDataCommand extends AbstractFlagAffectedCommand implements DataCommand {
    protected Object key;
-   private MessageRequest messageRequest;
 
    @Override
    public Object getKey() {
@@ -104,28 +101,15 @@ public abstract class AbstractDataCommand extends AbstractFlagAffectedCommand im
    @Override
    public String toString() {
       return new StringBuilder(getClass().getSimpleName())
-         .append(" {key=")
-         .append(key)
-         .append(", flags=").append(flags)
-         .append("}")
-         .toString();
+            .append(" {key=")
+            .append(key)
+            .append(", flags=").append(flags)
+            .append("}")
+            .toString();
    }
 
    @Override
    public boolean isReturnValueExpected() {
       return true;
-   }
-
-   @Override
-   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
-      this.messageRequest = request;
-   }
-
-   @Override
-   public void sendReply(Object reply, boolean isExceptionThrown) {
-      if (messageRequest == null) {
-         throw new NullPointerException("Message Request is null");
-      }
-      messageRequest.sendReply(reply, isExceptionThrown);
    }
 }

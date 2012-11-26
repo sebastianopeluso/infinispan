@@ -206,8 +206,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          ReplicableCommand cmd = null;
          try {
             cmd = (ReplicableCommand) req_marshaller.objectFromBuffer(req.getRawBuffer(), req.getOffset(), req.getLength());
-            cmd.setMessageRequest(request, null);
-            return executeCommand(cmd, req);
+            return executeCommand(cmd, request);
          } catch (InterruptedException e) {
             log.warnf("Shutdown while handling command %s", cmd);
             return new ExceptionResponse(new CacheException("Cache is shutting down"));
@@ -223,9 +222,11 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
       }
    }
 
-   private Object executeCommand(ReplicableCommand cmd, Message req) throws Throwable {
+   private Object executeCommand(ReplicableCommand cmd, MessageRequest request) throws Throwable {
+      Message req = request.getMessage();
       if (cmd == null) throw new NullPointerException("Unable to execute a null command!  Message was " + req);
       if (cmd instanceof CacheRpcCommand) {
+         ((CacheRpcCommand) cmd).setMessageRequest(request);
          if (trace) log.tracef("Attempting to execute command: %s [sender=%s]", cmd, req.getSrc());
          return inboundInvocationHandler.handle((CacheRpcCommand) cmd, fromJGroupsAddress(req.getSrc()));
       } else {

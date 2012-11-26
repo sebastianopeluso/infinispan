@@ -28,8 +28,6 @@ import org.infinispan.commands.Visitor;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.distexec.DistributedCallable;
 import org.infinispan.lifecycle.ComponentStatus;
-import org.infinispan.remoting.responses.ResponseGenerator;
-import org.jgroups.blocks.MessageRequest;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -55,9 +53,6 @@ public class DistributedExecuteCommand<V> implements VisitableCommand {
    private Set<Object> keys;
 
    private Callable<V> callable;
-
-   private MessageRequest messageRequest;
-
 
    public DistributedExecuteCommand(Collection<Object> inputKeys, Callable<V> callable) {
       if (inputKeys == null || inputKeys.isEmpty())
@@ -164,18 +159,5 @@ public class DistributedExecuteCommand<V> implements VisitableCommand {
    @Override
    public boolean isReturnValueExpected() {
       return true;
-   }
-
-   @Override
-   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
-      this.messageRequest = request;
-   }
-
-   @Override
-   public void sendReply(Object reply, boolean isExceptionThrown) {
-      if (messageRequest == null) {
-         throw new NullPointerException("Message Request is null");
-      }
-      messageRequest.sendReply(reply, isExceptionThrown);
    }
 }

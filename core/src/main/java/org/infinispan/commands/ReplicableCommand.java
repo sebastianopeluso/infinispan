@@ -75,8 +75,4 @@ public interface ReplicableCommand {
     * @return true or false
     */
    boolean isReturnValueExpected();
-
-   void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator);
-
-   void sendReply(Object reply, boolean isExceptionThrown);
 }

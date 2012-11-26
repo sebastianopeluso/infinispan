@@ -30,8 +30,6 @@ import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.lifecycle.ComponentStatus;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
-import org.infinispan.remoting.responses.ResponseGenerator;
-import org.jgroups.blocks.MessageRequest;
 
 import java.util.Collections;
 import java.util.Set;
@@ -44,7 +42,6 @@ public class ClearCommand extends AbstractFlagAffectedCommand implements WriteCo
 
    public static final byte COMMAND_ID = 5;
    CacheNotifier notifier;
-   private MessageRequest messageRequest;
 
    public ClearCommand() {
    }
@@ -104,10 +101,10 @@ public class ClearCommand extends AbstractFlagAffectedCommand implements WriteCo
    @Override
    public String toString() {
       return new StringBuilder()
-         .append("ClearCommand{flags=")
-         .append(flags)
-         .append("}")
-         .toString();
+            .append("ClearCommand{flags=")
+            .append(flags)
+            .append("}")
+            .toString();
    }
 
    @Override
@@ -133,18 +130,5 @@ public class ClearCommand extends AbstractFlagAffectedCommand implements WriteCo
    @Override
    public boolean ignoreCommandOnStatus(ComponentStatus status) {
       return false;
-   }
-
-   @Override
-   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
-      this.messageRequest = request;
-   }
-
-   @Override
-   public void sendReply(Object reply, boolean isExceptionThrown) {
-      if (messageRequest == null) {
-         throw new NullPointerException("Message Request is null");
-      }
-      messageRequest.sendReply(reply, isExceptionThrown);
    }
 }
