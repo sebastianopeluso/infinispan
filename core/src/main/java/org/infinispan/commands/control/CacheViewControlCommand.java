@@ -27,6 +27,7 @@ import org.infinispan.cacheviews.CacheView;
 import org.infinispan.cacheviews.CacheViewsManager;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.remoting.responses.ResponseGenerator;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -208,7 +209,7 @@ public class CacheViewControlCommand implements CacheRpcCommand {
    }
 
    @Override
-   public void setMessageRequest(MessageRequest request) {
+   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
       this.messageRequest = request;
    }
 

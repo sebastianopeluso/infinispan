@@ -24,9 +24,10 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.EntryWrappingInterceptor;
 import org.infinispan.transaction.gmu.CommitLog;
-import org.infinispan.transaction.gmu.CommitQueue;
+import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+import org.jgroups.blocks.RequestHandler;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -38,16 +39,16 @@ import static org.infinispan.transaction.gmu.GMUHelper.*;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implements CommitQueue.CommitInstance {
+public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implements TransactionCommitManager.CommitInstance {
 
    private static final Log log = LogFactory.getLog(GMUEntryWrappingInterceptor.class);
 
-   private CommitQueue commitQueue;
+   private TransactionCommitManager transactionCommitManager;
    private GMUVersionGenerator versionGenerator;
 
    @Inject
-   public void inject(CommitQueue commitQueue, DataContainer dataContainer, CommitLog commitLog, VersionGenerator versionGenerator) {
-      this.commitQueue = commitQueue;
+   public void inject(TransactionCommitManager transactionCommitManager, DataContainer dataContainer, CommitLog commitLog, VersionGenerator versionGenerator) {
+      this.transactionCommitManager = transactionCommitManager;
       this.versionGenerator = toGMUVersionGenerator(versionGenerator);
    }
 
@@ -89,15 +90,15 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
          ctx.setTransactionVersion(gmuCommitCommand.getCommitVersion());
       }
 
-      commitQueue.commitTransaction(ctx.getCacheTransaction());
+      transactionCommitManager.commitTransaction(ctx.getCacheTransaction(), gmuCommitCommand.getCommitVersion());
 
+      Object retVal = null;
       try {
-         return invokeNextInterceptor(ctx, command);
+         retVal = invokeNextInterceptor(ctx, command);
       } finally {
-         if (configuration.isSyncCommitPhase()) {
-            commitQueue.waitUntilCommitted(ctx.getCacheTransaction());
-         }
+         transactionCommitManager.awaitUntilCommitted(ctx.getCacheTransaction(), ctx.isOriginLocal() ? null : gmuCommitCommand);
       }
+      return ctx.isOriginLocal() ? retVal : RequestHandler.DO_NOT_REPLY;
    }
 
    @Override
@@ -105,7 +106,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
       try {
          return invokeNextInterceptor(ctx, command);
       } finally {
-         commitQueue.rollbackTransaction(ctx.getCacheTransaction());
+         transactionCommitManager.rollbackTransaction(ctx.getCacheTransaction());
       }
    }
 
@@ -165,7 +166,6 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
     *
     * @param ctx     the context
     * @param command the prepare command
-    * @return        the prepare version for the transaction
     * @throws InterruptedException  if interrupted
     */
    private void performValidation(TxInvocationContext ctx, GMUPrepareCommand command) throws InterruptedException {
@@ -193,9 +193,9 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
       }
 
       if (hasToUpdateLocalKeys) {
-         commitQueue.prepareTransaction(ctx.getCacheTransaction());
+         transactionCommitManager.prepareTransaction(ctx.getCacheTransaction());
       } else {
-         commitQueue.prepareReadOnlyTransaction(ctx.getCacheTransaction());
+         transactionCommitManager.prepareReadOnlyTransaction(ctx.getCacheTransaction());
       }
 
       if(log.isDebugEnabled()) {

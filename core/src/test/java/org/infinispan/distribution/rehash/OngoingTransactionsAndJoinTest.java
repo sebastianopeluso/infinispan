@@ -131,7 +131,7 @@ public class OngoingTransactionsAndJoinTest extends MultipleCacheManagersTest {
             return null;
          }
       }, 10, TimeUnit.MILLISECONDS);
-      
+
       // start a new node!
       addClusterEnabledCacheManager(configuration);
 
@@ -308,7 +308,7 @@ public class OngoingTransactionsAndJoinTest extends MultipleCacheManagersTest {
       }
 
       @Override
-      public Response handle(CacheRpcCommand cmd, Address origin) throws Throwable {
+      public Object handle(CacheRpcCommand cmd, Address origin) throws Throwable {
          boolean notifyRehashStarted = false;
          if (cmd instanceof CacheViewControlCommand) {
             CacheViewControlCommand rcc = (CacheViewControlCommand) cmd;

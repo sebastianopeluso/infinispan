@@ -1,6 +1,7 @@
 package org.infinispan.commands.read;
 
 import org.infinispan.commands.VisitableCommand;
+import org.infinispan.remoting.responses.ResponseGenerator;
 import org.jgroups.blocks.MessageRequest;
 
 /**
@@ -14,7 +15,7 @@ public abstract class AbstractVisitableLocalCommand extends AbstractLocalCommand
    private MessageRequest messageRequest;
 
    @Override
-   public void setMessageRequest(MessageRequest request) {
+   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
       this.messageRequest = request;
    }
 

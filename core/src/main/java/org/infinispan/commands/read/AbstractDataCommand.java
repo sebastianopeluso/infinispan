@@ -27,6 +27,7 @@ import org.infinispan.commands.DataCommand;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.lifecycle.ComponentStatus;
+import org.infinispan.remoting.responses.ResponseGenerator;
 import org.jgroups.blocks.MessageRequest;
 
 import java.util.Set;
@@ -116,7 +117,7 @@ public abstract class AbstractDataCommand extends AbstractFlagAffectedCommand im
    }
 
    @Override
-   public void setMessageRequest(MessageRequest request) {
+   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
       this.messageRequest = request;
    }
 

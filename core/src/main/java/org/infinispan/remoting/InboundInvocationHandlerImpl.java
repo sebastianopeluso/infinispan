@@ -44,6 +44,7 @@ import org.infinispan.remoting.transport.Transport;
 import org.infinispan.statetransfer.StateTransferManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+import org.jgroups.blocks.RequestHandler;
 
 /**
  * Sets the cache interceptor chain on an RPCCommand before calling it to perform
@@ -85,7 +86,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
    }
 
    @Override
-   public Response handle(final CacheRpcCommand cmd, Address origin) throws Throwable {
+   public Object handle(final CacheRpcCommand cmd, Address origin) throws Throwable {
       cmd.setOrigin(origin);
 
       // TODO Support global commands separately
@@ -115,7 +116,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
    }
 
 
-   private Response handleInternal(final CacheRpcCommand cmd, final ComponentRegistry cr) throws Throwable {
+   private Object handleInternal(final CacheRpcCommand cmd, final ComponentRegistry cr) throws Throwable {
       CommandsFactory commandsFactory = cr.getCommandsFactory();
 
       // initialize this command with components specific to the intended cache instance
@@ -125,6 +126,9 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
          if (trace) log.tracef("Calling perform() on %s", cmd);
          ResponseGenerator respGen = cr.getResponseGenerator();
          Object retval = cmd.perform(null);
+         if (retval == RequestHandler.DO_NOT_REPLY) {
+            return retval;
+         }
          return respGen.getResponse(cmd, retval);
       } catch (Exception e) {
          log.trace("Exception executing command", e);
@@ -132,19 +136,11 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
       }
    }
 
-   private Response handleWithWaitForBlocks(final CacheRpcCommand cmd, final ComponentRegistry cr) throws Throwable {
-      Response resp = handleInternal(cmd, cr);
-
-      // A null response is valid and OK ...
-      if (trace && resp != null && !resp.isValid()) {
-         // invalid response
-         log.tracef("Unable to execute command, got invalid response %s", resp);
-      }
-
-      return resp;
+   private Object handleWithWaitForBlocks(final CacheRpcCommand cmd, final ComponentRegistry cr) throws Throwable {
+      return handleInternal(cmd, cr);
    }
 
-   private Response handleWithRetry(final CacheRpcCommand cmd, final ComponentRegistry componentRegistry) throws Throwable {
+   private Object handleWithRetry(final CacheRpcCommand cmd, final ComponentRegistry componentRegistry) throws Throwable {
       // RehashControlCommands are the mechanism used for joining the cluster,
       // so they don't need to wait until the cache starts up.
       boolean isStateTransferCommand = cmd instanceof StateTransferControlCommand;

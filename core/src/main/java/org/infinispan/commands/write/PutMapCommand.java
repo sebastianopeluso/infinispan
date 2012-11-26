@@ -29,6 +29,7 @@ import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.lifecycle.ComponentStatus;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
+import org.infinispan.remoting.responses.ResponseGenerator;
 import org.jgroups.blocks.MessageRequest;
 
 import java.util.Iterator;
@@ -208,7 +209,7 @@ public class PutMapCommand extends AbstractFlagAffectedCommand implements WriteC
    }
 
    @Override
-   public void setMessageRequest(MessageRequest request) {
+   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
       this.messageRequest = request;
    }
 

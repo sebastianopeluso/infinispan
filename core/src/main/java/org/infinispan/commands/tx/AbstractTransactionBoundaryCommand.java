@@ -28,6 +28,7 @@ import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.impl.RemoteTxInvocationContext;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.lifecycle.ComponentStatus;
+import org.infinispan.remoting.responses.ResponseGenerator;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.remoting.transport.Address;
@@ -57,6 +58,7 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    protected Configuration configuration;
    private Address origin;
    private MessageRequest messageRequest;
+   private ResponseGenerator responseGenerator;
 
    public AbstractTransactionBoundaryCommand(String cacheName) {
       this.cacheName = cacheName;
@@ -218,15 +220,16 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    }
 
    @Override
-   public void setMessageRequest(MessageRequest request) {
+   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
       this.messageRequest = request;
+      this.responseGenerator = responseGenerator;
    }
 
    @Override
    public void sendReply(Object reply, boolean isExceptionThrown) {
-      if (messageRequest == null) {
+      if (messageRequest == null || responseGenerator == null) {
          throw new NullPointerException("Message Request is null");
       }
-      messageRequest.sendReply(reply, isExceptionThrown);
+      messageRequest.sendReply(responseGenerator.getResponse(this, reply), isExceptionThrown);
    }
 }

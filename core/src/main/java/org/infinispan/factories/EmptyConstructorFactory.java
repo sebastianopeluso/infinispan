@@ -31,7 +31,7 @@ import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.marshall.jboss.ExternalizerTable;
 import org.infinispan.transaction.gmu.CommitLog;
-import org.infinispan.transaction.gmu.CommitQueue;
+import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.InboundInvocationHandlerImpl;
 import org.infinispan.transaction.xa.TransactionFactory;
@@ -46,7 +46,7 @@ import org.infinispan.transaction.xa.TransactionFactory;
  * @since 4.0
  */
 @DefaultFactoryFor(classes = {InboundInvocationHandler.class, RemoteCommandsFactory.class, TransactionFactory.class, L1Manager.class, ExternalizerTable.class,
-                              CommitLog.class, CommitQueue.class})
+                              CommitLog.class, TransactionCommitManager.class})
 @Scope(Scopes.GLOBAL)
 public class EmptyConstructorFactory extends AbstractComponentFactory implements AutoInstantiableFactory {
 
@@ -65,9 +65,9 @@ public class EmptyConstructorFactory extends AbstractComponentFactory implements
          return (T) new ExternalizerTable();
       else if (componentType.equals(CommitLog.class)) {
          return (T) new CommitLog();
-      } else if (componentType.equals(CommitQueue.class)) {
-         return (T) new CommitQueue();
-      }      
+      } else if (componentType.equals(TransactionCommitManager.class)) {
+         return (T) new TransactionCommitManager();
+      }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());
    }

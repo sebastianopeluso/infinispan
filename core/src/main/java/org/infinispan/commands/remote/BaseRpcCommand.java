@@ -22,6 +22,7 @@
  */
 package org.infinispan.commands.remote;
 
+import org.infinispan.remoting.responses.ResponseGenerator;
 import org.infinispan.remoting.transport.Address;
 import org.jgroups.blocks.MessageRequest;
 
@@ -58,7 +59,7 @@ public abstract class BaseRpcCommand implements CacheRpcCommand {
    }
 
    @Override
-   public void setMessageRequest(MessageRequest request) {
+   public void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator) {
       this.messageRequest = request;
    }
 

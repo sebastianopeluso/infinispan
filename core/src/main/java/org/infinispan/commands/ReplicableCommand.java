@@ -23,6 +23,7 @@
 package org.infinispan.commands;
 
 import org.infinispan.context.InvocationContext;
+import org.infinispan.remoting.responses.ResponseGenerator;
 import org.jgroups.blocks.MessageRequest;
 
 /**
@@ -75,7 +76,7 @@ public interface ReplicableCommand {
     */
    boolean isReturnValueExpected();
 
-   void setMessageRequest(MessageRequest request);
+   void setMessageRequest(MessageRequest request, ResponseGenerator responseGenerator);
 
    void sendReply(Object reply, boolean isExceptionThrown);
 }

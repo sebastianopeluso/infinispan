@@ -206,7 +206,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          ReplicableCommand cmd = null;
          try {
             cmd = (ReplicableCommand) req_marshaller.objectFromBuffer(req.getRawBuffer(), req.getOffset(), req.getLength());
-            cmd.setMessageRequest(request);
+            cmd.setMessageRequest(request, null);
             return executeCommand(cmd, req);
          } catch (InterruptedException e) {
             log.warnf("Shutdown while handling command %s", cmd);

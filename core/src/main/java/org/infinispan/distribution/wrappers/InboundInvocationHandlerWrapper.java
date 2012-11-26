@@ -34,7 +34,7 @@ public class InboundInvocationHandlerWrapper implements InboundInvocationHandler
    }
 
    @Override
-   public Response handle(CacheRpcCommand command, Address origin) throws Throwable {
+   public Object handle(CacheRpcCommand command, Address origin) throws Throwable {
       log.tracef("Handle remote command [%s] by the invocation handle wrapper from %s", command, origin);
       GlobalTransaction globalTransaction = getGlobalTransaction(command);
       try{
