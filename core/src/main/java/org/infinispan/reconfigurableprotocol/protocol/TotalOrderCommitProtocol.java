@@ -121,7 +121,7 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
       interceptors.remove(InterceptorType.LOCKING);
 
       //Wrapper
-      if (configuration.versioning().enabled() && configuration.clustering().cacheMode().isClustered()) {
+      if (needsVersionAwareComponents()) {
          interceptors.put(InterceptorType.WRAPPER,
                           createInterceptor(new TotalOrderVersionedEntryWrappingInterceptor(),
                                             TotalOrderVersionedEntryWrappingInterceptor.class));
@@ -133,7 +133,7 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
       //Clustering
       switch (configuration.clustering().cacheMode()) {
          case REPL_SYNC:
-            if (configuration.versioning().enabled()) {
+            if (needsVersionAwareComponents()) {
                interceptors.put(InterceptorType.CLUSTER,
                                 createInterceptor(new TotalOrderVersionedReplicationInterceptor(),
                                                   TotalOrderVersionedReplicationInterceptor.class));
@@ -145,7 +145,7 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
                break;
             }
          case DIST_SYNC:
-            if (configuration.versioning().enabled()) {
+            if (needsVersionAwareComponents()) {
                interceptors.put(InterceptorType.CLUSTER,
                                 createInterceptor(new TotalOrderVersionedDistributionInterceptor(),
                                                   TotalOrderVersionedDistributionInterceptor.class));

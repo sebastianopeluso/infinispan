@@ -174,7 +174,7 @@ public abstract class ReconfigurableProtocol {
     * method invoked when a message is received for this protocol
     *
     * @param data the data in the message
-    * @param from the sender    
+    * @param from the sender
     */
    public final void handleData(Object data, Address from) {
       if (LOCAL_STOP_ACK.equals(data)) {
@@ -240,7 +240,7 @@ public abstract class ReconfigurableProtocol {
    /**
     * returns all the pending local transactions and their write set
     *
-    * @return  all the pending local transactions and their write set  
+    * @return  all the pending local transactions and their write set
     */
    public final String printLocalTransactions() {
       StringBuilder sb = new StringBuilder("Local committing transactions are:\n");
@@ -256,14 +256,14 @@ public abstract class ReconfigurableProtocol {
             sb.append(transaction).append("\n");
          }
       }
-      
+
       return sb.toString();
    }
 
    /**
     * returns all the pending remote transactions and their write set
     *
-    * @return  all the pending remote transactions and their write set  
+    * @return  all the pending remote transactions and their write set
     */
    public final String printRemoteTransactions() {
       StringBuilder sb = new StringBuilder("Remote transactions are:\n");
@@ -401,6 +401,13 @@ public abstract class ReconfigurableProtocol {
       internalBroadcastData(data, totalOrder);
    }
 
+   protected final boolean needsVersionAwareComponents() {
+      return configuration.transaction().transactionMode() == TransactionMode.TRANSACTIONAL &&
+            configuration.locking().writeSkewCheck() &&
+            configuration.transaction().lockingMode() == LockingMode.OPTIMISTIC &&
+            configuration.versioning().enabled();
+   }
+
    /**
     * builds the default 2PC interceptor chain based on the configuration
     *
@@ -433,7 +440,7 @@ public abstract class ReconfigurableProtocol {
       }
 
       //Wrapper
-      if (configuration.versioning().enabled() && configuration.clustering().cacheMode().isClustered()) {
+      if (needsVersionAwareComponents()) {
          defaultIC.put(InterceptorType.WRAPPER,
                        createInterceptor(new VersionedEntryWrappingInterceptor(), VersionedEntryWrappingInterceptor.class));
 
@@ -451,7 +458,7 @@ public abstract class ReconfigurableProtocol {
       //Clustering interceptor
       switch (configuration.clustering().cacheMode()) {
          case REPL_SYNC:
-            if (configuration.versioning().enabled()) {
+            if (needsVersionAwareComponents()) {
                defaultIC.put(InterceptorType.CLUSTER,
                              createInterceptor(new VersionedReplicationInterceptor(), VersionedReplicationInterceptor.class));
                break;
@@ -466,7 +473,7 @@ public abstract class ReconfigurableProtocol {
                           createInterceptor(new InvalidationInterceptor(), InvalidationInterceptor.class));
             break;
          case DIST_SYNC:
-            if (configuration.versioning().enabled()) {
+            if (needsVersionAwareComponents()) {
                defaultIC.put(InterceptorType.CLUSTER,
                              createInterceptor(new VersionedDistributionInterceptor(), VersionedDistributionInterceptor.class));
                break;
@@ -622,7 +629,7 @@ public abstract class ReconfigurableProtocol {
     * this method switches between te current protocol to the new protocol without ensure this strong condition:
     *  -- no transaction in the current protocol are running in all the system see {@link #stopProtocol(boolean)}
     *
-    * @param protocol   the new protocol                      
+    * @param protocol   the new protocol
     */
    public abstract void switchTo(ReconfigurableProtocol protocol);
 
@@ -679,7 +686,7 @@ public abstract class ReconfigurableProtocol {
     *
     * Note: the interceptor instances should be instances returned by {@link #createInterceptor(org.infinispan.interceptors.base.CommandInterceptor, Class)}
     *
-    * @return  the map with the new interceptors  
+    * @return  the map with the new interceptors
     */
    public abstract EnumMap<InterceptorType, CommandInterceptor> buildInterceptorChain();
 
@@ -695,7 +702,7 @@ public abstract class ReconfigurableProtocol {
    /**
     * returns true is the replication protocol uses Total Order properties
     *
-    * @return  true is the replication protocol uses Total Order properties  
+    * @return  true is the replication protocol uses Total Order properties
     */
    public abstract boolean useTotalOrder();
 
@@ -703,7 +710,7 @@ public abstract class ReconfigurableProtocol {
     * method invoked when a message is received for this protocol
     *
     * @param data the data in the message
-    * @param from the sender    
+    * @param from the sender
     */
    protected abstract void internalHandleData(Object data, Address from);
 
