@@ -245,7 +245,7 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
             }
          }
 
-         if(trace) log.tracef("After applying state data container has %d keys", dataContainer.size());
+         if(trace) log.tracef("After applying state data container has %d keys", dataContainer.size(null));
       } 
    }
 

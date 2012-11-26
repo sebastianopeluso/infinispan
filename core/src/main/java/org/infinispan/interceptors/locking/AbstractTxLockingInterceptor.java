@@ -132,8 +132,16 @@ public abstract class AbstractTxLockingInterceptor extends AbstractLockingInterc
     * the originator leaving the cluster (if recovery is disabled).
     */
    protected final void lockAndRegisterBackupLock(TxInvocationContext ctx, Object key) throws InterruptedException {
+      internalLockAndRegisterBackupLock(ctx, key, false);
+   }
+
+   protected final void lockAndRegisterShareBackupLock(TxInvocationContext ctx, Object key) throws InterruptedException {
+      internalLockAndRegisterBackupLock(ctx, key, true);
+   }
+
+   protected void internalLockAndRegisterBackupLock(TxInvocationContext ctx, Object key, boolean share) throws InterruptedException {
       if (cdl.localNodeIsPrimaryOwner(key)) {
-         lockKeyAndCheckOwnership(ctx, key);
+         lockKeyAndCheckOwnership(ctx, key, share);
       } else if (cdl.localNodeIsOwner(key)) {
          ctx.getCacheTransaction().addBackupLockForKey(key);
       }
@@ -159,11 +167,11 @@ public abstract class AbstractTxLockingInterceptor extends AbstractLockingInterc
     * Note: The algorithm described below only when nodes leave the cluster, so it doesn't add a performance burden
     * when the cluster is stable.
     */
-   protected final void lockKeyAndCheckOwnership(InvocationContext ctx, Object key) throws InterruptedException {
+   protected final void lockKeyAndCheckOwnership(InvocationContext ctx, Object key, boolean share) throws InterruptedException {
       boolean checkForPendingLocks = false;
       //this is possible when the put is originated as a result of a state transfer
       if (!ctx.isInTxScope()) {
-         lockManager.acquireLock(ctx, key);
+         lockManager.acquireLock(ctx, key, share);
          return;
       }
       TxInvocationContext txContext = (TxInvocationContext) ctx;
@@ -202,11 +210,11 @@ public abstract class AbstractTxLockingInterceptor extends AbstractLockingInterc
             throw newTimeoutException(key, txContext);
          } else {
             getLog().tracef("Finished waiting for other potential lockers, trying to acquire the lock on %s", key);
-            lockManager.acquireLock(ctx, key, remaining);
+            lockManager.acquireLock(ctx, key, remaining, share);
          }
       } else {
          getLog().tracef("Locking key %s, no need to check for pending locks.", key);
-         lockManager.acquireLock(ctx, key);
+         lockManager.acquireLock(ctx, key, share);
       }
    }
 

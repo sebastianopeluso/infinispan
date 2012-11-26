@@ -67,7 +67,7 @@ public class OptimisticLockingInterceptor extends AbstractTxLockingInterceptor {
    private LockAcquisitionVisitor lockAcquisitionVisitor;
    private static final MurmurHash3 HASH = new MurmurHash3();
    private boolean needToMarkReads;
-   private final static Comparator<Object> keyComparator = new Comparator<Object>() {
+   protected final static Comparator<Object> keyComparator = new Comparator<Object>() {
       @Override
       public int compare(Object o1, Object o2) {
          int thisVal = HASH.hash(o1);
@@ -129,8 +129,11 @@ public class OptimisticLockingInterceptor extends AbstractTxLockingInterceptor {
             ctx.addAllAffectedKeys(Arrays.asList(orderedKeys));
          }
       }
+      afterWriteLocksAcquired(ctx, command);
       return invokeNextAndCommitIf1Pc(ctx, command);
    }
+
+   protected void afterWriteLocksAcquired(TxInvocationContext ctx, PrepareCommand command) throws InterruptedException {}
 
    @Override
    public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
@@ -189,7 +192,7 @@ public class OptimisticLockingInterceptor extends AbstractTxLockingInterceptor {
    @Override
    public Object visitClearCommand(InvocationContext ctx, ClearCommand command) throws Throwable {
       try {
-         for (Object key : dataContainer.keySet())
+         for (Object key : dataContainer.keySet(null))
             entryFactory.wrapEntryForClear(ctx, key);
          return invokeNextInterceptor(ctx, command);
       } catch (Throwable te) {
@@ -207,14 +210,14 @@ public class OptimisticLockingInterceptor extends AbstractTxLockingInterceptor {
       throw new CacheException("Explicit locking is not allowed with optimistic caches!");
    }
 
-   private class LockAcquisitionVisitor extends AbstractVisitor {
+   protected class LockAcquisitionVisitor extends AbstractVisitor {
       protected void performWriteSkewCheck(TxInvocationContext ctx, Object key) {
          // A no-op
       }
       @Override
       public Object visitClearCommand(InvocationContext ctx, ClearCommand command) throws Throwable {
          final TxInvocationContext txC = (TxInvocationContext) ctx;
-         for (Object key : dataContainer.keySet()) {
+         for (Object key : dataContainer.keySet(null)) {
             lockAndRegisterBackupLock(txC, key);
             performWriteSkewCheck(txC, key);
             txC.addAffectedKey(key);

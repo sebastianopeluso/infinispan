@@ -76,9 +76,8 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
    }
 
    @Override
-   public boolean lockAndRecord(Object key, InvocationContext ctx, long lockTimeout) throws InterruptedException {
+   protected boolean internalLockAndRecord(Object key, InvocationContext ctx, long lockTimeout, boolean share) throws InterruptedException {
       if (trace) log.tracef("Attempting to lock %s with acquisition timeout of %s millis", key, lockTimeout);
-
 
       if (ctx.isInTxScope()) {
          if (trace) log.trace("Using early dead lock detection");
@@ -89,7 +88,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
          if (trace) log.tracef("Setting lock intention to %s for %s (%s)", key, thisTx, System.identityHashCode(thisTx));
 
          while (System.nanoTime() < timeoutNanoTime) {
-            if (lockContainer.acquireLock(ctx.getLockOwner(), key, spinDuration, MILLISECONDS) != null) {
+            if (tryAcquire(key, ctx.getLockOwner(), spinDuration, share)) {
                thisTx.setLockIntention(null); //clear lock intention
                if (trace) log.tracef("successfully acquired lock on %s on behalf of %s, returning ...", key, ctx.getLockOwner());
                return true;
@@ -112,7 +111,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
             }
          }
       } else {
-         if (lockContainer.acquireLock(ctx.getLockOwner(), key, lockTimeout, MILLISECONDS) != null) {
+         if (lockContainer.acquireExclusiveLock(ctx.getLockOwner(), key, lockTimeout, MILLISECONDS) != null) {
             return true;
          }
       }
@@ -184,7 +183,7 @@ public class DeadlockDetectingLockManager extends LockManagerImpl {
    public void resetStatistics() {
       localTxStopped.set(0);
       remoteTxStopped.set(0);
-      cannotRunDld.set(0); 
+      cannotRunDld.set(0);
    }
 
    @ManagedAttribute(description = "Number of remote transaction that were roll backed due to deadlocks")

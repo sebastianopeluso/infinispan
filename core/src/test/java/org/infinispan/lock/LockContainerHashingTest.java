@@ -51,7 +51,7 @@ public class LockContainerHashingTest extends AbstractInfinispanTest {
       Map<Lock, Integer> distribution = new HashMap<Lock, Integer>();
 
       for (String s : keys) {
-         Lock lock = stripedLock.getLock(s);
+         Lock lock = stripedLock.getExclusiveLock(s);
          if (distribution.containsKey(lock)) {
             int count = distribution.get(lock) + 1;
             distribution.put(lock, count);

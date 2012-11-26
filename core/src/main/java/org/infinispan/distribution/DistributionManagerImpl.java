@@ -76,9 +76,9 @@ public class DistributionManagerImpl implements DistributionManager {
    private static final boolean trace = log.isTraceEnabled();
 
    // Injected components
-   private Configuration configuration;
-   private RpcManager rpcManager;
-   private CommandsFactory cf;
+   protected Configuration configuration;
+   protected RpcManager rpcManager;
+   protected CommandsFactory cf;
    private CacheNotifier cacheNotifier;
    private StateTransferManager stateTransferManager;
 
@@ -111,7 +111,7 @@ public class DistributionManagerImpl implements DistributionManager {
       return configuration.getNumOwners();
    }
 
-   private Address getAddress() {
+   protected Address getAddress() {
       return rpcManager.getAddress();
    }
 

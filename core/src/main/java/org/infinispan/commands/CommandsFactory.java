@@ -34,6 +34,7 @@ import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
+import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.PrepareResponseCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
@@ -42,8 +43,10 @@ import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
+import org.infinispan.commands.tx.GMUCommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
+import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.commands.write.*;
@@ -59,6 +62,7 @@ import org.infinispan.statetransfer.LockInfo;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
 import javax.transaction.xa.Xid;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -73,6 +77,8 @@ import java.util.concurrent.Callable;
  * @author Manik Surtani
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @Scope(Scopes.NAMED_CACHE)
@@ -391,4 +397,30 @@ public interface CommandsFactory {
     * @return        the data placement command instance
     */
    DataPlacementCommand buildDataPlacementCommand(DataPlacementCommand.Type type, long roundId);
+
+   /**
+    * 
+    * @param gtx
+    * @param modifications
+    * @param onePhaseCommit
+    * @return
+    */
+   GMUPrepareCommand buildSerializablePrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications,                                      
+                                      boolean onePhaseCommit);
+
+   /**
+    * 
+    * @param gtx
+    * @return
+    */
+   GMUCommitCommand buildSerializableCommitCommand(GlobalTransaction gtx);
+
+   /**
+    * Builds a ClusteredGetCommand, which is a remote lookup command
+    * @param key key to look up
+    * @return a ClusteredGetCommand
+    */
+   GMUClusteredGetCommand buildGMUClusteredGetCommand(Object key, Set<Flag> flags, boolean acquireRemoteLock, 
+                                                      GlobalTransaction gtx, EntryVersion minVersion,
+                                                      EntryVersion maxVersion, BitSet alreadyReadFromMask);
 }

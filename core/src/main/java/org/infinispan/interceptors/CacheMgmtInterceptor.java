@@ -216,7 +216,7 @@ public class CacheMgmtInterceptor extends JmxStatsCommandInterceptor {
    @ManagedAttribute(description = "Number of entries currently in the cache")
    @Metric(displayName = "Number of current cache entries", displayType = DisplayType.SUMMARY)
    public int getNumberOfEntries() {
-      return dataContainer.size();
+      return dataContainer.size(null);
    }
 
    @ManagedAttribute(description = "Number of seconds since cache started")

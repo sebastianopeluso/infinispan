@@ -48,6 +48,7 @@ import java.util.Set;
  *
  * @author Mircea.Markus@jboss.com
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.0
  */
 public abstract class LocalTransaction extends AbstractCacheTransaction {
@@ -69,6 +70,9 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    //total order result -- has the result and behaves like a synchronization point between the remote and local
    // prepare commands
    private final PrepareResult prepareResult = new PrepareResult();
+   private boolean commitOrRollbackSent;
+   private boolean alreadyReadOnThisNode;
+   private Set<Address> readFrom;
 
    public LocalTransaction(Transaction transaction, GlobalTransaction tx, boolean implicitTransaction, int viewId) {
       super(tx, viewId);
@@ -357,4 +361,33 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    public final boolean wasPrepareSent() {
       return prepareSent;
    }
+
+   @Override
+   public void setAlreadyReadOnThisNode(boolean value) {
+      alreadyReadOnThisNode = value;
+   }
+
+   @Override
+   public boolean hasAlreadyReadOnThisNode() {
+      return alreadyReadOnThisNode;
+   }
+
+   @Override
+   public Set<Address> getReadFrom() {
+      return readFrom;
+   }
+
+   @Override
+   public void addReadFrom(Address address) {
+      if (readFrom == null) {
+         readFrom = new HashSet<Address>(16);
+      }
+      readFrom.add(address);
+   }
+
+   @Override
+   public Collection<Object> getReadKeys() {
+      return readKeys;
+   }
+
 }

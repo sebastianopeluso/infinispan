@@ -78,7 +78,7 @@ public class ReplicatedStateTransferTask extends BaseStateTransferTask {
 
       if (log.isDebugEnabled())
          log.debugf("Commencing state transfer %d on node: %s. Before start, data container had %d entries",
-               newViewId, self, dataContainer.size());
+               newViewId, self, dataContainer.size(null));
 
       // Don't need to log anything, all transactions will be blocked
       //distributionManager.getTransactionLogger().enable();

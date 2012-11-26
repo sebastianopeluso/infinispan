@@ -30,17 +30,56 @@ public abstract class AbstractLockContainer<L extends Lock> implements LockConta
     *
     * @param toRelease lock to release
     */
-   protected void safeRelease(L toRelease, Object lockOwner) {
+   protected void safeExclusiveRelease(L toRelease, Object lockOwner) {
       if (toRelease != null) {
          try {
-            unlock(toRelease, lockOwner);
+            unlockExclusive(toRelease, lockOwner);
          } catch (IllegalMonitorStateException imse) {
             // Perhaps the caller hadn't acquired the lock after all.
          }
       }
    }
 
-   protected abstract void unlock(L toRelease, Object ctx);
+   protected void safeShareRelease(L toRelease, Object lockOwner) {
+      if (toRelease != null) {
+         try {
+            unlockShare(toRelease, lockOwner);
+         } catch (IllegalMonitorStateException imse) {
+            // Perhaps the caller hadn't acquired the lock after all.
+         }
+      }
+   }
 
-   protected abstract boolean tryLock(L lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException;
+   protected abstract void unlockExclusive(L toRelease, Object owner);
+
+   protected abstract void unlockShare(L toRelease, Object owner);
+
+   protected abstract boolean tryExclusiveLock(L lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException;      
+
+   protected abstract boolean tryShareLock(L lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException;      
+
+   @Override
+   public boolean ownsShareLock(Object key, Object owner) {
+      return false;
+   }
+
+   @Override
+   public boolean isSharedLocked(Object key) {
+      return false;
+   }
+
+   @Override
+   public L getShareLock(Object key) {
+      throw new UnsupportedOperationException();
+   }
+
+   @Override
+   public L acquireShareLock(Object lockOwner, Object key, long timeout, TimeUnit unit) throws InterruptedException {
+      throw new UnsupportedOperationException();
+   }
+
+   @Override
+   public void releaseShareLock(Object lockOwner, Object key) {
+      //no-op
+   }
 }

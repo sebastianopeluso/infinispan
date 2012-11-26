@@ -26,16 +26,20 @@ import org.infinispan.config.ConfigurationException;
 import org.infinispan.config.parsing.XmlConfigHelper;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.DefaultDataContainer;
+import org.infinispan.container.GMUDataContainer;
 import org.infinispan.eviction.EvictionStrategy;
 import org.infinispan.eviction.EvictionThreadPolicy;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.util.Util;
+import org.infinispan.util.concurrent.IsolationLevel;
 
 /**
  * Constructs the data container
- * 
+ *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
  * @author Vladimir Blagojevic
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @DefaultFactoryFor(classes = DataContainer.class)
@@ -50,21 +54,22 @@ public class DataContainerFactory extends AbstractNamedCacheComponentFactory imp
       } else if (DefaultDataContainer.class.getName().equals(configuration.getDataContainerClass())) {
          EvictionStrategy st = configuration.getEvictionStrategy();
          int level = configuration.getConcurrencyLevel();
+         boolean serializable = configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE;
         
          switch (st) {
-            case NONE:         
-               return (T) DefaultDataContainer.unBoundedDataContainer(level);
-            case UNORDERED:   
+            case NONE:
+               return (T) unBoundedDataContainer(serializable, level);
+            case UNORDERED:
             case LRU:
             case FIFO:
             case LIRS:
                int maxEntries = configuration.getEvictionMaxEntries();
                //handle case when < 0 value signifies unbounded container 
                if(maxEntries < 0) {
-                   return (T) DefaultDataContainer.unBoundedDataContainer(level);
+                  return (T) unBoundedDataContainer(serializable, level);
                }
                EvictionThreadPolicy policy = configuration.getEvictionThreadPolicy();
-               return (T) DefaultDataContainer.boundedDataContainer(level, maxEntries, st, policy);
+               return (T) boundedDataContainer(serializable, level, maxEntries, st, policy);
             default:
                throw new ConfigurationException("Unknown eviction strategy "
                         + configuration.getEvictionStrategy());
@@ -74,5 +79,16 @@ public class DataContainerFactory extends AbstractNamedCacheComponentFactory imp
          XmlConfigHelper.setValues(dataContainer, configuration.getDataContainerProperties(), false, true);
          return (T) dataContainer;
       }
+   }
+
+   private DataContainer unBoundedDataContainer(boolean serializable, int level) {
+      return serializable ? GMUDataContainer.unBoundedDataContainer(level) :
+            DefaultDataContainer.unBoundedDataContainer(level);
+   }
+
+   private DataContainer boundedDataContainer(boolean serializable, int level, int maxEntries, EvictionStrategy st,
+                                              EvictionThreadPolicy policy) {
+      return serializable ? GMUDataContainer.boundedDataContainer(level, maxEntries, st, policy) :
+            DefaultDataContainer.boundedDataContainer(level, maxEntries, st, policy);
    }
 }

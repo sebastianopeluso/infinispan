@@ -58,19 +58,19 @@ public class OwnableReentrantStripedLockContainer extends AbstractStripedLockCon
    }
 
    @Override
-   public final OwnableReentrantLock getLock(Object object) {
+   public final OwnableReentrantLock getExclusiveLock(Object object) {
       return sharedLocks[hashToIndex(object)];
    }
 
    @Override
-   public final boolean ownsLock(Object object, Object owner) {
-      OwnableReentrantLock lock = getLock(object);
+   public final boolean ownsExclusiveLock(Object object, Object owner) {
+      OwnableReentrantLock lock = getExclusiveLock(object);
       return owner.equals(lock.getOwner());
    }
 
    @Override
-   public final boolean isLocked(Object object) {
-      OwnableReentrantLock lock = getLock(object);
+   public final boolean isExclusiveLocked(Object object) {
+      OwnableReentrantLock lock = getExclusiveLock(object);
       return lock.isLocked();
    }
 
@@ -82,7 +82,7 @@ public class OwnableReentrantStripedLockContainer extends AbstractStripedLockCon
    }
 
    public String toString() {
-      return "OwnableReentrantStripedLockContainer{" +
+      return "OwnableReentrantStripedReadWriteLockContainer{" +
             "sharedLocks=" + (sharedLocks == null ? null : Arrays.asList(sharedLocks)) +
             '}';
    }
@@ -93,12 +93,22 @@ public class OwnableReentrantStripedLockContainer extends AbstractStripedLockCon
    }
 
    @Override
-   protected boolean tryLock(OwnableReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
+   protected boolean tryExclusiveLock(OwnableReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
       return lock.tryLock(lockOwner, timeout, unit);
    }
 
    @Override
-   protected void unlock(OwnableReentrantLock l, Object owner) {
+   protected void unlockExclusive(OwnableReentrantLock l, Object owner) {
       l.unlock(owner);
+   }
+
+   @Override
+   protected void unlockShare(OwnableReentrantLock toRelease, Object owner) {
+      //no-o
+   }
+
+   @Override
+   protected boolean tryShareLock(OwnableReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
+      return false;
    }
 }

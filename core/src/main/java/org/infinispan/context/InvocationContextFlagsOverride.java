@@ -24,6 +24,9 @@
 package org.infinispan.context;
 
 import org.infinispan.container.entries.CacheEntry;
+import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
+import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.remoting.transport.Address;
 
 import java.util.Collection;
@@ -186,5 +189,40 @@ public class InvocationContextFlagsOverride implements InvocationContext {
    @Override
    public void clearLockedKeys() {
       delegate.clearLockedKeys();
+   }
+
+   @Override
+   public void addKeyReadInCommand(Object key, InternalGMUCacheEntry entry) {
+      delegate.addKeyReadInCommand(key, entry);
+   }
+
+   @Override
+   public void clearKeyReadInCommand() {
+      delegate.clearKeyReadInCommand();
+   }
+
+   @Override
+   public Map<Object, InternalGMUCacheEntry> getKeysReadInCommand() {
+      return delegate.getKeysReadInCommand();
+   }
+
+   @Override
+   public EntryVersion calculateVersionToRead(VersionGenerator versionGenerator) {
+      return delegate.calculateVersionToRead(versionGenerator);
+   }
+
+   @Override
+   public void setVersionToRead(EntryVersion entryVersion) {
+      delegate.setVersionToRead(entryVersion);
+   }
+
+   @Override
+   public boolean hasAlreadyReadOnThisNode() {
+      return delegate.hasAlreadyReadOnThisNode();
+   }
+
+   @Override
+   public void setAlreadyReadOnThisNode(boolean value) {
+      delegate.setAlreadyReadOnThisNode(value);
    }
 }

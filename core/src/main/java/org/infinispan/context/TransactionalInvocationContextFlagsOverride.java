@@ -30,7 +30,9 @@ import java.util.Set;
 import javax.transaction.Transaction;
 
 import org.infinispan.commands.write.WriteCommand;
+import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.context.impl.TxInvocationContext;
+import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
@@ -104,5 +106,30 @@ public class TransactionalInvocationContextFlagsOverride extends InvocationConte
    @Override
    public void addAffectedKey(Object key) {
       delegate.addAffectedKey(key);
+   }
+
+   @Override
+   public EntryVersion getTransactionVersion() {
+      return delegate.getTransactionVersion();
+   }
+
+   @Override
+   public void setTransactionVersion(EntryVersion version) {
+      delegate.setTransactionVersion(version);
+   }
+
+   @Override
+   public Set<Address> getAlreadyReadFrom() {
+      return delegate.getAlreadyReadFrom();
+   }
+
+   @Override
+   public void addReadFrom(Address address) {
+      delegate.addReadFrom(address);
+   }
+
+   @Override
+   public Collection<Object> getReadSet() {
+      return delegate.getReadSet();
    }
 }

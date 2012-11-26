@@ -81,7 +81,7 @@ import java.util.concurrent.TimeoutException;
  * @since 4.0
  */
 public class DistributionInterceptor extends BaseRpcInterceptor {
-   DistributionManager dm;
+   protected DistributionManager dm;
    StateTransferLock stateTransferLock;
    CommandsFactory cf;
    protected DataContainer dataContainer;
@@ -254,7 +254,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    private void lockAndWrap(InvocationContext ctx, Object key, InternalCacheEntry ice) throws InterruptedException {
       if (!configuration.isTotalOrder()) {
          //we don't have locks in total order
-         lockManager.acquireLock(ctx, key);
+         lockManager.acquireLock(ctx, key, false);
       }
       entryFactory.wrapEntryForPut(ctx, key, ice, false);
    }
@@ -266,7 +266,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
     * @return true if the key is not in L1, or L1 caching is not enabled.  false the key is in L1.
     */
    private boolean isNotInL1(Object key) {
-      return !isL1CacheEnabled || !dataContainer.containsKey(key);
+      return !isL1CacheEnabled || !dataContainer.containsKey(key, null);
    }
 
    // ---- WRITE commands

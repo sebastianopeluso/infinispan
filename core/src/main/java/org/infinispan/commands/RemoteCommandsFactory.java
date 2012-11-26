@@ -42,6 +42,8 @@ import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
+import org.infinispan.commands.tx.GMUCommitCommand;
+import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
@@ -76,6 +78,8 @@ import java.util.Map;
  * @see CommandsFactory#initializeReplicableCommand(ReplicableCommand,boolean)
  * @author Manik Surtani
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @Scope(Scopes.GLOBAL)
@@ -225,6 +229,11 @@ public class RemoteCommandsFactory {
                break;
             case DataPlacementCommand.COMMAND_ID:
                command = new DataPlacementCommand(cacheName);
+            case GMUPrepareCommand.COMMAND_ID:
+               command = new GMUPrepareCommand(cacheName);
+               break;
+            case GMUCommitCommand.COMMAND_ID:
+               command = new GMUCommitCommand(cacheName);
                break;
             default:
                throw new CacheException("Unknown command id " + id + "!");

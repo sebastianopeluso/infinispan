@@ -35,6 +35,7 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.transaction.xa.GlobalTransaction;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -103,6 +104,18 @@ public class TransactionCoordinator {
             @Override
             public PrepareCommand createPrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications) {
                return commandsFactory.buildVersionedPrepareCommand(gtx, modifications, false);
+            }
+         };
+      } else if (configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
+         commandCreator = new CommandCreator() {
+            @Override
+            public CommitCommand createCommitCommand(GlobalTransaction gtx) {
+               return commandsFactory.buildSerializableCommitCommand(gtx);
+            }
+
+            @Override
+            public PrepareCommand createPrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications) {
+               return commandsFactory.buildSerializablePrepareCommand(gtx, modifications, false);
             }
          };
       } else {

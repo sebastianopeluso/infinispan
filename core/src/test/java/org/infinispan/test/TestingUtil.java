@@ -746,9 +746,9 @@ public class TestingUtil {
          str = "a cache manager at address " + a;
       log.debugf("Cleaning data for cache '%s' on %s", cache.getName(), str);
       DataContainer dataContainer = TestingUtil.extractComponent(cache, DataContainer.class);
-      if (log.isDebugEnabled()) log.debugf("removeInMemoryData(): dataContainerBefore == %s", dataContainer.entrySet());
+      if (log.isDebugEnabled()) log.debugf("removeInMemoryData(): dataContainerBefore == %s", dataContainer.entrySet(null));
       dataContainer.clear();
-      if (log.isDebugEnabled()) log.debugf("removeInMemoryData(): dataContainerAfter == %s", dataContainer.entrySet());
+      if (log.isDebugEnabled()) log.debugf("removeInMemoryData(): dataContainerAfter == %s", dataContainer.entrySet(null));
    }
 
    /**

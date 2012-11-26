@@ -43,6 +43,7 @@ import org.infinispan.notifications.cachemanagerlistener.annotation.ViewChanged;
 import org.infinispan.notifications.cachemanagerlistener.event.ViewChangedEvent;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.synchronization.SyncLocalTransaction;
 import org.infinispan.transaction.synchronization.SynchronizationAdapter;
 import org.infinispan.transaction.xa.CacheTransaction;
@@ -73,6 +74,7 @@ import static org.infinispan.util.Util.currentMillisFromNanotime;
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @Listener(sync = false)
@@ -108,12 +110,15 @@ public class TransactionTable {
    private volatile int minTxViewId = CACHE_STOPPED_VIEW_ID;
    private volatile int currentViewId = CACHE_STOPPED_VIEW_ID;
 
+   protected CommitLog commitLog;
+
    @Inject
    public void initialize(RpcManager rpcManager, Configuration configuration,
                           InvocationContextContainer icc, InterceptorChain invoker, CacheNotifier notifier,
                           TransactionFactory gtf, EmbeddedCacheManager cm, TransactionCoordinator txCoordinator,
                           TransactionSynchronizationRegistry transactionSynchronizationRegistry,
-                          CommandsFactory commandsFactory, ClusteringDependentLogic clusteringDependentLogic) {
+                          CommandsFactory commandsFactory, ClusteringDependentLogic clusteringDependentLogic,
+                          CommitLog commitLog) {
       this.rpcManager = rpcManager;
       this.configuration = configuration;
       this.icc = icc;
@@ -125,6 +130,7 @@ public class TransactionTable {
       this.transactionSynchronizationRegistry = transactionSynchronizationRegistry;
       this.commandsFactory = commandsFactory;
       this.clusteringLogic = clusteringDependentLogic;
+      this.commitLog = commitLog;
    }
 
    @Start
@@ -194,6 +200,8 @@ public class TransactionTable {
                throw new CacheException(e);
             }
          }
+         //init the transaction vector clock. it is only used for Serializability
+         localTransaction.setTransactionVersion(commitLog.getCurrentVersion());
          ((SyncLocalTransaction) localTransaction).setEnlisted(true);
       }
    }

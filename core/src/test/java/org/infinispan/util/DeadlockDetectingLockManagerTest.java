@@ -68,7 +68,7 @@ public class DeadlockDetectingLockManagerTest extends AbstractInfinispanTest {
       InvocationContext nonTx = new NonTxInvocationContext();
 
       Lock mockLock = mock(Lock.class);
-      when(lc.acquireLock(nonTx.getLockOwner(), "k", config.getLockAcquisitionTimeout(), TimeUnit.MILLISECONDS)).thenReturn(mockLock).thenReturn(null);
+      when(lc.acquireExclusiveLock(nonTx.getLockOwner(), "k", config.getLockAcquisitionTimeout(), TimeUnit.MILLISECONDS)).thenReturn(mockLock).thenReturn(null);
 
       assert lockManager.lockAndRecord("k", nonTx, config.getLockAcquisitionTimeout());
       assert !lockManager.lockAndRecord("k", nonTx, config.getLockAcquisitionTimeout());
@@ -80,7 +80,7 @@ public class DeadlockDetectingLockManagerTest extends AbstractInfinispanTest {
 
       Lock mockLock = mock(Lock.class);
       //this makes sure that we cannot acquire lock from the first try
-      when(lc.acquireLock(localTxContext.getLockOwner(), "k", SPIN_DURATION, TimeUnit.MILLISECONDS)).thenReturn(null).thenReturn(mockLock);
+      when(lc.acquireExclusiveLock(localTxContext.getLockOwner(), "k", SPIN_DURATION, TimeUnit.MILLISECONDS)).thenReturn(null).thenReturn(mockLock);
       lockManager.setOwner(Thread.currentThread() );
       //next lock acquisition will succeed
 
@@ -99,7 +99,7 @@ public class DeadlockDetectingLockManagerTest extends AbstractInfinispanTest {
 
       //this makes sure that we cannot acquire lock from the first try
       Lock mockLock = mock(Lock.class);
-      when(lc.acquireLock(localTxContext.getLockOwner(), "k", SPIN_DURATION, TimeUnit.MILLISECONDS)).thenReturn(null).thenReturn(mockLock);
+      when(lc.acquireExclusiveLock(localTxContext.getLockOwner(), "k", SPIN_DURATION, TimeUnit.MILLISECONDS)).thenReturn(null).thenReturn(mockLock);
       lockOwner.setRemote(false);
       lockOwner.setLockIntention("k");
       lockManager.setOwner(lockOwner);

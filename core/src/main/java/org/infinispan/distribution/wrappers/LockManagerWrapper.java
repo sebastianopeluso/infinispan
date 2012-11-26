@@ -52,6 +52,12 @@ public class LockManagerWrapper implements LockManager {
    }
 
    @Override
+   public boolean shareLockAndRecord(Object key, InvocationContext ctx, long timeoutMillis) throws InterruptedException {
+      log.tracef("LockManagerWrapper.shareLockAndRecord");
+      return actual.shareLockAndRecord(key, ctx, timeoutMillis);
+   }
+
+   @Override
    public void unlock(Collection<Object> lockedKeys, Object lockOwner) {
       log.tracef("LockManagerWrapper.unlock");
       actual.unlock(lockedKeys, lockOwner);
@@ -71,7 +77,7 @@ public class LockManagerWrapper implements LockManager {
 
    @Override
    public boolean isLocked(Object key) {
-      log.tracef("LockManagerWrapper.isLocked");
+      log.tracef("LockManagerWrapper.isExclusiveLocked");
       return actual.isLocked(key);
    }
 
@@ -106,7 +112,7 @@ public class LockManagerWrapper implements LockManager {
    }
 
    @Override
-   public boolean acquireLock(InvocationContext ctx, Object key) throws InterruptedException, TimeoutException {
+   public boolean acquireLock(InvocationContext ctx, Object key, boolean share) throws InterruptedException, TimeoutException {
       log.tracef("LockManagerWrapper.acquireLock");
 
       long lockingTime = 0;
@@ -119,7 +125,7 @@ public class LockManagerWrapper implements LockManager {
          lockingTime = System.nanoTime();
       }
       try{
-         locked = actual.acquireLock(ctx, key);  //this returns false if you already have acquired the lock previously
+         locked = actual.acquireLock(ctx, key, share);  //this returns false if you already have acquired the lock previously
       }
       catch(TimeoutException e){
          StreamLibContainer.getInstance().addLockInformation(key, experiencedContention, true);
@@ -146,10 +152,10 @@ public class LockManagerWrapper implements LockManager {
    }
 
    @Override
-   public boolean acquireLock(InvocationContext ctx, Object key, long timeoutMillis) throws InterruptedException,
+   public boolean acquireLock(InvocationContext ctx, Object key, long timeoutMillis, boolean share) throws InterruptedException,
                                                                                             TimeoutException {
       log.tracef("LockManagerWrapper.acquireLock");
-      return actual.acquireLock(ctx, key, timeoutMillis);
+      return actual.acquireLock(ctx, key, timeoutMillis, share);
    }
 
    @Override

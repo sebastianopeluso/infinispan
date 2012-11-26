@@ -34,11 +34,17 @@ import java.util.Set;
 
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
+import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.EntryVersionsMap;
+import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
+import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+
+import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
 
 /**
  * Base class for local and remote transaction. Impl note: The aggregated modification list and lookedUpEntries are not
@@ -47,6 +53,8 @@ import org.infinispan.util.logging.LogFactory;
  *
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.2
  */
 public abstract class AbstractCacheTransaction implements CacheTransaction {
@@ -67,6 +75,8 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
    final int viewId;
 
    private EntryVersionsMap updatedEntryVersions;
+
+   private EntryVersion transactionVersion;
 
    public AbstractCacheTransaction(GlobalTransaction tx, int viewId) {
       this.tx = tx;
@@ -227,5 +237,38 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
    @Override
    public boolean wasPrepareSent() {
       return false;  // no-op
+   }
+
+   public EntryVersion calculateVersionToRead(VersionGenerator versionGenerator) {
+      GMUVersionGenerator gmuVersionGenerator = toGMUVersionGenerator(versionGenerator);
+      return gmuVersionGenerator.calculateMaxVersionToRead(transactionVersion, getReadFrom());
+   }
+
+   public Collection<Object> getReadKeys() {
+      return Collections.emptyList();
+   }
+
+   public void addReadFrom(Address address) {
+      //no-op
+   }
+
+   public Set<Address> getReadFrom() {
+      return Collections.emptySet();
+   }
+
+   public void setTransactionVersion(EntryVersion version) {
+      transactionVersion = version;
+   }
+
+   public EntryVersion getTransactionVersion() {
+      return transactionVersion;
+   }
+
+   public boolean hasAlreadyReadOnThisNode() {
+      return false;
+   }
+
+   public void setAlreadyReadOnThisNode(boolean value) {
+      //no-op
    }
 }

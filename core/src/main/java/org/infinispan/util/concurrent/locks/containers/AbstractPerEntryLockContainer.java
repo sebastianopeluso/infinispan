@@ -42,21 +42,6 @@ public abstract class AbstractPerEntryLockContainer<L extends Lock> extends Abst
       locks = ConcurrentMapFactory.makeConcurrentMap(16, concurrencyLevel);
    }
 
-   protected abstract L newLock();
-
-   @Override
-   public final L getLock(Object key) {
-      // this is an optimisation.  It is not foolproof as we may still be creating new locks unnecessarily (thrown away
-      // when we do a putIfAbsent) but it minimises the chances somewhat, for the cost of an extra CHM get.
-      L lock = locks.get(key);
-      if (lock == null) {
-         lock = newLock();
-         L existingLock = locks.putIfAbsent(key, lock);
-         if (existingLock != null) lock = existingLock;
-      }
-      return lock;
-   }
-
    @Override
    public int getNumLocksHeld() {
       return locks.size();
@@ -68,24 +53,74 @@ public abstract class AbstractPerEntryLockContainer<L extends Lock> extends Abst
    }
 
    @Override
-   public L acquireLock(Object lockOwner, Object key, long timeout, TimeUnit unit) throws InterruptedException {
+   public L acquireExclusiveLock(Object lockOwner, Object key, long timeout, TimeUnit unit) throws InterruptedException {
+      return acquire(lockOwner, key, timeout, unit, false);
+   }
+
+   @Override
+   public L acquireShareLock(Object lockOwner, Object key, long timeout, TimeUnit unit) throws InterruptedException {
+      return acquire(lockOwner, key, timeout, unit, true);
+   }
+
+   @Override
+   public void releaseExclusiveLock(Object lockOwner, Object key) {
+      L l = locks.remove(key);
+      if (l != null) unlockExclusive(l, lockOwner);
+   }
+
+   @Override
+   public void releaseShareLock(Object lockOwner, Object key) {
+      L l = locks.remove(key);
+      if (l != null) unlockShare(l, lockOwner);
+   }
+
+   @Override
+   public int getLockId(Object key) {
+      return System.identityHashCode(getExclusiveLock(key));
+   }
+
+   protected abstract L newLock();
+
+   protected final L getLockFromMap(Object key, boolean putIfAbsent) {
+      // this is an optimisation.  It is not foolproof as we may still be creating new locks unnecessarily (thrown away
+      // when we do a putIfAbsent) but it minimises the chances somewhat, for the cost of an extra CHM get.
+      L lock = locks.get(key);
+      if (lock == null && putIfAbsent) {
+         lock = newLock();
+         L existingLock = locks.putIfAbsent(key, lock);
+         if (existingLock != null) lock = existingLock;
+      }
+      return lock;
+   }
+
+   private L acquire(Object lockOwner, Object key, long timeout, TimeUnit unit, boolean share) throws InterruptedException {
       while (true) {
-         L lock = getLock(key);
+         L lock = share ? getShareLock(key) : getExclusiveLock(key);
          boolean locked;
          try {
-            locked = tryLock(lock, timeout, unit, lockOwner);
+            locked = share ?
+                  tryShareLock(lock, timeout, unit, lockOwner) :
+                  tryExclusiveLock(lock, timeout, unit, lockOwner);
          } catch (InterruptedException ie) {
-            safeRelease(lock, lockOwner);
+            if (share) {
+               safeShareRelease(lock, lockOwner);
+            } else {
+               safeExclusiveRelease(lock, lockOwner);
+            }
             throw ie;
          } catch (Throwable th) {
-             locked = false;
+            locked = false;
          }
          if (locked) {
             // lock acquired.  Now check if it is the *correct* lock!
             L existingLock = locks.putIfAbsent(key, lock);
             if (existingLock != null && existingLock != lock) {
                // we have the wrong lock!  Unlock and retry.
-               safeRelease(lock, lockOwner);
+               if (share) {
+                  safeShareRelease(lock, lockOwner);
+               } else {
+                  safeExclusiveRelease(lock, lockOwner);
+               }
             } else {
                // we got the right lock.
                return lock;
@@ -95,16 +130,5 @@ public abstract class AbstractPerEntryLockContainer<L extends Lock> extends Abst
             return null;
          }
       }
-   }
-
-   @Override
-   public void releaseLock(Object lockOwner, Object key) {
-      L l = locks.remove(key);
-      if (l != null) unlock(l, lockOwner);
-   }
-
-   @Override
-   public int getLockId(Object key) {
-      return System.identityHashCode(getLock(key));
    }
 }

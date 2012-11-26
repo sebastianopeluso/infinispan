@@ -127,7 +127,7 @@ public class DistributedStateTransferManagerImpl extends BaseStateTransferManage
             ctx.setFlags(CACHE_MODE_LOCAL, SKIP_LOCKING);
             interceptorChain.invoke(ctx, invalidateCmd);
 
-            log.debugf("Invalidated %d keys, data container now has %d keys", keysToRemove.size(), dataContainer.size());
+            log.debugf("Invalidated %d keys, data container now has %d keys", keysToRemove.size(), dataContainer.size(null));
             log.tracef("Invalidated keys: %s", keysToRemove);
          }
       } catch (CacheException e) {

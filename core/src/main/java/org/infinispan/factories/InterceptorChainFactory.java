@@ -30,8 +30,12 @@ import org.infinispan.config.CustomInterceptorConfig;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.interceptors.*;
 import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.interceptors.gmu.GMUDistributionInterceptor;
+import org.infinispan.interceptors.gmu.GMUEntryWrappingInterceptor;
+import org.infinispan.interceptors.gmu.GMUReplicationInterceptor;
 import org.infinispan.interceptors.locking.NonTransactionalLockingInterceptor;
 import org.infinispan.interceptors.locking.OptimisticLockingInterceptor;
+import org.infinispan.interceptors.locking.OptimisticReadWriteLockingInterceptor;
 import org.infinispan.interceptors.locking.PessimisticLockingInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderDistributionInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderStateTransferLockInterceptor;
@@ -56,6 +60,7 @@ import java.util.List;
  * @author <a href="mailto:manik@jboss.org">Manik Surtani (manik@jboss.org)</a>
  * @author Mircea.Markus@jboss.com
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @DefaultFactoryFor(classes = InterceptorChain.class)
@@ -93,6 +98,7 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       boolean needsVersionAwareComponents = configuration.isRequireVersioning();
 
       boolean invocationBatching = configuration.isInvocationBatchingEnabled();
+      boolean serializability = configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE;
       // load the icInterceptor first
 
       CommandInterceptor first;
@@ -159,7 +165,10 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       //the total order protocol doesn't need locks
       if (!configuration.isTotalOrder()) {
          if (configuration.isTransactionalCache()) {
-            if (configuration.getTransactionLockingMode() == LockingMode.PESSIMISTIC) {
+            if (serializability) {
+               interceptorChain.appendInterceptor(createInterceptor(new OptimisticReadWriteLockingInterceptor(),
+                                                                    OptimisticReadWriteLockingInterceptor.class), false);
+            }  else if (configuration.getTransactionLockingMode() == LockingMode.PESSIMISTIC) {
                interceptorChain.appendInterceptor(createInterceptor(new PessimisticLockingInterceptor(), PessimisticLockingInterceptor.class), false);
             } else {
                interceptorChain.appendInterceptor(createInterceptor(new OptimisticLockingInterceptor(), OptimisticLockingInterceptor.class), false);
@@ -178,8 +187,12 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          } else {
             interceptorChain.appendInterceptor(createInterceptor(new VersionedEntryWrappingInterceptor(), VersionedEntryWrappingInterceptor.class), false);
          }
-      } else
+      } else if (serializability) {
+         interceptorChain.appendInterceptor(createInterceptor(new GMUEntryWrappingInterceptor(),
+                                                              GMUEntryWrappingInterceptor.class), false);
+      } else {
          interceptorChain.appendInterceptor(createInterceptor(new EntryWrappingInterceptor(), EntryWrappingInterceptor.class), false);
+      }
 
       if (configuration.isUsingCacheLoaders()) {
          if (configuration.getCacheLoaderManagerConfig().isPassivation()) {
@@ -212,7 +225,9 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
 
       switch (configuration.getCacheMode()) {
          case REPL_SYNC:
-            if (needsVersionAwareComponents) {
+            if (serializability) {
+               interceptorChain.appendInterceptor(createInterceptor(new GMUReplicationInterceptor(), GMUReplicationInterceptor.class), false);
+            } else if (needsVersionAwareComponents) {
                //added custom interceptor to replace the original
                if (configuration.isTotalOrder()) {
                   interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedReplicationInterceptor(),
@@ -233,7 +248,9 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             interceptorChain.appendInterceptor(createInterceptor(new InvalidationInterceptor(), InvalidationInterceptor.class), false);
             break;
          case DIST_SYNC:
-            if (needsVersionAwareComponents) {
+            if(serializability) {
+               interceptorChain.appendInterceptor(createInterceptor(new GMUDistributionInterceptor(), GMUDistributionInterceptor.class), false);
+            } else if (needsVersionAwareComponents) {
                if (configuration.isTotalOrder()) {
                   interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedDistributionInterceptor(),
                         TotalOrderVersionedDistributionInterceptor.class), false);

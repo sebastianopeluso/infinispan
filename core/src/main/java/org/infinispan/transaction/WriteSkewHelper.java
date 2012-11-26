@@ -91,9 +91,9 @@ public class WriteSkewHelper {
                   IncrementableEntryVersion newVersion = entry.isCreated() ? versionGenerator.generateNew() : versionGenerator.increment((IncrementableEntryVersion) entry.getVersion());
                   uv.put(k, newVersion);
                } else {
-                  InternalCacheEntry actual = dataContainer.get(entry.getKey());
+                  InternalCacheEntry actual = dataContainer.get(entry.getKey(), null);
                   // Write skew check detected!
-                  throw WriteSkewException.createException(k, dataContainer.get(k), entry, prepareCommand.getGlobalTransaction());
+                  throw WriteSkewException.createException(k, actual, entry, prepareCommand.getGlobalTransaction());
                }
             }
          }

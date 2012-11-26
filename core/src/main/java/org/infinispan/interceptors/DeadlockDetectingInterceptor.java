@@ -33,6 +33,7 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.transaction.xa.DldGlobalTransaction;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -47,6 +48,8 @@ import static java.util.Collections.emptySet;
  * Note: for local caches, deadlock detection dos NOT work for aggregate operations (clear, putAll).
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public class DeadlockDetectingInterceptor extends CommandInterceptor {
@@ -102,12 +105,21 @@ public class DeadlockDetectingInterceptor extends CommandInterceptor {
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       DldGlobalTransaction globalTransaction = (DldGlobalTransaction) ctx.getGlobalTransaction();
+      boolean useSerializable = configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE;
       if (ctx.isOriginLocal()) {
          globalTransaction.setRemoteLockIntention(command.getAffectedKeys());
+         /*
+         if(useSerializable) {
+             globalTransaction.setRemoteReadLockIntention(command.getReadSet());
+         }
+         */
       }
       Object result = invokeNextInterceptor(ctx, command);
       if (ctx.isOriginLocal()) {
          globalTransaction.setRemoteLockIntention(emptySet());
+         if(useSerializable) {
+            globalTransaction.setRemoteReadLockIntention(emptySet());
+         }
       }
       return result;
    }

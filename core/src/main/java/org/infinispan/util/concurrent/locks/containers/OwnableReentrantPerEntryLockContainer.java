@@ -39,33 +39,59 @@ public class OwnableReentrantPerEntryLockContainer extends AbstractPerEntryLockC
    }
 
    @Override
+   public boolean ownsExclusiveLock(Object key, Object owner) {
+      OwnableReentrantLock l = getLockFromMap(key, false);
+      return l != null && owner.equals(l.getOwner());
+   }
+
+   @Override
+   public boolean ownsShareLock(Object key, Object owner) {
+      return false;
+   }
+
+   @Override
+   public boolean isExclusiveLocked(Object key) {
+      OwnableReentrantLock l = getLockFromMap(key, false);
+      return l != null && l.isLocked();
+   }
+
+   @Override
+   public boolean isSharedLocked(Object key) {
+      return false;
+   }
+
+   @Override
+   public OwnableReentrantLock getExclusiveLock(Object key) {
+      return getLockFromMap(key, true);
+   }
+
+   @Override
+   public OwnableReentrantLock getShareLock(Object key) {
+      throw new UnsupportedOperationException();
+   }
+
+   @Override
    protected OwnableReentrantLock newLock() {
       return new OwnableReentrantLock();
    }
 
    @Override
-   public boolean ownsLock(Object key, Object owner) {
-      OwnableReentrantLock l = getLockFromMap(key);
-      return l != null && owner.equals(l.getOwner());
-   }
-
-   @Override
-   public boolean isLocked(Object key) {
-      OwnableReentrantLock l = getLockFromMap(key);
-      return l != null && l.isLocked();
-   }
-
-   private OwnableReentrantLock getLockFromMap(Object key) {
-      return locks.get(key);
-   }
-
-   @Override
-   protected boolean tryLock(OwnableReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
+   protected boolean tryExclusiveLock(OwnableReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
       return lock.tryLock(lockOwner, timeout, unit);
    }
 
    @Override
-   protected void unlock(OwnableReentrantLock l, Object owner) {
+   protected boolean tryShareLock(OwnableReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
+      return false;
+   }
+
+   @Override
+   protected void unlockExclusive(OwnableReentrantLock l, Object owner) {
       l.unlock(owner);
+   }
+
+   @Override
+   protected void unlockShare(OwnableReentrantLock toRelease, Object ctx) {
+      throw new UnsupportedOperationException();
    }
 }

@@ -43,7 +43,7 @@ public class ClusteredRepeatableReadEntry extends RepeatableReadEntry {
    }
 
    public boolean performWriteSkewCheck(DataContainer container) {
-      InternalCacheEntry ice = container.get(key);
+      InternalCacheEntry ice = container.get(key, null);
       if (ice == null) {
          log.tracef("Entry for key '%s' doesn't exist in the container and current version is %s", key, version);
          return version == null;

@@ -23,6 +23,7 @@
 
 package org.infinispan.interceptors.locking;
 
+import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.config.Configuration;
 import org.infinispan.container.DataContainer;
@@ -38,6 +39,7 @@ import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.transaction.gmu.GMUHelper;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -71,6 +73,14 @@ public interface ClusteringDependentLogic {
 
    EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand);
    
+   /**
+    * performs the read set validation
+    *
+    * @param context          the transaction context
+    * @param prepareCommand   the prepare command    
+    */
+   void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand);
+
    Address getAddress();
 
 
@@ -135,6 +145,13 @@ public interface ClusteringDependentLogic {
          }
          updateLocalModeCacheEntries(versionGenerator, prepareCommand, context);
          return null;
+      }
+
+      @Override
+      public void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand) {
+         if (rpcManager.getTransport().isCoordinator()) {
+            GMUHelper.performReadSetValidation(prepareCommand, dataContainer, this);
+         }
       }
    }
 
@@ -210,6 +227,11 @@ public interface ClusteringDependentLogic {
          updateLocalModeCacheEntries(versionGenerator, prepareCommand, context);
          return (uv.isEmpty()) ? null : uv;
       }
+
+      @Override
+      public void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand) {
+         GMUHelper.performReadSetValidation(prepareCommand, dataContainer, this);
+      }
    }
 
    /**
@@ -274,6 +296,11 @@ public interface ClusteringDependentLogic {
       @Override
       public Address getAddress() {
          return rpcManager.getAddress();
+      }
+
+      @Override
+      public void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand) {
+         GMUHelper.performReadSetValidation(prepareCommand, dataContainer, this);
       }
    }
 
@@ -347,6 +374,11 @@ public interface ClusteringDependentLogic {
       @Override
       public Address getAddress() {
          return rpcManager.getAddress();
+      }
+
+      @Override
+      public void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand) {
+         GMUHelper.performReadSetValidation(prepareCommand, dataContainer, this);
       }
    }
 }

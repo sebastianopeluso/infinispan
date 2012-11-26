@@ -83,7 +83,7 @@ public class PessimisticLockingInterceptor extends AbstractTxLockingInterceptor 
    public final Object visitGetKeyValueCommand(InvocationContext ctx, GetKeyValueCommand command) throws Throwable {
       try {
          if (ctx.hasFlag(Flag.FORCE_WRITE_LOCK)) {
-            lockKeyAndCheckOwnership(ctx, command.getKey());
+            lockKeyAndCheckOwnership(ctx, command.getKey(), false);
          }
          return invokeNextInterceptor(ctx, command);
       } catch (Throwable t) {
@@ -112,7 +112,7 @@ public class PessimisticLockingInterceptor extends AbstractTxLockingInterceptor 
          final boolean localNodeOwnsLock = cdl.localNodeIsPrimaryOwner(command.getKey());
          acquireRemoteIfNeeded(ctx, command.getKey(), localNodeOwnsLock);
          if (ctx.hasFlag(Flag.SKIP_OWNERSHIP_CHECK) || localNodeOwnsLock) {
-            lockKeyAndCheckOwnership(ctx, command.getKey());
+            lockKeyAndCheckOwnership(ctx, command.getKey(), false);
          } else if (cdl.localNodeIsOwner(command.getKey())) {
             txContext.getCacheTransaction().addBackupLockForKey(command.getKey());
          }
@@ -186,7 +186,7 @@ public class PessimisticLockingInterceptor extends AbstractTxLockingInterceptor 
    @Override
    public Object visitClearCommand(InvocationContext ctx, ClearCommand command) throws Throwable {
       try {
-         for (InternalCacheEntry entry : dataContainer.entrySet())
+         for (InternalCacheEntry entry : dataContainer.entrySet(null))
             lockAndRegisterBackupLock((TxInvocationContext) ctx, entry.getKey());
          return invokeNextInterceptor(ctx, command);
       } catch (Throwable te) {
@@ -277,7 +277,7 @@ public class PessimisticLockingInterceptor extends AbstractTxLockingInterceptor 
 
    protected final void lockAndRegisterBackupLock(TxInvocationContext ctx, Object key, boolean isLockOwner) throws InterruptedException {
       if (isLockOwner) {
-         lockKeyAndCheckOwnership(ctx, key);
+         lockKeyAndCheckOwnership(ctx, key, false);
       } else if (cdl.localNodeIsOwner(key)) {
          ctx.getCacheTransaction().addBackupLockForKey(key);
       }

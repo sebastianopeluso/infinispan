@@ -21,6 +21,7 @@ package org.infinispan.factories;
 
 import org.infinispan.container.EntryFactory;
 import org.infinispan.container.EntryFactoryImpl;
+import org.infinispan.container.GMUEntryFactoryImpl;
 import org.infinispan.container.IncrementalVersionableEntryFactoryImpl;
 import org.infinispan.container.InternalEntryFactory;
 import org.infinispan.container.InternalEntryFactoryImpl;
@@ -29,6 +30,12 @@ import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.util.concurrent.IsolationLevel;
 
+/**
+ * Original authors are missing...
+ * 
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
+ */
 @DefaultFactoryFor(classes = {EntryFactory.class, InternalEntryFactory.class})
 public class EntryMetaFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
@@ -40,7 +47,9 @@ public class EntryMetaFactory extends AbstractNamedCacheComponentFactory impleme
       boolean useVersioning = configuration.isRequireVersioning();
 
       if (componentType.equals(EntryFactory.class)) {
-         if (useVersioning)
+         if (configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
+            return (T) new GMUEntryFactoryImpl();
+         } else if (useVersioning)
             return (T) new IncrementalVersionableEntryFactoryImpl();
          else
             return (T) new EntryFactoryImpl();

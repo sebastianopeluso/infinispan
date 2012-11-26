@@ -41,6 +41,8 @@ import java.util.concurrent.ConcurrentMap;
  * {@link TransactionTable} to be used with {@link TransactionXaAdapter}.
  *
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.0
  */
 public class XaTransactionTable extends TransactionTable {
@@ -113,6 +115,8 @@ public class XaTransactionTable extends TransactionTable {
             log.error("Failed to enlist TransactionXaAdapter to transaction", e);
             throw new CacheException(e);
          }
+         //initiates the vector clock for serializability
+         localTransaction.setTransactionVersion(commitLog.getCurrentVersion());
       }
    }
 

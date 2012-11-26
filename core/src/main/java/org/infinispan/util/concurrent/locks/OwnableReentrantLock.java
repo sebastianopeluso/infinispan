@@ -61,7 +61,7 @@ public class OwnableReentrantLock extends AbstractQueuedSynchronizer implements 
       return cr;
    }
 
-   private void setCurrentRequestor(Object requestor) {
+   protected void setCurrentRequestor(Object requestor) {
       requestorOnStack.set(requestor);
    }
 
@@ -194,6 +194,10 @@ public class OwnableReentrantLock extends AbstractQueuedSynchronizer implements 
       return getState() != 0;
    }
 
+   protected void resetState() {
+      setState(0);
+   }
+
    /**
     * Reconstitute this lock instance from a stream, resetting the lock to an unlocked state.
     *
@@ -202,7 +206,7 @@ public class OwnableReentrantLock extends AbstractQueuedSynchronizer implements 
    private void readObject(java.io.ObjectInputStream s)
          throws java.io.IOException, ClassNotFoundException {
       s.defaultReadObject();
-      setState(0); // reset to unlocked state
+      resetState();
    }
 
    /**

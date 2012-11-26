@@ -28,6 +28,8 @@ package org.infinispan.marshall;
  * defined, externalizers.
  *
  * @author Galder Zamarreño
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public interface Ids {
@@ -107,4 +109,5 @@ public interface Ids {
    int VERSIONED_TRANSIENT_VALUE = 82;
    int VERSIONED_TRANSIENT_MORTAL_VALUE = 83;
    int LOCK_INFO = 84;
+   int INTERNAL_MVCC_ENTRY = 85;
 }

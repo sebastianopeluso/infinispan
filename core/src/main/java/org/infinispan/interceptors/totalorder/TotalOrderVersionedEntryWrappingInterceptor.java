@@ -128,7 +128,7 @@ public class TotalOrderVersionedEntryWrappingInterceptor extends VersionedEntryW
          }
 
          if(!clusterMvccEntry.performWriteSkewCheck(dataContainer)) {
-            throw WriteSkewException.createException(mvccEntry.getKey(), dataContainer.get(mvccEntry.getKey()),
+            throw WriteSkewException.createException(mvccEntry.getKey(), dataContainer.get(mvccEntry.getKey(), null),
                                                      mvccEntry, prepareCommand.getGlobalTransaction());
          }
          return clusterMvccEntry;

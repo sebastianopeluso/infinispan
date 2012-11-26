@@ -43,13 +43,13 @@ public class ReentrantPerEntryLockContainer extends AbstractPerEntryLockContaine
    }
 
    @Override
-   public boolean ownsLock(Object key, Object ignored) {
+   public boolean ownsExclusiveLock(Object key, Object ignored) {
       ReentrantLock l = getLockFromMap(key);
       return l != null && l.isHeldByCurrentThread();
    }
 
    @Override
-   public boolean isLocked(Object key) {
+   public boolean isExclusiveLocked(Object key) {
       ReentrantLock l = getLockFromMap(key);
       return l != null && l.isLocked();
    }
@@ -59,12 +59,27 @@ public class ReentrantPerEntryLockContainer extends AbstractPerEntryLockContaine
    }
 
    @Override
-   protected void unlock(ReentrantLock l, Object unused) {
+   protected void unlockExclusive(ReentrantLock l, Object unused) {
       l.unlock();
    }
 
    @Override
-   protected boolean tryLock(ReentrantLock lock, long timeout, TimeUnit unit, Object unused) throws InterruptedException {
+   protected boolean tryExclusiveLock(ReentrantLock lock, long timeout, TimeUnit unit, Object unused) throws InterruptedException {
       return lock.tryLock(timeout, unit);
+   }
+
+   @Override
+   protected void unlockShare(ReentrantLock toRelease, Object owner) {
+      //no-op
+   }
+
+   @Override
+   protected boolean tryShareLock(ReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
+      throw new UnsupportedOperationException();
+   }
+
+   @Override
+   public ReentrantLock getExclusiveLock(Object key) {
+      return getLockFromMap(key);
    }
 }

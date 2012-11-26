@@ -608,7 +608,10 @@ public final class Util {
       for (WriteCommand wc: modifications) {
          switch (wc.getCommandId()) {
             case ClearCommand.COMMAND_ID:
-               set.addAll(dataContainer.keySet());
+               if (dataContainer == null) {
+                  return null;
+               }
+               set.addAll(dataContainer.keySet(null));
                break;
             case PutKeyValueCommand.COMMAND_ID:
             case RemoveCommand.COMMAND_ID:

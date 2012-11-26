@@ -60,8 +60,8 @@ public class TreeStructureHashCodeTest {
       for (Fqn f : fqns) {
          NodeKey dataKey = new NodeKey(f, NodeKey.Type.DATA);
          NodeKey structureKey = new NodeKey(f, NodeKey.Type.STRUCTURE);
-         addToDistribution(container.getLock(dataKey), distribution);
-         addToDistribution(container.getLock(structureKey), distribution);
+         addToDistribution(container.getExclusiveLock(dataKey), distribution);
+         addToDistribution(container.getExclusiveLock(structureKey), distribution);
       }
 
       System.out.println("Distribution: " + distribution);

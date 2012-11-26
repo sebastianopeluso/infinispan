@@ -57,7 +57,7 @@ public class ReentrantStripedLockContainer extends AbstractStripedLockContainer<
    }
 
    @Override
-   public final ReentrantLock getLock(Object object) {
+   public final ReentrantLock getExclusiveLock(Object object) {
       return sharedLocks[hashToIndex(object)];
    }
 
@@ -77,14 +77,14 @@ public class ReentrantStripedLockContainer extends AbstractStripedLockContainer<
    }
 
    @Override
-   public final boolean ownsLock(Object object, Object ignored) {
-      ReentrantLock lock = getLock(object);
+   public final boolean ownsExclusiveLock(Object object, Object ignored) {
+      ReentrantLock lock = getExclusiveLock(object);
       return lock.isHeldByCurrentThread();
    }
 
    @Override
-   public final boolean isLocked(Object object) {
-      ReentrantLock lock = getLock(object);
+   public final boolean isExclusiveLocked(Object object) {
+      ReentrantLock lock = getExclusiveLock(object);
       return lock.isLocked();
    }
 
@@ -95,12 +95,22 @@ public class ReentrantStripedLockContainer extends AbstractStripedLockContainer<
    }
 
    @Override
-   protected void unlock(ReentrantLock l, Object unused) {
+   protected void unlockExclusive(ReentrantLock l, Object unused) {
       l.unlock();
    }
 
    @Override
-   protected boolean tryLock(ReentrantLock lock, long timeout, TimeUnit unit, Object unused) throws InterruptedException {
+   protected void unlockShare(ReentrantLock toRelease, Object owner) {
+      //no-op
+   }
+
+   @Override
+   protected boolean tryExclusiveLock(ReentrantLock lock, long timeout, TimeUnit unit, Object unused) throws InterruptedException {
       return lock.tryLock(timeout, unit);
+   }
+
+   @Override
+   protected boolean tryShareLock(ReentrantLock lock, long timeout, TimeUnit unit, Object lockOwner) throws InterruptedException {
+      throw new UnsupportedOperationException();
    }
 }
