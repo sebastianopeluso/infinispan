@@ -1,5 +1,6 @@
 package org.infinispan.tx.gmu;
 
+import org.infinispan.Cache;
 import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.infinispan.configuration.cache.VersioningScheme;
@@ -9,6 +10,7 @@ import org.infinispan.test.MultipleCacheManagersTest;
 import org.infinispan.util.concurrent.IsolationLevel;
 
 import javax.transaction.SystemException;
+import javax.transaction.TransactionManager;
 import java.util.Map;
 
 import static junit.framework.Assert.assertEquals;
@@ -94,11 +96,11 @@ public abstract class AbstractGMUTest extends MultipleCacheManagersTest {
 
    protected final void put(int cacheIndex, Object key, Object value, Object returnValue) {
       txPut(cacheIndex, key, value, returnValue);
-      assertCachesValue(cacheIndex, key, value);      
+      assertCachesValue(cacheIndex, key, value);
    }
-   
+
    protected final void txPut(int cacheIndex, Object key, Object value, Object returnValue) {
-      Object oldValue = cache(cacheIndex).put(key, value);      
+      Object oldValue = cache(cacheIndex).put(key, value);
       assertEquals(returnValue, oldValue);
    }
 
@@ -138,10 +140,18 @@ public abstract class AbstractGMUTest extends MultipleCacheManagersTest {
       assertCachesValue(cacheIndex, key, returnValue);
       assertEquals(result, success);
    }
-   
+
    protected final void safeRollback(int cacheIndex) {
       try {
          tm(cacheIndex).rollback();
+      } catch (Exception e) {
+         log.warn("Exception suppressed when rollback: " + e.getMessage());
+      }
+   }
+
+   protected final void safeRollback(TransactionManager transactionManager) {
+      try {
+         transactionManager.rollback();
       } catch (Exception e) {
          log.warn("Exception suppressed when rollback: " + e.getMessage());
       }

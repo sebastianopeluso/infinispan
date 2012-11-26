@@ -1,5 +1,6 @@
 package org.infinispan.tx.gmu;
 
+import org.infinispan.Cache;
 import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.testng.annotations.Test;
@@ -17,6 +18,9 @@ import static junit.framework.Assert.assertEquals;
  */
 @Test(groups = "functional", testName = "tx.gmu.ConsistencyTest")
 public class ConsistencyTest extends AbstractGMUTest {
+
+   private static final String COUNTER_1 = "counter_1";
+   private static final String COUNTER_2 = "counter_2";
 
    public void testGetSnapshot() throws Exception {
       assertAtLeastCaches(2);
@@ -116,6 +120,48 @@ public class ConsistencyTest extends AbstractGMUTest {
       assertNoTransactions();
    }
 
+   public void testConcurrentWritesAndReads() throws InterruptedException {
+      assertAtLeastCaches(2);
+      assertCacheValuesNull(COUNTER_1, COUNTER_2);
+      put(0, COUNTER_1, 0, null);
+      put(0, COUNTER_2, 0, null);
+
+      ReadWriteThread[] readWriteThreads = new ReadWriteThread[2];
+      readWriteThreads[0] = new ReadWriteThread("Writer-0", cache(0));
+      readWriteThreads[1] = new ReadWriteThread("Writer-1", cache(1));
+
+      ReadOnlyThread[] readOnlyThreads = new ReadOnlyThread[2];
+      readOnlyThreads[0] = new ReadOnlyThread("Reader-0", cache(0));
+      readOnlyThreads[1] = new ReadOnlyThread("Reader-1", cache(1));
+
+      for (ReadOnlyThread readOnlyThread : readOnlyThreads) {
+         readOnlyThread.start();
+      }
+
+      for (ReadWriteThread readWriteThread : readWriteThreads) {
+         readWriteThread.start();
+      }
+
+      for (ReadWriteThread readWriteThread : readWriteThreads) {
+         readWriteThread.join();
+      }
+
+      for (ReadOnlyThread readOnlyThread : readOnlyThreads) {
+         readOnlyThread.join();
+      }
+
+      for (ReadWriteThread readWriteThread : readWriteThreads) {
+         assert !readWriteThread.error : "Error occurred in " + readWriteThread.getName();
+      }
+
+      for (ReadOnlyThread readOnlyThread : readOnlyThreads) {
+         assert !readOnlyThread.error : "Error occurred in " + readOnlyThread.getName();
+      }
+
+      printDataContainer();
+      assertNoTransactions();
+   }
+
    @Override
    protected void decorate(ConfigurationBuilder builder) {
       //no-op
@@ -134,5 +180,113 @@ public class ConsistencyTest extends AbstractGMUTest {
    @Override
    protected CacheMode cacheMode() {
       return CacheMode.REPL_SYNC;
+   }
+
+   private static boolean isEquals(Integer c1, Integer c2) {
+      return c1 == null ? c2 == null : c2.equals(c2);
+   }
+
+   private class ReadOnlyThread extends Thread {
+
+      private final Cache cache;
+      private final TransactionManager transactionManager;
+      private boolean run;
+      private boolean error;
+
+      private ReadOnlyThread(String threadName, Cache cache) {
+         super(threadName);
+         this.cache = cache;
+         this.transactionManager = cache.getAdvancedCache().getTransactionManager();
+         this.run = true;
+         this.error = false;
+      }
+
+      @Override
+      public void run() {
+         while (run) {
+            if (!consistentRead()) {
+               error = false;
+               break;
+            }
+         }
+      }
+
+      @Override
+      public void interrupt() {
+         run = false;
+         super.interrupt();
+      }
+
+      private boolean consistentRead() {
+         try {
+            transactionManager.begin();
+            Integer c1 = (Integer) cache.get(COUNTER_1);
+            Integer c2 = (Integer) cache.get(COUNTER_2);
+            transactionManager.commit();
+            return isEquals(c1, c2);
+         } catch (Exception e) {
+            return false;
+         }
+      }
+   }
+
+   private class ReadWriteThread extends Thread {
+
+      private final Cache cache;
+      private final TransactionManager transactionManager;
+      private boolean run;
+      private boolean error;
+
+      private ReadWriteThread(String threadName, Cache cache) {
+         super(threadName);
+         this.cache = cache;
+         this.transactionManager = cache.getAdvancedCache().getTransactionManager();
+         this.run = true;
+         this.error = false;
+      }
+
+      @Override
+      public void run() {
+         while (run && !error) {
+            if (!consistentIncrement()) {
+               error = false;
+               break;
+            }
+         }
+      }
+
+      @SuppressWarnings("unchecked")
+      private boolean consistentIncrement() {
+         try {
+            transactionManager.begin();
+            Integer c1 = (Integer) cache.get(COUNTER_1);
+            Integer c2 = (Integer) cache.get(COUNTER_2);
+
+            if (!isEquals(c1, c2)) {
+               error = false;
+               transactionManager.rollback();
+               return false;
+            }
+
+            if (c1 == null) {
+               c1 = 1;
+               c2 = 1;
+            } if (c1.equals(1000)) {
+               run = false;
+               transactionManager.commit();
+               return true;
+            } else {
+               c1++;
+               c2++;
+            }
+
+            cache.put(COUNTER_1, c1);
+            cache.put(COUNTER_2, c2);
+            transactionManager.commit();
+         } catch (Exception e) {
+            safeRollback(transactionManager);
+         }
+         return true;
+      }
    }
 }
