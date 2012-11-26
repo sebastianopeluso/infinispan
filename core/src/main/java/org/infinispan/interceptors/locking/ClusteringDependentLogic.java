@@ -23,8 +23,10 @@
 
 package org.infinispan.interceptors.locking;
 
+import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.commands.tx.totalorder.TotalOrderPrepareCommand;
+import org.infinispan.commands.write.ClearCommand;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.container.DataContainer;
@@ -43,10 +45,15 @@ import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferManager;
+import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.WriteSkewHelper;
+import org.infinispan.transaction.gmu.GMUHelper;
 import org.infinispan.transaction.xa.CacheTransaction;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.infinispan.transaction.WriteSkewHelper.performTotalOrderWriteSkewCheckAndReturnNewVersions;
 import static org.infinispan.transaction.WriteSkewHelper.performWriteSkewCheckAndReturnNewVersions;
@@ -71,11 +78,23 @@ public interface ClusteringDependentLogic {
 
    void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck, InvocationContext ctx);
 
-   Collection<Address> getOwners(Collection<Object> keys);
+   Collection<Address> getInvolvedNodes(CacheTransaction cacheTransaction);
 
    EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand);
    
+   /**
+    * performs the read set validation
+    *
+    * @param context          the transaction context
+    * @param prepareCommand   the prepare command    
+    */
+   void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand);
+
    Address getAddress();
+
+   Collection<Address> getOwners(Set<Object> affectedKeys);
+
+   Collection<Address> getWriteOwners(CacheTransaction cacheTransaction);
 
    public static abstract class AbstractClusteringDependentLogic implements ClusteringDependentLogic {
 
@@ -165,12 +184,17 @@ public interface ClusteringDependentLogic {
       }
 
       @Override
-      public Collection<Address> getOwners(Collection<Object> keys) {
+      public Address getAddress() {
          return null;
       }
 
       @Override
-      public Address getAddress() {
+      public Collection<Address> getOwners(Set<Object> affectedKeys) {
+         return null;
+      }
+
+      @Override
+      public Collection<Address> getWriteOwners(CacheTransaction cacheTransaction) {
          return null;
       }
 
@@ -189,7 +213,17 @@ public interface ClusteringDependentLogic {
       }
 
       @Override
+      public Collection<Address> getInvolvedNodes(CacheTransaction cacheTransaction) {
+         return null;
+      }
+
+      @Override
       public EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand) {
+         throw new IllegalStateException("Cannot invoke this method for local caches");
+      }
+
+      @Override
+      public void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand) {
          throw new IllegalStateException("Cannot invoke this method for local caches");
       }
    }
@@ -245,13 +279,23 @@ public interface ClusteringDependentLogic {
       }
 
       @Override
-      public Collection<Address> getOwners(Collection<Object> keys) {
-         return null;    //todo [anistor] should I actually return this based on current CH?
+      public Collection<Address> getInvolvedNodes(CacheTransaction cacheTransaction) {
+         return null;
       }
-      
+
+      @Override
+      public Collection<Address> getWriteOwners(CacheTransaction cacheTransaction) {
+         return null;
+      }
+
       @Override
       public Address getAddress() {
          return rpcManager.getAddress();
+      }
+
+      @Override
+      public Collection<Address> getOwners(Set<Object> affectedKeys) {
+         return null;            
       }
 
       @Override
@@ -272,6 +316,13 @@ public interface ClusteringDependentLogic {
             context.getCacheTransaction().setUpdatedEntryVersions(new EntryVersionsMap());
          }
          return null;
+      }
+
+      @Override
+      public void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand) {
+         if (rpcManager.getTransport().isCoordinator()) {
+            GMUHelper.performReadSetValidation(prepareCommand, dataContainer, this);
+         }
       }
    }
 
@@ -346,6 +397,11 @@ public interface ClusteringDependentLogic {
       }
 
       @Override
+      public Collection<Address> getOwners(Set<Object> affectedKeys) {
+         return dm.getAffectedNodes(affectedKeys);
+      }
+
+      @Override
       public boolean localNodeIsPrimaryOwner(Object key) {
          final Address address = rpcManager.getAddress();
          return dm.getPrimaryLocation(key).equals(address);
@@ -398,8 +454,18 @@ public interface ClusteringDependentLogic {
       }
 
       @Override
-      public Collection<Address> getOwners(Collection<Object> keys) {
-         return dm.getAffectedNodes(keys);
+      public Collection<Address> getInvolvedNodes(CacheTransaction cacheTransaction) {
+         Set<Address> involvedNodes = new HashSet<Address>();
+         if (cacheTransaction instanceof LocalTransaction) {
+            involvedNodes.addAll(((LocalTransaction) cacheTransaction).getRemoteLocksAcquired());
+         }
+         Collection<Address> writeOwners = getWriteOwners(cacheTransaction);
+         if (writeOwners != null) {
+            involvedNodes.addAll(writeOwners);
+         }
+         Collection<Address> readOwners = getReadOwners(cacheTransaction);
+         involvedNodes.addAll(readOwners);
+         return involvedNodes;
       }
 
       @Override
@@ -420,6 +486,31 @@ public interface ClusteringDependentLogic {
          }
          cacheTransaction.setUpdatedEntryVersions(uv);
          return (uv.isEmpty()) ? null : uv;
+      }
+
+      @Override
+      public void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand) {
+         GMUHelper.performReadSetValidation(prepareCommand, dataContainer, this);
+      }
+
+      @Override
+      public Collection<Address> getWriteOwners(CacheTransaction cacheTransaction) {
+         if (cacheTransaction.hasModification(ClearCommand.class)) {
+            return null;
+         }
+         Set<Object> affectedKeys = new HashSet<Object>();
+         for (WriteCommand writeCommand : cacheTransaction.getModifications()) {
+            affectedKeys.addAll(writeCommand.getAffectedKeys());
+         }
+         return dm.getAffectedNodes(affectedKeys);
+      }
+
+      private Collection<Address> getReadOwners(CacheTransaction cacheTransaction) {
+         Collection<Object> readKeys = cacheTransaction.getReadKeys();
+         if (readKeys == null) {
+            return Collections.emptyList();
+         }
+         return dm.getAffectedNodes(readKeys);
       }
    }
 }

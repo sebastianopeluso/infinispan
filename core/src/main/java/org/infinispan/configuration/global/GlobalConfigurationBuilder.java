@@ -42,6 +42,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
    private final ExecutorFactoryConfigurationBuilder asyncTransportExecutor;
    private final ExecutorFactoryConfigurationBuilder asyncListenerExecutor;
    private final ExecutorFactoryConfigurationBuilder totalOrderExecutor;
+   private final ExecutorFactoryConfigurationBuilder gmuExecutor;
    private final ScheduledExecutorFactoryConfigurationBuilder evictionScheduledExecutor;
    private final ScheduledExecutorFactoryConfigurationBuilder replicationQueueScheduledExecutor;
    private final ShutdownConfigurationBuilder shutdown;
@@ -61,6 +62,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
       this.site = new SiteConfigurationBuilder(this);
       //set a new executor by default, that allows to set the core number of threads and the keep alive time
       this.totalOrderExecutor = new ExecutorFactoryConfigurationBuilder(this);
+      gmuExecutor = new ExecutorFactoryConfigurationBuilder(this);
    }
 
    /**
@@ -172,11 +174,15 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
       return totalOrderExecutor;
    }
 
+   public ExecutorFactoryConfigurationBuilder gmuExecutor() {
+      return gmuExecutor;
+   }
+
    @SuppressWarnings("unchecked")
    public void validate() {
       for (AbstractGlobalConfigurationBuilder<?> validatable : asList(asyncListenerExecutor, asyncTransportExecutor,
             evictionScheduledExecutor, replicationQueueScheduledExecutor, globalJmxStatistics, transport,
-            serialization, shutdown, site, totalOrderExecutor)) {
+            serialization, shutdown, site, totalOrderExecutor, gmuExecutor)) {
          validatable.validate();
       }
       for (Builder<?> m : modules) {
@@ -202,8 +208,8 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
             modulesConfig,
             site.create(),
             cl,
-            totalOrderExecutor.create()
-            );
+            totalOrderExecutor.create(),
+            gmuExecutor.create());
    }
 
    public GlobalConfigurationBuilder read(GlobalConfiguration template) {
@@ -225,6 +231,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
       transport.read(template.transport());
       site.read(template.sites());
       totalOrderExecutor.read(template.totalOrderExecutor());
+      gmuExecutor.read(template.gmuExecutor());
       return this;
    }
 
@@ -253,6 +260,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
             ", shutdown=" + shutdown +
             ", site=" + site +
             ", totalOrderExecutor=" + totalOrderExecutor +
+            ", gmuExecutor=" + gmuExecutor +
             '}';
    }
 
@@ -282,6 +290,9 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
          return false;
       if (transport != null ? !transport.equals(that.transport) : that.transport != null)
          return false;
+      if (gmuExecutor != null ? !gmuExecutor.equals(that.gmuExecutor) : that.gmuExecutor != null) {
+         return false;
+      }
 
       return !(totalOrderExecutor != null ? !totalOrderExecutor.equals(that.totalOrderExecutor()) : that.totalOrderExecutor != null);
    }
@@ -299,6 +310,7 @@ public class GlobalConfigurationBuilder implements GlobalConfigurationChildBuild
       result = 31 * result + (shutdown != null ? shutdown.hashCode() : 0);
       result = 31 * result + (site != null ? site.hashCode() : 0);
       result = 31 * result + (totalOrderExecutor != null ? totalOrderExecutor().hashCode() : 0);
+      result = 31 * result + (gmuExecutor != null ? gmuExecutor.hashCode() : 0);
       return result;
    }
 

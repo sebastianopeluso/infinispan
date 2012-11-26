@@ -37,7 +37,7 @@ import java.util.Map;
  */
 public class DataPlacementCommand extends BaseRpcCommand {
 
-   public static final short COMMAND_ID = 102;
+   public static final short COMMAND_ID = 40;
    private static final Log log = LogFactory.getLog(DataPlacementCommand.class);
    private DataPlacementManager dataPlacementManager;
    //message data

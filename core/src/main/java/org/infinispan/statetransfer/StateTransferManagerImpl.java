@@ -24,6 +24,7 @@
 package org.infinispan.statetransfer;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +35,7 @@ import org.infinispan.commands.TopologyAffectedCommand;
 import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.global.GlobalConfiguration;
+import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.dataplacement.ch.DataPlacementConsistentHashFactory;
 import org.infinispan.distribution.ch.*;
 import org.infinispan.distribution.group.GroupManager;
@@ -73,6 +75,7 @@ public class StateTransferManagerImpl implements StateTransferManager {
    private RpcManager rpcManager;
    private GroupManager groupManager;   // optional
    private LocalTopologyManager localTopologyManager;
+   private VersionGenerator versionGenerator;
 
    private final CountDownLatch initialStateTransferComplete = new CountDownLatch(1);
 
@@ -88,7 +91,8 @@ public class StateTransferManagerImpl implements StateTransferManager {
                     GlobalConfiguration globalConfiguration,
                     RpcManager rpcManager,
                     GroupManager groupManager,
-                    LocalTopologyManager localTopologyManager) {
+                    LocalTopologyManager localTopologyManager,
+                    VersionGenerator versionGenerator) {
       this.stateConsumer = stateConsumer;
       this.stateProvider = stateProvider;
       this.cacheName = cache.getName();
@@ -98,6 +102,7 @@ public class StateTransferManagerImpl implements StateTransferManager {
       this.rpcManager = rpcManager;
       this.groupManager = groupManager;
       this.localTopologyManager = localTopologyManager;
+      this.versionGenerator = versionGenerator;
    }
 
    // needs to be AFTER the DistributionManager and *after* the cache loader manager (if any) inits and preloads
@@ -120,12 +125,25 @@ public class StateTransferManagerImpl implements StateTransferManager {
       localTopologyManager.join(cacheName, joinInfo, new CacheTopologyHandler() {
          @Override
          public void updateConsistentHash(CacheTopology cacheTopology) {
+            if (versionGenerator != null) {
+               versionGenerator.addCacheTopology(cacheTopology);
+            }
             doTopologyUpdate(cacheTopology, false);
          }
 
          @Override
          public void rebalance(CacheTopology cacheTopology) {
+            if (versionGenerator != null) {
+               versionGenerator.addCacheTopology(cacheTopology);
+            }
             doTopologyUpdate(cacheTopology, true);
+         }
+
+         @Override
+         public void addInitialCacheTopologyHistory(List<CacheTopology> cacheTopologyHistory) {
+            if (versionGenerator != null) {
+               versionGenerator.updateCacheTopology(cacheTopologyHistory);
+            }
          }
       });
    }

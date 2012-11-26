@@ -37,6 +37,8 @@ import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
+import org.infinispan.commands.remote.GMUClusteredGetCommand;
+import org.infinispan.commands.remote.GarbageCollectorControlCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
@@ -44,9 +46,13 @@ import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
+import org.infinispan.commands.tx.GMUCommitCommand;
+import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.totalorder.TotalOrderCommitCommand;
+import org.infinispan.commands.tx.totalorder.TotalOrderGMUCommitCommand;
+import org.infinispan.commands.tx.totalorder.TotalOrderGMUPrepareCommand;
 import org.infinispan.commands.tx.totalorder.TotalOrderNonVersionedPrepareCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
@@ -68,6 +74,8 @@ import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.InternalEntryFactory;
 import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.dataplacement.DataPlacementManager;
@@ -90,6 +98,9 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.StateTransferManager;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
+import org.infinispan.transaction.gmu.CommitLog;
+import org.infinispan.transaction.gmu.manager.GarbageCollectorManager;
+import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.xa.DldGlobalTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.transaction.xa.recovery.RecoveryManager;
@@ -100,6 +111,7 @@ import org.infinispan.xsite.BackupSender;
 import org.infinispan.xsite.XSiteAdminCommand;
 
 import javax.transaction.xa.Xid;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -111,6 +123,8 @@ import java.util.concurrent.Callable;
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
  * @author Sanne Grinovero <sanne@hibernate.org> (C) 2011 Red Hat Inc.
+ * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public class CommandsFactoryImpl implements CommandsFactory {
@@ -147,6 +161,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
    private DataPlacementManager dataPlacementManager;
 
    private Map<Byte, ModuleCommandInitializer> moduleCommandInitializers;
+   private CommitLog commitLog;
+   private VersionGenerator versionGenerator;
+   private GarbageCollectorManager garbageCollectorManager;
+   private TransactionCommitManager transactionCommitManager;
 
    @Inject
    public void setupDependencies(DataContainer container, CacheNotifier notifier, Cache<Object, Object> cache,
@@ -156,7 +174,8 @@ public class CommandsFactoryImpl implements CommandsFactory {
                                  RecoveryManager recoveryManager, StateProvider stateProvider, StateConsumer stateConsumer,
                                  LockManager lockManager, InternalEntryFactory entryFactory, MapReduceManager mapReduceManager,
                                  StateTransferManager stm, BackupSender backupSender, CancellationService cancellationService,
-                                 DataPlacementManager dataPlacementManager) {
+                                 DataPlacementManager dataPlacementManager, CommitLog commitLog, VersionGenerator versionGenerator,
+                                 GarbageCollectorManager garbageCollectorManager, TransactionCommitManager transactionCommitManager) {
       this.dataContainer = container;
       this.notifier = notifier;
       this.cache = cache;
@@ -176,6 +195,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
       this.backupSender = backupSender;
       this.cancellationService = cancellationService;
       this.dataPlacementManager = dataPlacementManager;
+      this.commitLog = commitLog;
+      this.versionGenerator = versionGenerator;
+      this.garbageCollectorManager = garbageCollectorManager;
+      this.transactionCommitManager = transactionCommitManager;
    }
 
    @Start(priority = 1)
@@ -369,10 +392,12 @@ public class CommandsFactoryImpl implements CommandsFactory {
             InvalidateL1Command ilc = (InvalidateL1Command) c;
             ilc.init(configuration, distributionManager, notifier, dataContainer);
             break;
+         case GMUPrepareCommand.COMMAND_ID:
          case PrepareCommand.COMMAND_ID:
          case VersionedPrepareCommand.COMMAND_ID:
          case TotalOrderNonVersionedPrepareCommand.COMMAND_ID:
          case TotalOrderVersionedPrepareCommand.COMMAND_ID:
+         case TotalOrderGMUPrepareCommand.COMMAND_ID:
             PrepareCommand pc = (PrepareCommand) c;
             pc.init(interceptorChain, icc, txTable);
             pc.initialize(notifier, recoveryManager);
@@ -386,6 +411,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
                transaction.setLocksHeldAtOrigin(pc.getAffectedKeys());
             }
             break;
+         case GMUCommitCommand.COMMAND_ID:
+         case TotalOrderGMUCommitCommand.COMMAND_ID:
+            GMUCommitCommand gmuCommitCommand = (GMUCommitCommand) c;
+            gmuCommitCommand.setTransactionCommitManager(transactionCommitManager);
          case CommitCommand.COMMAND_ID:
          case VersionedCommitCommand.COMMAND_ID:
          case TotalOrderCommitCommand.COMMAND_ID:
@@ -404,6 +433,9 @@ public class CommandsFactoryImpl implements CommandsFactory {
             ClearCommand cc = (ClearCommand) c;
             cc.init(notifier);
             break;
+         case GMUClusteredGetCommand.COMMAND_ID:
+            GMUClusteredGetCommand gmuClusteredGetCommand = (GMUClusteredGetCommand) c;
+            gmuClusteredGetCommand.initializeGMUComponents(commitLog, versionGenerator);
          case ClusteredGetCommand.COMMAND_ID:
             ClusteredGetCommand clusteredGetCommand = (ClusteredGetCommand) c;
             clusteredGetCommand.initialize(icc, this, entryFactory, interceptorChain, distributionManager, txTable);
@@ -479,6 +511,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
          case DataPlacementCommand.COMMAND_ID:
             DataPlacementCommand dataPlacementRequestCommand = (DataPlacementCommand)c;
             dataPlacementRequestCommand.initialize(dataPlacementManager);
+            break;
+         case GarbageCollectorControlCommand.COMMAND_ID:
+            GarbageCollectorControlCommand gccc = (GarbageCollectorControlCommand) c;
+            gccc.init(garbageCollectorManager);
             break;
          default:
             ModuleCommandInitializer mci = moduleCommandInitializers.get(c.getCommandId());
@@ -591,5 +627,30 @@ public class CommandsFactoryImpl implements CommandsFactory {
    @Override
    public DataPlacementCommand buildDataPlacementCommand(DataPlacementCommand.Type type, long roundId) {
       return new DataPlacementCommand(cacheName, type, roundId);
+   }
+
+   @Override
+   public GMUPrepareCommand buildGMUPrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications,
+                                                   boolean onePhaseCommit) {
+      return totalOrderProtocol ? new TotalOrderGMUPrepareCommand(cacheName, gtx, modifications, onePhaseCommit) :
+            new GMUPrepareCommand(cacheName, gtx, modifications, onePhaseCommit);
+   }
+
+   @Override
+   public GMUCommitCommand buildGMUCommitCommand(GlobalTransaction gtx) {
+      return totalOrderProtocol ? new TotalOrderGMUCommitCommand(cacheName, gtx) : new GMUCommitCommand(cacheName, gtx);
+   }
+
+   @Override
+   public GMUClusteredGetCommand buildGMUClusteredGetCommand(Object key, Set<Flag> flags, boolean acquireRemoteLock,
+                                                             GlobalTransaction gtx, GMUVersion txVersion,
+                                                             BitSet alreadyReadFromMask) {
+      return new GMUClusteredGetCommand(key, cacheName, flags, acquireRemoteLock, gtx, txVersion, alreadyReadFromMask);
+   }
+
+   @Override
+   public GarbageCollectorControlCommand buildGarbageCollectorControlCommand(GarbageCollectorControlCommand.Type type,
+                                                                             int minimumVisibleViewId) {
+      return new GarbageCollectorControlCommand(cacheName, type, minimumVisibleViewId);
    }
 }

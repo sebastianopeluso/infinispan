@@ -61,6 +61,7 @@ public class GlobalConfiguration {
    private final ExecutorFactoryConfiguration asyncListenerExecutor;
    private final ExecutorFactoryConfiguration asyncTransportExecutor;
    private final ExecutorFactoryConfiguration totalOrderExecutor;
+   private final ExecutorFactoryConfiguration gmuExecutor;
    private final ScheduledExecutorFactoryConfiguration evictionScheduledExecutor;
    private final ScheduledExecutorFactoryConfiguration replicationQueueScheduledExecutor;
    private final GlobalJmxStatisticsConfiguration globalJmxStatistics;
@@ -72,10 +73,10 @@ public class GlobalConfiguration {
    private final ClassLoader cl;
 
    GlobalConfiguration(ExecutorFactoryConfiguration asyncListenerExecutor,
-         ExecutorFactoryConfiguration asyncTransportExecutor, ScheduledExecutorFactoryConfiguration evictionScheduledExecutor,
-         ScheduledExecutorFactoryConfiguration replicationQueueScheduledExecutor, GlobalJmxStatisticsConfiguration globalJmxStatistics,
-         TransportConfiguration transport, SerializationConfiguration serialization, ShutdownConfiguration shutdown,
-         List<?> modules, SiteConfiguration site,ClassLoader cl, ExecutorFactoryConfiguration totalOrderExecutor) {
+                       ExecutorFactoryConfiguration asyncTransportExecutor, ScheduledExecutorFactoryConfiguration evictionScheduledExecutor,
+                       ScheduledExecutorFactoryConfiguration replicationQueueScheduledExecutor, GlobalJmxStatisticsConfiguration globalJmxStatistics,
+                       TransportConfiguration transport, SerializationConfiguration serialization, ShutdownConfiguration shutdown,
+                       List<?> modules, SiteConfiguration site, ClassLoader cl, ExecutorFactoryConfiguration totalOrderExecutor, ExecutorFactoryConfiguration gmuExecutor) {
       this.asyncListenerExecutor = asyncListenerExecutor;
       this.asyncTransportExecutor = asyncTransportExecutor;
       this.evictionScheduledExecutor = evictionScheduledExecutor;
@@ -84,6 +85,7 @@ public class GlobalConfiguration {
       this.transport = transport;
       this.serialization = serialization;
       this.shutdown = shutdown;
+      this.gmuExecutor = gmuExecutor;
       Map<Class<?>, Object> moduleMap = new HashMap<Class<?>, Object>();
       for(Object module : modules) {
          moduleMap.put(module.getClass(), module);
@@ -161,10 +163,15 @@ public class GlobalConfiguration {
             ", site=" + site +
             ", cl=" + cl +
             ", totalOrderExecutor=" + totalOrderExecutor +
+            ", gmuExecutor=" + gmuExecutor +
             '}';
    }
 
    public ExecutorFactoryConfiguration totalOrderExecutor() {
       return totalOrderExecutor;
+   }
+
+   public ExecutorFactoryConfiguration gmuExecutor() {
+      return gmuExecutor;
    }
 }

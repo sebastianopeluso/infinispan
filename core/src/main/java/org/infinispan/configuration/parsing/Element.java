@@ -91,6 +91,8 @@ public enum Element {
     TAKE_OFFLINE("takeOffline"),
     TOTAL_ORDER_EXECUTOR("totalOrderExecutor"),
     DATA_PLACEMENT("dataPlacement"),
+    GARBAGE_COLLECTOR("garbageCollector"),
+    GMU_EXECUTOR("gmuExecutor"),
     ;
 
     private final String name;
