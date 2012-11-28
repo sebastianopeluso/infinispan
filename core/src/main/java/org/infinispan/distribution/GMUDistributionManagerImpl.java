@@ -22,7 +22,6 @@
  */
 package org.infinispan.distribution;
 
-import org.infinispan.commands.FlagAffectedCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
@@ -31,7 +30,7 @@ import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContext;
-import org.infinispan.context.impl.LocalTxInvocationContext;
+import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.jmx.annotations.MBean;
@@ -41,6 +40,7 @@ import org.infinispan.remoting.responses.SuccessfulResponse;
 import org.infinispan.remoting.rpc.ResponseFilter;
 import org.infinispan.remoting.rpc.ResponseMode;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -66,6 +66,7 @@ public class GMUDistributionManagerImpl extends DistributionManagerImpl {
    private static final Log log = LogFactory.getLog(GMUDistributionManagerImpl.class);
 
    private GMUVersionGenerator versionGenerator;
+   private CommitLog commitLog;
 
    /**
     * Default constructor
@@ -73,18 +74,24 @@ public class GMUDistributionManagerImpl extends DistributionManagerImpl {
    public GMUDistributionManagerImpl() {}
 
    @Inject
-   public void setVersionGenerator(VersionGenerator versionGenerator) {
+   public void setVersionGeneratorAndCommitLog(VersionGenerator versionGenerator, CommitLog commitLog) {
       this.versionGenerator = toGMUVersionGenerator(versionGenerator);
+      this.commitLog = commitLog;
    }
 
    @Override
    public InternalCacheEntry retrieveFromRemoteSource(Object key, InvocationContext ctx, boolean acquireRemoteLock) throws Exception {
-      if (!ctx.isInTxScope()) {
-         throw new IllegalStateException("Only handles transaction context");
+      if (ctx instanceof SingleKeyNonTxInvocationContext) {
+         return retrieveSingleKeyFromRemoteSource(key, (SingleKeyNonTxInvocationContext) ctx);
+      } else if (ctx instanceof TxInvocationContext) {
+         return retrieveTransactionalGetFromRemoteSource(key, (TxInvocationContext) ctx, acquireRemoteLock);
       }
+      throw new IllegalStateException("Only handles transaction context or single key gets");
+   }
 
-      TxInvocationContext txInvocationContext = convert(ctx, TxInvocationContext.class);
-      GlobalTransaction gtx = acquireRemoteLock ? ((TxInvocationContext)ctx).getGlobalTransaction() : null;
+   private InternalCacheEntry retrieveTransactionalGetFromRemoteSource(Object key, TxInvocationContext txInvocationContext,
+                                                                       boolean acquireRemoteLock) {
+      GlobalTransaction gtx = acquireRemoteLock ? txInvocationContext.getGlobalTransaction() : null;
 
       List<Address> targets = new ArrayList<Address>(locate(key));
       // if any of the recipients has left the cluster since the command was issued, just don't wait for its response
@@ -96,7 +103,8 @@ public class GMUDistributionManagerImpl extends DistributionManagerImpl {
       EntryVersion maxVersionToRead = versionGenerator.calculateMaxVersionToRead(transactionVersion, alreadyReadFrom);
       EntryVersion minVersionToRead = versionGenerator.calculateMinVersionToRead(transactionVersion, alreadyReadFrom);
 
-      ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, ctx.getFlags(), acquireRemoteLock, gtx, minVersionToRead, maxVersionToRead, null);
+      ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, txInvocationContext.getFlags(), acquireRemoteLock,
+                                                               gtx, minVersionToRead, maxVersionToRead, null);
 
       if(log.isDebugEnabled()) {
          log.debugf("Perform a remote get for transaction %s. Key: %s, minVersion: %s, maxVersion: %s",
@@ -107,16 +115,10 @@ public class GMUDistributionManagerImpl extends DistributionManagerImpl {
       Map<Address, Response> responses = rpcManager.invokeRemotely(targets, get, ResponseMode.WAIT_FOR_VALID_RESPONSE,
                                                                    configuration.getSyncReplTimeout(), true, filter, false);
 
-      if(ctx.isInTxScope()) {
-         if(log.isDebugEnabled()) {
-            log.debugf("Remote get done for transaction %s [key:%s]. response are: %s",
-                       ((LocalTxInvocationContext) ctx).getGlobalTransaction().prettyPrint(),
-                       key, responses);
-         }
-      } else {
-         if(log.isDebugEnabled()) {
-            log.debugf("Remote get done for non-transaction context [key:%s]. response are: %s", key, responses);
-         }
+      if(log.isDebugEnabled()) {
+         log.debugf("Remote get done for transaction %s [key:%s]. response are: %s",
+                    txInvocationContext.getGlobalTransaction().prettyPrint(),
+                    key, responses);
       }
 
       if (!responses.isEmpty()) {
@@ -135,7 +137,59 @@ public class GMUDistributionManagerImpl extends DistributionManagerImpl {
 
                if(log.isDebugEnabled()) {
                   log.debugf("Remote Get successful for transaction %s and key %s. Return value is %s",
-                             ((LocalTxInvocationContext) ctx).getGlobalTransaction().prettyPrint(), key, gmuCacheValue);
+                             txInvocationContext.getGlobalTransaction().prettyPrint(), key, gmuCacheValue);
+               }
+               return gmuCacheEntry;
+            }
+         }
+      }
+
+      // TODO If everyone returned null, and the read CH has changed, retry the remote get.
+      // Otherwise our get command might be processed by the old owners after they have invalidated their data
+      // and we'd return a null even though the key exists on
+      return null;
+   }
+
+   private InternalCacheEntry retrieveSingleKeyFromRemoteSource(Object key, SingleKeyNonTxInvocationContext ctx) {
+      List<Address> targets = new ArrayList<Address>(locate(key));
+      // if any of the recipients has left the cluster since the command was issued, just don't wait for its response
+      targets.retainAll(rpcManager.getTransport().getMembers());
+
+      EntryVersion maxVersionToRead = versionGenerator.calculateMaxVersionToRead(null, null);
+      EntryVersion minVersionToRead = versionGenerator.calculateMinVersionToRead(commitLog.getCurrentVersion(), null);
+
+      ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, ctx.getFlags(), false, null,
+                                                               minVersionToRead, maxVersionToRead, null);
+
+      if(log.isDebugEnabled()) {
+         log.debugf("Perform a single remote get. Key: %s, minVersion: %s, maxVersion: %s", key, minVersionToRead,
+                    maxVersionToRead);
+      }
+
+      ResponseFilter filter = new ClusteredGetResponseValidityFilter(targets, getAddress());
+      Map<Address, Response> responses = rpcManager.invokeRemotely(targets, get, ResponseMode.WAIT_FOR_VALID_RESPONSE,
+                                                                   configuration.getSyncReplTimeout(), true, filter, false);
+
+      if(log.isDebugEnabled()) {
+         log.debugf("Remote get done for single key [key:%s]. response are: %s", key, responses);
+      }
+
+
+      if (!responses.isEmpty()) {
+         for (Map.Entry<Address,Response> entry : responses.entrySet()) {
+            Response r = entry.getValue();
+            if (r == null) {
+               continue;
+            }
+            if (r instanceof SuccessfulResponse) {
+               InternalGMUCacheValue gmuCacheValue = convert(((SuccessfulResponse) r).getResponseValue(),
+                                                             InternalGMUCacheValue.class);
+
+               InternalGMUCacheEntry gmuCacheEntry = (InternalGMUCacheEntry) gmuCacheValue.toInternalCacheEntry(key);
+               ctx.addKeyReadInCommand(key, gmuCacheEntry);
+
+               if(log.isDebugEnabled()) {
+                  log.debugf("Remote Get successful for single key %s. Return value is %s",key, gmuCacheValue);
                }
                return gmuCacheEntry;
             }

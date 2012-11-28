@@ -113,7 +113,12 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
          log.tracef("DataContainer.put(%s,%s,%s,%s,%s), correct version is %s", k, v, version, lifespan, maxIdle, maxVersion);
       }
 
-      chain.add(entryFactory.create(k, v, version, lifespan, maxIdle));
+      chain.add(entryFactory.create(k, v, maxVersion, lifespan, maxIdle));
+      if (log.isTraceEnabled()) {
+         StringBuilder stringBuilder = new StringBuilder();
+         chain.chainToString(stringBuilder);
+         log.tracef("Updated chain is %s", stringBuilder);
+      }
    }
 
    @Override
@@ -268,9 +273,10 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
    private static InternalCacheEntry wrap(Object key, InternalCacheEntry entry, boolean mostRecent,
                                           EntryVersion maxTxVersion) {
       if (entry == null || entry.isNull()) {
-         return new InternalGMUNullCacheEntry(key, (entry == null ? null : entry.getVersion()), null, maxTxVersion, null, mostRecent);
+         return new InternalGMUNullCacheEntry(key, (entry == null ? null : entry.getVersion()), maxTxVersion, mostRecent, null, null
+         );
       }
-      return new InternalGMUValueCacheEntry(entry, null, maxTxVersion, null, mostRecent);
+      return new InternalGMUValueCacheEntry(entry, maxTxVersion, mostRecent, null, null);
    }
 
    private class GMUEntryIterator extends EntryIterator {

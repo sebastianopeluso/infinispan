@@ -19,6 +19,8 @@
 
 package org.infinispan.cacheviews;
 
+import java.util.List;
+
 /**
  * Callback interface for installing views on a cache.
  *
@@ -26,7 +28,7 @@ package org.infinispan.cacheviews;
  * will implement this interface and add itself as a cache view listener in order to transfer cache state
  * to the new owners during the prepare phase.
  *
- * The view is installed in two phases, so every {@link #prepareView(CacheView,CacheView)}
+ * The view is installed in two phases, so every {@link #prepareView(CacheView, CacheView, java.util.List)}
  * call will be followed either by a {@link #commitView(int)} or a {@link #rollbackView(int, int)}.
  *
  * @author Dan Berindei &lt;dan@infinispan.org&gt;
@@ -36,7 +38,7 @@ public interface CacheViewListener {
    /**
     * Called after preparing a cache view.
     */
-   void prepareView(CacheView newView, CacheView oldView) throws Exception;
+   void prepareView(CacheView newView, CacheView oldView, List<CacheView> viewHistory) throws Exception;
 
    /**
     * Called before committing a cache view.

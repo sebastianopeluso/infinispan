@@ -4,6 +4,14 @@ import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.InternalCacheValue;
 import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.marshall.AbstractExternalizer;
+import org.infinispan.marshall.Ids;
+import org.infinispan.util.Util;
+
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+import java.util.Set;
 
 /**
  * // TODO: Document this
@@ -19,8 +27,8 @@ public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
    private final EntryVersion maxValidVersion;
    private final boolean mostRecent;
 
-   public InternalGMUValueCacheEntry(InternalCacheEntry internalCacheEntry, EntryVersion creationVersion,
-                                     EntryVersion maxTxVersion, EntryVersion maxValidVersion, boolean mostRecent) {
+   public InternalGMUValueCacheEntry(InternalCacheEntry internalCacheEntry, EntryVersion maxTxVersion,
+                                     boolean mostRecent, EntryVersion creationVersion, EntryVersion maxValidVersion) {
       this.internalCacheEntry = internalCacheEntry;
       this.creationVersion = creationVersion;
       this.maxTxVersion = maxTxVersion;
@@ -85,7 +93,8 @@ public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
 
    @Override
    public InternalCacheValue toInternalCacheValue() {
-      return new InternalGMUValueCacheValue(internalCacheEntry.toInternalCacheValue(), creationVersion, maxTxVersion, maxValidVersion, mostRecent);
+      return new InternalGMUValueCacheValue(internalCacheEntry.toInternalCacheValue(), maxTxVersion, mostRecent,
+                                            creationVersion, maxValidVersion);
    }
 
    @Override
@@ -248,5 +257,38 @@ public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
             ", maxValidVersion=" + maxValidVersion +
             ", mostRecent=" + mostRecent +
             '}';
+   }
+
+   public static class Externalizer extends AbstractExternalizer<InternalGMUValueCacheEntry> {
+
+      @Override
+      public Set<Class<? extends InternalGMUValueCacheEntry>> getTypeClasses() {
+         return Util.<Class<? extends InternalGMUValueCacheEntry>>asSet(InternalGMUValueCacheEntry.class);
+      }
+
+      @Override
+      public void writeObject(ObjectOutput output, InternalGMUValueCacheEntry object) throws IOException {
+         output.writeObject(object.internalCacheEntry);
+         output.writeObject(object.creationVersion);
+         output.writeObject(object.maxTxVersion);
+         output.writeObject(object.maxValidVersion);
+         output.writeBoolean(object.mostRecent);
+      }
+
+      @Override
+      public InternalGMUValueCacheEntry readObject(ObjectInput input) throws IOException, ClassNotFoundException {
+         InternalCacheEntry internalCacheEntry = (InternalCacheEntry) input.readObject();
+         EntryVersion creationVersion = (EntryVersion) input.readObject();
+         EntryVersion maxTxVersion = (EntryVersion) input.readObject();
+         EntryVersion maxValidVersion = (EntryVersion) input.readObject();
+         boolean mostRecent = input.readBoolean();
+         return new InternalGMUValueCacheEntry(internalCacheEntry, maxTxVersion, mostRecent, creationVersion, maxValidVersion
+         );
+      }
+
+      @Override
+      public Integer getId() {
+         return Ids.INTERNAL_GMU_ENTRY;
+      }
    }
 }

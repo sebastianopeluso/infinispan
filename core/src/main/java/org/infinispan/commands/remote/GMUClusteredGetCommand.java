@@ -29,7 +29,6 @@ import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.GMUEntryVersion;
-import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.transaction.gmu.CommitLog;
@@ -37,11 +36,9 @@ import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.util.Collections;
 import java.util.Set;
 
 import static org.infinispan.transaction.gmu.GMUHelper.toGMUEntryVersion;
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
 
 /**
  * Issues a remote get call.  This is not a {@link org.infinispan.commands.VisitableCommand} and hence not passed up the
@@ -76,14 +73,6 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
       super(key, cacheName, flags, acquireRemoteLock, gtx);
    }
 
-   public GMUClusteredGetCommand(Object key, String cacheName) {
-      this(key, cacheName, Collections.<Flag>emptySet(), false, null);
-   }
-
-   public GMUClusteredGetCommand(String key, String cacheName, Set<Flag> flags) {
-      this(key, cacheName, flags, false, null);
-   }
-
    public GMUClusteredGetCommand(Object key, String cacheName, Set<Flag> flags, boolean acquireRemoteLock,
                                  GlobalTransaction globalTransaction, EntryVersion minVersion, EntryVersion maxVersion) {
       super(key,  cacheName, flags, acquireRemoteLock, globalTransaction);
@@ -92,9 +81,6 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    }
 
    public void initializeGMUComponents(CommitLog commitLog, VersionGenerator versionGenerator, Configuration configuration) {
-      GMUVersionGenerator gmuVersionGenerator = toGMUVersionGenerator(versionGenerator);
-      toGMUEntryVersion(minVersion).init(gmuVersionGenerator);
-      toGMUEntryVersion(maxVersion).init(gmuVersionGenerator);
       this.commitLog = commitLog;
       this.configuration = configuration;
    }
@@ -107,12 +93,17 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
       GMUEntryVersion minGMUVersion = toGMUEntryVersion(minVersion);
       GMUEntryVersion maxGMUVersion = toGMUEntryVersion(maxVersion);
 
-      long timeout = configuration.getSyncReplTimeout();
+      long timeout = configuration.getSyncReplTimeout() / 2;
 
-      boolean alreadyReadOnThisNode = maxGMUVersion.getThisNodeVersionValue() == GMUEntryVersion.NON_EXISTING;
+      boolean alreadyReadOnThisNode = maxGMUVersion != null &&
+            maxGMUVersion.getThisNodeVersionValue() == GMUEntryVersion.NON_EXISTING;
       context.setAlreadyReadOnThisNode(alreadyReadOnThisNode);
+      context.setVersionToRead(maxGMUVersion);
 
       if(!alreadyReadOnThisNode){
+         if (minGMUVersion == null) {
+            throw new NullPointerException("Min Version cannot be null");
+         }
          try {
             if(!commitLog.waitForVersion(minGMUVersion, timeout)) {
                log.warnf("Receive remote get request, but the value wanted is not available. key: %s," +
@@ -128,6 +119,9 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
 
    @Override
    protected InternalCacheValue invoke(GetKeyValueCommand command, InvocationContext context) {
+      if (context == null) {
+         return null;
+      }
       super.invoke(command, context);
       InternalGMUCacheEntry gmuCacheEntry = context.getKeysReadInCommand().get(getKey());
       return gmuCacheEntry == null ? null : gmuCacheEntry.toInternalCacheValue();
@@ -153,8 +147,8 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    public void setParameters(int commandId, Object[] args) {
       int index = args.length - 3;
       super.setParameters(commandId, args);
-      minVersion = (GMUEntryVersion) args[index++];
-      maxVersion = (GMUEntryVersion) args[index];
+      minVersion = (EntryVersion) args[index++];
+      maxVersion = (EntryVersion) args[index];
    }
 
 

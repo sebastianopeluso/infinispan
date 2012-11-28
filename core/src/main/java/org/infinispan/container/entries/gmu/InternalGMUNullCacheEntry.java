@@ -3,6 +3,8 @@ package org.infinispan.container.entries.gmu;
 import org.infinispan.container.entries.InternalCacheValue;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.marshall.AbstractExternalizer;
+import org.infinispan.marshall.Ids;
+import org.infinispan.util.Util;
 
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -22,8 +24,8 @@ public class InternalGMUNullCacheEntry extends InternalGMURemovedCacheEntry {
    private final EntryVersion maxValidVersion;
    private final EntryVersion maxTxVersion;
 
-   public InternalGMUNullCacheEntry(Object key, EntryVersion version, EntryVersion creationVersion,
-                                    EntryVersion maxValidVersion, EntryVersion maxTxVersion, boolean mostRecent) {
+   public InternalGMUNullCacheEntry(Object key, EntryVersion version, EntryVersion maxTxVersion, boolean mostRecent,
+                                    EntryVersion creationVersion, EntryVersion maxValidVersion) {
       super(key, version);
       this.creationVersion = creationVersion;
       this.maxValidVersion = maxValidVersion;
@@ -41,7 +43,7 @@ public class InternalGMUNullCacheEntry extends InternalGMURemovedCacheEntry {
 
    @Override
    public InternalCacheValue toInternalCacheValue() {
-      return new InternalGMUNullCacheValue(getVersion(), mostRecent, creationVersion, maxValidVersion, maxTxVersion);
+      return new InternalGMUNullCacheValue(getVersion(), maxTxVersion, mostRecent, creationVersion, maxValidVersion);
    }
 
    @Override
@@ -81,17 +83,33 @@ public class InternalGMUNullCacheEntry extends InternalGMURemovedCacheEntry {
 
       @Override
       public Set<Class<? extends InternalGMUNullCacheEntry>> getTypeClasses() {
-         return null;  // TODO: Customise this generated block
+         return Util.<Class<? extends InternalGMUNullCacheEntry>>asSet(InternalGMUNullCacheEntry.class);
       }
 
       @Override
       public void writeObject(ObjectOutput output, InternalGMUNullCacheEntry object) throws IOException {
-         // TODO: Customise this generated block
+         output.writeObject(object.getKey());
+         output.writeObject(object.getVersion());
+         output.writeObject(object.creationVersion);
+         output.writeObject(object.maxTxVersion);
+         output.writeObject(object.maxValidVersion);
+         output.writeBoolean(object.mostRecent);
       }
 
       @Override
       public InternalGMUNullCacheEntry readObject(ObjectInput input) throws IOException, ClassNotFoundException {
-         return null;  // TODO: Customise this generated block
+         Object key = input.readObject();
+         EntryVersion version = (EntryVersion) input.readObject();
+         EntryVersion creationVersion = (EntryVersion) input.readObject();
+         EntryVersion maxTxVersion = (EntryVersion) input.readObject();
+         EntryVersion maxValidVersion = (EntryVersion) input.readObject();
+         boolean mostRecent = input.readBoolean();
+         return new InternalGMUNullCacheEntry(key, version, maxTxVersion, mostRecent, creationVersion, maxValidVersion);
+      }
+
+      @Override
+      public Integer getId() {
+         return Ids.INTERNAL_GMU_NULL_ENTRY;
       }
    }
 }

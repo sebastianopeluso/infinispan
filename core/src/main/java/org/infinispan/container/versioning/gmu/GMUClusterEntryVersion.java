@@ -2,9 +2,17 @@ package org.infinispan.container.versioning.gmu;
 
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.InequalVersionComparisonResult;
+import org.infinispan.factories.GlobalComponentRegistry;
+import org.infinispan.marshall.AbstractExternalizer;
+import org.infinispan.marshall.Ids;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.util.Util;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.Arrays;
+import java.util.Set;
 
 /**
  * // TODO: Document this
@@ -16,19 +24,19 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
 
    private final long[] versions;
 
-   public GMUClusterEntryVersion(long viewId, GMUVersionGenerator versionGenerator) {
-      super(viewId, versionGenerator);
-      versions = new long[clusterSnapshot.size()];
-      Arrays.fill(versions, NON_EXISTING);
-   }
-
-   public GMUClusterEntryVersion(long viewId, GMUVersionGenerator versionGenerator, long[] versions) {
-      super(viewId, versionGenerator);
+   public GMUClusterEntryVersion(String cacheName, int viewId, GMUVersionGenerator versionGenerator, long[] versions) {
+      super(cacheName, viewId, versionGenerator);
       if (versions.length != clusterSnapshot.size()) {
          throw new IllegalArgumentException("Version vector (size " + versions.length + ") has not the expected size " +
                                                   clusterSnapshot.size());
       }
       this.versions = Arrays.copyOf(versions, clusterSnapshot.size());
+   }
+
+   private GMUClusterEntryVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, Address localAddress,
+                                  long[] versions) {
+      super(cacheName, viewId, clusterSnapshot, localAddress);
+      this.versions = versions;
    }
 
    @Override
@@ -38,7 +46,7 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
 
    @Override
    public long getVersionValue(int addressIndex) {
-      return validIndex(addressIndex) ? NON_EXISTING : versions[addressIndex];
+      return validIndex(addressIndex) ? versions[addressIndex] : NON_EXISTING;
    }
 
    @Override
@@ -102,45 +110,55 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
       return index >= 0 && index < versions.length;
    }
 
-   private String versionsToString() {
-      if (versions == null || versions.length == 0) {
-         return "[]";
-      }
-
-      StringBuilder stringBuilder = new StringBuilder();
-      if (clusterSnapshot == null) {
-         if (versions.length == 1) {
-            return "[" + versions[0] + "]";
-         } else {
-            stringBuilder.append("[");
-            for (long v : versions) {
-               stringBuilder.append(v)
-                     .append(",");
-            }
-            stringBuilder.replace(stringBuilder.length() - 2, stringBuilder.length() - 1, "]");
-            return stringBuilder.toString();
-         }
-      }
-      if (versions.length == 1) {
-         return "[" + clusterSnapshot.get(0) + "=" + versions[0] + "]";
-      } else {
-         stringBuilder.append("[");
-         int idx = 0;
-         for (long v : versions) {
-            stringBuilder.append(clusterSnapshot.get(idx++))
-                  .append("=")
-                  .append(v)
-                  .append(",");
-         }
-         stringBuilder.replace(stringBuilder.length() - 2, stringBuilder.length() - 1, "]");
-         return stringBuilder.toString();
-      }
-   }
-
    @Override
    public String toString() {
       return "GMUClusterEntryVersion{" +
-            "versions=" + versionsToString() +
+            "versions=" + versionsToString(versions, clusterSnapshot) +
             ", " + super.toString();
+   }
+
+   public static class Externalizer extends AbstractExternalizer<GMUClusterEntryVersion> {
+
+      private final GlobalComponentRegistry globalComponentRegistry;
+
+      public Externalizer(GlobalComponentRegistry globalComponentRegistry) {
+         this.globalComponentRegistry = globalComponentRegistry;
+      }
+
+      @SuppressWarnings("unchecked")
+      @Override
+      public Set<Class<? extends GMUClusterEntryVersion>> getTypeClasses() {
+         return Util.<Class<? extends GMUClusterEntryVersion>>asSet(GMUClusterEntryVersion.class);
+      }
+
+      @Override
+      public void writeObject(ObjectOutput output, GMUClusterEntryVersion object) throws IOException {
+         output.writeUTF(object.cacheName);
+         output.writeInt(object.viewId);
+         for (long v : object.versions) {
+            output.writeLong(v);
+         }
+      }
+
+      @Override
+      public GMUClusterEntryVersion readObject(ObjectInput input) throws IOException, ClassNotFoundException {
+         String cacheName = input.readUTF();
+         GMUVersionGenerator gmuVersionGenerator = getGMUVersionGenerator(globalComponentRegistry, cacheName);
+         int viewId = input.readInt();
+         ClusterSnapshot clusterSnapshot = gmuVersionGenerator.getClusterSnapshot(viewId);
+         if (clusterSnapshot == null) {
+            throw new IllegalArgumentException("View Id " + viewId + " not found in this node");
+         }
+         long[] versions = new long[clusterSnapshot.size()];
+         for (int i = 0; i < versions.length; ++i) {
+            versions[i] = input.readLong();
+         }
+         return new GMUClusterEntryVersion(cacheName, viewId, clusterSnapshot, gmuVersionGenerator.getAddress(), versions);
+      }
+
+      @Override
+      public Integer getId() {
+         return Ids.GMU_CLUSTER_VERSION;
+      }
    }
 }

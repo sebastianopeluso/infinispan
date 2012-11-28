@@ -46,6 +46,11 @@ public class SortedTransactionQueue {
          }
 
          @Override
+         public boolean isCommitted() {
+            return false;
+         }
+
+         @Override
          public GlobalTransaction getGlobalTransaction() {
             throw new IllegalStateException("Cannot return the global transaction from the first node");
          }
@@ -86,6 +91,11 @@ public class SortedTransactionQueue {
 
          @Override
          public void committed() {}
+
+         @Override
+         public String toString() {
+            return "FIRST_ENTRY";
+         }
       };
 
       this.lastEntry = new Node() {
@@ -101,6 +111,11 @@ public class SortedTransactionQueue {
 
          @Override
          public boolean isReady() {
+            return false;
+         }
+
+         @Override
+         public boolean isCommitted() {
             return false;
          }
 
@@ -145,6 +160,11 @@ public class SortedTransactionQueue {
 
          @Override
          public void committed() {}
+
+         @Override
+         public String toString() {
+            return "LAST_ENTRY";
+         }
       };
 
       firstEntry.setNext(lastEntry);
@@ -180,6 +200,7 @@ public class SortedTransactionQueue {
    }
 
    public final synchronized void populateToCommit(List<TransactionEntry> transactionEntryList) throws InterruptedException {
+      removeCommitted();
       while (!firstEntry.getNext().isReady()) {
          if (log.isTraceEnabled()) {
             log.tracef("get transactions to commit. First is not ready! %s", firstEntry.getNext());
@@ -236,18 +257,31 @@ public class SortedTransactionQueue {
 
    private void commitUntil(Node exclusive, List<TransactionEntry> transactionEntryList) {
       Node transaction = firstEntry.getNext();
-      exclusive.getPrevious().setNext(null);
-      exclusive.setPrevious(firstEntry);
 
-      while (transaction != null) {
-         concurrentHashMap.remove(transaction.getGlobalTransaction());
+      while (transaction != exclusive) {
          transactionEntryList.add(transaction);
-         transaction.getPrevious().setNext(null);
-         transaction.setPrevious(null);
          transaction = transaction.getNext();
       }
+   }
 
-      firstEntry.setNext(exclusive);
+   private void removeCommitted() {
+      Node node = firstEntry.getNext();
+      while (node != lastEntry) {
+         if (node.isCommitted()) {
+            node = node.getNext();
+         } else {
+            break;
+         }
+      }
+      Node newFirst = node;
+      node = newFirst.getPrevious();
+      while (node != firstEntry) {
+         node.getNext().setPrevious(null);
+         node.setNext(null);
+         node = node.getPrevious();
+      }
+      firstEntry.setNext(newFirst);
+      newFirst.setPrevious(firstEntry);
    }
 
    private synchronized void update(Node entry, GMUEntryVersion commitVersion) {
@@ -370,6 +404,11 @@ public class SortedTransactionQueue {
          return ready;
       }
 
+      @Override
+      public synchronized boolean isCommitted() {
+         return committed;
+      }
+
       public GlobalTransaction getGlobalTransaction() {
          return cacheTransaction.getGlobalTransaction();
       }
@@ -382,20 +421,33 @@ public class SortedTransactionQueue {
          if (commitCommand != null) {
             commitCommand.sendReply(null, false);
          }
+         notifyAll();
       }
 
       @Override
       public synchronized void awaitUntilCommitted(GMUCommitCommand commitCommand) throws InterruptedException {
+         if (log.isTraceEnabled()) {
+            log.tracef("await until this [%s] is committed.");
+         }
          if (committed && commitCommand != null) {
             commitCommand.sendReply(null, false);
+            if (log.isTraceEnabled()) {
+               log.tracef("Done! This [%s] is committed.");
+            }
             return;
          }
          if (commitCommand != null) {
             this.commitCommand = commitCommand;
+            if (log.isTraceEnabled()) {
+               log.tracef("Don't wait. It is remote. Reply will be sent when this [%s] is committed.");
+            }
             return;
          }
          while (!committed) {
             wait();
+         }
+         if (log.isTraceEnabled()) {
+            log.tracef("Done! This [%s] is committed.");
          }
       }
 
@@ -461,6 +513,7 @@ public class SortedTransactionQueue {
       void commitVersion(GMUEntryVersion commitCommand);
       GMUEntryVersion getVersion();
       boolean isReady();
+      boolean isCommitted();
       GlobalTransaction getGlobalTransaction();
 
       Node getPrevious();

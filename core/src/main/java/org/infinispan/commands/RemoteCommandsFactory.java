@@ -34,6 +34,7 @@ import org.infinispan.commands.read.MapReduceCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
+import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.PrepareResponseCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
@@ -229,11 +230,15 @@ public class RemoteCommandsFactory {
                break;
             case DataPlacementCommand.COMMAND_ID:
                command = new DataPlacementCommand(cacheName);
+               break;
             case GMUPrepareCommand.COMMAND_ID:
                command = new GMUPrepareCommand(cacheName);
                break;
             case GMUCommitCommand.COMMAND_ID:
                command = new GMUCommitCommand(cacheName);
+               break;
+            case GMUClusteredGetCommand.COMMAND_ID:
+               command = new GMUClusteredGetCommand(cacheName);
                break;
             default:
                throw new CacheException("Unknown command id " + id + "!");

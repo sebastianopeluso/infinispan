@@ -10,6 +10,7 @@ import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.context.InvocationContextFlagsOverride;
 import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.transaction.gmu.CommitLog;
@@ -63,9 +64,6 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
          versionToRead = null;
       } else {
          versionToRead = context.calculateVersionToRead(gmuVersionGenerator);
-         if (versionToRead == null) {
-            throw new IllegalStateException("Version to read should be non-null");
-         }
       }
 
       boolean hasAlreadyReadFromThisNode = context.hasAlreadyReadOnThisNode();

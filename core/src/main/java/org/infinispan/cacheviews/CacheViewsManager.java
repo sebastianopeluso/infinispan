@@ -26,6 +26,7 @@ import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.remoting.transport.Address;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -69,7 +70,7 @@ public interface CacheViewsManager {
 
    void handleRequestLeave(Address sender, String cacheName);
 
-   void handlePrepareView(String cacheName, CacheView pendingView, CacheView committedView) throws Exception;
+   void handlePrepareView(String cacheName, CacheView pendingView, CacheView committedView, List<CacheView> viewHistory) throws Exception;
 
    void handleCommitView(String cacheName, int viewId);
 

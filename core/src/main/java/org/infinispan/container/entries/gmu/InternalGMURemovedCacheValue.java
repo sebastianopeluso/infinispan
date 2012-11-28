@@ -11,9 +11,9 @@ import org.infinispan.container.versioning.EntryVersion;
  * @since 5.2
  */
 public class InternalGMURemovedCacheValue implements InternalGMUCacheValue {
-   
+
    protected final EntryVersion version;
-   
+
    public InternalGMURemovedCacheValue(EntryVersion version) {
       this.version = version;
    }
@@ -86,5 +86,12 @@ public class InternalGMURemovedCacheValue implements InternalGMUCacheValue {
    @Override
    public long getMaxIdle() {
       return -1;
+   }
+
+   @Override
+   public String toString() {
+      return "InternalGMURemovedCacheValue{" +
+            "version=" + version +
+            '}';
    }
 }

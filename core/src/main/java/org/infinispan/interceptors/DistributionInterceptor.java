@@ -48,6 +48,7 @@ import org.infinispan.distribution.L1Manager;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.base.BaseRpcInterceptor;
+import org.infinispan.interceptors.locking.ClusteringDependentLogic;
 import org.infinispan.remoting.responses.Response;
 import org.infinispan.remoting.responses.SuccessfulResponse;
 import org.infinispan.remoting.transport.Address;
@@ -89,6 +90,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    EntryFactory entryFactory;
    L1Manager l1Manager;
    LockManager lockManager;
+   ClusteringDependentLogic cdl;
 
    static final RecipientGenerator CLEAR_COMMAND_GENERATOR = new RecipientGenerator() {
       @Override
@@ -114,7 +116,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    @Inject
    public void injectDependencies(DistributionManager distributionManager, StateTransferLock stateTransferLock,
                                   CommandsFactory cf, DataContainer dataContainer, EntryFactory entryFactory,
-                                  L1Manager l1Manager, LockManager lockManager) {
+                                  L1Manager l1Manager, LockManager lockManager, ClusteringDependentLogic cdl) {
       this.dm = distributionManager;
       this.stateTransferLock = stateTransferLock;
       this.cf = cf;
@@ -122,6 +124,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
       this.entryFactory = entryFactory;
       this.l1Manager = l1Manager;
       this.lockManager = lockManager;
+      this.cdl = cdl;
    }
 
    @Start
@@ -281,7 +284,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
 
       return returnValue;
    }
-   
+
    @Override
    public Object visitPutMapCommand(InvocationContext ctx, PutMapCommand command) throws Throwable {
       // don't bother with a remote get for the PutMapCommand!
@@ -365,15 +368,18 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    private void sendCommitCommand(TxInvocationContext ctx, CommitCommand command, Collection<Address> preparedOn)
          throws TimeoutException, InterruptedException {
       // we only send the commit command to the nodes that
-      Collection<Address> recipients = dm.getAffectedNodes(ctx.getAffectedKeys());
+      Collection<Address> recipients = cdl.getInvolvedNodes(ctx.getCacheTransaction());
 
       // By default, use the configured commit sync settings
-      boolean syncCommitPhase = configuration.isSyncCommitPhase();
-      for (Address a : preparedOn) {
-         if (!recipients.contains(a)) {
-            // However if we have prepared on some nodes and are now committing on different nodes, make sure we
-            // force sync commit so we can respond to prepare resend requests.
-            syncCommitPhase = true;
+      boolean syncCommitPhase = configuration.isSyncCommitPhase() || recipients == null;
+
+      if (preparedOn != null && recipients != null) {
+         for (Address a : preparedOn) {
+            if (!recipients.contains(a)) {
+               // However if we have prepared on some nodes and are now committing on different nodes, make sure we
+               // force sync commit so we can respond to prepare resend requests.
+               syncCommitPhase = true;
+            }
          }
       }
 
@@ -392,7 +398,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
          }
       }
    }
-   
+
    protected PrepareCommand buildPrepareCommandForResend(TxInvocationContext ctx, CommitCommand command) {
       // Make sure this is 1-Phase!!
       return cf.buildPrepareCommand(command.getGlobalTransaction(), ctx.getModifications(), true);
@@ -411,10 +417,11 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
          ctx.getCacheTransaction().markPrepareSent();
          if (command.isOnePhaseCommit()) flushL1Caches(ctx); // if we are one-phase, don't block on this future.
 
-         Collection<Address> recipients = dm.getAffectedNodes(ctx.getAffectedKeys());
+         Collection<Address> recipients = cdl.getInvolvedNodes(ctx.getCacheTransaction());
          prepareOnAffectedNodes(ctx, command, recipients, sync);
 
-         ((LocalTxInvocationContext) ctx).remoteLocksAcquired(recipients);
+         ((LocalTxInvocationContext) ctx).remoteLocksAcquired(recipients == null ? dm.getConsistentHash().getCaches() :
+                                                                    recipients);
       } else if (isL1CacheEnabled && command.isOnePhaseCommit() && !ctx.isOriginLocal() && !ctx.getLockedKeys().isEmpty()) {
          // We fall into this block if we are a remote node, happen to be the primary data owner and have locked keys.
          // it is still our responsibility to invalidate L1 caches in the cluster.
@@ -431,7 +438,8 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    @Override
    public Object visitRollbackCommand(TxInvocationContext ctx, RollbackCommand command) throws Throwable {
       if (shouldInvokeRemoteTxCommand(ctx) && shouldInvokeRemoteRollbackCommand(ctx, command)) {
-         rpcManager.invokeRemotely(dm.getAffectedNodes(ctx.getAffectedKeys()), command, configuration.isSyncRollbackPhase(), true, false);
+         rpcManager.invokeRemotely(cdl.getInvolvedNodes(ctx.getCacheTransaction()), command,
+                                   configuration.isSyncRollbackPhase(), true, false);
       }
 
       return invokeNextInterceptor(ctx, command);
@@ -482,19 +490,19 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
 
                boolean useFuture = ctx.isUseFutureReturnType();
                if (isL1CacheEnabled && !skipL1Invalidation)
-               	// Handle the case where the put is local. If in unicast mode and this is not a data
-               	// owner, nothing happens. If in multicast mode, we this node will send the multicast
-               	if (rpcManager.getTransport().getMembers().size() > numCallRecipients) {
-               		// Command was successful, we have a number of receipients and L1 should be flushed, so request any L1 invalidations from this node
-               		if (trace) log.tracef("Put occuring on node, requesting L1 cache invalidation for keys %s. Other data owners are %s", command.getAffectedKeys(), dm.getAffectedNodes(command.getAffectedKeys()));
+                  // Handle the case where the put is local. If in unicast mode and this is not a data
+                  // owner, nothing happens. If in multicast mode, we this node will send the multicast
+                  if (rpcManager.getTransport().getMembers().size() > numCallRecipients) {
+                     // Command was successful, we have a number of receipients and L1 should be flushed, so request any L1 invalidations from this node
+                     if (trace) log.tracef("Put occuring on node, requesting L1 cache invalidation for keys %s. Other data owners are %s", command.getAffectedKeys(), dm.getAffectedNodes(command.getAffectedKeys()));
                      if (useFuture) {
-               		   futureToReturn = l1Manager.flushCache(recipientGenerator.getKeys(), returnValue,
+                        futureToReturn = l1Manager.flushCache(recipientGenerator.getKeys(), returnValue,
                                                               ctx.getOrigin(), !(command instanceof RemoveCommand));
                      } else {
                         invalidationFuture = l1Manager.flushCacheWithSimpleFuture(recipientGenerator.getKeys(), returnValue,
                                                                                   ctx.getOrigin(), !(command instanceof RemoveCommand));
                      }
-               	} else {
+                  } else {
                      if (trace) log.tracef("Not performing invalidation! numCallRecipients=%s", numCallRecipients);
                   }
                if (!isSingleOwnerAndLocal(recipientGenerator)) {
@@ -513,18 +521,18 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
                   if (trace) log.tracef("Finished invalidating keys %s ", recipientGenerator.getKeys());
                }
             } else {
-            	// Piggyback remote puts and cause L1 invalidations
-            	if (isL1CacheEnabled && !skipL1Invalidation) {
-               	// Command was successful and L1 should be flushed, so request any L1 invalidations from this node
-            		if (trace) log.tracef("Put occuring on node, requesting cache invalidation for keys %s. Origin of command is remote", command.getAffectedKeys());
+               // Piggyback remote puts and cause L1 invalidations
+               if (isL1CacheEnabled && !skipL1Invalidation) {
+                  // Command was successful and L1 should be flushed, so request any L1 invalidations from this node
+                  if (trace) log.tracef("Put occuring on node, requesting cache invalidation for keys %s. Origin of command is remote", command.getAffectedKeys());
                   // If this is a remove command, then don't pass in the origin - since the entru would be removed from the origin's L1 cache.
-            		invalidationFuture = l1Manager.flushCacheWithSimpleFuture(recipientGenerator.getKeys(),
+                  invalidationFuture = l1Manager.flushCacheWithSimpleFuture(recipientGenerator.getKeys(),
                                                                             returnValue, ctx.getOrigin(), !(command instanceof RemoveCommand));
-            		if (sync) {
+                  if (sync) {
                      invalidationFuture.get(); // wait for the inval command to complete
                      if (trace) log.tracef("Finished invalidating keys %s ", recipientGenerator.getKeys());
-            		}
-            	}
+                  }
+               }
             }
          }
       }

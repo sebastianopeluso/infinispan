@@ -76,6 +76,7 @@ public class CacheViewControlCommand implements CacheRpcCommand {
    private List<Address> newMembers;
    private int oldViewId;
    private List<Address> oldMembers;
+   private List<CacheView> viewHistory;
    private MessageRequest messageRequest;
    private ResponseGenerator responseGenerator;
 
@@ -88,7 +89,8 @@ public class CacheViewControlCommand implements CacheRpcCommand {
       this.cacheName = cacheName;
    }
 
-   public CacheViewControlCommand(String cacheName, Type type, Address sender, int newViewId, List<Address> newMembers, int oldViewId, List<Address> oldMembers) {
+   public CacheViewControlCommand(String cacheName, Type type, Address sender, int newViewId, List<Address> newMembers,
+                                  int oldViewId, List<Address> oldMembers, List<CacheView> viewHistory) {
       this.cacheName = cacheName;
       this.type = type;
       this.sender = sender;
@@ -96,6 +98,7 @@ public class CacheViewControlCommand implements CacheRpcCommand {
       this.newMembers = newMembers;
       this.oldViewId = oldViewId;
       this.oldMembers = oldMembers;
+      this.viewHistory = viewHistory;
    }
 
    public CacheViewControlCommand(String cacheName, Type type, Address sender, int viewId) {
@@ -129,7 +132,7 @@ public class CacheViewControlCommand implements CacheRpcCommand {
                return null;
             case PREPARE_VIEW:
                cacheViewsManager.handlePrepareView(cacheName, new CacheView(newViewId, newMembers),
-                                                   new CacheView(oldViewId, oldMembers));
+                                                   new CacheView(oldViewId, oldMembers), viewHistory);
                return null;
             case COMMIT_VIEW:
                cacheViewsManager.handleCommitView(cacheName, newViewId);
@@ -176,7 +179,7 @@ public class CacheViewControlCommand implements CacheRpcCommand {
 
    @Override
    public Object[] getParameters() {
-      return new Object[]{(byte) type.ordinal(), sender, newViewId, newMembers, oldViewId, oldMembers};
+      return new Object[]{(byte) type.ordinal(), sender, newViewId, newMembers, oldViewId, oldMembers, viewHistory};
    }
 
    @Override
@@ -189,6 +192,7 @@ public class CacheViewControlCommand implements CacheRpcCommand {
       newMembers = (List<Address>) parameters[i++];
       oldViewId = (Integer) parameters[i++];
       oldMembers = (List<Address>) parameters[i++];
+      viewHistory = (List<CacheView>) parameters[i];
    }
 
    @Override

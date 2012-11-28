@@ -24,7 +24,6 @@ import org.infinispan.commands.control.CacheViewControlCommand;
 import org.infinispan.config.ConfigurationException;
 import org.infinispan.config.GlobalConfiguration;
 import org.infinispan.configuration.cache.Configuration;
-import org.infinispan.dataplacement.DataPlacementManager;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
@@ -283,11 +282,13 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
    private CacheView clusterPrepareView(final String cacheName, final CacheView pendingView) throws Exception {
       final CacheViewInfo cacheViewInfo = viewsInfo.get(cacheName);
       final CacheView committedView = cacheViewInfo.getCommittedView();
+      final List<CacheView> viewHistory = cacheViewInfo.getViewHistory();
       log.tracef("%s: Preparing view %d on members %s", cacheName, pendingView.getViewId(), pendingView.getMembers());
 
       final CacheViewControlCommand cmd = new CacheViewControlCommand(cacheName,
             CacheViewControlCommand.Type.PREPARE_VIEW, self, pendingView.getViewId(),
-            pendingView.getMembers(), committedView.getViewId(), committedView.getMembers());
+            pendingView.getMembers(), committedView.getViewId(), committedView.getMembers(),
+            viewHistory);
 
       Set<Address> leavers = cacheViewInfo.getPendingChanges().getLeavers();
       if (pendingView.containsAny(leavers))
@@ -321,7 +322,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
          Future<Object> localFuture = asyncTransportExecutor.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
-               handlePrepareView(cacheName, pendingView, committedView);
+               handlePrepareView(cacheName, pendingView, committedView, viewHistory);
                return null;
             }
          });
@@ -352,7 +353,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
          // it's ok to send the rollback to nodes that don't have the cache yet, they will just ignore it
          // on the other hand we *have* to send the rollback to any nodes that got the prepare
          final CacheViewControlCommand cmd = new CacheViewControlCommand(cacheName,
-               CacheViewControlCommand.Type.ROLLBACK_VIEW, self, newViewId, null, committedViewId, null);
+               CacheViewControlCommand.Type.ROLLBACK_VIEW, self, newViewId, null, committedViewId, null, null);
          // wait until we get all the responses, but ignore the results
          Map<Address, Response> rspList = transport.invokeRemotely(validTargets, cmd,
                ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, false, null, false, false);
@@ -424,13 +425,13 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
       cacheViewInfo.getPendingChanges().requestJoin(sender);
       viewTriggerThread.wakeUp();
    }
-   
+
    /**
     *  Handle the request to move keys   by Li
     */
    public void handleRequestMoveKeys(String cacheName){
 	  log.error("signaling moving keys");
-	   
+
 	  CacheViewInfo cacheViewInfo = getCacheViewInfo(cacheName);
 	  cacheViewInfo.getPendingChanges().requestMoveKeys();
 	  viewTriggerThread.wakeUp();
@@ -484,7 +485,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
    }
 
    @Override
-   public void handlePrepareView(String cacheName, CacheView pendingView, CacheView committedView) throws Exception {
+   public void handlePrepareView(String cacheName, CacheView pendingView, CacheView committedView, List<CacheView> viewHistory) throws Exception {
       boolean isLocal = pendingView.contains(self);
 
       if (getConfiguration(cacheName).transaction().transactionProtocol().isTotalOrder() &&
@@ -515,7 +516,7 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
       if (isLocal) {
          CacheViewListener cacheViewListener = cacheViewInfo.getListener();
          if (cacheViewListener != null) {
-            cacheViewListener.prepareView(pendingView, lastCommittedView);
+            cacheViewListener.prepareView(pendingView, lastCommittedView, viewHistory);
          } else {
             throw new IllegalStateException(String.format("%s: Received cache view prepare request after the local node has already shut down", cacheName));
          }

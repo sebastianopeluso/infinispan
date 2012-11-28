@@ -37,13 +37,8 @@ public class GMUDistributionInterceptor extends DistributionInterceptor {
    }
 
    @Override
-   protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command, Collection<Address> recipients, boolean sync) {
-      //we need to join the read set owners to validate
-      Set<Address> realRecipients = new HashSet<Address>(recipients);
-      for (List<Address> list : dm.locateAll(ctx.getReadSet()).values()) {
-         realRecipients.addAll(list);
-      }      
-
+   protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command,
+                                         Collection<Address> recipients, boolean sync) {
       Map<Address, Response> responses = rpcManager.invokeRemotely(recipients, command, true, false, false);
       log.debugf("prepare command for transaction %s is sent. responses are: %s",
                  command.getGlobalTransaction().prettyPrint(), responses.toString());

@@ -29,6 +29,7 @@ import org.infinispan.config.Configuration;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.entries.InternalCacheEntry;
+import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.distribution.ch.ConsistentHash;
@@ -92,6 +93,7 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
    private CommandBuilder commandBuilder;
    protected TransactionTable transactionTable;
    private LockContainer<?> lockContainer;
+   private VersionGenerator versionGenerator;
 
    public BaseStateTransferManagerImpl() {
    }
@@ -100,7 +102,8 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
    public void init(Configuration configuration, RpcManager rpcManager, CommandsFactory cf,
                     DataContainer dataContainer, InterceptorChain interceptorChain, InvocationContextContainer icc,
                     CacheLoaderManager cacheLoaderManager, CacheNotifier cacheNotifier, StateTransferLock stateTransferLock,
-                    CacheViewsManager cacheViewsManager, TransactionTable transactionTable, LockContainer<?> lockContainer) {
+                    CacheViewsManager cacheViewsManager, TransactionTable transactionTable, LockContainer<?> lockContainer,
+                    VersionGenerator versionGenerator) {
       this.cacheLoaderManager = cacheLoaderManager;
       this.configuration = configuration;
       this.rpcManager = rpcManager;
@@ -113,6 +116,7 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
       this.cacheViewsManager = cacheViewsManager;
       this.transactionTable = transactionTable;
       this.lockContainer = lockContainer;
+      this.versionGenerator = versionGenerator;
    }
 
    // needs to be AFTER the DistributionManager and *after* the cache loader manager (if any) inits and preloads
@@ -209,11 +213,11 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
    }
 
    private boolean isLatchOpen(CountDownLatch latch) {
-         return latch.getCount() == 0;
+      return latch.getCount() == 0;
    }
 
    private boolean isLatchOpen(ReclosableLatch latch) {
-        return latch.isOpened();
+      return latch.isOpened();
    }
 
    @Override
@@ -246,7 +250,7 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
          }
 
          if(trace) log.tracef("After applying state data container has %d keys", dataContainer.size(null));
-      } 
+      }
    }
 
    @Override
@@ -318,7 +322,8 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
    }
 
    @Override
-   public void prepareView(CacheView pendingView, CacheView committedView) throws Exception {
+   public void prepareView(CacheView pendingView, CacheView committedView, List<CacheView> viewHistory) throws Exception {
+      versionGenerator.updateViewHistory(viewHistory);
       log.tracef("Received new cache view: %s %s", configuration.getName(), pendingView);
 
       joinStartedLatch.countDown();
@@ -343,12 +348,13 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
             return;
          } else {
             throw new IllegalArgumentException(String.format("Cannot commit view %d, we are at view %d",
-                  viewId, oldView.getViewId()));
+                                                             viewId, oldView.getViewId()));
          }
       }
 
       tempTask.commitStateTransfer();
       stateTransferTask = null;
+      versionGenerator.addCacheView(newView);
 
       // we can now use the new CH as the baseline for the next rehash
       oldView = newView;
@@ -361,11 +367,11 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
       if (tempTask == null) {
          if (committedViewId == oldView.getViewId()) {
             log.tracef("Ignoring rollback for cache view %d as we don't have a state transfer in progress",
-                  committedViewId);
+                       committedViewId);
             return;
          } else {
             throw new IllegalArgumentException(String.format("Cannot rollback to view %d, we are at view %d",
-                  committedViewId, oldView.getViewId()));
+                                                             committedViewId, oldView.getViewId()));
          }
       }
 

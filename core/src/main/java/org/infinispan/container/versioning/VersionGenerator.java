@@ -19,6 +19,10 @@
 
 package org.infinispan.container.versioning;
 
+import org.infinispan.cacheviews.CacheView;
+
+import java.util.List;
+
 /**
  * Generates versions
  *
@@ -33,4 +37,8 @@ public interface VersionGenerator {
    IncrementableEntryVersion generateNew();
 
    IncrementableEntryVersion increment(IncrementableEntryVersion initialVersion);
+
+   void updateViewHistory(List<CacheView> viewHistory);
+
+   void addCacheView(CacheView cacheView);
 }

@@ -20,12 +20,15 @@
 package org.infinispan.container.versioning;
 
 import org.infinispan.Cache;
+import org.infinispan.cacheviews.CacheView;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.notifications.Listener;
 import org.infinispan.notifications.cachemanagerlistener.annotation.ViewChanged;
 import org.infinispan.notifications.cachemanagerlistener.event.ViewChangedEvent;
 import org.infinispan.remoting.transport.Transport;
+
+import java.util.List;
 
 /**
  * A version generator implementation for SimpleClusteredVersions
@@ -77,5 +80,15 @@ public class SimpleClusteredVersionGenerator implements VersionGenerator {
       public void handleViewChange(ViewChangedEvent e) {
          viewId = e.getViewId();
       }
+   }
+
+   @Override
+   public void updateViewHistory(List<CacheView> viewHistory) {
+      //no-op
+   }
+
+   @Override
+   public void addCacheView(CacheView cacheView) {
+      //no-op
    }
 }

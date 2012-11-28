@@ -40,12 +40,12 @@ import org.infinispan.transaction.xa.GlobalTransaction;
  * Extension of InvocationContextFlagsOverride to be used when a TxInvocationContext
  * is required.
  * @see InvocationContextFlagsOverride
- * 
+ *
  * @author Sanne Grinovero <sanne@hibernate.org> (C) 2011 Red Hat Inc.
  * @since 5.0
  */
 public class TransactionalInvocationContextFlagsOverride extends InvocationContextFlagsOverride implements TxInvocationContext {
-   
+
    private TxInvocationContext delegate;
 
    public TransactionalInvocationContextFlagsOverride(TxInvocationContext delegate, Set<Flag> flags) {

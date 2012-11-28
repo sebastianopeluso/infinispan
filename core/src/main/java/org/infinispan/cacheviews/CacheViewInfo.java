@@ -19,12 +19,14 @@
 
 package org.infinispan.cacheviews;
 
-import java.util.List;
-
 import org.infinispan.remoting.MembershipArithmetic;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * The cluster-wide state of a cache.
@@ -36,6 +38,8 @@ public class CacheViewInfo {
 
    private final String cacheName;
    private final Object lock = new Object();
+
+   private final List<CacheView> viewHistory = new LinkedList<CacheView>();
 
    // The last view for which the coordinator sent a COMMIT_VIEW message
    private CacheView committedView;
@@ -74,6 +78,12 @@ public class CacheViewInfo {
       }
    }
 
+   public final List<CacheView> getViewHistory() {
+      synchronized (lock) {
+         return new ArrayList<CacheView>(viewHistory);
+      }
+   }
+
    /**
     * We only support one listener per cache.
     * TODO Consider moving the listener to the <tt>CacheNotifier</tt> interface.
@@ -100,12 +110,12 @@ public class CacheViewInfo {
       synchronized (lock) {
          if (pendingView != null) {
             throw new IllegalStateException(String.format("Cannot prepare new view %s on cache %s, we are currently preparing view %s",
-                  newView, cacheName, pendingView));
+                                                          newView, cacheName, pendingView));
          }
 
          if (committedView.getViewId() > newView.getViewId()) {
             throw new IllegalStateException(String.format("Cannot prepare new view %s on cache %s, we have already committed view %s",
-                  newView, cacheName, committedView));
+                                                          newView, cacheName, committedView));
          }
 
          this.pendingView = newView;
@@ -129,6 +139,7 @@ public class CacheViewInfo {
 
          committedView = pendingView;
          pendingView = null;
+         viewHistory.add(committedView);
       }
    }
 

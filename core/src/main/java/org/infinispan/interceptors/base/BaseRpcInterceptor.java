@@ -96,13 +96,13 @@ public abstract class BaseRpcInterceptor extends CommandInterceptor {
 
    /**
     * check if the rollback command should be sent remotely or not.
-    * 
+    *
     * Rules:
     *  1) if prepare was sent, then the rollback should be sent
     *  2) if prepare was not sent then we have two cases:
     *    a) in total order, no locks are acquired during execution, so we can avoid the invoke remotely
     *    b) in pessimist locking, lock *can* be acquired and then the command should be sent
-    *      
+    *
     * @param ctx     the invocation context
     * @param command the rollback command
     * @return        true if it should be invoked, false otherwise
@@ -110,7 +110,7 @@ public abstract class BaseRpcInterceptor extends CommandInterceptor {
    protected final boolean shouldInvokeRemoteRollbackCommand(TxInvocationContext ctx, RollbackCommand command) {
       CacheTransaction cacheTransaction = ctx.getCacheTransaction();
       command.setPrepareSent(cacheTransaction.wasPrepareSent());
-      return cacheTransaction.wasPrepareSent() || 
+      return cacheTransaction.wasPrepareSent() ||
             (!configuration.isTotalOrder() && configuration.getTransactionLockingMode() == LockingMode.PESSIMISTIC);
    }
 }

@@ -9,6 +9,8 @@ import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.Arrays;
 
@@ -22,6 +24,8 @@ import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
  * @since 5.2
  */
 public class CommitLog {
+
+   private static final Log log = LogFactory.getLog(CommitLog.class);
 
    private VersionEntry currentVersion;
    private GMUVersionGenerator versionGenerator;
@@ -44,7 +48,11 @@ public class CommitLog {
 
    public synchronized EntryVersion getCurrentVersion() {
       //versions are immutable
-      return currentVersion.getVersion();
+      EntryVersion version = currentVersion.getVersion();
+      if (log.isTraceEnabled()) {
+         log.tracef("getCurrentVersion() ==> %s", version);
+      }
+      return version;
    }
 
 
@@ -53,14 +61,22 @@ public class CommitLog {
       synchronized (this) {
          //if other is null, return the most recent version
          if (other == null || isLessOrEquals(currentVersion.getVersion(), other)) {
-            return currentVersion.getVersion();
+            EntryVersion version = currentVersion.getVersion();
+            if (log.isTraceEnabled()) {
+               log.tracef("getAvailableVersionLessThan(%s) ==> %s", other, version);
+            }
+            return version;
          }
          iterator = currentVersion.getPrevious();
       }
 
       while (iterator != null) {
          if (isLessOrEquals(iterator.getVersion(), other)) {
-            return iterator.getVersion();
+            EntryVersion version = iterator.getVersion();
+            if (log.isTraceEnabled()) {
+               log.tracef("getAvailableVersionLessThan(%s) ==> %s", other, version);
+            }
+            return version;
          }
          iterator = iterator.getPrevious();
       }
@@ -72,22 +88,43 @@ public class CommitLog {
             versionGenerator.mergeAndMax(Arrays.asList(currentVersion.getVersion(), newVersion))));
       if (current.getVersion().compareTo(currentVersion.getVersion()) == EQUAL) {
          //same version??
+         if (log.isTraceEnabled()) {
+            log.tracef("addNewVersion(%s) ==> %s", newVersion, currentVersion.getVersion());
+         }
          return;
       }
       current.setPrevious(currentVersion);
       currentVersion = current;
+      if (log.isTraceEnabled()) {
+         log.tracef("addNewVersion(%s) ==> %s", newVersion, currentVersion.getVersion());
+      }
       notifyAll();
    }
 
    public synchronized boolean waitForVersion(EntryVersion version, long timeout) throws InterruptedException {
       long finalTimeout = System.currentTimeMillis() + timeout;
       long versionValue = toGMUEntryVersion(version).getThisNodeVersionValue();
+      if (log.isTraceEnabled()) {
+         log.tracef("waitForVersion(%s,%s) and current version is %s", version, timeout, currentVersion.getVersion());
+      }
       do {
          if (currentVersion.getVersion().getThisNodeVersionValue() >= versionValue) {
+            if (log.isTraceEnabled()) {
+               log.tracef("waitForVersion(%s) ==> %s >= %s ?", version,
+                          currentVersion.getVersion().getThisNodeVersionValue(), versionValue);
+            }
             return true;
          }
-         wait(System.currentTimeMillis() - finalTimeout);
-      } while (finalTimeout < System.currentTimeMillis());
+         long waitingTime = finalTimeout - System.currentTimeMillis();
+         if (waitingTime <= 0) {
+            break;
+         }
+         wait(waitingTime);
+      } while (true);
+      if (log.isTraceEnabled()) {
+         log.tracef("waitForVersion(%s) ==> %s >= %s ?", version,
+                    currentVersion.getVersion().getThisNodeVersionValue(), versionValue);
+      }
       return currentVersion.getVersion().getThisNodeVersionValue() >= versionValue;
    }
 

@@ -198,4 +198,12 @@ public class InternalGMURemovedCacheEntry implements InternalGMUCacheEntry {
    public InternalCacheEntry getInternalCacheEntry() {
       return null;
    }
+
+   @Override
+   public String toString() {
+      return "InternalGMURemovedCacheEntry{" +
+            "key=" + key +
+            ", version=" + version +
+            '}';
+   }
 }

@@ -48,7 +48,7 @@ import static org.infinispan.context.Flag.SKIP_LOCKING;
  * @author Mircea.Markus@jboss.com
  * @author Bela Ban
  * @author Dan Berindei &lt;dan@infinispan.org&gt;
- * @author Zhongmiao Li 
+ * @author Zhongmiao Li
  * @since 4.0
  */
 @MBean(objectName = "DistributedStateTransferManager", description = "Component that handles state transfer in distributed mode")
@@ -97,7 +97,7 @@ public class DistributedStateTransferManagerImpl extends BaseStateTransferManage
 
    @Override
    public void commitView(int viewId) {
-      dataPlacementConsistentHash = null; //TODO check: if a node fails, it will create a default consistent hash, 
+      dataPlacementConsistentHash = null; //TODO check: if a node fails, it will create a default consistent hash,
       //TODO: and it puts the keys back in their original owner (home)
       super.commitView(viewId);
    }

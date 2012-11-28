@@ -91,7 +91,10 @@ public class GMUHelper {
    public static void joinAndSetTransactionVersion(Collection<Response> responses, TxInvocationContext ctx,
                                                    GMUVersionGenerator versionGenerator) {
       if (responses.isEmpty()) {
-         throw new IllegalStateException("New Versions are expected from other nodes");
+         if (log.isDebugEnabled()) {
+            log.debugf("Versions received are empty!");
+         }
+         return;
       }
       List<EntryVersion> allPreparedVersions = new LinkedList<EntryVersion>();
       allPreparedVersions.add(ctx.getTransactionVersion());

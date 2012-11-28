@@ -23,6 +23,7 @@ import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.EntryWrappingInterceptor;
+import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.util.logging.Log;
@@ -45,11 +46,14 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
 
    private TransactionCommitManager transactionCommitManager;
    private GMUVersionGenerator versionGenerator;
+   private TransactionTable transactionTable;
 
    @Inject
-   public void inject(TransactionCommitManager transactionCommitManager, DataContainer dataContainer, CommitLog commitLog, VersionGenerator versionGenerator) {
+   public void inject(TransactionCommitManager transactionCommitManager, DataContainer dataContainer,
+                      CommitLog commitLog, VersionGenerator versionGenerator, TransactionTable transactionTable) {
       this.transactionCommitManager = transactionCommitManager;
       this.versionGenerator = toGMUVersionGenerator(versionGenerator);
+      this.transactionTable = transactionTable;
    }
 
    @Override
@@ -71,7 +75,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
 
       if (ctx.isOriginLocal()) {
          EntryVersion commitVersion = calculateCommitVersion(ctx.getTransactionVersion(), versionGenerator,
-                                                             cll.getOwners(command.getAffectedKeys()));
+                                                             cll.getWriteOwners(ctx.getCacheTransaction()));
          ctx.setTransactionVersion(commitVersion);
       } else {
          retVal = ctx.getTransactionVersion();
@@ -220,6 +224,10 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
       TxInvocationContext txInvocationContext = (TxInvocationContext) context;
       List<EntryVersion> entryVersionList = new LinkedList<EntryVersion>();
       entryVersionList.add(txInvocationContext.getTransactionVersion());
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Keys read in this command: %s", txInvocationContext.getKeysReadInCommand());
+      }
 
       for (InternalGMUCacheEntry internalGMUCacheEntry : txInvocationContext.getKeysReadInCommand().values()) {
          if (txInvocationContext.hasModifications() && !internalGMUCacheEntry.isMostRecent()) {
