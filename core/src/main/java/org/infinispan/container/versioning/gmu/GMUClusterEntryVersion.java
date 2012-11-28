@@ -101,7 +101,9 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
          } else if (after) {
             return InequalVersionComparisonResult.AFTER;
          }
-         throw new IllegalArgumentException("GMU entry version has nothing in common with this version. Cannot compare it");
+         //is this safe?
+         return InequalVersionComparisonResult.BEFORE_OR_EQUAL;
+
       }
       throw new IllegalArgumentException("GMU entry version cannot compare " + other.getClass().getSimpleName());
    }

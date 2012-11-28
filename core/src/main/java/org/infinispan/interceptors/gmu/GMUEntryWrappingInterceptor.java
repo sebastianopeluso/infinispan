@@ -23,6 +23,7 @@ import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.EntryWrappingInterceptor;
+import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
@@ -46,18 +47,15 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
 
    private TransactionCommitManager transactionCommitManager;
    private GMUVersionGenerator versionGenerator;
-   private TransactionTable transactionTable;
 
    @Inject
    public void inject(TransactionCommitManager transactionCommitManager, DataContainer dataContainer,
-                      CommitLog commitLog, VersionGenerator versionGenerator, TransactionTable transactionTable) {
+                      CommitLog commitLog, VersionGenerator versionGenerator) {
       this.transactionCommitManager = transactionCommitManager;
       this.versionGenerator = toGMUVersionGenerator(versionGenerator);
-      this.transactionTable = transactionTable;
    }
 
    @Override
-
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       GMUPrepareCommand spc = convert(command, GMUPrepareCommand.class);
 
@@ -240,6 +238,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
          txInvocationContext.getCacheTransaction().addReadKey(internalGMUCacheEntry.getKey());
          if (cll.localNodeIsOwner(internalGMUCacheEntry.getKey())) {
             txInvocationContext.setAlreadyReadOnThisNode(true);
+            txInvocationContext.addReadFrom(cll.getAddress());
          }
       }
 

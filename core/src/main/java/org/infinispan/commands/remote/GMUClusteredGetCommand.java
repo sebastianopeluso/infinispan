@@ -98,7 +98,6 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
       boolean alreadyReadOnThisNode = maxGMUVersion != null &&
             maxGMUVersion.getThisNodeVersionValue() == GMUEntryVersion.NON_EXISTING;
       context.setAlreadyReadOnThisNode(alreadyReadOnThisNode);
-      context.setVersionToRead(maxGMUVersion);
 
       if(!alreadyReadOnThisNode){
          if (minGMUVersion == null) {
@@ -114,6 +113,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
             return null;
          }
       }
+      context.setVersionToRead(commitLog.getAvailableVersionLessThan(maxGMUVersion));
       return context;
    }
 

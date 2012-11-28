@@ -262,11 +262,17 @@ public abstract class AbstractCacheTransaction implements CacheTransaction {
 
    @Override
    public void setTransactionVersion(EntryVersion version) {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] new transaction version: %s", tx.prettyPrint(), version);
+      }
       transactionVersion = version;
    }
 
    @Override
    public EntryVersion getTransactionVersion() {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] get transaction version: %s", tx.prettyPrint(), transactionVersion);
+      }
       return transactionVersion;
    }
 

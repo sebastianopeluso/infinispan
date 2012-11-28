@@ -93,6 +93,12 @@ public abstract class GMUEntryVersion implements IncrementableEntryVersion {
    }
 
    protected final InequalVersionComparisonResult compare(long value1, long value2) {
+      if (value1 == NON_EXISTING) {
+         return InequalVersionComparisonResult.BEFORE;
+      } else if (value2 == NON_EXISTING) {
+         return InequalVersionComparisonResult.AFTER;
+      }
+
       int compare = Long.valueOf(value1).compareTo(value2);
       if (compare < 0) {
          return InequalVersionComparisonResult.BEFORE;

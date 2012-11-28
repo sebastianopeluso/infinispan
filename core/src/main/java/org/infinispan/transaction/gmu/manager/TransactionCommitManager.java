@@ -181,7 +181,6 @@ public class TransactionCommitManager {
                      log.warnf("Error occurs while committing transaction entries for %s", transactionEntry);
                   } finally {
                      icc.clearThreadLocal();
-                     transactionEntry.committed();
                   }
                }
 
@@ -195,6 +194,9 @@ public class TransactionCommitManager {
             } catch (Throwable throwable) {
                log.fatalf(throwable, "Exception caught in commit. This should not happen");
             } finally {
+               for (TransactionEntry transactionEntry : commitList) {
+                  transactionEntry.committed();
+               }
                committedVersions.clear();
                commitList.clear();
             }

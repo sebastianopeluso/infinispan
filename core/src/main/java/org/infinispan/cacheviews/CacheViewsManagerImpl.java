@@ -285,6 +285,8 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
       final List<CacheView> viewHistory = cacheViewInfo.getViewHistory();
       log.tracef("%s: Preparing view %d on members %s", cacheName, pendingView.getViewId(), pendingView.getMembers());
 
+
+
       final CacheViewControlCommand cmd = new CacheViewControlCommand(cacheName,
             CacheViewControlCommand.Type.PREPARE_VIEW, self, pendingView.getViewId(),
             pendingView.getMembers(), committedView.getViewId(), committedView.getMembers(),

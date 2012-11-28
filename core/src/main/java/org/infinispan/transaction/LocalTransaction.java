@@ -65,7 +65,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    private final Transaction transaction;
 
    private final boolean implicitTransaction;
-   private boolean prepareSent = false;   
+   private boolean prepareSent = false;
 
    //total order result -- has the result and behaves like a synchronization point between the remote and local
    // prepare commands
@@ -315,7 +315,7 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
     * @param exception is it an exception?
     */
    public void addPrepareResult(Object object, boolean exception) {
-      prepareResult.addResultFromPrepare(object, exception);      
+      prepareResult.addResultFromPrepare(object, exception);
    }
 
    /**
@@ -364,16 +364,25 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
 
    @Override
    public void setAlreadyReadOnThisNode(boolean value) {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] set already read on this node to %s", tx.prettyPrint(), value);
+      }
       alreadyReadOnThisNode = value;
    }
 
    @Override
    public boolean hasAlreadyReadOnThisNode() {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] has already read on this node? %s", tx.prettyPrint(), alreadyReadOnThisNode);
+      }
       return alreadyReadOnThisNode;
    }
 
    @Override
    public Set<Address> getReadFrom() {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] get read from %s", tx.prettyPrint(), readFrom);
+      }
       return readFrom;
    }
 
@@ -382,11 +391,17 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       if (readFrom == null) {
          readFrom = new HashSet<Address>(16);
       }
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] add read from %s to %s", tx.prettyPrint(), address, readFrom);
+      }
       readFrom.add(address);
    }
 
    @Override
    public Collection<Object> getReadKeys() {
+      if (log.isDebugEnabled()) {
+         log.debugf("[%s] get read keys %s", tx.prettyPrint(), readKeys);
+      }
       return readKeys;
    }
 

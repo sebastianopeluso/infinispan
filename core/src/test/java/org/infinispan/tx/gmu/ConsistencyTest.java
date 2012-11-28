@@ -6,6 +6,8 @@ import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.jgroups.util.Util;
 import org.testng.annotations.Test;
 
+import javax.transaction.NotSupportedException;
+import javax.transaction.SystemException;
 import javax.transaction.Transaction;
 import javax.transaction.TransactionManager;
 
@@ -27,32 +29,35 @@ public class ConsistencyTest extends AbstractGMUTest {
       assertAtLeastCaches(2);
       assertCacheValuesNull(KEY_1, KEY_2, KEY_3);
 
-      cache(0).put(KEY_1, VALUE_1);
-      cache(0).put(KEY_2, VALUE_1);
-      cache(0).put(KEY_3, VALUE_1);
+      tm(0).begin();
+      txPut(0, KEY_1, VALUE_1, null);
+      txPut(0, KEY_2, VALUE_1, null);
+      txPut(0, KEY_3, VALUE_1, null);
+      tm(0).commit();
 
       assertCachesValue(0, KEY_1, VALUE_1);
       assertCachesValue(0, KEY_2, VALUE_1);
       assertCachesValue(0, KEY_3, VALUE_1);
 
-      TransactionManager tm0 = cache(0).getAdvancedCache().getTransactionManager();
-      tm0.begin();
+      tm(0).begin();
       assert VALUE_1.equals(cache(0).get(KEY_1));
-      Transaction tx0 = tm0.suspend();
+      Transaction tx0 = tm(0).suspend();
 
+      tm(1).begin();
       cache(1).put(KEY_1, VALUE_2);
-      cache(0).put(KEY_2, VALUE_2);
+      cache(1).put(KEY_2, VALUE_2);
       cache(1).put(KEY_3, VALUE_2);
+      tm(1).commit();
 
       assertCachesValue(1, KEY_1, VALUE_2);
-      assertCachesValue(0, KEY_2, VALUE_2);
+      assertCachesValue(1, KEY_2, VALUE_2);
       assertCachesValue(1, KEY_3, VALUE_2);
 
-      tm0.resume(tx0);
+      tm(0).resume(tx0);
       assert VALUE_1.equals(cache(0).get(KEY_1));
       assert VALUE_1.equals(cache(0).get(KEY_2));
       assert VALUE_1.equals(cache(0).get(KEY_3));
-      tm0.commit();
+      tm(0).commit();
 
       assertNoTransactions();
       printDataContainer();
@@ -62,8 +67,10 @@ public class ConsistencyTest extends AbstractGMUTest {
       assertAtLeastCaches(2);
       assertCacheValuesNull(KEY_1, KEY_2);
 
-      put(0, KEY_1, VALUE_1, null);
-      put(1, KEY_2, VALUE_1, null);
+      tm(0).begin();
+      txPut(0, KEY_1, VALUE_1, null);
+      txPut(0, KEY_2, VALUE_1, null);
+      tm(0).commit();
 
 
       tm(0).begin();
@@ -93,8 +100,10 @@ public class ConsistencyTest extends AbstractGMUTest {
       assertAtLeastCaches(2);
       assertCacheValuesNull(KEY_1, KEY_2);
 
-      put(0, KEY_1, VALUE_1, null);
-      put(1, KEY_2, VALUE_1, null);
+      tm(0).begin();
+      txPut(0, KEY_1, VALUE_1, null);
+      txPut(0, KEY_2, VALUE_1, null);
+      tm(0).commit();
 
 
       tm(0).begin();
@@ -122,11 +131,14 @@ public class ConsistencyTest extends AbstractGMUTest {
    }
 
    @Test(enabled = false)
-   public void testConcurrentWritesAndReads() throws InterruptedException {
+   public void testConcurrentWritesAndReads() throws Exception {
       assertAtLeastCaches(2);
       assertCacheValuesNull(COUNTER_1, COUNTER_2);
+
+      tm(0).begin();
       put(0, COUNTER_1, 0, null);
       put(0, COUNTER_2, 0, null);
+      tm(0).commit();
 
       ReadWriteThread[] readWriteThreads = new ReadWriteThread[2];
       readWriteThreads[0] = new ReadWriteThread("Writer-0", cache(0));
