@@ -88,7 +88,6 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    @Override
    protected InvocationContext createInvocationContext(GetKeyValueCommand command) {
       InvocationContext context = super.createInvocationContext(command);
-      context.setVersionToRead(maxVersion);
 
       GMUEntryVersion minGMUVersion = toGMUEntryVersion(minVersion);
       GMUEntryVersion maxGMUVersion = toGMUEntryVersion(maxVersion);
@@ -97,9 +96,15 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
 
       boolean alreadyReadOnThisNode = maxGMUVersion != null &&
             maxGMUVersion.getThisNodeVersionValue() == GMUEntryVersion.NON_EXISTING;
+
       context.setAlreadyReadOnThisNode(alreadyReadOnThisNode);
 
       if(!alreadyReadOnThisNode){
+         if (log.isTraceEnabled()) {
+            log.tracef("Max GMU version=%s, this node value=%s, Non-Existing=%s", maxGMUVersion,
+                       (maxGMUVersion != null ? maxGMUVersion.getThisNodeVersionValue() : "N/A"),
+                       GMUEntryVersion.NON_EXISTING);
+         }
          if (minGMUVersion == null) {
             throw new NullPointerException("Min Version cannot be null");
          }

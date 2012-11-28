@@ -229,6 +229,7 @@ public class SortedTransactionQueue {
             wait();
             return;
          }
+         transactionToCheck = transactionToCheck.getNext();
       }
       //commit until this transaction
       commitUntil(transactionToCheck, transactionEntryList);
