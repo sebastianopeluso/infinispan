@@ -124,9 +124,6 @@ public class GMUDistributionManagerImpl extends DistributionManagerImpl {
       if (!responses.isEmpty()) {
          for (Map.Entry<Address,Response> entry : responses.entrySet()) {
             Response r = entry.getValue();
-            if (r == null) {
-               continue;
-            }
             if (r instanceof SuccessfulResponse) {
                InternalGMUCacheValue gmuCacheValue = convert(((SuccessfulResponse) r).getResponseValue(),
                                                              InternalGMUCacheValue.class);

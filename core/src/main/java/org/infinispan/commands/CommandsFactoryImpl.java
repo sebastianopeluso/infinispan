@@ -97,7 +97,7 @@ import java.util.concurrent.Callable;
  * @author Galder Zamarreño
  * @author Sanne Grinovero <sanne@hibernate.org> (C) 2011 Red Hat Inc.
  * @author Pedro Ruivo
- * @author Sebastiano Peluso 
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 public class CommandsFactoryImpl implements CommandsFactory {
@@ -372,7 +372,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
             break;
          case GMUClusteredGetCommand.COMMAND_ID:
             GMUClusteredGetCommand gmuClusteredGetCommand = (GMUClusteredGetCommand) c;
-            gmuClusteredGetCommand.initializeGMUComponents(commitLog, versionGenerator, configuration);
+            gmuClusteredGetCommand.initializeGMUComponents(commitLog, configuration);
          case ClusteredGetCommand.COMMAND_ID:
             ClusteredGetCommand clusteredGetCommand = (ClusteredGetCommand) c;
             clusteredGetCommand.initialize(icc, this, entryFactory, interceptorChain, distributionManager, txTable);

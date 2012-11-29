@@ -27,11 +27,11 @@ import org.infinispan.config.Configuration;
 import org.infinispan.container.entries.InternalCacheValue;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
-import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.GMUEntryVersion;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.transaction.gmu.CommitLog;
+import org.infinispan.transaction.gmu.VersionNotAvailableException;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -61,16 +61,8 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    private CommitLog commitLog;
    private Configuration configuration;
 
-   private GMUClusteredGetCommand() {
-      super(null); // For command id uniqueness test
-   }
-
    public GMUClusteredGetCommand(String cacheName) {
       super(cacheName);
-   }
-
-   public GMUClusteredGetCommand(Object key, String cacheName, Set<Flag> flags, boolean acquireRemoteLock, GlobalTransaction gtx) {
-      super(key, cacheName, flags, acquireRemoteLock, gtx);
    }
 
    public GMUClusteredGetCommand(Object key, String cacheName, Set<Flag> flags, boolean acquireRemoteLock,
@@ -80,7 +72,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
       this.maxVersion = maxVersion;
    }
 
-   public void initializeGMUComponents(CommitLog commitLog, VersionGenerator versionGenerator, Configuration configuration) {
+   public void initializeGMUComponents(CommitLog commitLog, Configuration configuration) {
       this.commitLog = commitLog;
       this.configuration = configuration;
    }
@@ -112,10 +104,11 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
             if(!commitLog.waitForVersion(minGMUVersion, timeout)) {
                log.warnf("Receive remote get request, but the value wanted is not available. key: %s," +
                                "min version: %s, max version: %s", getKey(), minVersion, maxVersion);
-               return null; //no version available
+               throw new VersionNotAvailableException();
             }
          } catch (InterruptedException e) {
-            return null;
+            Thread.currentThread().interrupt();
+            throw new VersionNotAvailableException();
          }
       }
       context.setVersionToRead(commitLog.getAvailableVersionLessThan(maxGMUVersion));
@@ -124,12 +117,12 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
 
    @Override
    protected InternalCacheValue invoke(GetKeyValueCommand command, InvocationContext context) {
-      if (context == null) {
-         return null;
-      }
       super.invoke(command, context);
       InternalGMUCacheEntry gmuCacheEntry = context.getKeysReadInCommand().get(getKey());
-      return gmuCacheEntry == null ? null : gmuCacheEntry.toInternalCacheValue();
+      if (gmuCacheEntry == null) {
+         throw new VersionNotAvailableException();
+      }
+      return gmuCacheEntry.toInternalCacheValue();
    }
 
    @Override
@@ -159,12 +152,9 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
 
    @Override
    public String toString() {
-      return new StringBuilder()
-            .append("GMUClusteredGetCommand{key=").append(getKey())
-            .append(", flags=").append(getFlags())
-            .append(", minVersion=").append(minVersion)
-            .append(", maxVersion=").append(maxVersion)
-            .append("}")
-            .toString();
+      return "GMUClusteredGetCommand{key=" + getKey() +
+            ", flags=" + getFlags() +
+            ", minVersion=" + minVersion +
+            ", maxVersion=" + maxVersion + "}";
    }
 }
