@@ -22,9 +22,9 @@ import java.util.Set;
 public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
 
    private final InternalCacheEntry internalCacheEntry;
-   private final EntryVersion creationVersion;
+   private EntryVersion creationVersion;
    private final EntryVersion maxTxVersion;
-   private final EntryVersion maxValidVersion;
+   private EntryVersion maxValidVersion;
    private final boolean mostRecent;
 
    public InternalGMUValueCacheEntry(InternalCacheEntry internalCacheEntry, EntryVersion maxTxVersion,
@@ -244,6 +244,16 @@ public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
    @Override
    public InternalCacheEntry getInternalCacheEntry() {
       return internalCacheEntry;
+   }
+
+   @Override
+   public void setCreationVersion(EntryVersion entryVersion) {
+      this.creationVersion = entryVersion;
+   }
+
+   @Override
+   public void setMaximumValidVersion(EntryVersion version) {
+      this.maxValidVersion = version;
    }
 
    @Override

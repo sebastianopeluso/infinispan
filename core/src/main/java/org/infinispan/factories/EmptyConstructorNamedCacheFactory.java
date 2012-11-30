@@ -27,9 +27,14 @@ import org.infinispan.batch.BatchContainer;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.CommandsFactoryImpl;
 import org.infinispan.config.ConfigurationException;
+import org.infinispan.container.gmu.GMUL1Manager;
+import org.infinispan.container.gmu.L1GMUContainer;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.NonTransactionalInvocationContextContainer;
 import org.infinispan.context.TransactionalInvocationContextContainer;
+import org.infinispan.dataplacement.DataPlacementManager;
+import org.infinispan.distribution.L1Manager;
+import org.infinispan.distribution.L1ManagerImpl;
 import org.infinispan.eviction.EvictionManager;
 import org.infinispan.eviction.EvictionManagerImpl;
 import org.infinispan.eviction.PassivationManager;
@@ -43,11 +48,13 @@ import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
 import org.infinispan.statetransfer.totalorder.TotalOrderStateTransferLockImpl;
+import org.infinispan.transaction.TransactionCoordinator;
+import org.infinispan.transaction.gmu.CommitLog;
+import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.totalorder.DistParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.ParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.SequentialTotalOrderManager;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
-import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.xa.recovery.RecoveryAdminOperations;
 import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.concurrent.locks.containers.LockContainer;
@@ -55,7 +62,6 @@ import org.infinispan.util.concurrent.locks.containers.OwnableReentrantPerEntryL
 import org.infinispan.util.concurrent.locks.containers.OwnableReentrantStripedLockContainer;
 import org.infinispan.util.concurrent.locks.containers.ReentrantPerEntryLockContainer;
 import org.infinispan.util.concurrent.locks.containers.ReentrantStripedLockContainer;
-import org.infinispan.dataplacement.DataPlacementManager;
 import org.infinispan.util.concurrent.locks.containers.readwrite.OwnableReentrantPerEntryReadWriteLockContainer;
 import org.infinispan.util.concurrent.locks.containers.readwrite.OwnableReentrantStripedReadWriteLockContainer;
 
@@ -72,7 +78,8 @@ import static org.infinispan.util.Util.getInstance;
                               CacheLoaderManager.class, InvocationContextContainer.class, PassivationManager.class,
                               BatchContainer.class, EvictionManager.class,
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
-                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class, DataPlacementManager.class})
+                              ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class, DataPlacementManager.class,
+                              L1GMUContainer.class, L1Manager.class, CommitLog.class, TransactionCommitManager.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -141,6 +148,16 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
                : (T) new SequentialTotalOrderManager();
       } else if (componentType.equals(DataPlacementManager.class)){
          return (T) new DataPlacementManager();
+      } else if (componentType.equals(L1GMUContainer.class)) {
+         return (T) new L1GMUContainer();
+      } else if (componentType.equals(CommitLog.class)) {
+         return (T) new CommitLog();
+      } else if (componentType.equals(TransactionCommitManager.class)) {
+         return (T) new TransactionCommitManager();
+      } else if (componentType.equals(L1Manager.class)) {
+         return configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE ?
+               (T) new GMUL1Manager() :
+               (T) new L1ManagerImpl();
       }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());

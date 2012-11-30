@@ -55,6 +55,32 @@ public class CommitLog {
       return version;
    }
 
+   public EntryVersion getOldestVersion() {
+      VersionEntry iterator;
+      synchronized (this) {
+         iterator = currentVersion;
+      }
+      while (iterator.getPrevious() != null) {
+         iterator = iterator.getPrevious();
+      }
+      return iterator.getVersion();
+   }
+
+   public EntryVersion getEntry(EntryVersion entryVersion) {
+      GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(entryVersion);
+      VersionEntry versionEntry;
+      synchronized (this) {
+         versionEntry = currentVersion;
+      }
+      while (versionEntry != null) {
+         if (versionEntry.getVersion().getThisNodeVersionValue() == gmuEntryVersion.getThisNodeVersionValue()) {
+         return versionEntry.getVersion();
+         }
+         versionEntry = versionEntry.getPrevious();
+      }
+      return getOldestVersion();
+   }
+
 
    public EntryVersion getAvailableVersionLessThan(EntryVersion other) {
       VersionEntry iterator;

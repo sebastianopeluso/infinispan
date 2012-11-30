@@ -1,15 +1,13 @@
 package org.infinispan.tx.gmu;
 
-import org.infinispan.Cache;
 import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.infinispan.configuration.cache.VersioningScheme;
 import org.infinispan.container.DataContainer;
-import org.infinispan.container.GMUDataContainer;
+import org.infinispan.container.gmu.GMUDataContainer;
 import org.infinispan.test.MultipleCacheManagersTest;
 import org.infinispan.util.concurrent.IsolationLevel;
 
-import javax.transaction.SystemException;
 import javax.transaction.TransactionManager;
 import java.util.Map;
 
@@ -157,7 +155,7 @@ public abstract class AbstractGMUTest extends MultipleCacheManagersTest {
       }
    }
 
-   private ConfigurationBuilder defaultGMUConfiguration() {
+   protected final ConfigurationBuilder defaultGMUConfiguration() {
       ConfigurationBuilder builder = getDefaultClusteredCacheConfig(cacheMode(), true);
       builder.locking().isolationLevel(IsolationLevel.SERIALIZABLE);
       builder.versioning().enable().scheme(VersioningScheme.GMU);

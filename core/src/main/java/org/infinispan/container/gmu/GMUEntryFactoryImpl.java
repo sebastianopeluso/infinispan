@@ -1,16 +1,18 @@
-package org.infinispan.container;
+package org.infinispan.container.gmu;
 
+import org.infinispan.container.EntryFactoryImpl;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.MVCCEntry;
 import org.infinispan.container.entries.NullMarkerEntry;
 import org.infinispan.container.entries.NullMarkerEntryForRemoval;
 import org.infinispan.container.entries.SerializableEntry;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
+import org.infinispan.container.entries.gmu.InternalGMUNullCacheEntry;
+import org.infinispan.container.entries.gmu.InternalGMUValueCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContext;
-import org.infinispan.context.InvocationContextFlagsOverride;
 import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.transaction.gmu.CommitLog;
@@ -55,6 +57,7 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
    protected InternalCacheEntry getFromContainer(Object key, InvocationContext context) {
       boolean singleRead = context instanceof SingleKeyNonTxInvocationContext;
       boolean remotePrepare = !context.isOriginLocal() && context.isInTxScope();
+      boolean remoteRead = !context.isOriginLocal() && !context.isInTxScope();
 
       EntryVersion versionToRead;
       if (singleRead || remotePrepare) {
@@ -71,7 +74,20 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
       EntryVersion realVersionToRead = hasAlreadyReadFromThisNode ? versionToRead :
             commitLog.getAvailableVersionLessThan(versionToRead);
 
+      EntryVersion mostRecentCommitLogVersion = commitLog.getCurrentVersion();
+
       InternalGMUCacheEntry entry = toInternalGMUCacheEntry(container.get(key, realVersionToRead));
+
+      if (remoteRead) {
+         if (entry.getMaximumValidVersion() == null) {
+            entry.setMaximumValidVersion(mostRecentCommitLogVersion);
+         }
+         if (entry.getCreationVersion() == null) {
+            entry.setCreationVersion(commitLog.getOldestVersion());
+         } else {
+            entry.setCreationVersion(commitLog.getEntry(entry.getCreationVersion()));
+         }
+      }
 
       context.addKeyReadInCommand(key, entry);
 
@@ -80,5 +96,15 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
       }
 
       return entry.getInternalCacheEntry();
+   }
+
+   public static InternalGMUCacheEntry wrap(Object key, InternalCacheEntry entry, boolean mostRecent,
+                                            EntryVersion maxTxVersion, EntryVersion creationVersion,
+                                            EntryVersion maxValidVersion) {
+      if (entry == null || entry.isNull()) {
+         return new InternalGMUNullCacheEntry(key, (entry == null ? null : entry.getVersion()), maxTxVersion, mostRecent,
+                                              creationVersion, maxValidVersion);
+      }
+      return new InternalGMUValueCacheEntry(entry, maxTxVersion, mostRecent, creationVersion, maxValidVersion);
    }
 }

@@ -1,11 +1,11 @@
-package org.infinispan.container;
+package org.infinispan.container.gmu;
 
+import org.infinispan.container.AbstractDataContainer;
+import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.gmu.InternalGMUNullCacheEntry;
 import org.infinispan.container.entries.gmu.InternalGMURemovedCacheEntry;
-import org.infinispan.container.entries.gmu.InternalGMUValueCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
-import org.infinispan.container.versioning.InequalVersionComparisonResult;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.eviction.EvictionStrategy;
@@ -20,7 +20,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-import static org.infinispan.container.versioning.InequalVersionComparisonResult.*;
+import static org.infinispan.container.gmu.GMUEntryFactoryImpl.wrap;
 import static org.infinispan.transaction.gmu.GMUHelper.toInternalGMUCacheEntry;
 
 /**
@@ -29,7 +29,7 @@ import static org.infinispan.transaction.gmu.GMUHelper.toInternalGMUCacheEntry;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.VersionChain> {
+public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.DataContainerVersionChain> {
 
    private static final Log log = LogFactory.getLog(GMUDataContainer.class);
 
@@ -77,19 +77,21 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
          log.tracef("DataContainer.peek(%s,%s)", k, version);
       }
 
-      VersionChain chain = entries.get(k);
+      DataContainerVersionChain chain = entries.get(k);
       if (chain == null) {
          if (log.isTraceEnabled()) {
             log.tracef("DataContainer.peek(%s,%s) => NOT_FOUND", k, version);
          }
-         return wrap(k, null, true, version);
+         return wrap(k, null, true, version, null, null);
       }
-      GMUVersionEntry entry = chain.get(version);
+      VersionEntry<InternalCacheEntry> entry = chain.get(version);
 
       if (log.isTraceEnabled()) {
          log.tracef("DataContainer.peek(%s,%s) => %s", k, version, entry);
       }
-      return wrap(k, entry.getEntry(), entry.isMostRecent(), version);
+      EntryVersion creationVersion = entry.getEntry() == null ? null : entry.getEntry().getVersion();
+
+      return wrap(k, entry.getEntry(), entry.isMostRecent(), version, creationVersion, entry.getNextVersion());
    }
 
    @Override
@@ -97,13 +99,13 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
       if (log.isTraceEnabled()) {
          log.tracef("DataContainer.put(%s,%s,%s,%s,%s)", k, v, version, lifespan, maxIdle);
       }
-      VersionChain chain = entries.get(k);
+      DataContainerVersionChain chain = entries.get(k);
 
       if (chain == null) {
          if (log.isTraceEnabled()) {
             log.tracef("DataContainer.put(%s,%s,%s,%s,%s), create new VersionChain", k, v, version, lifespan, maxIdle);
          }
-         chain = new VersionChain();
+         chain = new DataContainerVersionChain();
          entries.put(k, chain);
       }
 
@@ -143,19 +145,19 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
          log.tracef("DataContainer.remove(%s,%s)", k, version);
       }
 
-      VersionChain chain = entries.get(k);
+      DataContainerVersionChain chain = entries.get(k);
       if (chain == null) {
          if (log.isTraceEnabled()) {
             log.tracef("DataContainer.remove(%s,%s) => NOT_FOUND", k, version);
          }
-         return wrap(k, null, true, null);
+         return wrap(k, null, true, null, null, null);
       }
-      GMUVersionEntry entry = chain.remove(k, getVersionToWrite(version));
+      VersionEntry<InternalCacheEntry> entry = chain.remove(new InternalGMURemovedCacheEntry(k, getVersionToWrite(version)));
 
       if (log.isTraceEnabled()) {
          log.tracef("DataContainer.remove(%s,%s) => %s", k, version, entry);
       }
-      return wrap(k, entry.getEntry(), entry.isMostRecent(), null);
+      return wrap(k, entry.getEntry(), entry.isMostRecent(), null, null, null);
    }
 
    @Override
@@ -216,7 +218,7 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
 
    public String stateToString() {
       StringBuilder stringBuilder = new StringBuilder();
-      for (Map.Entry<Object, VersionChain> entry : entries.entrySet()) {
+      for (Map.Entry<Object, DataContainerVersionChain> entry : entries.entrySet()) {
          stringBuilder.append(entry.getKey())
                .append("=>");
          entry.getValue().chainToString(stringBuilder);
@@ -226,21 +228,21 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
    }
 
    @Override
-   protected Map<Object, InternalCacheEntry> getCacheEntries(Map<Object, VersionChain> evicted) {
+   protected Map<Object, InternalCacheEntry> getCacheEntries(Map<Object, DataContainerVersionChain> evicted) {
       Map<Object, InternalCacheEntry> evictedMap = new HashMap<Object, InternalCacheEntry>();
-      for (Map.Entry<Object, VersionChain> entry : evicted.entrySet()) {
+      for (Map.Entry<Object, DataContainerVersionChain> entry : evicted.entrySet()) {
          evictedMap.put(entry.getKey(), entry.getValue().get(null).getEntry());
       }
       return evictedMap;
    }
 
    @Override
-   protected InternalCacheEntry getCacheEntry(VersionChain evicted) {
+   protected InternalCacheEntry getCacheEntry(DataContainerVersionChain evicted) {
       return evicted.get(null).getEntry();
    }
 
    @Override
-   protected InternalCacheEntry getCacheEntry(VersionChain entry, EntryVersion version) {
+   protected InternalCacheEntry getCacheEntry(DataContainerVersionChain entry, EntryVersion version) {
       return entry == null ? null : entry.get(version).getEntry();
    }
 
@@ -256,36 +258,13 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
       return gmuVersionGenerator.convertVersionToWrite(version);
    }
 
-   private static boolean isOlder(VersionBody current, VersionBody version) {
-      return current.getInternalCacheEntry().getVersion().compareTo(version.getInternalCacheEntry().getVersion()) == BEFORE;
-   }
-
-   private static boolean isOlderOrEqual(VersionBody current, EntryVersion version) {
-      InequalVersionComparisonResult result = current.getInternalCacheEntry().getVersion().compareTo(version);
-      return result == BEFORE || result == BEFORE_OR_EQUAL || result == EQUAL;
-   }
-
-   private static boolean isExpired(VersionBody body, long now) {
-      InternalCacheEntry entry = body.getInternalCacheEntry();
-      return entry != null && entry.canExpire() && entry.isExpired(now);
-   }
-
-   private static InternalCacheEntry wrap(Object key, InternalCacheEntry entry, boolean mostRecent,
-                                          EntryVersion maxTxVersion) {
-      if (entry == null || entry.isNull()) {
-         return new InternalGMUNullCacheEntry(key, (entry == null ? null : entry.getVersion()), maxTxVersion, mostRecent, null, null
-         );
-      }
-      return new InternalGMUValueCacheEntry(entry, maxTxVersion, mostRecent, null, null);
-   }
-
    private class GMUEntryIterator extends EntryIterator {
 
       private final EntryVersion version;
-      private final Iterator<VersionChain> iterator;
+      private final Iterator<DataContainerVersionChain> iterator;
       private InternalCacheEntry next;
 
-      private GMUEntryIterator(EntryVersion version, Iterator<VersionChain> iterator) {
+      private GMUEntryIterator(EntryVersion version, Iterator<DataContainerVersionChain> iterator) {
          this.version = version;
          this.iterator = iterator;
          findNext();
@@ -314,7 +293,7 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
       private void findNext() {
          next = null;
          while (iterator.hasNext()) {
-            VersionChain chain = iterator.next();
+            DataContainerVersionChain chain = iterator.next();
             next = chain.get(version).getEntry();
             if (next != null) {
                return;
@@ -323,193 +302,54 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
       }
    }
 
-   private static class GMUVersionEntry {
-      private final InternalCacheEntry entry;
-      private final boolean mostRecent;
-
-      private GMUVersionEntry(InternalCacheEntry entry, boolean mostRecent) {
-         this.entry = entry;
-         this.mostRecent = mostRecent;
-      }
-
-      public InternalCacheEntry getEntry() {
-         return entry;
-      }
-
-      public boolean isMostRecent() {
-         return mostRecent;
-      }
+   public static class DataContainerVersionChain extends VersionChain<InternalCacheEntry> {
 
       @Override
-      public String toString() {
-         return "GMUVersionEntry{" +
-               "entry=" + entry +
-               ", mostRecent=" + mostRecent +
-               '}';
+      protected VersionBody<InternalCacheEntry> newValue(InternalCacheEntry value) {
+         return new DataContainerVersionBody(value);
       }
    }
 
-   public static class VersionChain {
-      private VersionBody first;
+   public static class DataContainerVersionBody extends VersionBody<InternalCacheEntry> {
 
-      public final GMUVersionEntry get(EntryVersion version) {
-         VersionBody iterator;
-         synchronized (this) {
-            iterator = first;
-         }
-
-         if (log.isTraceEnabled()) {
-            log.tracef("[%s] find value for version %s", Thread.currentThread().getName(), version);
-         }
-
-         if (version == null) {
-            InternalCacheEntry entry = iterator == null ? null : iterator.getInternalCacheEntry();
-            if (log.isTraceEnabled()) {
-               log.tracef("[%s] version is null... returning the most recent: %s", Thread.currentThread().getName(), entry);
-            }
-            return new GMUVersionEntry(entry, true);
-         }
-
-         boolean mostRecent = true;
-
-         while (iterator != null) {
-            if (isOlderOrEqual(iterator, version)) {
-               if (log.isTraceEnabled()) {
-                  log.tracef("[%s] value found: %s", Thread.currentThread().getName(), iterator);
-               }
-               return new GMUVersionEntry(iterator.getInternalCacheEntry(), mostRecent);
-            }
-            iterator = iterator.getPrevious();
-            mostRecent = false;
-         }
-
-         if (log.isTraceEnabled()) {
-            log.tracef("[%s] No value found!", Thread.currentThread().getName());
-         }
-         return new GMUVersionEntry(null, mostRecent);
-      }
-
-      public final VersionBody add(InternalCacheEntry cacheEntry) {
-         VersionBody toAdd = new VersionBody(cacheEntry);
-         VersionBody iterator = firstAdd(toAdd);
-         while (iterator != null) {
-            iterator = iterator.add(toAdd);
-         }
-         return toAdd.getPrevious();
-      }
-
-      public final boolean contains(EntryVersion version) {
-         VersionBody iterator;
-         synchronized (this) {
-            iterator = first;
-         }
-
-         if (version == null) {
-            return iterator != null && !iterator.getInternalCacheEntry().isNull();
-         }
-
-         while (iterator != null) {
-            if (isOlderOrEqual(iterator, version)) {
-               return !iterator.getInternalCacheEntry().isNull();
-            }
-            iterator = iterator.getPrevious();
-         }
-         return false;
-      }
-
-      public final GMUVersionEntry remove(Object key, EntryVersion version) {
-         VersionBody previous = add(new InternalGMURemovedCacheEntry(key, version));
-         InternalCacheEntry entry = previous == null ? null : previous.getInternalCacheEntry();
-         return new GMUVersionEntry(entry, first == null || first.getPrevious() == previous);
-      }
-
-      public final void purgeExpired(long now) {
-         VersionBody iterator;
-         synchronized (this) {
-            while (first != null && isExpired(first, now)) {
-               first = first.getPrevious();
-            }
-            iterator = first;
-         }
-         while (iterator != null) {
-            iterator = iterator.expire(now);
-         }
-      }
-
-      private synchronized VersionBody firstAdd(VersionBody body) {
-         if (first == null || isOlder(first, body)) {
-            body.setPrevious(first);
-            first = body;
-            return null;
-         }
-         return first.add(body);
-      }
-
-      public void chainToString(StringBuilder stringBuilder) {
-         VersionBody iterator;
-         synchronized (this) {
-            iterator = first;
-         }
-         while (iterator != null) {
-            InternalCacheEntry entry = iterator.getInternalCacheEntry();
-            stringBuilder.append(entry.getValue())
-                  .append("=")
-                  .append(entry.getVersion())
-                  .append("-->");
-            iterator = iterator.getPrevious();
-         }
-         stringBuilder.append("NULL");
-      }
-   }
-
-   public static class VersionBody {
-      private final InternalCacheEntry internalCacheEntry;
-      private VersionBody previous;
-
-      public VersionBody(InternalCacheEntry internalCacheEntry) {
-         this.internalCacheEntry = internalCacheEntry;
-      }
-
-      public InternalCacheEntry getInternalCacheEntry() {
-         return internalCacheEntry;
-      }
-
-      public synchronized VersionBody getPrevious() {
-         return previous;
-      }
-
-      private synchronized void setPrevious(VersionBody previous) {
-         this.previous = previous;
-      }
-
-      public synchronized VersionBody add(VersionBody other) {
-         if (previous == null) {
-            previous = other;
-            return null;
-         } else if (isOlder(previous, other)) {
-            other.setPrevious(previous);
-            setPrevious(other);
-            return null;
-         }
-         return previous;
-      }
-
-      public synchronized VersionBody expire(long now) {
-         if (previous == null) {
-            return null;
-         }
-         if (isExpired(previous, now)) {
-            previous = previous.getPrevious();
-            return this;
-         }
-         return previous;
+      protected DataContainerVersionBody(InternalCacheEntry value) {
+         super(value);
       }
 
       @Override
-      public String toString() {
-         return "VersionBody{" +
-               "internalCacheEntry=" + internalCacheEntry +
-               '}';
+      public EntryVersion getVersion() {
+         return getValue().getVersion();
+      }
+
+      @Override
+      public boolean isOlder(VersionBody<InternalCacheEntry> otherBody) {
+         return isOlder(getValue().getVersion(), otherBody.getVersion());
+      }
+
+      @Override
+      public boolean isOlderOrEquals(EntryVersion entryVersion) {
+         return isOlderOrEquals(getValue().getVersion(), entryVersion);
+      }
+
+      @Override
+      public boolean isEqual(VersionBody<InternalCacheEntry> otherBody) {
+         return isEqual(getValue().getVersion(), otherBody.getVersion());
+      }
+
+      @Override
+      public boolean isRemove() {
+         return getValue().isRemoved();
+      }
+
+      @Override
+      public void reincarnate(VersionBody<InternalCacheEntry> other) {
+         throw new IllegalStateException("This cannot happen");
+      }
+
+      @Override
+      protected boolean isExpired(long now) {
+         InternalCacheEntry entry = getValue();
+         return entry != null && entry.canExpire() && entry.isExpired(now);
       }
    }
 }
