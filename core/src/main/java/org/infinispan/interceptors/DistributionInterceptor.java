@@ -79,6 +79,8 @@ import java.util.concurrent.TimeoutException;
  * @author Mircea.Markus@jboss.com
  * @author Pete Muir
  * @author Dan Berindei <dan@infinispan.org>
+ * @author Pedro Ruivo
+ * @author Hugo Pimentel
  * @since 4.0
  */
 public class DistributionInterceptor extends BaseRpcInterceptor {
@@ -87,7 +89,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
    CommandsFactory cf;
    protected DataContainer dataContainer;
    boolean isL1CacheEnabled, needReliableReturnValues;
-   EntryFactory entryFactory;
+   protected EntryFactory entryFactory;
    L1Manager l1Manager;
    LockManager lockManager;
    ClusteringDependentLogic cdl;
@@ -160,6 +162,28 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
       }
    }
 
+   protected void storeInL1(Object key, InternalCacheEntry ice, InvocationContext ctx, boolean isWrite) throws Throwable {
+      // This should be fail-safe
+      try {
+         if (log.isTraceEnabled()) {
+            log.tracef("Doing a put in L1 into the data container");
+         }
+         long lifespan = ice.getLifespan() < 0 ? configuration.getL1Lifespan() : Math.min(ice.getLifespan(), configuration.getL1Lifespan());
+         PutKeyValueCommand put = cf.buildPutKeyValueCommand(ice.getKey(), ice.getValue(), lifespan, -1, ctx.getFlags());
+         lockAndWrap(ctx, key, ice);
+         invokeNextInterceptor(ctx, put);
+      } catch (Exception e) {
+         // Couldn't store in L1 for some reason.  But don't fail the transaction!
+         log.infof("Unable to store entry %s in L1 cache", key);
+         log.debug("Inability to store in L1 caused by", e);
+      }
+   }
+
+   protected InternalCacheEntry retrieveFromRemoteSource(Object key, InvocationContext ctx, boolean acquireRemoteLock)
+         throws Exception {
+      return dm.retrieveFromRemoteSource(key, ctx, acquireRemoteLock);
+   }
+
    private boolean needsRemoteGet(InvocationContext ctx, Object key, boolean retvalCheck) {
       final CacheEntry entry;
       return retvalCheck
@@ -211,7 +235,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
          acquireRemoteLock = isWrite && isPessimisticCache && !txContext.getAffectedKeys().contains(key);
       }
       // attempt a remote lookup
-      InternalCacheEntry ice = dm.retrieveFromRemoteSource(key, ctx, acquireRemoteLock);
+      InternalCacheEntry ice = retrieveFromRemoteSource(key, ctx, acquireRemoteLock);
 
       if (acquireRemoteLock) {
          ((TxInvocationContext)ctx).addAffectedKey(key);
@@ -222,17 +246,7 @@ public class DistributionInterceptor extends BaseRpcInterceptor {
          if (storeInL1) {
             if (isL1CacheEnabled) {
                if (trace) log.tracef("Caching remotely retrieved entry for key %s in L1", key);
-               // This should be fail-safe
-               try {
-                  long lifespan = ice.getLifespan() < 0 ? configuration.getL1Lifespan() : Math.min(ice.getLifespan(), configuration.getL1Lifespan());
-                  PutKeyValueCommand put = cf.buildPutKeyValueCommand(ice.getKey(), ice.getValue(), lifespan, -1, ctx.getFlags());
-                  lockAndWrap(ctx, key, ice);
-                  invokeNextInterceptor(ctx, put);
-               } catch (Exception e) {
-                  // Couldn't store in L1 for some reason.  But don't fail the transaction!
-                  log.infof("Unable to store entry %s in L1 cache", key);
-                  log.debug("Inability to store in L1 caused by", e);
-               }
+               storeInL1(key, ice, ctx, isWrite);
             } else {
                CacheEntry ce = ctx.lookupEntry(key);
                if (ce == null || ce.isNull() || ce.isLockPlaceholder() || ce.getValue() == null) {

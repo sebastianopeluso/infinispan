@@ -21,18 +21,17 @@ package org.infinispan.factories;
 
 import org.infinispan.container.EntryFactory;
 import org.infinispan.container.EntryFactoryImpl;
-import org.infinispan.container.GMUEntryFactoryImpl;
+import org.infinispan.container.gmu.GMUEntryFactoryImpl;
 import org.infinispan.container.IncrementalVersionableEntryFactoryImpl;
 import org.infinispan.container.InternalEntryFactory;
 import org.infinispan.container.InternalEntryFactoryImpl;
 import org.infinispan.container.VersionedInternalEntryFactoryImpl;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
-import org.infinispan.transaction.LockingMode;
 import org.infinispan.util.concurrent.IsolationLevel;
 
 /**
  * Original authors are missing...
- * 
+ *
  * @author Pedro Ruivo
  * @author Sebastiano Peluso
  */

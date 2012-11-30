@@ -6,7 +6,7 @@ import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.infinispan.configuration.cache.VersioningScheme;
 import org.infinispan.container.DataContainer;
-import org.infinispan.container.GMUDataContainer;
+import org.infinispan.container.gmu.GMUDataContainer;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.distribution.DistributionManager;
 import org.infinispan.distribution.ch.ConsistentHash;
@@ -430,7 +430,7 @@ public abstract class AbstractGMUTest extends MultipleCacheManagersTest {
       private SortedTransactionQueue.TransactionEntry transactionEntry;
       private Thread expectedThread;
 
-      public ObtainTransactionEntry(Cache<?,?> cache) {
+      public ObtainTransactionEntry(Cache<?, ?> cache) {
          this.transactionCommitManager = cache.getAdvancedCache().getComponentRegistry()
                .getComponent(TransactionCommitManager.class);
          cache.getAdvancedCache().addInterceptorAfter(this, TxInterceptor.class);

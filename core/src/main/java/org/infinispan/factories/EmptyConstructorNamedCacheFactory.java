@@ -32,10 +32,14 @@ import org.infinispan.container.GMUCommitContextEntries;
 import org.infinispan.container.NonVersionedCommitContextEntries;
 import org.infinispan.container.TotalOrderVersionedCommitContextEntries;
 import org.infinispan.container.VersionedCommitContextEntries;
+import org.infinispan.container.gmu.GMUL1Manager;
+import org.infinispan.container.gmu.L1GMUContainer;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.NonTransactionalInvocationContextContainer;
 import org.infinispan.context.TransactionalInvocationContextContainer;
 import org.infinispan.dataplacement.DataPlacementManager;
+import org.infinispan.distribution.L1Manager;
+import org.infinispan.distribution.L1ManagerImpl;
 import org.infinispan.eviction.EvictionManager;
 import org.infinispan.eviction.EvictionManagerImpl;
 import org.infinispan.eviction.PassivationManager;
@@ -58,6 +62,8 @@ import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
 import org.infinispan.statetransfer.totalorder.TotalOrderStateTransferLockImpl;
 import org.infinispan.transaction.TransactionCoordinator;
+import org.infinispan.transaction.gmu.CommitLog;
+import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.totalorder.ParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.SequentialTotalOrderManager;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
@@ -85,7 +91,8 @@ import static org.infinispan.util.Util.getInstance;
                               BatchContainer.class, EvictionManager.class,
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
                               ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class, DataPlacementManager.class,
-                              ReconfigurableReplicationManager.class, ProtocolTable.class, CommitContextEntries.class})
+                              ReconfigurableReplicationManager.class, ProtocolTable.class, CommitContextEntries.class,
+                              L1GMUContainer.class, L1Manager.class, CommitLog.class, TransactionCommitManager.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -198,6 +205,16 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          } else {
             return (T) new NonVersionedCommitContextEntries();
          }
+      } else if (componentType.equals(L1GMUContainer.class)) {
+         return (T) new L1GMUContainer();
+      } else if (componentType.equals(CommitLog.class)) {
+         return (T) new CommitLog();
+      } else if (componentType.equals(TransactionCommitManager.class)) {
+         return (T) new TransactionCommitManager();
+      } else if (componentType.equals(L1Manager.class)) {
+         return configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE ?
+               (T) new GMUL1Manager() :
+               (T) new L1ManagerImpl();
       }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());

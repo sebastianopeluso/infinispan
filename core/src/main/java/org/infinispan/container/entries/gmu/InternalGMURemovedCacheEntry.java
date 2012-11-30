@@ -200,6 +200,16 @@ public class InternalGMURemovedCacheEntry implements InternalGMUCacheEntry {
    }
 
    @Override
+   public void setCreationVersion(EntryVersion entryVersion) {
+      //no-op
+   }
+
+   @Override
+   public void setMaximumValidVersion(EntryVersion version) {
+      //no-op
+   }
+
+   @Override
    public String toString() {
       return "InternalGMURemovedCacheEntry{" +
             "key=" + key +

@@ -24,14 +24,10 @@ package org.infinispan.factories;
 
 import org.infinispan.commands.RemoteCommandsFactory;
 import org.infinispan.config.ConfigurationException;
-import org.infinispan.distribution.L1Manager;
-import org.infinispan.distribution.L1ManagerImpl;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.marshall.jboss.ExternalizerTable;
-import org.infinispan.transaction.gmu.CommitLog;
-import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.InboundInvocationHandlerImpl;
 import org.infinispan.transaction.xa.TransactionFactory;
@@ -45,8 +41,7 @@ import org.infinispan.transaction.xa.TransactionFactory;
  * @author Sebastiano Peluso
  * @since 4.0
  */
-@DefaultFactoryFor(classes = {InboundInvocationHandler.class, RemoteCommandsFactory.class, TransactionFactory.class, L1Manager.class, ExternalizerTable.class,
-                              CommitLog.class, TransactionCommitManager.class})
+@DefaultFactoryFor(classes = {InboundInvocationHandler.class, RemoteCommandsFactory.class, TransactionFactory.class,ExternalizerTable.class})
 @Scope(Scopes.GLOBAL)
 public class EmptyConstructorFactory extends AbstractComponentFactory implements AutoInstantiableFactory {
 
@@ -59,15 +54,8 @@ public class EmptyConstructorFactory extends AbstractComponentFactory implements
          return (T) new RemoteCommandsFactory();
       else if (componentType.equals(TransactionFactory.class))
          return (T) new TransactionFactory();
-      else if (componentType.equals(L1Manager.class))
-         return (T) new L1ManagerImpl();
       else if (componentType.equals(ExternalizerTable.class))
          return (T) new ExternalizerTable();
-      else if (componentType.equals(CommitLog.class)) {
-         return (T) new CommitLog();
-      } else if (componentType.equals(TransactionCommitManager.class)) {
-         return (T) new TransactionCommitManager();
-      }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());
    }

@@ -38,14 +38,13 @@ import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
 public class CommitLog {
 
    private static final Log log = LogFactory.getLog(CommitLog.class);
-
    private GMUVersion mostRecentVersion;
    private VersionEntry currentVersion;
    private GMUVersionGenerator versionGenerator;
    private boolean enabled = false;
 
    @Inject
-   public void inject(VersionGenerator versionGenerator, Configuration configuration){
+   public void inject(VersionGenerator versionGenerator, Configuration configuration) {
       if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
          this.versionGenerator = toGMUVersionGenerator(versionGenerator);
       }
@@ -78,6 +77,31 @@ public class CommitLog {
       return version;
    }
 
+   public EntryVersion getOldestVersion() {
+      VersionEntry iterator;
+      synchronized (this) {
+         iterator = currentVersion;
+      }
+      while (iterator.getPrevious() != null) {
+         iterator = iterator.getPrevious();
+      }
+      return iterator.getVersion();
+   }
+
+   public EntryVersion getEntry(EntryVersion entryVersion) {
+      GMUVersion gmuEntryVersion = toGMUVersion(entryVersion);
+      VersionEntry versionEntry;
+      synchronized (this) {
+         versionEntry = currentVersion;
+      }
+      while (versionEntry != null) {
+         if (versionEntry.getVersion().getThisNodeVersionValue() == gmuEntryVersion.getThisNodeVersionValue()) {
+            return versionEntry.getVersion();
+         }
+         versionEntry = versionEntry.getPrevious();
+      }
+      return getOldestVersion();
+   }
 
    public GMUVersion getAvailableVersionLessThan(EntryVersion other) {
       assertEnabled();
@@ -281,12 +305,12 @@ public class CommitLog {
          return previous;
       }
 
-      public int getSubVersion() {
-         return subVersion;
-      }
-
       public void setPrevious(VersionEntry previous) {
          this.previous = previous;
+      }
+
+      public int getSubVersion() {
+         return subVersion;
       }
 
       @Override

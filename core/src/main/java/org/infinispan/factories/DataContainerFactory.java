@@ -26,7 +26,7 @@ import org.infinispan.config.ConfigurationException;
 import org.infinispan.config.parsing.XmlConfigHelper;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.DefaultDataContainer;
-import org.infinispan.container.GMUDataContainer;
+import org.infinispan.container.gmu.GMUDataContainer;
 import org.infinispan.eviction.EvictionStrategy;
 import org.infinispan.eviction.EvictionThreadPolicy;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
@@ -55,7 +55,7 @@ public class DataContainerFactory extends AbstractNamedCacheComponentFactory imp
          EvictionStrategy st = configuration.getEvictionStrategy();
          int level = configuration.getConcurrencyLevel();
          boolean serializable = configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE;
-        
+
          switch (st) {
             case NONE:
                return (T) unBoundedDataContainer(serializable, level);
@@ -64,7 +64,7 @@ public class DataContainerFactory extends AbstractNamedCacheComponentFactory imp
             case FIFO:
             case LIRS:
                int maxEntries = configuration.getEvictionMaxEntries();
-               //handle case when < 0 value signifies unbounded container 
+               //handle case when < 0 value signifies unbounded container
                if(maxEntries < 0) {
                   return (T) unBoundedDataContainer(serializable, level);
                }

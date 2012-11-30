@@ -20,8 +20,8 @@ import java.util.Set;
 public class InternalGMUNullCacheEntry extends InternalGMURemovedCacheEntry {
 
    private final boolean mostRecent;
-   private final EntryVersion creationVersion;
-   private final EntryVersion maxValidVersion;
+   private EntryVersion creationVersion;
+   private EntryVersion maxValidVersion;
    private final EntryVersion maxTxVersion;
 
    public InternalGMUNullCacheEntry(Object key, EntryVersion version, EntryVersion maxTxVersion, boolean mostRecent,
@@ -64,6 +64,16 @@ public class InternalGMUNullCacheEntry extends InternalGMURemovedCacheEntry {
    @Override
    public boolean isMostRecent() {
       return mostRecent;
+   }
+
+   @Override
+   public void setCreationVersion(EntryVersion entryVersion) {
+      this.creationVersion = entryVersion;
+   }
+
+   @Override
+   public void setMaximumValidVersion(EntryVersion version) {
+      this.maxValidVersion = version;
    }
 
    @Override
