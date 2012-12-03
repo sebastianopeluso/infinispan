@@ -81,6 +81,8 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
       if (remoteRead) {
          if (entry.getMaximumValidVersion() == null) {
             entry.setMaximumValidVersion(mostRecentCommitLogVersion);
+         } else {
+            entry.setMaximumValidVersion(commitLog.getEntry(entry.getMaximumValidVersion()));
          }
          if (entry.getCreationVersion() == null) {
             entry.setCreationVersion(commitLog.getOldestVersion());

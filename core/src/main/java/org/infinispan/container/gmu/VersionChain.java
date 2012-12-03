@@ -103,6 +103,7 @@ public abstract class VersionChain<T> {
 
    protected abstract VersionBody<T> newValue(T value);
 
+   //return null if the value was added successfully
    private synchronized VersionBody<T> firstAdd(VersionBody<T> body) {
       if (first == null || first.isOlder(body)) {
          body.setPrevious(first);
@@ -110,7 +111,7 @@ public abstract class VersionChain<T> {
          return null;
       } else if (first.isEqual(body)) {
          first.reincarnate(body);
-         return first.getPrevious();
+         return null;
       }
       return first.add(body);
    }

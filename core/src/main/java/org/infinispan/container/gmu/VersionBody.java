@@ -43,6 +43,7 @@ public abstract class VersionBody<T> {
          return null;
       } else if (previous.isEqual(other)) {
          previous.reincarnate(other);
+         return null;
       }
       return previous;
    }

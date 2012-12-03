@@ -181,7 +181,7 @@ public class SimpleTest extends AbstractGMUL1Test {
    public void testReplaceWithOldVal() {
       assertAtLeastCaches(2);
       Object cache1Key1 = newKey(1, "key_1");
-      assertCacheValuesNull(KEY_1);
+      assertCacheValuesNull(cache1Key1);
 
       put(1, cache1Key1, VALUE_2, null);
       put(0, cache1Key1, VALUE_3, VALUE_2);
