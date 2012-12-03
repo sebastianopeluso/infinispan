@@ -186,17 +186,19 @@ public class SortedTransactionQueue {
       notifyIfNeeded();
    }
 
-   public final void commit(CacheTransaction cacheTransaction, GMUEntryVersion commitVersion) {
+   //return true if it is a read-write transaction
+   public final boolean commit(CacheTransaction cacheTransaction, GMUEntryVersion commitVersion) {
       Node entry = concurrentHashMap.get(cacheTransaction.getGlobalTransaction());
       if (entry == null) {
          if (log.isDebugEnabled()) {
             log.debugf("Cannot commit transaction %s. Maybe it is a read-only on this node",
                        cacheTransaction.getGlobalTransaction().prettyPrint());
          }
-         return;
+         return false;
       }
       update(entry, commitVersion);
       notifyIfNeeded();
+      return true;
    }
 
    public final synchronized void populateToCommit(List<TransactionEntry> transactionEntryList) throws InterruptedException {

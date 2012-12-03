@@ -25,6 +25,7 @@ public class CommitLog {
 
    private static final Log log = LogFactory.getLog(CommitLog.class);
 
+   private GMUEntryVersion mostRecentVersion;
    private VersionEntry currentVersion;
    private GMUVersionGenerator versionGenerator;
 
@@ -37,6 +38,7 @@ public class CommitLog {
    @Start(priority = 31)
    public void start() {
       currentVersion = new VersionEntry(toGMUEntryVersion(versionGenerator.generateNew()));
+      mostRecentVersion = toGMUEntryVersion(versionGenerator.generateNew());
    }
 
    @Stop
@@ -46,7 +48,7 @@ public class CommitLog {
 
    public synchronized EntryVersion getCurrentVersion() {
       //versions are immutable
-      EntryVersion version = currentVersion.getVersion();
+      EntryVersion version = versionGenerator.updatedVersion(mostRecentVersion);
       if (log.isTraceEnabled()) {
          log.tracef("getCurrentVersion() ==> %s", version);
       }
@@ -58,7 +60,9 @@ public class CommitLog {
       VersionEntry iterator;
       synchronized (this) {
          //if other is null, return the most recent version
-         if (other == null || isLessOrEquals(currentVersion.getVersion(), other)) {
+         if (other == null || isLessOrEquals(mostRecentVersion, other)) {
+            return getCurrentVersion();
+         } else if (isLessOrEquals(currentVersion.getVersion(), other)) {
             EntryVersion version = currentVersion.getVersion();
             if (log.isTraceEnabled()) {
                log.tracef("getAvailableVersionLessThan(%s) ==> %s", other, version);
@@ -81,22 +85,32 @@ public class CommitLog {
       throw new IllegalStateException("Version required no longer exists");
    }
 
-   public synchronized void addNewVersion(EntryVersion newVersion) {
+   public synchronized void insertNewCommittedVersion(EntryVersion newVersion) {
       VersionEntry current = new VersionEntry(toGMUEntryVersion(
             versionGenerator.mergeAndMax(currentVersion.getVersion(), newVersion)));
       if (current.getVersion().compareTo(currentVersion.getVersion()) == EQUAL) {
          //same version??
          if (log.isTraceEnabled()) {
-            log.tracef("addNewVersion(%s) ==> %s", newVersion, currentVersion.getVersion());
+            log.tracef("insertNewCommittedVersion(%s) ==> %s", newVersion, currentVersion.getVersion());
          }
          return;
       }
       current.setPrevious(currentVersion);
       currentVersion = current;
       if (log.isTraceEnabled()) {
-         log.tracef("addNewVersion(%s) ==> %s", newVersion, currentVersion.getVersion());
+         log.tracef("insertNewCommittedVersion(%s) ==> %s", newVersion, currentVersion.getVersion());
       }
+      mostRecentVersion = versionGenerator.mergeAndMax(mostRecentVersion, currentVersion.getVersion());
       notifyAll();
+   }
+
+   public synchronized void updateMostRecentVersion(EntryVersion newVersion) {
+      GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(newVersion);
+      if (gmuEntryVersion.getThisNodeVersionValue() > mostRecentVersion.getThisNodeVersionValue()) {
+         throw new IllegalArgumentException("Cannot update the most recent version to a version higher than " +
+                                                  "the current version");
+      }
+      mostRecentVersion = versionGenerator.mergeAndMax(mostRecentVersion, gmuEntryVersion);
    }
 
    public synchronized boolean waitForVersion(EntryVersion version, long timeout) throws InterruptedException {

@@ -119,7 +119,9 @@ public class TransactionCommitManager {
    public synchronized void commitTransaction(CacheTransaction cacheTransaction, EntryVersion version) {
       GMUEntryVersion commitVersion = toGMUEntryVersion(version);
       lastPreparedVersion = Math.max(commitVersion.getThisNodeVersionValue(), lastPreparedVersion);
-      sortedTransactionQueue.commit(cacheTransaction, commitVersion);
+      if (!sortedTransactionQueue.commit(cacheTransaction, commitVersion)) {
+         commitLog.updateMostRecentVersion(commitVersion);
+      }
    }
 
    public void prepareReadOnlyTransaction(CacheTransaction cacheTransaction) {
@@ -185,7 +187,7 @@ public class TransactionCommitManager {
                }
 
                GMUEntryVersion[] committedVersionsArray = new GMUEntryVersion[committedVersions.size()];
-               commitLog.addNewVersion(versionGenerator.mergeAndMax(committedVersions.toArray(committedVersionsArray)));
+               commitLog.insertNewCommittedVersion(versionGenerator.mergeAndMax(committedVersions.toArray(committedVersionsArray)));
             } catch (InterruptedException e) {
                running = false;
                if (log.isTraceEnabled()) {
