@@ -13,7 +13,7 @@ import java.util.Collection;
  * @since 5.2
  */
 public interface GMUVersionGenerator extends VersionGenerator {
-   GMUEntryVersion mergeAndMax(Collection<? extends EntryVersion> entryVersions);
+   GMUEntryVersion mergeAndMax(EntryVersion... entryVersions);
 
    GMUEntryVersion calculateCommitVersion(EntryVersion prepareVersion, Collection<Address> affectedOwners);
 
@@ -24,6 +24,8 @@ public interface GMUVersionGenerator extends VersionGenerator {
    GMUEntryVersion calculateMinVersionToRead(EntryVersion transactionVersion, Collection<Address> alreadyReadFrom);
 
    GMUEntryVersion setNodeVersion(EntryVersion version, long value);
+
+   GMUEntryVersion updatedVersion(EntryVersion entryVersion);
 
    ClusterSnapshot getClusterSnapshot(int viewId);
 

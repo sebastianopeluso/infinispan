@@ -83,12 +83,12 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public final GMUEntryVersion mergeAndMax(Collection<? extends EntryVersion> entryVersions) {
-      if (entryVersions == null || entryVersions.isEmpty()) {
+   public final GMUEntryVersion mergeAndMax(EntryVersion... entryVersions) {
+      if (entryVersions == null || entryVersions.length == 0) {
          throw new IllegalStateException("Cannot merge an empy list");
       }
 
-      List<GMUEntryVersion> gmuEntryVersions = new ArrayList<GMUEntryVersion>(entryVersions.size());
+      List<GMUEntryVersion> gmuEntryVersions = new ArrayList<GMUEntryVersion>(entryVersions.length);
       //validate the entry versions
       for (EntryVersion entryVersion : entryVersions) {
          if (entryVersion == null) {
@@ -178,7 +178,7 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
             log.tracef("calculateMinVersionToRead(%s, %s) ==> %s", transactionVersion, alreadyReadFrom,
                        transactionVersion);
          }
-         return toGMUEntryVersion(transactionVersion);
+         return updatedVersion(transactionVersion);
       }
 
       //the min version is defined by the nodes that we haven't read yet
@@ -223,6 +223,23 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
          log.tracef("setNodeVersion(%s, %s) ==> %s", version, value, newVersion);
       }
       return newVersion;
+   }
+
+   @Override
+   public GMUEntryVersion updatedVersion(EntryVersion entryVersion) {
+      if (entryVersion instanceof GMUCacheEntryVersion) {
+         return new GMUCacheEntryVersion(cacheName, currentViewId, this,
+                                         ((GMUCacheEntryVersion) entryVersion).getThisNodeVersionValue());
+      } else if (entryVersion instanceof GMUClusterEntryVersion) {
+         int viewId = currentViewId;
+         ClusterSnapshot clusterSnapshot = getClusterSnapshot(viewId);
+         long[] newVersions = new long[clusterSnapshot.size()];
+         for (int i = 0;  i < clusterSnapshot.size(); ++i) {
+            newVersions[i] = ((GMUClusterEntryVersion) entryVersion).getVersionValue(clusterSnapshot.get(i));
+         }
+         return new GMUClusterEntryVersion(cacheName, viewId, this, newVersions);
+      }
+      throw new IllegalArgumentException("Cannot handle " + entryVersion);
    }
 
    @Override

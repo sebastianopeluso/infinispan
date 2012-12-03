@@ -108,6 +108,10 @@ public abstract class GMUEntryVersion implements IncrementableEntryVersion {
       return InequalVersionComparisonResult.AFTER;
    }
 
+   protected final Address getAddress() {
+      return clusterSnapshot.get(nodeIndex);
+   }
+
    protected static GMUVersionGenerator getGMUVersionGenerator(GlobalComponentRegistry globalComponentRegistry,
                                                                      String cacheName) {
       ComponentRegistry componentRegistry = globalComponentRegistry.getNamedComponentRegistry(cacheName);

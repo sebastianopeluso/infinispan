@@ -12,8 +12,6 @@ import org.infinispan.factories.annotations.Stop;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.util.Arrays;
-
 import static org.infinispan.container.versioning.InequalVersionComparisonResult.*;
 import static org.infinispan.transaction.gmu.GMUHelper.toGMUEntryVersion;
 import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
@@ -85,7 +83,7 @@ public class CommitLog {
 
    public synchronized void addNewVersion(EntryVersion newVersion) {
       VersionEntry current = new VersionEntry(toGMUEntryVersion(
-            versionGenerator.mergeAndMax(Arrays.asList(currentVersion.getVersion(), newVersion))));
+            versionGenerator.mergeAndMax(currentVersion.getVersion(), newVersion)));
       if (current.getVersion().compareTo(currentVersion.getVersion()) == EQUAL) {
          //same version??
          if (log.isTraceEnabled()) {

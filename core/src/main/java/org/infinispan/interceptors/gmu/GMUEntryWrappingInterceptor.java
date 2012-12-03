@@ -23,8 +23,6 @@ import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.EntryWrappingInterceptor;
-import org.infinispan.remoting.rpc.RpcManager;
-import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.util.logging.Log;
@@ -243,7 +241,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
       }
 
       if (entryVersionList.size() > 1) {
-         txInvocationContext.setTransactionVersion(versionGenerator.mergeAndMax(entryVersionList));
+         EntryVersion[] txVersionArray = new EntryVersion[entryVersionList.size()];
+         txInvocationContext.setTransactionVersion(versionGenerator.mergeAndMax(entryVersionList.toArray(txVersionArray)));
       }
    }
 

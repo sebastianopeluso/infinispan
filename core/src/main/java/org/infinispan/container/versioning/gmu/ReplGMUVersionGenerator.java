@@ -57,7 +57,7 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public final GMUEntryVersion mergeAndMax(Collection<? extends EntryVersion> entryVersions) {
+   public final GMUEntryVersion mergeAndMax(EntryVersion... entryVersions) {
       //validate the entry versions
       for (EntryVersion entryVersion : entryVersions) {
          if (entryVersion instanceof GMUCacheEntryVersion) {
@@ -73,7 +73,7 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
    @Override
    public final GMUEntryVersion calculateCommitVersion(EntryVersion mergedPrepareVersion,
                                                        Collection<Address> affectedOwners) {
-      return toGMUEntryVersion(mergedPrepareVersion);
+      return updatedVersion(mergedPrepareVersion);
    }
 
    @Override
@@ -88,18 +88,35 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
       if (alreadyReadFrom == null || alreadyReadFrom.isEmpty()) {
          return null;
       }
-      return toGMUEntryVersion(transactionVersion);
+      return updatedVersion(transactionVersion);
    }
 
    @Override
    public GMUEntryVersion calculateMinVersionToRead(EntryVersion transactionVersion,
                                                     Collection<Address> alreadyReadFrom) {
-      return toGMUEntryVersion(transactionVersion);
+      return updatedVersion(transactionVersion);
    }
 
    @Override
    public GMUEntryVersion setNodeVersion(EntryVersion version, long value) {
       return new GMUCacheEntryVersion(cacheName, currentViewId, this, value);
+   }
+
+   @Override
+   public GMUEntryVersion updatedVersion(EntryVersion entryVersion) {
+      if (entryVersion instanceof GMUCacheEntryVersion) {
+         return new GMUCacheEntryVersion(cacheName, currentViewId, this,
+                                         ((GMUCacheEntryVersion) entryVersion).getThisNodeVersionValue());
+      } else if (entryVersion instanceof GMUClusterEntryVersion) {
+         int viewId = currentViewId;
+         ClusterSnapshot clusterSnapshot = getClusterSnapshot(viewId);
+         long[] newVersions = new long[clusterSnapshot.size()];
+         for (int i = 0;  i < clusterSnapshot.size(); ++i) {
+            newVersions[i] = ((GMUClusterEntryVersion) entryVersion).getVersionValue(clusterSnapshot.get(i));
+         }
+         return new GMUClusterEntryVersion(cacheName, viewId, this, newVersions);
+      }
+      throw new IllegalArgumentException("Cannot handle " + entryVersion);
    }
 
    @Override
@@ -136,9 +153,12 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
       throw new IllegalArgumentException("Expected a GMU entry version but received " + version.getClass().getSimpleName());
    }
 
-   private long merge(Collection<? extends EntryVersion> entryVersions) {
+   private long merge(EntryVersion... entryVersions) {
       long max = NON_EXISTING;
       for (EntryVersion entryVersion : entryVersions) {
+         if (entryVersion == null) {
+            continue;
+         }
          GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(entryVersion);
          max = Math.max(max, gmuEntryVersion.getThisNodeVersionValue());
       }

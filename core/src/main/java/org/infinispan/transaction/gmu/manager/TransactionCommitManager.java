@@ -184,7 +184,8 @@ public class TransactionCommitManager {
                   }
                }
 
-               commitLog.addNewVersion(versionGenerator.mergeAndMax(committedVersions));
+               GMUEntryVersion[] committedVersionsArray = new GMUEntryVersion[committedVersions.size()];
+               commitLog.addNewVersion(versionGenerator.mergeAndMax(committedVersions.toArray(committedVersionsArray)));
             } catch (InterruptedException e) {
                running = false;
                if (log.isTraceEnabled()) {

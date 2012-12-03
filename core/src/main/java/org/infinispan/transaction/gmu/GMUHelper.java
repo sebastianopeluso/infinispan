@@ -114,7 +114,8 @@ public class GMUHelper {
          }
       }
 
-      EntryVersion commitVersion = versionGenerator.mergeAndMax(allPreparedVersions);
+      EntryVersion[] preparedVersionsArray = new EntryVersion[allPreparedVersions.size()];
+      EntryVersion commitVersion = versionGenerator.mergeAndMax(allPreparedVersions.toArray(preparedVersionsArray));
 
       if (log.isTraceEnabled()) {
          log.tracef("Merging transaction [%s] prepare versions %s ==> %s", gtx.prettyPrint(), allPreparedVersions,
