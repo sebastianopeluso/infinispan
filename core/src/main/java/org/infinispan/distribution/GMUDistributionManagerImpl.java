@@ -26,8 +26,9 @@ import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.entries.gmu.InternalGMUCacheValue;
-import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.ClusterSnapshot;
+import org.infinispan.container.versioning.gmu.GMUEntryVersion;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.SingleKeyNonTxInvocationContext;
@@ -46,12 +47,12 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-import static org.infinispan.transaction.gmu.GMUHelper.convert;
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
+import static org.infinispan.transaction.gmu.GMUHelper.*;
 
 /**
  * The distribution manager implementation for the GMU protocol
@@ -98,17 +99,31 @@ public class GMUDistributionManagerImpl extends DistributionManagerImpl {
       targets.retainAll(rpcManager.getTransport().getMembers());
 
       Collection<Address> alreadyReadFrom = txInvocationContext.getAlreadyReadFrom();
-      EntryVersion transactionVersion = txInvocationContext.getTransactionVersion();
+      GMUEntryVersion transactionVersion = toGMUEntryVersion(txInvocationContext.getTransactionVersion());
 
-      EntryVersion maxVersionToRead = versionGenerator.calculateMaxVersionToRead(transactionVersion, alreadyReadFrom);
-      EntryVersion minVersionToRead = versionGenerator.calculateMinVersionToRead(transactionVersion, alreadyReadFrom);
+      BitSet alreadyReadFromMask;
+
+      if (alreadyReadFrom == null) {
+         alreadyReadFromMask = null;
+      } else {
+         int txViewId = transactionVersion.getViewId();
+         ClusterSnapshot clusterSnapshot = versionGenerator.getClusterSnapshot(txViewId);
+         alreadyReadFromMask = new BitSet(clusterSnapshot.size());
+
+         for (Address address : alreadyReadFrom) {
+            int idx = clusterSnapshot.indexOf(address);
+            if (idx != -1) {
+               alreadyReadFromMask.set(idx);
+            }
+         }
+      }
 
       ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, txInvocationContext.getFlags(), acquireRemoteLock,
-                                                               gtx, minVersionToRead, maxVersionToRead, null);
+                                                               gtx, transactionVersion, alreadyReadFromMask);
 
       if(log.isDebugEnabled()) {
-         log.debugf("Perform a remote get for transaction %s. Key: %s, minVersion: %s, maxVersion: %s",
-                    txInvocationContext.getGlobalTransaction().prettyPrint(), key, minVersionToRead, maxVersionToRead);
+         log.debugf("Perform a remote get for transaction %s. %s",
+                    txInvocationContext.getGlobalTransaction().prettyPrint(), get);
       }
 
       ResponseFilter filter = new ClusteredGetResponseValidityFilter(targets, getAddress());
@@ -152,15 +167,11 @@ public class GMUDistributionManagerImpl extends DistributionManagerImpl {
       // if any of the recipients has left the cluster since the command was issued, just don't wait for its response
       targets.retainAll(rpcManager.getTransport().getMembers());
 
-      EntryVersion maxVersionToRead = versionGenerator.calculateMaxVersionToRead(null, null);
-      EntryVersion minVersionToRead = versionGenerator.calculateMinVersionToRead(commitLog.getCurrentVersion(), null);
-
       ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, ctx.getFlags(), false, null,
-                                                               minVersionToRead, maxVersionToRead, null);
+                                                               toGMUEntryVersion(commitLog.getCurrentVersion()), null);
 
       if(log.isDebugEnabled()) {
-         log.debugf("Perform a single remote get. Key: %s, minVersion: %s, maxVersion: %s", key, minVersionToRead,
-                    maxVersionToRead);
+         log.debugf("Perform a single remote get. %s", get);
       }
 
       ResponseFilter filter = new ClusteredGetResponseValidityFilter(targets, getAddress());

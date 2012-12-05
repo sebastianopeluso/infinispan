@@ -26,19 +26,25 @@ import org.infinispan.commands.read.GetKeyValueCommand;
 import org.infinispan.config.Configuration;
 import org.infinispan.container.entries.InternalCacheValue;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
-import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.ClusterSnapshot;
 import org.infinispan.container.versioning.gmu.GMUEntryVersion;
+import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
+import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.gmu.VersionNotAvailableException;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.BitSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUEntryVersion;
+import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
 
 /**
  * Issues a remote get call.  This is not a {@link org.infinispan.commands.VisitableCommand} and hence not passed up the
@@ -54,11 +60,11 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    public static final byte COMMAND_ID = 32;
    private static final Log log = LogFactory.getLog(GMUClusteredGetCommand.class);
 
-   //with null, it does not waits for anything and return a value compatible with maxVC
-   private EntryVersion minVersion = null;
-   //read the most recent version (in tx context, this is not null)
-   private EntryVersion maxVersion;
+   //the transaction version. from this version and with the bit set, it calculates the max and min version to read
+   private GMUEntryVersion transactionVersion;
+   private BitSet alreadyReadFrom;
    private CommitLog commitLog;
+   private GMUVersionGenerator versionGenerator;
    private Configuration configuration;
 
    public GMUClusteredGetCommand(String cacheName) {
@@ -66,23 +72,41 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    }
 
    public GMUClusteredGetCommand(Object key, String cacheName, Set<Flag> flags, boolean acquireRemoteLock,
-                                 GlobalTransaction globalTransaction, EntryVersion minVersion, EntryVersion maxVersion) {
+                                 GlobalTransaction globalTransaction, GMUEntryVersion txVersion, BitSet alreadyReadFrom) {
       super(key,  cacheName, flags, acquireRemoteLock, globalTransaction);
-      this.minVersion = minVersion;
-      this.maxVersion = maxVersion;
+      this.transactionVersion = txVersion;
+      this.alreadyReadFrom = alreadyReadFrom == null || alreadyReadFrom.isEmpty() ? null : alreadyReadFrom;
    }
 
-   public void initializeGMUComponents(CommitLog commitLog, Configuration configuration) {
+   public void initializeGMUComponents(CommitLog commitLog, Configuration configuration,
+                                       VersionGenerator versionGenerator) {
       this.commitLog = commitLog;
       this.configuration = configuration;
+      this.versionGenerator = toGMUVersionGenerator(versionGenerator);
    }
 
    @Override
    protected InvocationContext createInvocationContext(GetKeyValueCommand command) {
       InvocationContext context = super.createInvocationContext(command);
 
-      GMUEntryVersion minGMUVersion = toGMUEntryVersion(minVersion);
-      GMUEntryVersion maxGMUVersion = toGMUEntryVersion(maxVersion);
+      GMUEntryVersion minGMUVersion;
+      GMUEntryVersion maxGMUVersion;
+
+      if (alreadyReadFrom != null) {
+         int txViewId = transactionVersion.getViewId();
+         ClusterSnapshot clusterSnapshot = versionGenerator.getClusterSnapshot(txViewId);
+         List<Address> addressList = new LinkedList<Address>();
+         for (int i = 0; i < clusterSnapshot.size(); ++i) {
+            if (alreadyReadFrom.get(i)) {
+               addressList.add(clusterSnapshot.get(i));
+            }
+         }
+         minGMUVersion = versionGenerator.calculateMinVersionToRead(transactionVersion, addressList);
+         maxGMUVersion = versionGenerator.calculateMaxVersionToRead(transactionVersion, addressList);
+      } else {
+         minGMUVersion = transactionVersion;
+         maxGMUVersion = null;
+      }
 
       long timeout = configuration.getSyncReplTimeout() / 2;
 
@@ -103,7 +127,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
          try {
             if(!commitLog.waitForVersion(minGMUVersion, timeout)) {
                log.warnf("Receive remote get request, but the value wanted is not available. key: %s," +
-                               "min version: %s, max version: %s", getKey(), minVersion, maxVersion);
+                               "min version: %s, max version: %s", getKey(), minGMUVersion, maxGMUVersion);
                throw new VersionNotAvailableException();
             }
          } catch (InterruptedException e) {
@@ -136,8 +160,8 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
       Object[] retVal = new Object[original.length + 3];
       System.arraycopy(original, 0, retVal, 0, original.length);
       int index = original.length;
-      retVal[index++] = minVersion;
-      retVal[index] = maxVersion;
+      retVal[index++] = transactionVersion;
+      retVal[index] = alreadyReadFrom;
       return retVal;
    }
 
@@ -145,8 +169,8 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    public void setParameters(int commandId, Object[] args) {
       int index = args.length - 3;
       super.setParameters(commandId, args);
-      minVersion = (EntryVersion) args[index++];
-      maxVersion = (EntryVersion) args[index];
+      transactionVersion = (GMUEntryVersion) args[index++];
+      alreadyReadFrom = (BitSet) args[index];
    }
 
 
@@ -154,7 +178,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    public String toString() {
       return "GMUClusteredGetCommand{key=" + getKey() +
             ", flags=" + getFlags() +
-            ", minVersion=" + minVersion +
-            ", maxVersion=" + maxVersion + "}";
+            ", transactionVersion=" + transactionVersion +
+            ", alreadyReadFrom=" + alreadyReadFrom + "}";
    }
 }

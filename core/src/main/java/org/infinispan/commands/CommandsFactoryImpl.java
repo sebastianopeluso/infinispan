@@ -58,6 +58,7 @@ import org.infinispan.container.InternalEntryFactory;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.GMUEntryVersion;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.dataplacement.DataPlacementManager;
@@ -372,7 +373,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
             break;
          case GMUClusteredGetCommand.COMMAND_ID:
             GMUClusteredGetCommand gmuClusteredGetCommand = (GMUClusteredGetCommand) c;
-            gmuClusteredGetCommand.initializeGMUComponents(commitLog, configuration);
+            gmuClusteredGetCommand.initializeGMUComponents(commitLog, configuration, versionGenerator);
          case ClusteredGetCommand.COMMAND_ID:
             ClusteredGetCommand clusteredGetCommand = (ClusteredGetCommand) c;
             clusteredGetCommand.initialize(icc, this, entryFactory, interceptorChain, distributionManager, txTable);
@@ -530,7 +531,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
 
    @Override
    public GMUPrepareCommand buildSerializablePrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications,
-                                                                     boolean onePhaseCommit) {
+                                                            boolean onePhaseCommit) {
       return new GMUPrepareCommand(cacheName, gtx, modifications, onePhaseCommit);
    }
 
@@ -541,9 +542,8 @@ public class CommandsFactoryImpl implements CommandsFactory {
 
    @Override
    public GMUClusteredGetCommand buildGMUClusteredGetCommand(Object key, Set<Flag> flags, boolean acquireRemoteLock,
-                                                             GlobalTransaction gtx, EntryVersion minVersion,
-                                                             EntryVersion maxVersion, BitSet alreadyReadFromMask) {
-      return new GMUClusteredGetCommand(key, cacheName, flags, acquireRemoteLock, gtx, minVersion, maxVersion
-      );
+                                                             GlobalTransaction gtx, GMUEntryVersion txVersion,
+                                                             BitSet alreadyReadFromMask) {
+      return new GMUClusteredGetCommand(key, cacheName, flags, acquireRemoteLock, gtx, txVersion, alreadyReadFromMask);
    }
 }

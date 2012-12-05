@@ -44,14 +44,15 @@ import org.infinispan.commands.remote.recovery.GetInDoubtTxInfoCommand;
 import org.infinispan.commands.remote.recovery.TxCompletionNotificationCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.GMUCommitCommand;
+import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
-import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.VersionedCommitCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.commands.write.*;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.gmu.GMUEntryVersion;
 import org.infinispan.context.Flag;
 import org.infinispan.distexec.mapreduce.Mapper;
 import org.infinispan.distexec.mapreduce.Reducer;
@@ -333,11 +334,11 @@ public interface CommandsFactory {
    TxCompletionNotificationCommand buildTxCompletionNotificationCommand(Xid xid, GlobalTransaction globalTransaction);
 
    /**
-    * Builds a DistributedExecuteCommand used for migration and execution of distributed Callables and Runnables. 
+    * Builds a DistributedExecuteCommand used for migration and execution of distributed Callables and Runnables.
     *
     * @param callable the callable task
     * @param sender sender's Address
-    * @param keys keys used in Callable 
+    * @param keys keys used in Callable
     * @return a DistributedExecuteCommand
     */
    <T>DistributedExecuteCommand<T> buildDistributedExecuteCommand(Callable<T> callable, Address sender, Collection keys);
@@ -373,7 +374,7 @@ public interface CommandsFactory {
 
 
    /**
-    * Builds a ApplyDeltaCommand used for applying Delta objects to DeltaAware containers stored in cache 
+    * Builds a ApplyDeltaCommand used for applying Delta objects to DeltaAware containers stored in cache
     *
     * @return ApplyDeltaCommand instance
     * @see ApplyDeltaCommand
@@ -384,7 +385,7 @@ public interface CommandsFactory {
     * Builds a PrepareResponseCommand used to send back a collection of keys validated by
     * the keys owners or an exception (i.e. the outcome of the write skew check)
     *
-    * @param globalTransaction the transaction associated 
+    * @param globalTransaction the transaction associated
     * @return instance
     */
    PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction);
@@ -399,17 +400,17 @@ public interface CommandsFactory {
    DataPlacementCommand buildDataPlacementCommand(DataPlacementCommand.Type type, long roundId);
 
    /**
-    * 
+    *
     * @param gtx
     * @param modifications
     * @param onePhaseCommit
     * @return
     */
-   GMUPrepareCommand buildSerializablePrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications,                                      
-                                      boolean onePhaseCommit);
+   GMUPrepareCommand buildSerializablePrepareCommand(GlobalTransaction gtx, List<WriteCommand> modifications,
+                                                     boolean onePhaseCommit);
 
    /**
-    * 
+    *
     * @param gtx
     * @return
     */
@@ -420,7 +421,7 @@ public interface CommandsFactory {
     * @param key key to look up
     * @return a ClusteredGetCommand
     */
-   GMUClusteredGetCommand buildGMUClusteredGetCommand(Object key, Set<Flag> flags, boolean acquireRemoteLock, 
-                                                      GlobalTransaction gtx, EntryVersion minVersion,
-                                                      EntryVersion maxVersion, BitSet alreadyReadFromMask);
+   GMUClusteredGetCommand buildGMUClusteredGetCommand(Object key, Set<Flag> flags, boolean acquireRemoteLock,
+                                                      GlobalTransaction gtx, GMUEntryVersion txVersion,
+                                                      BitSet alreadyReadFromMask);
 }
