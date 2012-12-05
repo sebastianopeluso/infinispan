@@ -20,6 +20,7 @@ import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.xa.CacheTransaction;
+import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -142,6 +143,11 @@ public class TransactionCommitManager {
 
    public static interface CommitInstance {
       void commitTransaction(TxInvocationContext ctx);
+   }
+
+   //DEBUG ONLY!
+   public final TransactionEntry getTransactionEntry(GlobalTransaction globalTransaction) {
+      return sortedTransactionQueue.getTransactionEntry(globalTransaction);
    }
 
    private class CommitThread extends Thread {

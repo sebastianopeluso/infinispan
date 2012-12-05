@@ -1,6 +1,5 @@
 package org.infinispan.tx.gmu;
 
-import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
 
 /**
@@ -9,12 +8,7 @@ import org.infinispan.configuration.cache.ConfigurationBuilder;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class DistConsistencyTest2 extends ConsistencyTest {
-
-   @Override
-   protected CacheMode cacheMode() {
-      return CacheMode.DIST_SYNC;
-   }
+public class DistConsistencyTest2 extends DistConsistencyTest {
 
    @Override
    protected int initialClusterSize() {

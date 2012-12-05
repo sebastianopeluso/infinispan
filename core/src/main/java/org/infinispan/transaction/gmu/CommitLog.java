@@ -114,6 +114,20 @@ public class CommitLog {
    }
 
    public synchronized boolean waitForVersion(EntryVersion version, long timeout) throws InterruptedException {
+      if (timeout < 0) {
+         if (log.isTraceEnabled()) {
+            log.tracef("waitForVersion(%s,%s) and current version is %s", version, timeout, currentVersion.getVersion());
+         }
+         long versionValue = toGMUEntryVersion(version).getThisNodeVersionValue();
+         while (currentVersion.getVersion().getThisNodeVersionValue() < versionValue) {
+            wait();
+         }
+         if (log.isTraceEnabled()) {
+            log.tracef("waitForVersion(%s) ==> %s >= TRUE ?", version,
+                       currentVersion.getVersion().getThisNodeVersionValue());
+         }
+         return true;
+      }
       long finalTimeout = System.currentTimeMillis() + timeout;
       long versionValue = toGMUEntryVersion(version).getThisNodeVersionValue();
       if (log.isTraceEnabled()) {

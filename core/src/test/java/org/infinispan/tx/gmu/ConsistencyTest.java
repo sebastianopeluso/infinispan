@@ -6,8 +6,6 @@ import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.jgroups.util.Util;
 import org.testng.annotations.Test;
 
-import javax.transaction.NotSupportedException;
-import javax.transaction.SystemException;
 import javax.transaction.Transaction;
 import javax.transaction.TransactionManager;
 

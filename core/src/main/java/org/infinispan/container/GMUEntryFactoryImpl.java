@@ -10,14 +10,14 @@ import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContext;
-import org.infinispan.context.InvocationContextFlagsOverride;
 import org.infinispan.context.SingleKeyNonTxInvocationContext;
+import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.transaction.gmu.CommitLog;
-import org.infinispan.transaction.gmu.GMUHelper;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
 import static org.infinispan.transaction.gmu.GMUHelper.toInternalGMUCacheEntry;
 
 /**
@@ -35,7 +35,7 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
    @Inject
    public void injectDependencies(CommitLog commitLog, VersionGenerator versionGenerator) {
       this.commitLog = commitLog;
-      this.gmuVersionGenerator = GMUHelper.toGMUVersionGenerator(versionGenerator);
+      this.gmuVersionGenerator = toGMUVersionGenerator(versionGenerator);
    }
 
    public void start() {
@@ -67,6 +67,16 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
       }
 
       boolean hasAlreadyReadFromThisNode = context.hasAlreadyReadOnThisNode();
+
+      if (context.isInTxScope() && context.isOriginLocal() && !context.hasAlreadyReadOnThisNode()) {
+         //firs read on the local node for a transaction. ensure the min version
+         EntryVersion transactionVersion = ((TxInvocationContext)context).getTransactionVersion();
+         try {
+            commitLog.waitForVersion(transactionVersion, -1);
+         } catch (InterruptedException e) {
+            //ignore...
+         }
+      }
 
       EntryVersion realVersionToRead = hasAlreadyReadFromThisNode ? versionToRead :
             commitLog.getAvailableVersionLessThan(versionToRead);
