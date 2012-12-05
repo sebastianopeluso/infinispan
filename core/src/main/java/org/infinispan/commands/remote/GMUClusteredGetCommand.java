@@ -92,6 +92,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
       GMUEntryVersion minGMUVersion;
       GMUEntryVersion maxGMUVersion;
 
+      boolean alreadyReadOnThisNode;
       if (alreadyReadFrom != null) {
          int txViewId = transactionVersion.getViewId();
          ClusterSnapshot clusterSnapshot = versionGenerator.getClusterSnapshot(txViewId);
@@ -103,15 +104,17 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
          }
          minGMUVersion = versionGenerator.calculateMinVersionToRead(transactionVersion, addressList);
          maxGMUVersion = versionGenerator.calculateMaxVersionToRead(transactionVersion, addressList);
+         int myIndex = clusterSnapshot.indexOf(versionGenerator.getAddress());
+         //to be safe, is better to wait...
+         alreadyReadOnThisNode = myIndex != -1 && alreadyReadFrom.get(myIndex);
+
       } else {
          minGMUVersion = transactionVersion;
          maxGMUVersion = null;
+         alreadyReadOnThisNode = false;
       }
 
       long timeout = configuration.getSyncReplTimeout() / 2;
-
-      boolean alreadyReadOnThisNode = maxGMUVersion != null &&
-            maxGMUVersion.getThisNodeVersionValue() == GMUEntryVersion.NON_EXISTING;
 
       context.setAlreadyReadOnThisNode(alreadyReadOnThisNode);
 

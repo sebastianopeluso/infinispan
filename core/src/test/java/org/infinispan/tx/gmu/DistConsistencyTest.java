@@ -67,6 +67,60 @@ public class DistConsistencyTest extends ConsistencyTest {
 
       printDataContainer();
       assertNoTransactions();
+      cache(0).getAdvancedCache().removeInterceptor(DelayCommit.class);
+      cache(1).getAdvancedCache().removeInterceptor(ObtainTransactionEntry.class);
+   }
+
+   public void testWaitInRemoteNode() throws Exception {
+      assertAtLeastCaches(2);
+
+      DelayCommit delayCommit = new DelayCommit(5000);
+      cache(0).getAdvancedCache().addInterceptorAfter(delayCommit, TxInterceptor.class);
+
+      final ObtainTransactionEntry obtainTransactionEntry = new ObtainTransactionEntry(cache(1));
+
+      final Object cache0Key = new GMUMagicKey(cache(0), cache(1), "Key0");
+      final Object cache1Key = new GMUMagicKey(cache(1), cache(0), "Key1");
+      assertCacheValuesNull(cache0Key, cache1Key);
+
+      tm(0).begin();
+      txPut(0, cache0Key, VALUE_1, null);
+      txPut(0, cache1Key, VALUE_1, null);
+      tm(0).commit();
+
+      Thread otherThread = new Thread("TestWaitingForLocalCommit-Thread") {
+         @Override
+         public void run() {
+            try {
+               tm(1).begin();
+               txPut(1, cache0Key, VALUE_2, VALUE_1);
+               txPut(1, cache1Key, VALUE_2, VALUE_1);
+               obtainTransactionEntry.expectedThisThread();
+               tm(1).commit();
+            } catch (Exception e) {
+               e.printStackTrace();
+            }
+         }
+      };
+      obtainTransactionEntry.reset();
+      otherThread.start();
+      TransactionEntry transactionEntry = obtainTransactionEntry.getTransactionEntry();
+      transactionEntry.awaitUntilCommitted(null);
+
+      //tx already committed in cache(1). start a read only on cache(1) reading the local key and them the remote key.
+      // the remote get should wait until the transaction is committed
+      tm(1).begin();
+      assertEquals(VALUE_2, cache(1).get(cache1Key));
+      assertEquals(VALUE_2, cache(1).get(cache0Key));
+      tm(1).commit();
+
+      delayCommit.unblock();
+      otherThread.join();
+
+      printDataContainer();
+      assertNoTransactions();
+      cache(0).getAdvancedCache().removeInterceptor(DelayCommit.class);
+      cache(1).getAdvancedCache().removeInterceptor(ObtainTransactionEntry.class);
    }
 
    @Override
