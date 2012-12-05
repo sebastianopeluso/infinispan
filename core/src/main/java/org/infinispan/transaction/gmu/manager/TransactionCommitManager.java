@@ -125,11 +125,6 @@ public class TransactionCommitManager {
       }
    }
 
-   public void prepareReadOnlyTransaction(CacheTransaction cacheTransaction) {
-      EntryVersion preparedVersion = commitLog.getCurrentVersion();
-      cacheTransaction.setTransactionVersion(preparedVersion);
-   }
-
    public void awaitUntilCommitted(CacheTransaction transaction, GMUCommitCommand commitCommand) throws InterruptedException {
       TransactionEntry transactionEntry = sortedTransactionQueue.getTransactionEntry(transaction.getGlobalTransaction());
       if (transactionEntry == null) {

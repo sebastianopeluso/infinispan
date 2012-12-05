@@ -37,6 +37,9 @@ public class GMUHelper {
    public static void performReadSetValidation(GMUPrepareCommand prepareCommand,
                                                DataContainer dataContainer,
                                                ClusteringDependentLogic keyLogic) {
+      if (prepareCommand.getReadSet() == null || prepareCommand.getReadSet().length == 0) {
+         return;
+      }
       EntryVersion prepareVersion = prepareCommand.getPrepareVersion();
       for (Object key : prepareCommand.getReadSet()) {
          if (keyLogic.localNodeIsOwner(key)) {

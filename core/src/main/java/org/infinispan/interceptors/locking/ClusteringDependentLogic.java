@@ -73,8 +73,6 @@ public interface ClusteringDependentLogic {
 
    void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck);
 
-   Collection<Address> getWriteOwners(CacheTransaction cacheTransaction);
-
    Collection<Address> getInvolvedNodes(CacheTransaction cacheTransaction);
 
    EntryVersionsMap createNewVersionsAndCheckForWriteSkews(VersionGenerator versionGenerator, TxInvocationContext context, VersionedPrepareCommand prepareCommand);
@@ -119,11 +117,6 @@ public interface ClusteringDependentLogic {
       @Override
       public void commitEntry(CacheEntry entry, EntryVersion newVersion, boolean skipOwnershipCheck) {
          entry.commit(dataContainer, newVersion);
-      }
-
-      @Override
-      public Collection<Address> getWriteOwners(CacheTransaction cacheTransaction) {
-         return null;
       }
 
       @Override
@@ -217,15 +210,6 @@ public interface ClusteringDependentLogic {
       }
 
       @Override
-      public Collection<Address> getWriteOwners(CacheTransaction cacheTransaction) {
-         Collection<Object> affectedKeys = Util.getAffectedKeys(cacheTransaction.getModifications(), null);
-         if (affectedKeys == null) {
-            return null;
-         }
-         return dm.getAffectedNodes(affectedKeys);
-      }
-
-      @Override
       public Collection<Address> getInvolvedNodes(CacheTransaction cacheTransaction) {
          Collection<Address> writeOwners = getWriteOwners(cacheTransaction);
          if (writeOwners == null) {
@@ -261,6 +245,14 @@ public interface ClusteringDependentLogic {
       @Override
       public void performReadSetValidation(TxInvocationContext context, GMUPrepareCommand prepareCommand) {
          GMUHelper.performReadSetValidation(prepareCommand, dataContainer, this);
+      }
+
+      private Collection<Address> getWriteOwners(CacheTransaction cacheTransaction) {
+         Collection<Object> affectedKeys = Util.getAffectedKeys(cacheTransaction.getModifications(), null);
+         if (affectedKeys == null) {
+            return null;
+         }
+         return dm.getAffectedNodes(affectedKeys);
       }
 
       private Collection<Address> getReadOwners(CacheTransaction cacheTransaction) {
