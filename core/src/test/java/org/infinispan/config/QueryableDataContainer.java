@@ -35,20 +35,20 @@ import static java.util.Collections.synchronizedCollection;
 
 /**
  * Original author are missing...
- * 
+ *
  * @author Pedro Ruivo
  * @author Sebastiano Peluso
  */
 public class QueryableDataContainer implements DataContainer {
-	
+
 	private static DataContainer delegate;
-	
+
 	public static void setDelegate(DataContainer delegate) {
 	   QueryableDataContainer.delegate = delegate;
    }
-	
+
 	private final Collection<String> loggedOperations;
-	
+
 	public void setFoo(String foo) {
 		loggedOperations.add("setFoo(" + foo + ")");
 	}
@@ -56,7 +56,7 @@ public class QueryableDataContainer implements DataContainer {
 	public QueryableDataContainer() {
 	   this.loggedOperations = synchronizedCollection(new ArrayList<String>());
    }
-	
+
 	@Override
 	public Iterator<InternalCacheEntry> iterator() {
 		loggedOperations.add("iterator()");
@@ -134,8 +134,14 @@ public class QueryableDataContainer implements DataContainer {
       loggedOperations.add("clear(" + version + ")");
       delegate.clear(version);
    }
-	
-	public Collection<String> getLoggedOperations() {
+
+   @Override
+   public boolean dumpTo(String filePath) {
+      loggedOperations.add("dumpTo(" + filePath + ")");
+      return delegate.dumpTo(filePath);
+   }
+
+   public Collection<String> getLoggedOperations() {
 	   return loggedOperations;
    }
 }

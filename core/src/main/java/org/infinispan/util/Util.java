@@ -37,7 +37,10 @@ import org.infinispan.container.DataContainer;
 import org.infinispan.marshall.Marshaller;
 
 import javax.naming.Context;
+import java.io.BufferedWriter;
 import java.io.Closeable;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.lang.management.LockInfo;
@@ -237,7 +240,7 @@ public final class Util {
     * Clones parameter x of type T with a given Marshaller reference;
     *
     *
-    * @return a deep clone of an object parameter x 
+    * @return a deep clone of an object parameter x
     */
    @SuppressWarnings("unchecked")
    public static <T> T cloneWithMarshaller(Marshaller marshaller, T x){
@@ -629,5 +632,17 @@ public final class Util {
          }
       }
       return set;
+   }
+
+   public static BufferedWriter getBufferedWriter(String filePath) {
+      try {
+         return new BufferedWriter(new FileWriter(filePath));
+      } catch (IOException e) {
+         return null;
+      }
+   }
+
+   public static void safeWrite(BufferedWriter writer, Object object) throws IOException {
+      writer.write(object == null ? "null" : object.toString());
    }
 }

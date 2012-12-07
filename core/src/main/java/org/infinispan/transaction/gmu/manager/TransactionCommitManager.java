@@ -125,6 +125,11 @@ public class TransactionCommitManager {
       }
    }
 
+   public void prepareReadOnlyTransaction(CacheTransaction cacheTransaction) {
+      EntryVersion preparedVersion = commitLog.getCurrentVersion();
+      cacheTransaction.setTransactionVersion(preparedVersion);
+   }
+
    public void awaitUntilCommitted(CacheTransaction transaction, GMUCommitCommand commitCommand) throws InterruptedException {
       TransactionEntry transactionEntry = sortedTransactionQueue.getTransactionEntry(transaction.getGlobalTransaction());
       if (transactionEntry == null) {
@@ -147,13 +152,13 @@ public class TransactionCommitManager {
 
    private class CommitThread extends Thread {
       private boolean running;
-      private final List<GMUEntryVersion> committedVersions;
+      private final List<CacheTransaction> committedTransactions;
       private final List<SortedTransactionQueue.TransactionEntry> commitList;
 
       private CommitThread(String threadName) {
          super(threadName);
          running = false;
-         committedVersions = new LinkedList<GMUEntryVersion>();
+         committedTransactions = new LinkedList<CacheTransaction>();
          commitList = new LinkedList<SortedTransactionQueue.TransactionEntry>();
       }
 
@@ -175,7 +180,7 @@ public class TransactionCommitManager {
 
                      CacheTransaction cacheTransaction = transactionEntry.getCacheTransactionForCommit();
                      commitInvocationInstance.commitTransaction(createInvocationContext(cacheTransaction));
-                     committedVersions.add(toGMUEntryVersion(cacheTransaction.getTransactionVersion()));
+                     committedTransactions.add(cacheTransaction);
 
                      if (log.isTraceEnabled()) {
                         log.tracef("Transaction entries committed for %s", transactionEntry);
@@ -187,8 +192,7 @@ public class TransactionCommitManager {
                   }
                }
 
-               GMUEntryVersion[] committedVersionsArray = new GMUEntryVersion[committedVersions.size()];
-               commitLog.insertNewCommittedVersion(versionGenerator.mergeAndMax(committedVersions.toArray(committedVersionsArray)));
+               commitLog.insertNewCommittedVersions(committedTransactions);
             } catch (InterruptedException e) {
                running = false;
                if (log.isTraceEnabled()) {
@@ -201,7 +205,7 @@ public class TransactionCommitManager {
                for (TransactionEntry transactionEntry : commitList) {
                   transactionEntry.committed();
                }
-               committedVersions.clear();
+               committedTransactions.clear();
                commitList.clear();
             }
          }

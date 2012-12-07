@@ -1,12 +1,15 @@
 package org.infinispan.tx.gmu;
 
 import org.infinispan.Cache;
+import org.infinispan.remoting.transport.Address;
 
 import java.io.Serializable;
-import java.util.Random;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 
 import static org.infinispan.distribution.DistributionTestHelper.addressOf;
-import static org.infinispan.distribution.DistributionTestHelper.isOwner;
 
 /**
  * // TODO: Document this
@@ -16,44 +19,25 @@ import static org.infinispan.distribution.DistributionTestHelper.isOwner;
  */
 public class GMUMagicKey implements Serializable {
    private final String name;
-   private final int hashCode;
-   private final String mapTo;
-   private final String notMapTo;
+   private final Collection<Address> mapTo;
+   private final Collection<Address> notMapTo;
 
-   public GMUMagicKey(Cache<?, ?> toMapTo, Cache<?,?> notToMapTo, String name) {
+   public GMUMagicKey(Collection<Cache> toMapTo, Collection<Cache> notToMapTo, String name) {
       if (toMapTo == null && notToMapTo == null) {
          throw new NullPointerException("Both map to and not map to cannot be null");
       }
 
-      mapTo = toMapTo == null ? "N/A" : addressOf(toMapTo).toString();
-      notMapTo = notToMapTo == null ? "N/A" : addressOf(notToMapTo).toString();
-
-      Random r = new Random();
-      Object dummy;
-      do {
-         // create a dummy object with this hashCode
-         final int hc = r.nextInt();
-         dummy = new Object() {
-            @Override
-            public int hashCode() {
-               return hc;
-            }
-         };
-
-      } while (!checkCondition(toMapTo, notToMapTo, dummy));
-
-      // we have found a hashCode that works!
-      hashCode = dummy.hashCode();
+      mapTo = getAddresses(toMapTo);
+      notMapTo = getAddresses(notToMapTo);
       this.name = name;
    }
 
-   private boolean checkCondition(Cache<?,?> toMapTo, Cache<?,?> notToMapTo, Object dummy) {
-      if (toMapTo == null) {
-         return !isOwner(notToMapTo, dummy);
-      } else if (notToMapTo == null) {
-         return isOwner(toMapTo, dummy);
-      }
-      return isOwner(toMapTo, dummy) && !isOwner(notToMapTo, dummy);
+   public final Collection<Address> getMapTo() {
+      return mapTo == null ? Collections.<Address>emptyList() : mapTo;
+   }
+
+   public final Collection<Address> getNotMapTo() {
+      return notMapTo == null ? Collections.<Address>emptyList() : notMapTo;
    }
 
    @Override
@@ -61,26 +45,39 @@ public class GMUMagicKey implements Serializable {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
 
-      GMUMagicKey that = (GMUMagicKey) o;
+      GMUMagicKey magicKey = (GMUMagicKey) o;
 
-      return hashCode == that.hashCode &&
-            !(mapTo != null ? !mapTo.equals(that.mapTo) : that.mapTo != null) &&
-            !(notMapTo != null ? !notMapTo.equals(that.notMapTo) : that.notMapTo != null);
+      return !(mapTo != null ? !mapTo.equals(magicKey.mapTo) : magicKey.mapTo != null) &&
+            !(name != null ? !name.equals(magicKey.name) : magicKey.name != null) &&
+            !(notMapTo != null ? !notMapTo.equals(magicKey.notMapTo) : magicKey.notMapTo != null);
 
    }
 
    @Override
    public int hashCode() {
-      return hashCode;
+      int result = name != null ? name.hashCode() : 0;
+      result = 31 * result + (mapTo != null ? mapTo.hashCode() : 0);
+      result = 31 * result + (notMapTo != null ? notMapTo.hashCode() : 0);
+      return result;
    }
 
    @Override
    public String toString() {
       return "GMUMagicKey{" +
-            (name == null ? "" : "name='" + name + '\'') +
-            ", hashCode=" + hashCode +
-            ", mapTo='" + mapTo + '\'' +
-            ", notMapTo='" + notMapTo + '\'' +
+            "name='" + name + '\'' +
+            ", mapTo=" + mapTo +
+            ", notMapTo=" + notMapTo +
             '}';
+   }
+
+   private static Collection<Address> getAddresses(Collection<Cache> caches) {
+      if (caches == null) {
+         return null;
+      }
+      List<Address> list = new LinkedList<Address>();
+      for (Cache cache : caches) {
+         list.add(addressOf(cache));
+      }
+      return list;
    }
 }

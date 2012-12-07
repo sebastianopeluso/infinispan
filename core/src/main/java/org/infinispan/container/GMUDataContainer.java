@@ -12,9 +12,12 @@ import org.infinispan.eviction.EvictionStrategy;
 import org.infinispan.eviction.EvictionThreadPolicy;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.transaction.gmu.GMUHelper;
+import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -205,6 +208,39 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
       }
    }
 
+   @Override
+   public final boolean dumpTo(String filePath) {
+      BufferedWriter bufferedWriter = Util.getBufferedWriter(filePath);
+      if (bufferedWriter == null) {
+         return false;
+      }
+      try {
+         for (Map.Entry<Object, VersionChain> entry : entries.entrySet()) {
+            Util.safeWrite(bufferedWriter, entry.getKey());
+            Util.safeWrite(bufferedWriter, "=");
+            entry.getValue().dumpChain(bufferedWriter);
+            bufferedWriter.newLine();
+            bufferedWriter.flush();
+         }
+         return true;
+      } catch (IOException e) {
+         return false;
+      } finally {
+         Util.close(bufferedWriter);
+      }
+   }
+
+   public final String stateToString() {
+      StringBuilder stringBuilder = new StringBuilder(8132);
+      for (Map.Entry<Object, VersionChain> entry : entries.entrySet()) {
+         stringBuilder.append(entry.getKey())
+               .append("=");
+         entry.getValue().chainToString(stringBuilder);
+         stringBuilder.append("\n");
+      }
+      return stringBuilder.toString();
+   }
+
    public static DataContainer boundedDataContainer(int concurrencyLevel, int maxEntries,
                                                     EvictionStrategy strategy, EvictionThreadPolicy policy) {
       return new GMUDataContainer(concurrencyLevel, maxEntries, strategy, policy);
@@ -212,17 +248,6 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
 
    public static DataContainer unBoundedDataContainer(int concurrencyLevel) {
       return new GMUDataContainer(concurrencyLevel);
-   }
-
-   public String stateToString() {
-      StringBuilder stringBuilder = new StringBuilder();
-      for (Map.Entry<Object, VersionChain> entry : entries.entrySet()) {
-         stringBuilder.append(entry.getKey())
-               .append("=>");
-         entry.getValue().chainToString(stringBuilder);
-         stringBuilder.append("\n");
-      }
-      return stringBuilder.toString();
    }
 
    @Override
@@ -445,7 +470,7 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
          return first.add(body);
       }
 
-      public void chainToString(StringBuilder stringBuilder) {
+      public final String chainToString(StringBuilder stringBuilder) {
          VersionBody iterator;
          synchronized (this) {
             iterator = first;
@@ -455,10 +480,25 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Ver
             stringBuilder.append(entry.getValue())
                   .append("=")
                   .append(entry.getVersion())
-                  .append("-->");
+                  .append("|");
             iterator = iterator.getPrevious();
          }
-         stringBuilder.append("NULL");
+         return stringBuilder.toString();
+      }
+
+      public final void dumpChain(BufferedWriter writer) throws IOException {
+         VersionBody iterator;
+         synchronized (this) {
+            iterator = first;
+         }
+         while (iterator != null) {
+            InternalCacheEntry entry = iterator.getInternalCacheEntry();
+            Util.safeWrite(writer, entry.getValue());
+            Util.safeWrite(writer, "=");
+            Util.safeWrite(writer, entry.getVersion());
+            Util.safeWrite(writer, "|");
+            iterator = iterator.getPrevious();
+         }
       }
    }
 

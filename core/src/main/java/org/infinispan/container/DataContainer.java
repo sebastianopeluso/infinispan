@@ -45,23 +45,23 @@ import org.infinispan.factories.scopes.Scopes;
 public interface DataContainer extends Iterable<InternalCacheEntry> {
 
    /**
-    * Retrieves a cached entry version that is less or equals than {@param version}.    
+    * Retrieves a cached entry version that is less or equals than {@param version}.
     *
     * @param k key under which entry is stored
     * @param version the snapshot version to read. if it is null, the most recent version is returned
     * @return entry, if it exists and has not expired, or null if not
     */
    InternalCacheEntry get(Object k, EntryVersion version);
-   
+
    /**
     * Retrieves a cache entry in the same way as {@link #get(Object, org.infinispan.container.versioning.EntryVersion)}}
-    * except that it does not update or reorder any of the internal constructs. 
-    * I.e., expiration does not happen, and in the case of the LRU container, 
+    * except that it does not update or reorder any of the internal constructs.
+    * I.e., expiration does not happen, and in the case of the LRU container,
     * the entry is not moved to the end of the chain.
     *
     * This method should be used instead of {@link #get(Object, org.infinispan.container.versioning.EntryVersion)}} when called
     * while iterating through the data container using methods like {@link #keySet(org.infinispan.container.versioning.EntryVersion)}
-    * to avoid changing the underlying collection's order.  
+    * to avoid changing the underlying collection's order.
     *
     * @param k key under which entry is stored
     * @param version the snapshot version to read. if it is null, the most recent version is returned
@@ -92,7 +92,7 @@ public interface DataContainer extends Iterable<InternalCacheEntry> {
     * Removes an entry from the cache
     *
     * @param k key to remove
-    * @param version the snapshot version to set to the removed value. if it is null, the key is removed with all the 
+    * @param version the snapshot version to set to the removed value. if it is null, the key is removed with all the
     *                version chain
     * @return entry removed, or null if it didn't exist or had expired
     */
@@ -100,7 +100,7 @@ public interface DataContainer extends Iterable<InternalCacheEntry> {
 
    /**
     *
-    * @return count of the number of entries in the container with a snapshot version less than the {@param version} 
+    * @return count of the number of entries in the container with a snapshot version less than the {@param version}
     * @param version the snapshot version to check. if it is null, it counts the number of entries
     */
    int size(EntryVersion version);
@@ -136,11 +136,11 @@ public interface DataContainer extends Iterable<InternalCacheEntry> {
    Collection<Object> values(EntryVersion version);
 
    /**
-    * Returns a mutable set of immutable cache entries exposed as immutable Map.Entry instances. Clients 
-    * of this method such as Cache.entrySet() operation implementors are free to convert the set into an 
-    * immutable set if needed, which is the most common use case. 
+    * Returns a mutable set of immutable cache entries exposed as immutable Map.Entry instances. Clients
+    * of this method such as Cache.entrySet() operation implementors are free to convert the set into an
+    * immutable set if needed, which is the most common use case.
     *
-    * If a client needs to iterate through a mutable set of mutable cache entries, it should iterate the 
+    * If a client needs to iterate through a mutable set of mutable cache entries, it should iterate the
     * container itself rather than iterating through the return of entrySet().
     *
     * @return a set of immutable cache entries
@@ -152,4 +152,6 @@ public interface DataContainer extends Iterable<InternalCacheEntry> {
     * Purges entries that have passed their expiry time
     */
    void purgeExpired();
+
+   boolean dumpTo(String filePath);
 }

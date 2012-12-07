@@ -7,9 +7,11 @@ import org.infinispan.commands.tx.GMUCommitCommand;
 import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
+import org.infinispan.commands.write.ClearCommand;
 import org.infinispan.commands.write.PutKeyValueCommand;
 import org.infinispan.commands.write.RemoveCommand;
 import org.infinispan.commands.write.ReplaceCommand;
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
@@ -67,9 +69,9 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
 
       Object retVal = invokeNextInterceptor(ctx, command);
 
-      if (ctx.isOriginLocal()) {
+      if (ctx.isOriginLocal() && command.getModifications().length > 0) {
          EntryVersion commitVersion = calculateCommitVersion(ctx.getTransactionVersion(), versionGenerator,
-                                                             cll.getInvolvedNodes(ctx.getCacheTransaction()));
+                                                             cll.getWriteOwners(ctx.getCacheTransaction()));
          ctx.setTransactionVersion(commitVersion);
       } else {
          retVal = ctx.getTransactionVersion();
@@ -167,11 +169,32 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
     * @throws InterruptedException  if interrupted
     */
    private void performValidation(TxInvocationContext ctx, GMUPrepareCommand command) throws InterruptedException {
+      boolean hasToUpdateLocalKeys = false;
       boolean isReadOnly = command.getModifications().length == 0;
+
+      for (Object key : command.getAffectedKeys()) {
+         if (cll.localNodeIsOwner(key)) {
+            hasToUpdateLocalKeys = true;
+            break;
+         }
+      }
+
+      if (!hasToUpdateLocalKeys) {
+         for (WriteCommand writeCommand : command.getModifications()) {
+            if (writeCommand instanceof ClearCommand) {
+               hasToUpdateLocalKeys = true;
+               break;
+            }
+         }
+      }
 
       if (!isReadOnly) {
          cll.performReadSetValidation(ctx, command);
-         transactionCommitManager.prepareTransaction(ctx.getCacheTransaction());
+         if (hasToUpdateLocalKeys) {
+            transactionCommitManager.prepareTransaction(ctx.getCacheTransaction());
+         } else {
+            transactionCommitManager.prepareReadOnlyTransaction(ctx.getCacheTransaction());
+         }
       }
 
       if(log.isDebugEnabled()) {

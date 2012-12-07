@@ -27,7 +27,10 @@ import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.eviction.EvictionStrategy;
 import org.infinispan.eviction.EvictionThreadPolicy;
+import org.infinispan.util.Util;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -162,6 +165,30 @@ public class DefaultDataContainer extends AbstractDataContainer<InternalCacheEnt
    @Override
    protected EntryIterator createEntryIterator(EntryVersion version) {
       return new DefaultEntryIterator(entries.values().iterator());
+   }
+
+   @Override
+   public final boolean dumpTo(String filePath) {
+      BufferedWriter bufferedWriter = Util.getBufferedWriter(filePath);
+      if (bufferedWriter == null) {
+         return false;
+      }
+      try {
+         for (Map.Entry<Object, InternalCacheEntry> entry : entries.entrySet()) {
+            Util.safeWrite(bufferedWriter, entry.getKey());
+            Util.safeWrite(bufferedWriter, "=");
+            Util.safeWrite(bufferedWriter, entry.getValue().getValue());
+            Util.safeWrite(bufferedWriter, "=");
+            Util.safeWrite(bufferedWriter, entry.getValue().getVersion());
+            bufferedWriter.newLine();
+            bufferedWriter.flush();
+         }
+         return true;
+      } catch (IOException e) {
+         return false;
+      } finally {
+         Util.close(bufferedWriter);
+      }
    }
 
    public static class DefaultEntryIterator extends EntryIterator {

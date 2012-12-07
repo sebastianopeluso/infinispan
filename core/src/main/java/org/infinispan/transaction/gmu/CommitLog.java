@@ -9,10 +9,21 @@ import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
+import org.infinispan.transaction.xa.CacheTransaction;
+import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.Set;
+
 import static org.infinispan.container.versioning.InequalVersionComparisonResult.*;
+import static org.infinispan.container.versioning.gmu.GMUEntryVersion.NON_EXISTING;
 import static org.infinispan.transaction.gmu.GMUHelper.toGMUEntryVersion;
 import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
 
@@ -25,7 +36,7 @@ public class CommitLog {
 
    private static final Log log = LogFactory.getLog(CommitLog.class);
 
-   private GMUEntryVersion mostRecentVersion;
+   //private GMUEntryVersion mostRecentVersion;
    private VersionEntry currentVersion;
    private GMUVersionGenerator versionGenerator;
 
@@ -37,8 +48,8 @@ public class CommitLog {
    //AFTER THE VersionVCFactory
    @Start(priority = 31)
    public void start() {
-      currentVersion = new VersionEntry(toGMUEntryVersion(versionGenerator.generateNew()));
-      mostRecentVersion = toGMUEntryVersion(versionGenerator.generateNew());
+      currentVersion = new VersionEntry(toGMUEntryVersion(versionGenerator.generateNew()), Collections.emptySet());
+      //mostRecentVersion = toGMUEntryVersion(versionGenerator.generateNew());
    }
 
    @Stop
@@ -46,9 +57,10 @@ public class CommitLog {
 
    }
 
-   public synchronized EntryVersion getCurrentVersion() {
+   public synchronized GMUEntryVersion getCurrentVersion() {
       //versions are immutable
-      EntryVersion version = versionGenerator.updatedVersion(mostRecentVersion);
+      //GMUEntryVersion version = versionGenerator.updatedVersion(mostRecentVersion);
+      GMUEntryVersion version = versionGenerator.updatedVersion(currentVersion.getVersion());
       if (log.isTraceEnabled()) {
          log.tracef("getCurrentVersion() ==> %s", version);
       }
@@ -56,61 +68,59 @@ public class CommitLog {
    }
 
 
-   public EntryVersion getAvailableVersionLessThan(EntryVersion other) {
-      VersionEntry iterator;
-      synchronized (this) {
-         //if other is null, return the most recent version
-         if (other == null || isLessOrEquals(mostRecentVersion, other)) {
-            return getCurrentVersion();
-         } else if (isLessOrEquals(currentVersion.getVersion(), other)) {
-            EntryVersion version = currentVersion.getVersion();
-            if (log.isTraceEnabled()) {
-               log.tracef("getAvailableVersionLessThan(%s) ==> %s", other, version);
-            }
-            return version;
-         }
-         iterator = currentVersion.getPrevious();
+   public GMUEntryVersion getAvailableVersionLessThan(EntryVersion other) {
+      if (other == null) {
+         return getCurrentVersion();
+      }
+      GMUEntryVersion otherVersion = toGMUEntryVersion(other);
+
+      if (otherVersion.getThisNodeVersionValue() != NON_EXISTING) {
+         return otherVersion;
       }
 
+      LinkedList<GMUEntryVersion> possibleVersion = new LinkedList<GMUEntryVersion>();
+      VersionEntry iterator;
+      synchronized (this) {
+         /*if (isLessOrEquals(mostRecentVersion, otherVersion)) {
+            possibleVersion.add(mostRecentVersion);
+         }*/
+         iterator = currentVersion;
+      }
       while (iterator != null) {
-         if (isLessOrEquals(iterator.getVersion(), other)) {
-            EntryVersion version = iterator.getVersion();
-            if (log.isTraceEnabled()) {
-               log.tracef("getAvailableVersionLessThan(%s) ==> %s", other, version);
-            }
-            return version;
+         if (isLessOrEquals(iterator.getVersion(), otherVersion)) {
+            possibleVersion.add(iterator.getVersion());
+         } else {
+            possibleVersion.clear();
          }
          iterator = iterator.getPrevious();
       }
-      throw new IllegalStateException("Version required no longer exists");
+      return versionGenerator.mergeAndMax(possibleVersion.toArray(new GMUEntryVersion[possibleVersion.size()]));
    }
 
-   public synchronized void insertNewCommittedVersion(EntryVersion newVersion) {
-      VersionEntry current = new VersionEntry(toGMUEntryVersion(
-            versionGenerator.mergeAndMax(currentVersion.getVersion(), newVersion)));
-      if (current.getVersion().compareTo(currentVersion.getVersion()) == EQUAL) {
-         //same version??
-         if (log.isTraceEnabled()) {
-            log.tracef("insertNewCommittedVersion(%s) ==> %s", newVersion, currentVersion.getVersion());
-         }
-         return;
+   public synchronized void insertNewCommittedVersions(Collection<CacheTransaction> transactions) {
+      for (CacheTransaction transaction : transactions) {
+         VersionEntry current = new VersionEntry(toGMUEntryVersion(transaction.getTransactionVersion()),
+                                                 Util.getAffectedKeys(transaction.getModifications(), null));
+         current.setPrevious(currentVersion);
+         currentVersion = current;
+         //mostRecentVersion = versionGenerator.mergeAndMax(mostRecentVersion, currentVersion.getVersion());
       }
-      current.setPrevious(currentVersion);
-      currentVersion = current;
       if (log.isTraceEnabled()) {
-         log.tracef("insertNewCommittedVersion(%s) ==> %s", newVersion, currentVersion.getVersion());
+         log.tracef("insertNewCommittedVersions(...) ==> %s", currentVersion.getVersion());
       }
-      mostRecentVersion = versionGenerator.mergeAndMax(mostRecentVersion, currentVersion.getVersion());
       notifyAll();
    }
 
    public synchronized void updateMostRecentVersion(EntryVersion newVersion) {
+      /*
       GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(newVersion);
       if (gmuEntryVersion.getThisNodeVersionValue() > mostRecentVersion.getThisNodeVersionValue()) {
-         throw new IllegalArgumentException("Cannot update the most recent version to a version higher than " +
+         log.warn("Cannot update the most recent version to a version higher than " +
                                                   "the current version");
+         return;
       }
       mostRecentVersion = versionGenerator.mergeAndMax(mostRecentVersion, gmuEntryVersion);
+      */
    }
 
    public synchronized boolean waitForVersion(EntryVersion version, long timeout) throws InterruptedException {
@@ -123,7 +133,7 @@ public class CommitLog {
             wait();
          }
          if (log.isTraceEnabled()) {
-            log.tracef("waitForVersion(%s) ==> %s >= TRUE ?", version,
+            log.tracef("waitForVersion(%s) ==> %s TRUE ?", version,
                        currentVersion.getVersion().getThisNodeVersionValue());
          }
          return true;
@@ -154,6 +164,30 @@ public class CommitLog {
       return currentVersion.getVersion().getThisNodeVersionValue() >= versionValue;
    }
 
+   public final boolean dumpTo(String filePath) {
+      BufferedWriter bufferedWriter = Util.getBufferedWriter(filePath);
+      if (bufferedWriter == null) {
+         return false;
+      }
+      try {
+         VersionEntry iterator;
+         synchronized (this) {
+            //bufferedWriter.write(mostRecentVersion.toString());
+            iterator = currentVersion;
+         }
+         bufferedWriter.newLine();
+         while (iterator != null) {
+            iterator.dumpTo(bufferedWriter);
+            iterator = iterator.getPrevious();
+         }
+         return true;
+      } catch (IOException e) {
+         return false;
+      } finally {
+         Util.close(bufferedWriter);
+      }
+   }
+
    private boolean isLessOrEquals(EntryVersion version1, EntryVersion version2) {
       InequalVersionComparisonResult comparisonResult = version1.compareTo(version2);
       return comparisonResult == BEFORE_OR_EQUAL || comparisonResult == BEFORE || comparisonResult == EQUAL;
@@ -161,10 +195,16 @@ public class CommitLog {
 
    private static class VersionEntry {
       private final GMUEntryVersion version;
+      private final Object[] keysModified;
       private VersionEntry previous;
 
-      private VersionEntry(GMUEntryVersion version) {
+      private VersionEntry(GMUEntryVersion version, Set<Object> keysModified) {
          this.version = version;
+         if (keysModified == null) {
+            this.keysModified = null;
+         } else {
+            this.keysModified = keysModified.toArray(new Object[keysModified.size()]);
+         }
       }
 
       public GMUEntryVersion getVersion() {
@@ -177,6 +217,22 @@ public class CommitLog {
 
       public void setPrevious(VersionEntry previous) {
          this.previous = previous;
+      }
+
+      @Override
+      public String toString() {
+         return "VersionEntry{" +
+               "version=" + version +
+               ", keysModified=" + (keysModified == null ? "ALL" : Arrays.asList(keysModified)) +
+               '}';
+      }
+
+      public final void dumpTo(BufferedWriter writer) throws IOException {
+         writer.write(version.toString());
+         writer.write("=");
+         writer.write((keysModified == null ? "ALL" : Arrays.asList(keysModified).toString()));
+         writer.newLine();
+         writer.flush();
       }
    }
 }

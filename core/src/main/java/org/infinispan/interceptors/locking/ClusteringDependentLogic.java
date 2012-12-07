@@ -87,6 +87,8 @@ public interface ClusteringDependentLogic {
 
    Address getAddress();
 
+   Collection<Address> getWriteOwners(CacheTransaction cacheTransaction);
+
 
    /**
     * This logic is used when a changing a key affects all the nodes in the cluster, e.g. int the replicated,
@@ -121,6 +123,11 @@ public interface ClusteringDependentLogic {
 
       @Override
       public Collection<Address> getInvolvedNodes(CacheTransaction cacheTransaction) {
+         return null;
+      }
+
+      @Override
+      public Collection<Address> getWriteOwners(CacheTransaction cacheTransaction) {
          return null;
       }
 
@@ -247,7 +254,8 @@ public interface ClusteringDependentLogic {
          GMUHelper.performReadSetValidation(prepareCommand, dataContainer, this);
       }
 
-      private Collection<Address> getWriteOwners(CacheTransaction cacheTransaction) {
+      @Override
+      public Collection<Address> getWriteOwners(CacheTransaction cacheTransaction) {
          Collection<Object> affectedKeys = Util.getAffectedKeys(cacheTransaction.getModifications(), null);
          if (affectedKeys == null) {
             return null;
