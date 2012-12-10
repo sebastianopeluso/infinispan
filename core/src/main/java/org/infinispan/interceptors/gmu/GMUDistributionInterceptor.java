@@ -29,7 +29,7 @@ public class GMUDistributionInterceptor extends DistributionInterceptor {
 
    private static final Log log = LogFactory.getLog(GMUDistributionInterceptor.class);
 
-   private GMUVersionGenerator versionGenerator;
+   protected GMUVersionGenerator versionGenerator;
 
    @Inject
    public void setVersionGenerator(VersionGenerator versionGenerator) {
@@ -39,7 +39,7 @@ public class GMUDistributionInterceptor extends DistributionInterceptor {
    @Override
    protected void prepareOnAffectedNodes(TxInvocationContext ctx, PrepareCommand command,
                                          Collection<Address> recipients, boolean sync) {
-      Map<Address, Response> responses = rpcManager.invokeRemotely(recipients, command, true, false, false);
+      Map<Address, Response> responses = rpcManager.invokeRemotely(recipients, command, true, true, false);
       log.debugf("prepare command for transaction %s is sent. responses are: %s",
                  command.getGlobalTransaction().prettyPrint(), responses.toString());
 

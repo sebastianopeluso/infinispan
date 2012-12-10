@@ -1,6 +1,7 @@
 package org.infinispan.transaction.gmu;
 
 
+import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.InequalVersionComparisonResult;
 import org.infinispan.container.versioning.VersionGenerator;
@@ -11,6 +12,7 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.util.Util;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -39,15 +41,22 @@ public class CommitLog {
    //private GMUEntryVersion mostRecentVersion;
    private VersionEntry currentVersion;
    private GMUVersionGenerator versionGenerator;
+   private boolean enabled = false;
 
    @Inject
-   public void inject(VersionGenerator versionGenerator){
-      this.versionGenerator = toGMUVersionGenerator(versionGenerator);
+   public void inject(VersionGenerator versionGenerator, Configuration configuration){
+      if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+         this.versionGenerator = toGMUVersionGenerator(versionGenerator);
+      }
+      enabled = this.versionGenerator != null;
    }
 
    //AFTER THE VersionVCFactory
    @Start(priority = 31)
    public void start() {
+      if (!enabled) {
+         return;
+      }
       currentVersion = new VersionEntry(toGMUEntryVersion(versionGenerator.generateNew()), Collections.emptySet());
       //mostRecentVersion = toGMUEntryVersion(versionGenerator.generateNew());
    }
@@ -58,6 +67,7 @@ public class CommitLog {
    }
 
    public synchronized GMUEntryVersion getCurrentVersion() {
+      assertEnabled();
       //versions are immutable
       //GMUEntryVersion version = versionGenerator.updatedVersion(mostRecentVersion);
       GMUEntryVersion version = versionGenerator.updatedVersion(currentVersion.getVersion());
@@ -69,6 +79,7 @@ public class CommitLog {
 
 
    public GMUEntryVersion getAvailableVersionLessThan(EntryVersion other) {
+      assertEnabled();
       if (other == null) {
          return getCurrentVersion();
       }
@@ -98,6 +109,7 @@ public class CommitLog {
    }
 
    public synchronized void insertNewCommittedVersions(Collection<CacheTransaction> transactions) {
+      assertEnabled();
       for (CacheTransaction transaction : transactions) {
          VersionEntry current = new VersionEntry(toGMUEntryVersion(transaction.getTransactionVersion()),
                                                  Util.getAffectedKeys(transaction.getModifications(), null));
@@ -113,6 +125,7 @@ public class CommitLog {
 
    public synchronized void updateMostRecentVersion(EntryVersion newVersion) {
       /*
+      assertEnabled();
       GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(newVersion);
       if (gmuEntryVersion.getThisNodeVersionValue() > mostRecentVersion.getThisNodeVersionValue()) {
          log.warn("Cannot update the most recent version to a version higher than " +
@@ -124,6 +137,7 @@ public class CommitLog {
    }
 
    public synchronized boolean waitForVersion(EntryVersion version, long timeout) throws InterruptedException {
+      assertEnabled();
       if (timeout < 0) {
          if (log.isTraceEnabled()) {
             log.tracef("waitForVersion(%s,%s) and current version is %s", version, timeout, currentVersion.getVersion());
@@ -165,6 +179,7 @@ public class CommitLog {
    }
 
    public final boolean dumpTo(String filePath) {
+      assertEnabled();
       BufferedWriter bufferedWriter = Util.getBufferedWriter(filePath);
       if (bufferedWriter == null) {
          return false;
@@ -185,6 +200,12 @@ public class CommitLog {
          return false;
       } finally {
          Util.close(bufferedWriter);
+      }
+   }
+
+   private void assertEnabled() {
+      if (!enabled) {
+         throw new IllegalStateException("Commit Log not enabled!");
       }
    }
 

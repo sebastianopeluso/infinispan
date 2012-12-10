@@ -7,24 +7,26 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.VersionedDistributionInterceptor;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
-import org.infinispan.util.Util;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.util.Arrays;
 import java.util.Collection;
 
+import static org.infinispan.interceptors.totalorder.TotalOrderHelper.totalOrderBroadcastPrepare;
+import static org.infinispan.interceptors.totalorder.TotalOrderHelper.TotalOrderRpcInterceptor;
+import static org.infinispan.interceptors.totalorder.TotalOrderHelper.prepare;
 import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepareCommand;
+import static org.infinispan.util.Util.getAffectedKeys;
 
 /**
  * This interceptor is used in total order in distributed mode when the write skew check is enabled.
- * After sending the prepare through TOA (Total Order Anycast), it blocks the execution thread until the transaction 
+ * After sending the prepare through TOA (Total Order Anycast), it blocks the execution thread until the transaction
  * outcome is know (i.e., the write skew check passes in all keys owners)
  *
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class TotalOrderVersionedDistributionInterceptor extends VersionedDistributionInterceptor {
+public class TotalOrderVersionedDistributionInterceptor extends VersionedDistributionInterceptor implements TotalOrderRpcInterceptor {
 
    private static final Log log = LogFactory.getLog(TotalOrderVersionedDistributionInterceptor.class);
 
@@ -37,26 +39,12 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-      //this map is only populated after locks are acquired. However, no locks are acquired when total order is enabled
-      //so we need to populate it here
-      ctx.addAllAffectedKeys(Util.getAffectedKeys(Arrays.asList(command.getModifications()), dataContainer));
+      return prepare(ctx, command, this);
+   }
 
-      Object result;
-      boolean shouldRetransmit;
-
-      do{
-         result = super.visitPrepareCommand(ctx, command);
-         shouldRetransmit = false;
-
-         if (shouldInvokeRemoteTxCommand(ctx)) {
-            //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication
-            //not to take place, e.g. in the case there are no changes in the context. And this is the place where we know
-            // if the replication occurred.
-            shouldRetransmit = totalOrderManager.waitForPrepareToSucceed(ctx);
-         }
-      } while (shouldRetransmit);
-
-      return result;
+   @Override
+   public Object visitPrepare(TxInvocationContext context, PrepareCommand command) throws Throwable {
+      return super.visitPrepareCommand(context, command);
    }
 
    @Override
@@ -71,6 +59,7 @@ public class TotalOrderVersionedDistributionInterceptor extends VersionedDistrib
       }
 
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
-      rpcManager.invokeRemotely(recipients, command, false, false, true);
+      totalOrderBroadcastPrepare(command, false, recipients, getAffectedKeys(command, null), rpcManager,
+                                 configuration.getSyncReplTimeout());
    }
 }

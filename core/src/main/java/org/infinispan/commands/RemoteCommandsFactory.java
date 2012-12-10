@@ -36,7 +36,6 @@ import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
-import org.infinispan.commands.remote.PrepareResponseCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
@@ -224,9 +223,6 @@ public class RemoteCommandsFactory {
                break;
             case CacheViewControlCommand.COMMAND_ID:
                command = new CacheViewControlCommand(cacheName);
-               break;
-            case PrepareResponseCommand.COMMAND_ID:
-               command = new PrepareResponseCommand(cacheName);
                break;
             case DataPlacementCommand.COMMAND_ID:
                command = new DataPlacementCommand(cacheName);

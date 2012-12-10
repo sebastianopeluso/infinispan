@@ -51,10 +51,12 @@ public abstract class BaseRpcInterceptor extends CommandInterceptor {
    }
 
    protected boolean defaultSynchronous;
+   protected long timeout;
 
    @Start
    public void init() {
       defaultSynchronous = configuration.getCacheMode().isSynchronous();
+      timeout = configuration.getSyncReplTimeout();
    }
 
    @Override

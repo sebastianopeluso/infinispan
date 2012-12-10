@@ -29,6 +29,7 @@ import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.xa.recovery.RecoveryManager;
 import org.infinispan.util.concurrent.ConcurrentMapFactory;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -116,7 +117,9 @@ public class XaTransactionTable extends TransactionTable {
             throw new CacheException(e);
          }
          //initiates the vector clock for serializability
+         if (configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
          localTransaction.setTransactionVersion(commitLog.getCurrentVersion());
+         }
       }
    }
 

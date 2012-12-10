@@ -33,16 +33,19 @@ import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.interceptors.gmu.GMUDistributionInterceptor;
 import org.infinispan.interceptors.gmu.GMUEntryWrappingInterceptor;
 import org.infinispan.interceptors.gmu.GMUReplicationInterceptor;
+import org.infinispan.interceptors.gmu.TotalOrderGMUDistributionInterceptor;
+import org.infinispan.interceptors.gmu.TotalOrderGMUEntryWrappingInterceptor;
+import org.infinispan.interceptors.gmu.TotalOrderGMUReplicationInterceptor;
 import org.infinispan.interceptors.locking.NonTransactionalLockingInterceptor;
 import org.infinispan.interceptors.locking.OptimisticLockingInterceptor;
 import org.infinispan.interceptors.locking.OptimisticReadWriteLockingInterceptor;
 import org.infinispan.interceptors.locking.PessimisticLockingInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderDistributionInterceptor;
+import org.infinispan.interceptors.totalorder.TotalOrderInterceptor;
+import org.infinispan.interceptors.totalorder.TotalOrderReplicationInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderStateTransferLockInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderVersionedDistributionInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderVersionedEntryWrappingInterceptor;
-import org.infinispan.interceptors.totalorder.TotalOrderInterceptor;
-import org.infinispan.interceptors.totalorder.TotalOrderReplicationInterceptor;
 import org.infinispan.interceptors.totalorder.TotalOrderVersionedReplicationInterceptor;
 import org.infinispan.loaders.CacheLoaderConfig;
 import org.infinispan.loaders.CacheStoreConfig;
@@ -143,14 +146,14 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
          interceptorChain.appendInterceptor(createInterceptor(new TotalOrderInterceptor(), TotalOrderInterceptor.class),
                                             false);
       }
-      
+
       // load the tx interceptor
       if (configuration.isTransactionalCache())
-         interceptorChain.appendInterceptor(createInterceptor(new TxInterceptor(), TxInterceptor.class), false);      
+         interceptorChain.appendInterceptor(createInterceptor(new TxInterceptor(), TxInterceptor.class), false);
 
       if (configuration.isPassiveReplication()) {
          interceptorChain.appendInterceptor(createInterceptor(new PassiveReplicationInterceptor(),
-                                            PassiveReplicationInterceptor.class), false);
+                                                              PassiveReplicationInterceptor.class), false);
       }
 
       if (isUsingMarshalledValues(configuration))
@@ -180,13 +183,18 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       }
 
       if (serializability) {
-         interceptorChain.appendInterceptor(createInterceptor(new GMUEntryWrappingInterceptor(),
-                                                              GMUEntryWrappingInterceptor.class), false);
+         if (configuration.isTotalOrder()) {
+            interceptorChain.appendInterceptor(createInterceptor(new TotalOrderGMUEntryWrappingInterceptor(),
+                                                                 TotalOrderGMUEntryWrappingInterceptor.class), false);
+         } else {
+            interceptorChain.appendInterceptor(createInterceptor(new GMUEntryWrappingInterceptor(),
+                                                                 GMUEntryWrappingInterceptor.class), false);
+         }
       } else if (needsVersionAwareComponents && configuration.getCacheMode().isClustered()) {
          //added custom entry wrapping interceptor for total order protocol
          if (configuration.isTotalOrder()) {
             interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedEntryWrappingInterceptor(),
-                  TotalOrderVersionedEntryWrappingInterceptor.class), false);
+                                                                 TotalOrderVersionedEntryWrappingInterceptor.class), false);
          } else {
             interceptorChain.appendInterceptor(createInterceptor(new VersionedEntryWrappingInterceptor(), VersionedEntryWrappingInterceptor.class), false);
          }
@@ -226,13 +234,19 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
       switch (configuration.getCacheMode()) {
          case REPL_SYNC:
             if (serializability) {
-               interceptorChain.appendInterceptor(createInterceptor(new GMUReplicationInterceptor(), GMUReplicationInterceptor.class), false);
+               if (configuration.isTotalOrder()) {
+                  interceptorChain.appendInterceptor(createInterceptor(new TotalOrderGMUReplicationInterceptor(),
+                                                                       TotalOrderGMUReplicationInterceptor.class), false);
+               } else {
+                  interceptorChain.appendInterceptor(createInterceptor(new GMUReplicationInterceptor(),
+                                                                       GMUReplicationInterceptor.class), false);
+               }
                break;
             } else if (needsVersionAwareComponents) {
                //added custom interceptor to replace the original
                if (configuration.isTotalOrder()) {
                   interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedReplicationInterceptor(),
-                        TotalOrderVersionedReplicationInterceptor.class), false);
+                                                                       TotalOrderVersionedReplicationInterceptor.class), false);
                } else {
                   interceptorChain.appendInterceptor(createInterceptor(new VersionedReplicationInterceptor(), VersionedReplicationInterceptor.class), false);
                }
@@ -250,12 +264,18 @@ public class InterceptorChainFactory extends AbstractNamedCacheComponentFactory 
             break;
          case DIST_SYNC:
             if(serializability) {
-               interceptorChain.appendInterceptor(createInterceptor(new GMUDistributionInterceptor(), GMUDistributionInterceptor.class), false);
+               if (configuration.isTotalOrder()) {
+                  interceptorChain.appendInterceptor(createInterceptor(new TotalOrderGMUDistributionInterceptor(),
+                                                                       TotalOrderGMUDistributionInterceptor.class), false);
+               } else {
+                  interceptorChain.appendInterceptor(createInterceptor(new GMUDistributionInterceptor(),
+                                                                       GMUDistributionInterceptor.class), false);
+               }
                break;
             } else if (needsVersionAwareComponents) {
                if (configuration.isTotalOrder()) {
                   interceptorChain.appendInterceptor(createInterceptor(new TotalOrderVersionedDistributionInterceptor(),
-                        TotalOrderVersionedDistributionInterceptor.class), false);
+                                                                       TotalOrderVersionedDistributionInterceptor.class), false);
                } else {
                   interceptorChain.appendInterceptor(createInterceptor(new VersionedDistributionInterceptor(), VersionedDistributionInterceptor.class), false);
                }

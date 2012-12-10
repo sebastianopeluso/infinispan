@@ -23,8 +23,10 @@ public interface TotalOrderManager {
 
    /**
     * Processes the transaction as received from the sequencer.
+    *
+    * @return the result of the transaction
     */
-   void processTransactionFromSequencer(PrepareCommand prepareCommand, TxInvocationContext ctx, CommandInterceptor invoker);
+   Object processTransactionFromSequencer(PrepareCommand prepareCommand, TxInvocationContext ctx, CommandInterceptor invoker) throws Throwable;
 
    /**
     * This will mark a global transaction as finished. It will be invoked in the processing of the commit command in
@@ -55,26 +57,16 @@ public interface TotalOrderManager {
    void addLocalTransaction(GlobalTransaction globalTransaction, LocalTransaction localTransaction);
 
    /**
-    * this method block the thread until the enough condition is enough to consider a transaction prepared (and later
-    * to ack the transaction manager)
-    * @param context the invocation context
-    * @return        true if the transaction should be retransmitted (state transfer in progress), false otherwise
-    */
-   boolean waitForPrepareToSucceed(TxInvocationContext context);
-
-   void notifyStateTransferInProgress(GlobalTransaction globalTransaction, StateTransferInProgressException e);
-
-   /**
-    * return the local transaction associated to the global transaction
-    * @param globalTransaction   the global transaction
-    * @return the local transaction associated to the global transaction
-    */
-   LocalTransaction getLocalTransaction(GlobalTransaction globalTransaction);
-
-   /**
     * returns a set of the transaction dependency latch that are actually committing
     *
     * @return  a set of the transaction dependency latch that are actually committing
     */
    Set<TxDependencyLatch> getPendingCommittingTransaction();
+
+   /**
+    * @param globalTransaction   the global transaction
+    * @return                    returns true if the transaction represented by {@param globalTransaction} is
+    *                            originated locally
+    */
+   boolean isCoordinatedLocally(GlobalTransaction globalTransaction);
 }

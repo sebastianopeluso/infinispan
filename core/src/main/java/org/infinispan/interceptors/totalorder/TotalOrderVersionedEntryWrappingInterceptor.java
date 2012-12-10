@@ -17,6 +17,9 @@ import org.infinispan.transaction.WriteSkewException;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Wrapping Interceptor for Total Order protocol with versioning
  *
@@ -53,7 +56,7 @@ public class TotalOrderVersionedEntryWrappingInterceptor extends VersionedEntryW
             c.acceptVisitor(ctx, visitor);
       }
 
-      Object retVal = invokeNextInterceptor(ctx, command);
+      invokeNextInterceptor(ctx, command);
       if (command.isOnePhaseCommit()) {
          commitContextEntries(ctx);
       } else {
@@ -61,7 +64,7 @@ public class TotalOrderVersionedEntryWrappingInterceptor extends VersionedEntryW
             log.tracef("Transaction %s will be committed in the 2nd phase", ctx.getGlobalTransaction().prettyPrint());
       }
 
-      return retVal;
+      return visitor.getKeysValidated();
    }
 
    @Override
@@ -86,10 +89,16 @@ public class TotalOrderVersionedEntryWrappingInterceptor extends VersionedEntryW
 
    public class VersionCheckWrappingEntryVisitor extends EntryWrappingVisitor {
 
-      final VersionedPrepareCommand prepareCommand;
+      private final VersionedPrepareCommand prepareCommand;
+      private final Set<Object> keysValidated;
 
       public VersionCheckWrappingEntryVisitor(PrepareCommand command) {
          this.prepareCommand = (VersionedPrepareCommand) command;
+         this.keysValidated = new HashSet<Object>();
+      }
+
+      public Set<Object> getKeysValidated() {
+         return keysValidated;
       }
 
       @Override
@@ -131,6 +140,7 @@ public class TotalOrderVersionedEntryWrappingInterceptor extends VersionedEntryW
             throw WriteSkewException.createException(mvccEntry.getKey(), dataContainer.get(mvccEntry.getKey(), null),
                                                      mvccEntry, prepareCommand.getGlobalTransaction());
          }
+         keysValidated.add(clusterMvccEntry.getKey());
          return clusterMvccEntry;
       }
    }

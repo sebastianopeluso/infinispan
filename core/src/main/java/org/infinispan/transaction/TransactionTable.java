@@ -51,6 +51,7 @@ import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.transaction.xa.TransactionFactory;
 import org.infinispan.util.Util;
 import org.infinispan.util.concurrent.ConcurrentMapFactory;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -201,7 +202,9 @@ public class TransactionTable {
             }
          }
          //init the transaction vector clock. it is only used for Serializability
-         localTransaction.setTransactionVersion(commitLog.getCurrentVersion());
+         if (configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
+            localTransaction.setTransactionVersion(commitLog.getCurrentVersion());
+         }
          ((SyncLocalTransaction) localTransaction).setEnlisted(true);
       }
    }
@@ -499,7 +502,7 @@ public class TransactionTable {
          RemoteTransaction existing = remoteTransactions.putIfAbsent(globalTransaction, remoteTransaction);
          if (existing != null) {
             log.tracef("Returning a concurrent created remote transaction %s for global transaction %s",
-                      existing, globalTransaction.prettyPrint());
+                       existing, globalTransaction.prettyPrint());
             remoteTransaction = existing;
          } else {
             log.tracef("Created a new remote transaction %s for global transaction %s",

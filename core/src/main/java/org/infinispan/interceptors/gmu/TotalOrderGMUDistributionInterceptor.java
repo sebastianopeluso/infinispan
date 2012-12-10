@@ -1,28 +1,27 @@
-package org.infinispan.interceptors.totalorder;
+package org.infinispan.interceptors.gmu;
 
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.context.impl.TxInvocationContext;
-import org.infinispan.interceptors.DistributionInterceptor;
+import org.infinispan.remoting.responses.Response;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collection;
 
-import static org.infinispan.interceptors.totalorder.TotalOrderHelper.totalOrderBroadcastPrepare;
-import static org.infinispan.interceptors.totalorder.TotalOrderHelper.prepare;
+import static org.infinispan.interceptors.totalorder.TotalOrderHelper.*;
+import static org.infinispan.transaction.gmu.GMUHelper.joinAndSetTransactionVersion;
 import static org.infinispan.util.Util.getAffectedKeys;
 
 /**
- * This interceptor handles distribution of entries across a cluster, as well as transparent lookup, when the
- * total order based protocol is enabled
+ * // TODO: Document this
  *
  * @author Pedro Ruivo
- * @since 5.2
+ * @since 4.0
  */
-public class TotalOrderDistributionInterceptor extends DistributionInterceptor implements TotalOrderHelper.TotalOrderRpcInterceptor {
+public class TotalOrderGMUDistributionInterceptor extends GMUDistributionInterceptor implements TotalOrderRpcInterceptor {
 
-   private static final Log log = LogFactory.getLog(TotalOrderDistributionInterceptor.class);
+   private final Log log = LogFactory.getLog(TotalOrderGMUDistributionInterceptor.class);
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
@@ -39,7 +38,9 @@ public class TotalOrderDistributionInterceptor extends DistributionInterceptor i
       if(log.isTraceEnabled()) {
          log.tracef("Total Order Anycast transaction %s with Total Order", command.getGlobalTransaction().prettyPrint());
       }
-      totalOrderBroadcastPrepare(command, false, recipients, getAffectedKeys(command, null), rpcManager,
-                                 configuration.getSyncReplTimeout());
+      Collection<Response> responses = totalOrderBroadcastPrepare(command, false, recipients,
+                                                                  getAffectedKeys(command, null), rpcManager,
+                                                                  configuration.getSyncReplTimeout());
+      joinAndSetTransactionVersion(responses, ctx, versionGenerator);
    }
 }

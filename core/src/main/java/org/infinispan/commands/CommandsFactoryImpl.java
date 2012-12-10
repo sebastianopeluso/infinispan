@@ -38,7 +38,6 @@ import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
-import org.infinispan.commands.remote.PrepareResponseCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
 import org.infinispan.commands.remote.recovery.GetInDoubtTransactionsCommand;
@@ -429,10 +428,6 @@ public class CommandsFactoryImpl implements CommandsFactory {
             break;
          case ApplyDeltaCommand.COMMAND_ID:
             break;
-         case PrepareResponseCommand.COMMAND_ID:
-            PrepareResponseCommand prc = (PrepareResponseCommand) c;
-            prc.initialize(totalOrderManager);
-            break;
          case DataPlacementCommand.COMMAND_ID:
             DataPlacementCommand dataPlacementRequestCommand = (DataPlacementCommand)c;
             dataPlacementRequestCommand.initialize(dataPlacementManager);
@@ -517,11 +512,6 @@ public class CommandsFactoryImpl implements CommandsFactory {
    @Override
    public ApplyDeltaCommand buildApplyDeltaCommand(Object deltaAwareValueKey, Delta delta, Collection keys) {
       return new ApplyDeltaCommand(deltaAwareValueKey, delta, keys);
-   }
-
-   @Override
-   public PrepareResponseCommand buildPrepareResponseCommand(GlobalTransaction globalTransaction) {
-      return new PrepareResponseCommand(cacheName, globalTransaction);
    }
 
    @Override

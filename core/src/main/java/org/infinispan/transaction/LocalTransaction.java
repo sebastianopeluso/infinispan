@@ -26,10 +26,8 @@ package org.infinispan.transaction;
 import org.infinispan.CacheException;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
-import org.infinispan.container.versioning.EntryVersionsMap;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.xa.GlobalTransaction;
-import org.infinispan.util.concurrent.TimeoutException;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -67,10 +65,6 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    private final boolean implicitTransaction;
    private boolean prepareSent = false;
 
-   //total order result -- has the result and behaves like a synchronization point between the remote and local
-   // prepare commands
-   private final PrepareResult prepareResult = new PrepareResult();
-   private boolean commitOrRollbackSent;
    private boolean alreadyReadOnThisNode;
    private Set<Address> readFrom;
 
@@ -194,162 +188,6 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
    @Override
    public boolean keyRead(Object key) {
       return readKeys != null && readKeys.contains(key);
-   }
-
-   /**
-    * Total order result
-    */
-   private class PrepareResult {
-      //modifications are applied?
-      private volatile boolean modificationsApplied;
-      //is the result an exception?
-      private volatile boolean exception;
-      //the validation result
-      private volatile Object result;
-
-      //for distribution:
-      //has a set of keys that are not validated yet
-      private Set<Object> keysMissingValidation;
-      //true if the transaction was locally prepared
-      private volatile boolean localPrepared;
-
-      //for state transfer
-      private volatile boolean markedToRetransmit;
-
-      public PrepareResult() {}
-
-      private synchronized void init(Collection<Object> affectedKeys) {
-         keysMissingValidation = new HashSet<Object>(affectedKeys);
-      }
-
-      private synchronized void waitForOutcome() throws Throwable {
-         if (!modificationsApplied && !markedToRetransmit) {
-            this.wait();
-         }
-         if (markedToRetransmit) {
-            //no op
-         } else if (!modificationsApplied) {
-            throw new TimeoutException("Unable to wait until modifications are applied");
-         } else if (exception) {
-            throw (Throwable) result;
-         }
-      }
-
-      private synchronized void addResultFromPrepare(Object result, boolean exception) {
-         log.tracef("Received prepare result %s, is exception? %s", result, exception);
-
-         modificationsApplied = true;
-         this.result = result;
-         this.exception = exception;
-
-         if (!exception && result != null && result instanceof EntryVersionsMap) {
-            setUpdatedEntryVersions(((EntryVersionsMap) result).merge(getUpdatedEntryVersions()));
-         }
-
-         this.notify();
-      }
-
-      private synchronized void addKeysValidated(Collection<Object> keysValidated, boolean local) {
-         if (modificationsApplied) {
-            return; //already prepared
-         }
-
-         keysMissingValidation.removeAll(keysValidated);
-         if (local) {
-            prepareResult.localPrepared = true;
-         }
-         checkIfPrepared();
-      }
-
-      private synchronized void addException(Exception exception, boolean local) {
-         if (modificationsApplied) {
-            return; //already prepared
-         }
-
-         result = exception;
-         this.exception = true;
-         keysMissingValidation = Collections.emptySet();
-
-         if (local) {
-            localPrepared = true;
-         }
-         checkIfPrepared();
-      }
-
-      private synchronized void markToRetransmit() {
-         markedToRetransmit = true;
-         this.notify();
-      }
-
-      private synchronized boolean isMarkedToRetransmitAndReset() {
-         boolean marked = markedToRetransmit;
-         markedToRetransmit = false;
-         return marked;
-      }
-
-      /**
-       * unblocks the thread if enough conditions are ok to mark the transaction as prepared
-       */
-      private void checkIfPrepared() {
-         //the condition is: the transaction was delivered locally and all keys are validated (or an exception)
-         if (prepareResult.localPrepared && prepareResult.keysMissingValidation.isEmpty()) {
-            prepareResult.modificationsApplied = true;
-            this.notify();
-         }
-      }
-   }
-
-   /**
-    * waits until the modification are applied
-    *
-    * @throws Throwable throw the validation result if it is an exception
-    */
-   public final void awaitUntilModificationsApplied() throws Throwable {
-      prepareResult.waitForOutcome();
-   }
-
-   /**
-    * add the transaction result and notify
-    *
-    * @param object    the validation result
-    * @param exception is it an exception?
-    */
-   public void addPrepareResult(Object object, boolean exception) {
-      prepareResult.addResultFromPrepare(object, exception);
-   }
-
-   /**
-    * add a collection of keys successful validated (write skew check)
-    * @param keysValidated the keys validated
-    * @param local         if it is originated locally or remotely
-    */
-   public final void addKeysValidated(Collection<Object> keysValidated, boolean local) {
-      prepareResult.addKeysValidated(keysValidated, local);
-   }
-
-   /**
-    * add an exception (write skew check fails)
-    * @param exception  the exception
-    * @param local      if it is originated locally or remotely
-    */
-   public final void addException(Exception exception, boolean local) {
-      prepareResult.addException(exception, local);
-   }
-
-   /**
-    * invoked before send the prepare command to init the collection of keys that needs validation
-    * @param affectedKeys  the collection of keys wrote by the transaction
-    */
-   public final void initToCollectAcks(Collection<Object> affectedKeys) {
-      prepareResult.init(affectedKeys);
-   }
-
-   public final void markToRetransmit() {
-      prepareResult.markToRetransmit();
-   }
-
-   public final boolean isMarkedToRetransmit() {
-      return prepareResult.isMarkedToRetransmitAndReset();
    }
 
    @Override

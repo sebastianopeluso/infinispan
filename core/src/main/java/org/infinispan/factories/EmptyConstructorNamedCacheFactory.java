@@ -43,7 +43,6 @@ import org.infinispan.notifications.cachelistener.CacheNotifierImpl;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferLockImpl;
 import org.infinispan.statetransfer.totalorder.TotalOrderStateTransferLockImpl;
-import org.infinispan.transaction.totalorder.DistParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.ParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.SequentialTotalOrderManager;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
@@ -134,11 +133,7 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          boolean needsMultiThreadValidation = configuration.getIsolationLevel() == IsolationLevel.REPEATABLE_READ &&
                configuration.isWriteSkewCheck() && !configuration.isUseSynchronizationForTransactions();
 
-         return needsMultiThreadValidation ?
-               (configuration.getCacheMode().isDistributed() ?
-                      (T) new DistParallelTotalOrderManager() :
-                      (T) new ParallelTotalOrderManager())
-               : (T) new SequentialTotalOrderManager();
+         return needsMultiThreadValidation ? (T) new ParallelTotalOrderManager() : (T) new SequentialTotalOrderManager();
       } else if (componentType.equals(DataPlacementManager.class)){
          return (T) new DataPlacementManager();
       }

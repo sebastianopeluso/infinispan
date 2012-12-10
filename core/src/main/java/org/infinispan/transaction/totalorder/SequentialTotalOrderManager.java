@@ -18,27 +18,26 @@ public class SequentialTotalOrderManager extends BaseTotalOrderManager {
 
    private static final Log log = LogFactory.getLog(SequentialTotalOrderManager.class);
 
-   public final void processTransactionFromSequencer(PrepareCommand prepareCommand, TxInvocationContext ctx, CommandInterceptor invoker) {
+   public final Object processTransactionFromSequencer(PrepareCommand prepareCommand, TxInvocationContext ctx,
+                                                       CommandInterceptor invoker) throws Throwable {
 
       logAndCheckContext(prepareCommand, ctx);
 
       copyLookedUpEntriesToRemoteContext(ctx);
-      
-      Object result = null;
+
       boolean exception = false;
       long startTime = now();
       try {
-         result = prepareCommand.acceptVisitor(ctx, invoker);
+         return prepareCommand.acceptVisitor(ctx, invoker);
       } catch (Throwable t) {
          log.trace("Exception while processing the rest of the interceptor chain", t);
-         result = t;
-         exception = true;
-         //if an exception is throw, the TxInterceptor will not remove it from the TxTable and the rollback is not 
+         //if an exception is throw, the TxInterceptor will not remove it from the TxTable and the rollback is not
          //sent (with TO)
          transactionTable.remoteTransactionRollback(prepareCommand.getGlobalTransaction());
+         exception = true;
+         throw t;
       } finally {
-         logProcessingFinalStatus(prepareCommand, result, exception);
-         updateLocalTransaction(result, exception, prepareCommand.getGlobalTransaction());
+         logProcessingFinalStatus(prepareCommand, exception);
          updateProcessingDurationStats(startTime, now());
       }
    }
@@ -48,13 +47,5 @@ public class SequentialTotalOrderManager extends BaseTotalOrderManager {
          processingDuration.addAndGet(end - start);
          numberOfTxValidated.incrementAndGet();
       }
-   }
-
-
-   private void logProcessingFinalStatus(PrepareCommand prepareCommand, Object result, boolean exception) {
-      if (trace)
-         log.tracef("Transaction %s finished processing (%s). Validation result is %s ",
-                    prepareCommand.getGlobalTransaction().prettyPrint(),
-                    (exception ? "failed" : "ok"), (exception ? ((Throwable) result).getMessage() : result));
    }
 }

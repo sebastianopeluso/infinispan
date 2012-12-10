@@ -2,37 +2,30 @@ package org.infinispan.interceptors.totalorder;
 
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.context.impl.TxInvocationContext;
-import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.ReplicationInterceptor;
-import org.infinispan.transaction.totalorder.TotalOrderManager;
+
+import static org.infinispan.interceptors.totalorder.TotalOrderHelper.*;
 
 /**
  * @author mircea.markus@jboss.com
  * @since 5.2.0
  */
-public class TotalOrderReplicationInterceptor extends ReplicationInterceptor {
-
-   private TotalOrderManager totalOrderManager;
-
-   @Inject
-   public void init(TotalOrderManager totalOrderManager) {
-      this.totalOrderManager = totalOrderManager;
-   }
+public class TotalOrderReplicationInterceptor extends ReplicationInterceptor implements TotalOrderRpcInterceptor {
 
    @Override
    public final Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-      Object result;
-      boolean shouldRetransmit;
-      do {
-         result = super.visitPrepareCommand(ctx, command);
-         shouldRetransmit = false;
-         if (shouldInvokeRemoteTxCommand(ctx)) {
-            //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication
-            //not to take place, e.g. in the case there are no changes in the context. And this is the place where we know
-            // if the replication occurred.
-            shouldRetransmit = totalOrderManager.waitForPrepareToSucceed(ctx);
-         }
-      } while (shouldRetransmit);
-      return result;
+      return prepare(ctx, command, this);
+   }
+
+   @Override
+   public Object visitPrepare(TxInvocationContext context, PrepareCommand command) throws Throwable {
+      return super.visitPrepareCommand(context, command);
+   }
+
+   @Override
+   protected void broadcastPrepare(TxInvocationContext context, PrepareCommand command) {
+      boolean waitOnlySelfDeliver =!configuration.isSyncCommitPhase();
+      totalOrderBroadcastPrepare(command, waitOnlySelfDeliver, null, null, rpcManager,
+                                 configuration.getSyncReplTimeout());
    }
 }

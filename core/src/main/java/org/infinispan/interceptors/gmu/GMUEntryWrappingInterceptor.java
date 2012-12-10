@@ -44,7 +44,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
    private static final Log log = LogFactory.getLog(GMUEntryWrappingInterceptor.class);
 
    private TransactionCommitManager transactionCommitManager;
-   private GMUVersionGenerator versionGenerator;
+   protected GMUVersionGenerator versionGenerator;
 
    @Inject
    public void inject(TransactionCommitManager transactionCommitManager, DataContainer dataContainer,
@@ -75,6 +75,10 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
          ctx.setTransactionVersion(commitVersion);
       } else {
          retVal = ctx.getTransactionVersion();
+      }
+
+      if (command.isOnePhaseCommit()) {
+         commitContextEntries(ctx);
       }
 
       return retVal;
@@ -168,7 +172,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor implem
     * @param command the prepare command
     * @throws InterruptedException  if interrupted
     */
-   private void performValidation(TxInvocationContext ctx, GMUPrepareCommand command) throws InterruptedException {
+   protected void performValidation(TxInvocationContext ctx, GMUPrepareCommand command) throws InterruptedException {
       boolean hasToUpdateLocalKeys = false;
       boolean isReadOnly = command.getModifications().length == 0;
 

@@ -24,6 +24,7 @@ package org.infinispan.util;
 
 import org.infinispan.CacheConfigurationException;
 import org.infinispan.CacheException;
+import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.write.ApplyDeltaCommand;
 import org.infinispan.commands.write.ClearCommand;
 import org.infinispan.commands.write.DataWriteCommand;
@@ -632,6 +633,10 @@ public final class Util {
          }
       }
       return set;
+   }
+
+   public static Set<Object> getAffectedKeys(PrepareCommand command, DataContainer dataContainer) {
+      return getAffectedKeys(Arrays.asList(command.getModifications()), dataContainer);
    }
 
    public static BufferedWriter getBufferedWriter(String filePath) {

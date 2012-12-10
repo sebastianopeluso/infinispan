@@ -25,7 +25,7 @@ public class GMUReplicationInterceptor extends ReplicationInterceptor {
 
    private static final Log log = LogFactory.getLog(GMUReplicationInterceptor.class);
 
-   private GMUVersionGenerator versionGenerator;
+   protected GMUVersionGenerator versionGenerator;
 
    @Inject
    public void inject(VersionGenerator versionGenerator){

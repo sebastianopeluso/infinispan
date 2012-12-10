@@ -3,12 +3,13 @@ package org.infinispan.interceptors.totalorder;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.VersionedPrepareCommand;
 import org.infinispan.context.impl.TxInvocationContext;
-import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.VersionedReplicationInterceptor;
-import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import static org.infinispan.interceptors.totalorder.TotalOrderHelper.TotalOrderRpcInterceptor;
+import static org.infinispan.interceptors.totalorder.TotalOrderHelper.prepare;
+import static org.infinispan.interceptors.totalorder.TotalOrderHelper.totalOrderBroadcastPrepare;
 import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepareCommand;
 
 /**
@@ -18,15 +19,18 @@ import static org.infinispan.transaction.WriteSkewHelper.setVersionsSeenOnPrepar
  * @author Mircea.Markus@jboss.com
  * @since 5.2
  */
-public class TotalOrderVersionedReplicationInterceptor extends VersionedReplicationInterceptor {
+public class TotalOrderVersionedReplicationInterceptor extends VersionedReplicationInterceptor implements TotalOrderRpcInterceptor {
 
    private static final Log log = LogFactory.getLog(TotalOrderVersionedReplicationInterceptor.class);
 
-   private TotalOrderManager totalOrderManager;
+   @Override
+   public final Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
+      return prepare(ctx, command, this);
+   }
 
-   @Inject
-   public void init(TotalOrderManager totalOrderManager) {
-      this.totalOrderManager = totalOrderManager;
+   @Override
+   public Object visitPrepare(TxInvocationContext context, PrepareCommand command) throws Throwable {
+      return super.visitPrepareCommand(context, command);
    }
 
    @Override
@@ -40,19 +44,8 @@ public class TotalOrderVersionedReplicationInterceptor extends VersionedReplicat
          log.tracef("Broadcasting prepare for transaction %s with total order", command.getGlobalTransaction());
 
       setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, ctx);
-      //broadcast the command
-      boolean sync = command.isOnePhaseCommit() && configuration.isSyncCommitPhase();
-      boolean shouldRetransmit;
-
-      do {
-         shouldRetransmit = false;
-         rpcManager.broadcastRpcCommand(command, sync, true);
-         if (shouldInvokeRemoteTxCommand(ctx)) {
-            //we need to do the waiting here and not in the TotalOrderInterceptor because it is possible for the replication
-            //not to take place, e.g. in the case there are no changes in the context. And this is the place where we know
-            // if the replication occurred.
-            shouldRetransmit = totalOrderManager.waitForPrepareToSucceed(ctx);
-         }
-      } while (shouldRetransmit);
+      boolean waitOnlySelfDeliver =!configuration.isSyncCommitPhase();
+      totalOrderBroadcastPrepare(command, waitOnlySelfDeliver, null, null, rpcManager,
+                                 configuration.getSyncReplTimeout());
    }
 }

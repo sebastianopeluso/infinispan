@@ -10,8 +10,8 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.base.CommandInterceptor;
-import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.transaction.totalorder.TotalOrderRemoteTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
@@ -57,8 +57,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
                                                   (LocalTransaction) ctx.getCacheTransaction());
             return invokeNextInterceptor(ctx, command);
          } else {
-            totalOrderManager.processTransactionFromSequencer(command, ctx, getNext());
-            return null;
+            return totalOrderManager.processTransactionFromSequencer(command, ctx, getNext());
          }
       } catch (Throwable t) {
          if (trace) {
@@ -88,7 +87,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
 
       try {
          if (!ctx.isOriginLocal()) {
-            remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction(); 
+            remoteTransaction = (TotalOrderRemoteTransaction) ctx.getCacheTransaction();
             processCommand = totalOrderManager.waitForTxPrepared(remoteTransaction, false, null);
             if (!processCommand) {
                return null;
@@ -104,7 +103,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
          }
          throw t;
       } finally {
-         if (processCommand) {            
+         if (processCommand) {
             totalOrderManager.finishTransaction(gtx, !ctx.isOriginLocal() || !ctx.getCacheTransaction().wasPrepareSent(),
                                                 remoteTransaction);
          }

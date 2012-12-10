@@ -323,7 +323,9 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
 
    @Override
    public void prepareView(CacheView pendingView, CacheView committedView, List<CacheView> viewHistory) throws Exception {
-      versionGenerator.updateViewHistory(viewHistory);
+      if (versionGenerator != null) {
+         versionGenerator.updateViewHistory(viewHistory);
+      }
       log.tracef("Received new cache view: %s %s", configuration.getName(), pendingView);
 
       joinStartedLatch.countDown();
@@ -354,7 +356,9 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
 
       tempTask.commitStateTransfer();
       stateTransferTask = null;
-      versionGenerator.addCacheView(newView);
+      if (versionGenerator != null) {
+         versionGenerator.addCacheView(newView);
+      }
 
       // we can now use the new CH as the baseline for the next rehash
       oldView = newView;

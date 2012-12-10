@@ -7,7 +7,7 @@ import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.StateTransferLockInterceptor;
-import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.statetransfer.StateTransferException;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
@@ -21,6 +21,7 @@ import org.infinispan.util.logging.LogFactory;
 public class TotalOrderStateTransferLockInterceptor extends StateTransferLockInterceptor {
 
    private static final Log log = LogFactory.getLog(TotalOrderStateTransferLockInterceptor.class);
+   private static final StateTransferException STATE_TRANSFER_EXCEPTION = new StateTransferException();
 
    private CacheViewsManager cacheViewsManager;
    private TotalOrderManager totalOrderManager;
@@ -33,23 +34,11 @@ public class TotalOrderStateTransferLockInterceptor extends StateTransferLockInt
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
-      stateTransferLock.acquireForCommand(ctx, command);
-
       if (ctx.isOriginLocal()) {
-         setTransactionViewId(command.getGlobalTransaction(), command.getCacheName());
+         return processLocalPrepare(ctx, command);
+      } else {
+         return processRemotePrepare(ctx, command);
       }
-
-      if (shouldRetransmit(command)) {
-         LocalTransaction ltx = totalOrderManager.getLocalTransaction(command.getGlobalTransaction());
-         log.tracef("Transaction %s should be retransmitted. Local transaction is %s", command.getGlobalTransaction().prettyPrint(),
-                    ltx);
-         if (ltx != null) {
-            setTransactionViewId(ltx.getGlobalTransaction(), command.getCacheName());
-            ltx.markToRetransmit();
-         }
-         return null;
-      }
-      return invokeNextInterceptor(ctx, command);
    }
 
    @Override
@@ -70,5 +59,42 @@ public class TotalOrderStateTransferLockInterceptor extends StateTransferLockInt
    private void setTransactionViewId(GlobalTransaction globalTransaction, String cacheName) {
       globalTransaction.setViewId(cacheViewsManager.getCommittedView(cacheName).getViewId());
       log.tracef("Set view id [%s] for transaction %s", globalTransaction.getViewId(), globalTransaction.prettyPrint());
+   }
+
+   private Object processLocalPrepare(TxInvocationContext txInvocationContext, PrepareCommand command) throws Throwable {
+      boolean mustRetransmit;
+      Object result = null;
+      do {
+         try {
+            stateTransferLock.acquireForCommand(txInvocationContext, command);
+            setTransactionViewId(command.getGlobalTransaction(), command.getCacheName());
+            result = invokeNextInterceptor(txInvocationContext, command);
+            mustRetransmit = false;
+         } catch (StateTransferException e) {
+            mustRetransmit = true;
+         } finally {
+            stateTransferLock.releaseForCommand(txInvocationContext, command);
+         }
+      } while (mustRetransmit);
+      return result;
+   }
+
+   private Object processRemotePrepare(TxInvocationContext txInvocationContext, PrepareCommand command) throws Throwable {
+      try {
+         stateTransferLock.acquireForCommand(txInvocationContext, command);
+         if (shouldRetransmit(command)) {
+            boolean coordinatedLocally = totalOrderManager.isCoordinatedLocally(command.getGlobalTransaction());
+            log.tracef("Transaction %s should be retransmitted. Coordinated locally? %s",
+                       command.getGlobalTransaction().prettyPrint(), coordinatedLocally);
+            if (coordinatedLocally) {
+               throw STATE_TRANSFER_EXCEPTION;
+            } else {
+               return null;
+            }
+         }
+         return invokeNextInterceptor(txInvocationContext, command);
+      } finally {
+         stateTransferLock.releaseForCommand(txInvocationContext, command);
+      }
    }
 }
