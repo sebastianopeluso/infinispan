@@ -1,7 +1,7 @@
 package org.infinispan.transaction.gmu.manager;
 
 import org.infinispan.commands.tx.GMUCommitCommand;
-import org.infinispan.container.versioning.gmu.GMUEntryVersion;
+import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
@@ -10,7 +10,7 @@ import org.infinispan.util.logging.LogFactory;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUEntryVersion;
+import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersion;
 
 /**
  * // TODO: Document this
@@ -33,10 +33,10 @@ public class SortedTransactionQueue {
          private Node first;
 
          @Override
-         public void commitVersion(GMUEntryVersion commitCommand) {}
+         public void commitVersion(GMUVersion commitCommand) {}
 
          @Override
-         public GMUEntryVersion getVersion() {
+         public GMUVersion getVersion() {
             throw new IllegalStateException("Cannot return the version from the first node");
          }
 
@@ -102,10 +102,10 @@ public class SortedTransactionQueue {
          private Node last;
 
          @Override
-         public void commitVersion(GMUEntryVersion commitCommand) {}
+         public void commitVersion(GMUVersion commitCommand) {}
 
          @Override
-         public GMUEntryVersion getVersion() {
+         public GMUVersion getVersion() {
             throw new IllegalStateException("Cannot return the version from the last node");
          }
 
@@ -187,7 +187,7 @@ public class SortedTransactionQueue {
    }
 
    //return true if it is a read-write transaction
-   public final boolean commit(CacheTransaction cacheTransaction, GMUEntryVersion commitVersion) {
+   public final boolean commit(CacheTransaction cacheTransaction, GMUVersion commitVersion) {
       Node entry = concurrentHashMap.get(cacheTransaction.getGlobalTransaction());
       if (entry == null) {
          if (log.isDebugEnabled()) {
@@ -287,7 +287,7 @@ public class SortedTransactionQueue {
       newFirst.setPrevious(firstEntry);
    }
 
-   private synchronized void update(Node entry, GMUEntryVersion commitVersion) {
+   private synchronized void update(Node entry, GMUVersion commitVersion) {
       if (log.isTraceEnabled()) {
          log.tracef("Update %s with %s", entry, commitVersion);
       }
@@ -374,7 +374,7 @@ public class SortedTransactionQueue {
    private class TransactionEntryImpl implements Node {
 
       private final CacheTransaction cacheTransaction;
-      private GMUEntryVersion entryVersion;
+      private GMUVersion entryVersion;
       private boolean ready;
       private boolean committed;
       private GMUCommitCommand commitCommand;
@@ -384,10 +384,10 @@ public class SortedTransactionQueue {
 
       private TransactionEntryImpl(CacheTransaction cacheTransaction) {
          this.cacheTransaction = cacheTransaction;
-         this.entryVersion = toGMUEntryVersion(cacheTransaction.getTransactionVersion());
+         this.entryVersion = toGMUVersion(cacheTransaction.getTransactionVersion());
       }
 
-      public synchronized void commitVersion(GMUEntryVersion commitVersion) {
+      public synchronized void commitVersion(GMUVersion commitVersion) {
          this.entryVersion = commitVersion;
          this.ready = true;
          if (log.isTraceEnabled()) {
@@ -395,7 +395,7 @@ public class SortedTransactionQueue {
          }
       }
 
-      public synchronized GMUEntryVersion getVersion() {
+      public synchronized GMUVersion getVersion() {
          return entryVersion;
       }
 
@@ -513,8 +513,8 @@ public class SortedTransactionQueue {
    }
 
    private interface Node extends TransactionEntry, Comparable<Node> {
-      void commitVersion(GMUEntryVersion commitCommand);
-      GMUEntryVersion getVersion();
+      void commitVersion(GMUVersion commitCommand);
+      GMUVersion getVersion();
       boolean isReady();
       boolean isCommitted();
       GlobalTransaction getGlobalTransaction();

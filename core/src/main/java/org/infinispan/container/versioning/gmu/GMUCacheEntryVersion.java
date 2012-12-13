@@ -7,13 +7,13 @@ import org.infinispan.marshall.AbstractExternalizer;
 import org.infinispan.marshall.Ids;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.Util;
-import org.infinispan.util.logging.Log;
-import org.infinispan.util.logging.LogFactory;
 
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Set;
+
+import static org.infinispan.container.versioning.InequalVersionComparisonResult.*;
 
 /**
  * // TODO: Document this
@@ -21,71 +21,84 @@ import java.util.Set;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class GMUCacheEntryVersion extends GMUEntryVersion {
-
-   private static final Log log = LogFactory.getLog(GMUCacheEntryVersion.class);
+public class GMUCacheEntryVersion extends GMUVersion {
 
    private final long version;
+   private final int subVersion;
 
-   public GMUCacheEntryVersion(String cacheName, int viewId, GMUVersionGenerator versionGenerator, long version) {
+   public GMUCacheEntryVersion(String cacheName, int viewId, GMUVersionGenerator versionGenerator, long version,
+                               int subVersion) {
       super(cacheName, viewId, versionGenerator);
       this.version = version;
+      this.subVersion = subVersion;
    }
 
-   private GMUCacheEntryVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, Address localAddress, long version) {
+   private GMUCacheEntryVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, Address localAddress,
+                                long version, int subVersion) {
       super(cacheName, viewId, clusterSnapshot, localAddress);
       this.version = version;
+      this.subVersion = subVersion;
    }
 
    @Override
-   public long getVersionValue(Address address) {
+   public final long getVersionValue(Address address) {
       return getVersionValue(clusterSnapshot.indexOf(address));
    }
 
    @Override
-   public long getVersionValue(int addressIndex) {
-      return addressIndex == nodeIndex ? version : NON_EXISTING;
+   public final long getVersionValue(int addressIndex) {
+      if (addressIndex == nodeIndex) {
+         return version;
+      }
+      return NON_EXISTING;
+   }
+
+   public final int getSubVersion() {
+      return subVersion;
    }
 
    @Override
    public InequalVersionComparisonResult compareTo(EntryVersion other) {
-      if (other instanceof GMUCacheEntryVersion) {
+      //this particular version can only be compared with this type of GMU version or with GMUReadVersion
+      if (other == null) {
+         return BEFORE;
+      } else if (other instanceof GMUCacheEntryVersion) {
          GMUCacheEntryVersion cacheEntryVersion = (GMUCacheEntryVersion) other;
-         InequalVersionComparisonResult versionComparisonResult = compare(this.version, cacheEntryVersion.version);
-
-         if (versionComparisonResult == InequalVersionComparisonResult.EQUAL) {
-            versionComparisonResult = compare(this.viewId, cacheEntryVersion.viewId);
+         InequalVersionComparisonResult result = compare(version, cacheEntryVersion.version);
+         if (result == EQUAL) {
+            return compare(subVersion, cacheEntryVersion.subVersion);
          }
-
-         if (log.isTraceEnabled()) {
-            log.tracef("Compare this[%s] with other[%s] => %s", this, other, versionComparisonResult);
+         return result;
+      } else if (other instanceof GMUReadVersion) {
+         GMUReadVersion readVersion = (GMUReadVersion) other;
+         if (readVersion.contains(version, subVersion)) {
+            //this is an invalid version. set it higher
+            return AFTER;
          }
-         return versionComparisonResult;
+         return compare(version, readVersion.getThisNodeVersionValue());
+      } else if (other instanceof GMUReplicatedVersion) {
+         GMUReplicatedVersion replicatedVersion = (GMUReplicatedVersion) other;
+         InequalVersionComparisonResult result = compare(version, replicatedVersion.getThisNodeVersionValue());
+         if (result == EQUAL) {
+            return compare(viewId, replicatedVersion.getViewId());
+         }
+         return result;
+      }  else if (other instanceof GMUDistributedVersion) {
+         GMUDistributedVersion distributedVersion = (GMUDistributedVersion) other;
+         InequalVersionComparisonResult result = compare(version, distributedVersion.getThisNodeVersionValue());
+         if (result == EQUAL) {
+            return compare(viewId, distributedVersion.getViewId());
+         }
+         return result;
       }
-
-      if (other instanceof GMUClusterEntryVersion) {
-         GMUClusterEntryVersion clusterEntryVersion = (GMUClusterEntryVersion) other;
-         InequalVersionComparisonResult versionComparisonResult = compare(this.version, clusterEntryVersion.getThisNodeVersionValue());
-
-         if (versionComparisonResult == InequalVersionComparisonResult.EQUAL) {
-            versionComparisonResult = compare(this.viewId, clusterEntryVersion.viewId);
-         }
-
-         if (log.isTraceEnabled()) {
-            log.tracef("Compare this[%s] with other[%s] => %s", this, other, versionComparisonResult);
-         }
-
-         return versionComparisonResult;
-      }
-
-      throw new IllegalArgumentException("Cannot compare GMU entry versions with " + (other == null ? "N/A" :
-                                                                                            other.getClass().getSimpleName()));
+      throw new IllegalArgumentException("Cannot compare " + getClass() + " with " + other.getClass());
    }
 
    @Override
    public String toString() {
       return "GMUCacheEntryVersion{" +
             "version=" + version +
+            ", subVersion=" + subVersion +
             ", " + super.toString();
    }
 
@@ -108,6 +121,7 @@ public class GMUCacheEntryVersion extends GMUEntryVersion {
          output.writeUTF(object.cacheName);
          output.writeInt(object.viewId);
          output.writeLong(object.version);
+         output.writeInt(object.subVersion);
       }
 
       @Override
@@ -120,12 +134,14 @@ public class GMUCacheEntryVersion extends GMUEntryVersion {
             throw new IllegalArgumentException("View Id " + viewId + " not found in this node");
          }
          long version = input.readLong();
-         return new GMUCacheEntryVersion(cacheName, viewId, clusterSnapshot, gmuVersionGenerator.getAddress(), version);
+         int subVersion = input.readInt();
+         return new GMUCacheEntryVersion(cacheName, viewId, clusterSnapshot, gmuVersionGenerator.getAddress(), version,
+                                         subVersion);
       }
 
       @Override
       public Integer getId() {
-         return Ids.GMU_ENTRY_VERSION;
+         return Ids.GMU_CACHE_VERSION;
       }
    }
 }

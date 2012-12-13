@@ -21,8 +21,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeMap;
 
-import static org.infinispan.container.versioning.gmu.GMUEntryVersion.NON_EXISTING;
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUEntryVersion;
+import static org.infinispan.container.versioning.gmu.GMUVersion.NON_EXISTING;
+import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersion;
 
 /**
  * // TODO: Document this
@@ -34,10 +34,9 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
 
    private static final Hash HASH = new MurmurHash3();
    private static final Log log = LogFactory.getLog(DistGMUVersionGenerator.class);
-
+   private final TreeMap<Integer, ClusterSnapshot> viewIdClusterSnapshot;
    private RpcManager rpcManager;
    private String cacheName;
-   private final TreeMap<Integer, ClusterSnapshot> viewIdClusterSnapshot;
    private volatile int currentViewId;
 
    public DistGMUVersionGenerator() {
@@ -62,7 +61,7 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
       ClusterSnapshot clusterSnapshot = getClusterSnapshot(viewId);
       long[] versions = create(true, clusterSnapshot.size());
       versions[clusterSnapshot.indexOf(getAddress())] = 0;
-      return new GMUClusterEntryVersion(cacheName, currentViewId, this, versions);
+      return new GMUDistributedVersion(cacheName, currentViewId, this, versions);
    }
 
    @Override
@@ -71,10 +70,10 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
          throw new NullPointerException("Cannot increment a null version");
       }
 
-      GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(initialVersion);
+      GMUVersion gmuVersion = toGMUVersion(initialVersion);
       int viewId = currentViewId;
-      GMUClusterEntryVersion incrementedVersion = new GMUClusterEntryVersion(cacheName, viewId, this,
-                                                                             increment(gmuEntryVersion, viewId));
+      GMUDistributedVersion incrementedVersion = new GMUDistributedVersion(cacheName, viewId, this,
+                                                                           increment(gmuVersion, viewId));
 
       if (log.isTraceEnabled()) {
          log.tracef("increment(%s) ==> %s", initialVersion, incrementedVersion);
@@ -83,18 +82,18 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public final GMUEntryVersion mergeAndMax(EntryVersion... entryVersions) {
+   public final GMUVersion mergeAndMax(EntryVersion... entryVersions) {
       if (entryVersions == null || entryVersions.length == 0) {
          throw new IllegalStateException("Cannot merge an empy list");
       }
 
-      List<GMUEntryVersion> gmuEntryVersions = new ArrayList<GMUEntryVersion>(entryVersions.length);
+      List<GMUVersion> gmuVersions = new ArrayList<GMUVersion>(entryVersions.length);
       //validate the entry versions
       for (EntryVersion entryVersion : entryVersions) {
          if (entryVersion == null) {
             log.errorf("Null version in list %s. It will be ignored", entryVersion);
-         } else if (entryVersion instanceof GMUEntryVersion) {
-            gmuEntryVersions.add(toGMUEntryVersion(entryVersion));
+         } else if (entryVersion instanceof GMUVersion) {
+            gmuVersions.add(toGMUVersion(entryVersion));
          } else {
             throw new IllegalArgumentException("Expected an array of GMU entry version but it has " +
                                                      entryVersion.getClass().getSimpleName());
@@ -102,8 +101,8 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
       }
 
       int viewId = currentViewId;
-      GMUClusterEntryVersion mergedVersion = new GMUClusterEntryVersion(cacheName, viewId, this,
-                                                                        mergeClustered(viewId, gmuEntryVersions));
+      GMUDistributedVersion mergedVersion = new GMUDistributedVersion(cacheName, viewId, this,
+                                                                      mergeClustered(viewId, gmuVersions));
       if (log.isTraceEnabled()) {
          log.tracef("mergeAndMax(%s) ==> %s", entryVersions, mergedVersion);
       }
@@ -111,12 +110,12 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public final GMUEntryVersion calculateCommitVersion(EntryVersion prepareVersion,
-                                                       Collection<Address> affectedOwners) {
+   public final GMUVersion calculateCommitVersion(EntryVersion prepareVersion,
+                                                  Collection<Address> affectedOwners) {
       int viewId = currentViewId;
-      GMUClusterEntryVersion commitVersion = new GMUClusterEntryVersion(cacheName, viewId, this,
-                                                                        calculateVersionToCommit(viewId, prepareVersion,
-                                                                                                 affectedOwners));
+      GMUDistributedVersion commitVersion = new GMUDistributedVersion(cacheName, viewId, this,
+                                                                      calculateVersionToCommit(viewId, prepareVersion,
+                                                                                               affectedOwners));
       if (log.isTraceEnabled()) {
          log.tracef("calculateCommitVersion(%s,%s) ==> %s", prepareVersion, affectedOwners, commitVersion);
       }
@@ -124,20 +123,29 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public final GMUEntryVersion convertVersionToWrite(EntryVersion version) {
-      GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(version);
-      GMUCacheEntryVersion writeVersion = new GMUCacheEntryVersion(cacheName, currentViewId, this,
-                                                                   gmuEntryVersion.getThisNodeVersionValue());
+   public final GMUCacheEntryVersion convertVersionToWrite(EntryVersion version, int subVersion) {
+      GMUVersion gmuVersion = toGMUVersion(version);
+      GMUCacheEntryVersion cacheEntryVersion = new GMUCacheEntryVersion(cacheName, currentViewId, this,
+                                                                        gmuVersion.getThisNodeVersionValue(), subVersion);
 
       if (log.isTraceEnabled()) {
-         log.tracef("convertVersionToWrite(%s) ==> %s", version, writeVersion);
+         log.tracef("convertVersionToWrite(%s) ==> %s", version, cacheEntryVersion);
       }
-      return writeVersion;
+      return cacheEntryVersion;
    }
 
    @Override
-   public GMUEntryVersion calculateMaxVersionToRead(EntryVersion transactionVersion,
-                                                    Collection<Address> alreadyReadFrom) {
+   public GMUReadVersion convertVersionToRead(EntryVersion version) {
+      if (version == null) {
+         return null;
+      }
+      GMUVersion gmuVersion  = toGMUVersion(version);
+      return new GMUReadVersion(cacheName, currentViewId, this, gmuVersion.getThisNodeVersionValue());
+   }
+
+   @Override
+   public GMUVersion calculateMaxVersionToRead(EntryVersion transactionVersion,
+                                               Collection<Address> alreadyReadFrom) {
       if (alreadyReadFrom == null || alreadyReadFrom.isEmpty()) {
          if (log.isTraceEnabled()) {
             log.tracef("calculateMaxVersionToRead(%s, %s) ==> null", transactionVersion, alreadyReadFrom);
@@ -145,7 +153,7 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
          return null;
       }
       //the max version is calculated with the position of the version in which this node has already read from
-      GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(transactionVersion);
+      GMUVersion gmuVersion = toGMUVersion(transactionVersion);
 
       int viewId = currentViewId;
       ClusterSnapshot clusterSnapshot = getClusterSnapshot(viewId);
@@ -157,10 +165,10 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
             //does not exists in current view (is this safe? -- I think that it depends of the state transfer...)
             continue;
          }
-         versionsValues[index] = gmuEntryVersion.getVersionValue(readFrom);
+         versionsValues[index] = gmuVersion.getVersionValue(readFrom);
       }
 
-      GMUClusterEntryVersion maxVersionToRead = new GMUClusterEntryVersion(cacheName, viewId, this, versionsValues);
+      GMUDistributedVersion maxVersionToRead = new GMUDistributedVersion(cacheName, viewId, this, versionsValues);
       if (log.isTraceEnabled()) {
          log.tracef("calculateMaxVersionToRead(%s, %s) ==> %s", transactionVersion, alreadyReadFrom, maxVersionToRead);
       }
@@ -168,8 +176,8 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public GMUEntryVersion calculateMinVersionToRead(EntryVersion transactionVersion,
-                                                    Collection<Address> alreadyReadFrom) {
+   public GMUVersion calculateMinVersionToRead(EntryVersion transactionVersion,
+                                               Collection<Address> alreadyReadFrom) {
       if (transactionVersion == null) {
          throw new NullPointerException("Transaction Version cannot be null to calculate the min version to read");
       }
@@ -183,7 +191,7 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
 
       //the min version is defined by the nodes that we haven't read yet
 
-      GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(transactionVersion);
+      GMUVersion gmuVersion = toGMUVersion(transactionVersion);
       int viewId = currentViewId;
       ClusterSnapshot clusterSnapshot = getClusterSnapshot(viewId);
       long[] versionValues = create(true, clusterSnapshot.size());
@@ -193,10 +201,10 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
          if (alreadyReadFrom.contains(address)) {
             continue;
          }
-         versionValues[i] = gmuEntryVersion.getVersionValue(address);
+         versionValues[i] = gmuVersion.getVersionValue(address);
       }
 
-      GMUClusterEntryVersion minVersionToRead = new GMUClusterEntryVersion(cacheName, viewId, this, versionValues);
+      GMUDistributedVersion minVersionToRead = new GMUDistributedVersion(cacheName, viewId, this, versionValues);
       if (log.isTraceEnabled()) {
          log.tracef("calculateMinVersionToRead(%s, %s) ==> %s", transactionVersion, alreadyReadFrom, minVersionToRead);
       }
@@ -204,21 +212,21 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public GMUEntryVersion setNodeVersion(EntryVersion version, long value) {
+   public GMUVersion setNodeVersion(EntryVersion version, long value) {
 
-      GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(version);
+      GMUVersion gmuVersion = toGMUVersion(version);
       int viewId = currentViewId;
       ClusterSnapshot clusterSnapshot = getClusterSnapshot(viewId);
       long[] versionValues = create(true, clusterSnapshot.size());
 
       for (int i = 0; i < clusterSnapshot.size(); ++i) {
          Address address = clusterSnapshot.get(i);
-         versionValues[i] = gmuEntryVersion.getVersionValue(address);
+         versionValues[i] = gmuVersion.getVersionValue(address);
       }
 
       versionValues[clusterSnapshot.indexOf(getAddress())] = value;
 
-      GMUClusterEntryVersion newVersion = new GMUClusterEntryVersion(cacheName, viewId, this, versionValues);
+      GMUDistributedVersion newVersion = new GMUDistributedVersion(cacheName, viewId, this, versionValues);
       if (log.isTraceEnabled()) {
          log.tracef("setNodeVersion(%s, %s) ==> %s", version, value, newVersion);
       }
@@ -226,18 +234,18 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public GMUEntryVersion updatedVersion(EntryVersion entryVersion) {
-      if (entryVersion instanceof GMUCacheEntryVersion) {
-         return new GMUCacheEntryVersion(cacheName, currentViewId, this,
-                                         ((GMUCacheEntryVersion) entryVersion).getThisNodeVersionValue());
-      } else if (entryVersion instanceof GMUClusterEntryVersion) {
+   public GMUVersion updatedVersion(EntryVersion entryVersion) {
+      if (entryVersion instanceof GMUReplicatedVersion) {
+         return new GMUReplicatedVersion(cacheName, currentViewId, this,
+                                         ((GMUReplicatedVersion) entryVersion).getThisNodeVersionValue());
+      } else if (entryVersion instanceof GMUDistributedVersion) {
          int viewId = currentViewId;
          ClusterSnapshot clusterSnapshot = getClusterSnapshot(viewId);
          long[] newVersions = new long[clusterSnapshot.size()];
          for (int i = 0;  i < clusterSnapshot.size(); ++i) {
-            newVersions[i] = ((GMUClusterEntryVersion) entryVersion).getVersionValue(clusterSnapshot.get(i));
+            newVersions[i] = ((GMUDistributedVersion) entryVersion).getVersionValue(clusterSnapshot.get(i));
          }
-         return new GMUClusterEntryVersion(cacheName, viewId, this, newVersions);
+         return new GMUDistributedVersion(cacheName, viewId, this, newVersions);
       }
       throw new IllegalArgumentException("Cannot handle " + entryVersion);
    }
@@ -299,7 +307,7 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
       return versions;
    }
 
-   private long[] increment(GMUEntryVersion initialVersion, int viewId) {
+   private long[] increment(GMUVersion initialVersion, int viewId) {
       ClusterSnapshot clusterSnapshot = getClusterSnapshot(viewId);
 
       long[] versions = create(false, clusterSnapshot.size());
@@ -313,11 +321,11 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
       return versions;
    }
 
-   private long[] mergeClustered(int viewId, Collection<GMUEntryVersion> entryVersions) {
+   private long[] mergeClustered(int viewId, Collection<GMUVersion> entryVersions) {
       ClusterSnapshot clusterSnapshot = getClusterSnapshot(viewId);
       long[] versions = create(true, clusterSnapshot.size());
 
-      for (GMUEntryVersion entryVersion : entryVersions) {
+      for (GMUVersion entryVersion : entryVersions) {
          for (int index = 0; index < clusterSnapshot.size(); ++index) {
             versions[index] = Math.max(versions[index], entryVersion.getVersionValue(clusterSnapshot.get(index)));
          }
@@ -326,14 +334,14 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    private long[] calculateVersionToCommit(int newViewId, EntryVersion version, Collection<Address> addresses) {
-      GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(version);
+      GMUVersion gmuVersion = toGMUVersion(version);
 
       if (addresses == null) {
-         int oldViewId = gmuEntryVersion.getViewId();
+         int oldViewId = gmuVersion.getViewId();
          ClusterSnapshot oldClusterSnapshot = getClusterSnapshot(oldViewId);
          long commitValue = 0;
          for (int i = 0; i < oldClusterSnapshot.size(); ++i) {
-            commitValue = Math.max(commitValue, gmuEntryVersion.getVersionValue(i));
+            commitValue = Math.max(commitValue, gmuVersion.getVersionValue(i));
          }
 
          ClusterSnapshot clusterSnapshot = getClusterSnapshot(newViewId);
@@ -354,7 +362,7 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
          if (index < 0) {
             continue;
          }
-         commitValue = Math.max(commitValue, gmuEntryVersion.getVersionValue(owner));
+         commitValue = Math.max(commitValue, gmuVersion.getVersionValue(owner));
          ownersIndex.add(index);
       }
 
@@ -362,7 +370,7 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
          if (ownersIndex.contains(index)) {
             versions[index] = commitValue;
          } else {
-            versions[index] = gmuEntryVersion.getVersionValue(clusterSnapshot.get(index));
+            versions[index] = gmuVersion.getVersionValue(clusterSnapshot.get(index));
          }
       }
       return versions;

@@ -57,8 +57,9 @@ import org.infinispan.container.entries.versioned.VersionedTransientCacheEntry;
 import org.infinispan.container.entries.versioned.VersionedTransientCacheValue;
 import org.infinispan.container.entries.versioned.VersionedTransientMortalCacheEntry;
 import org.infinispan.container.entries.versioned.VersionedTransientMortalCacheValue;
+import org.infinispan.container.versioning.gmu.GMUReplicatedVersion;
 import org.infinispan.container.versioning.gmu.GMUCacheEntryVersion;
-import org.infinispan.container.versioning.gmu.GMUClusterEntryVersion;
+import org.infinispan.container.versioning.gmu.GMUDistributedVersion;
 import org.infinispan.distribution.RemoteTransactionLogDetails;
 import org.infinispan.distribution.ch.DefaultConsistentHash;
 import org.infinispan.distribution.ch.TopologyAwareConsistentHash;
@@ -153,7 +154,7 @@ public class ExternalizerTable implements ObjectTable {
 
    @Inject
    public void inject(RemoteCommandsFactory cmdFactory, GlobalComponentRegistry gcr,
-         @ComponentName(GLOBAL_MARSHALLER) StreamingMarshaller globalMarshaller) {
+                      @ComponentName(GLOBAL_MARSHALLER) StreamingMarshaller globalMarshaller) {
       this.cmdFactory = cmdFactory;
       this.gcr = gcr;
       this.globalMarshaller = globalMarshaller;
@@ -306,8 +307,9 @@ public class ExternalizerTable implements ObjectTable {
       addInternalExternalizer(new InternalGMUNullCacheValue.Externalizer());
       addInternalExternalizer(new InternalGMUValueCacheEntry.Externalizer());
       addInternalExternalizer(new InternalGMUValueCacheValue.Externalizer());
+      addInternalExternalizer(new GMUReplicatedVersion.Externalizer(gcr));
+      addInternalExternalizer(new GMUDistributedVersion.Externalizer(gcr));
       addInternalExternalizer(new GMUCacheEntryVersion.Externalizer(gcr));
-      addInternalExternalizer(new GMUClusterEntryVersion.Externalizer(gcr));
    }
 
    void addInternalExternalizer(AdvancedExternalizer<?> ext) {
@@ -367,7 +369,7 @@ public class ExternalizerTable implements ObjectTable {
 
       if (log.isTraceEnabled())
          log.tracef("Loaded externalizer %s for %s with id %s and reader index %s",
-                   adapter.externalizer.getClass().getName(), typeClass, adapter.id, readerIndex);
+                    adapter.externalizer.getClass().getName(), typeClass, adapter.id, readerIndex);
 
    }
 

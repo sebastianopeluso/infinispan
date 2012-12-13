@@ -13,19 +13,21 @@ import java.util.Collection;
  * @since 5.2
  */
 public interface GMUVersionGenerator extends VersionGenerator {
-   GMUEntryVersion mergeAndMax(EntryVersion... entryVersions);
+   GMUVersion mergeAndMax(EntryVersion... entryVersions);
 
-   GMUEntryVersion calculateCommitVersion(EntryVersion prepareVersion, Collection<Address> affectedOwners);
+   GMUVersion calculateCommitVersion(EntryVersion prepareVersion, Collection<Address> affectedOwners);
 
-   GMUEntryVersion convertVersionToWrite(EntryVersion version);
+   GMUCacheEntryVersion convertVersionToWrite(EntryVersion version, int subVersion);
 
-   GMUEntryVersion calculateMaxVersionToRead(EntryVersion transactionVersion, Collection<Address> alreadyReadFrom);
+   GMUReadVersion convertVersionToRead(EntryVersion version);
 
-   GMUEntryVersion calculateMinVersionToRead(EntryVersion transactionVersion, Collection<Address> alreadyReadFrom);
+   GMUVersion calculateMaxVersionToRead(EntryVersion transactionVersion, Collection<Address> alreadyReadFrom);
 
-   GMUEntryVersion setNodeVersion(EntryVersion version, long value);
+   GMUVersion calculateMinVersionToRead(EntryVersion transactionVersion, Collection<Address> alreadyReadFrom);
 
-   GMUEntryVersion updatedVersion(EntryVersion entryVersion);
+   GMUVersion setNodeVersion(EntryVersion version, long value);
+
+   GMUVersion updatedVersion(EntryVersion entryVersion);
 
    ClusterSnapshot getClusterSnapshot(int viewId);
 

@@ -15,7 +15,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import static org.infinispan.container.versioning.gmu.GMUEntryVersion.NON_EXISTING;
+import static org.infinispan.container.versioning.gmu.GMUVersion.NON_EXISTING;
+import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersion;
 
 /**
  * // TODO: Document this
@@ -47,44 +48,53 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
 
    @Override
    public final IncrementableEntryVersion generateNew() {
-      return new GMUCacheEntryVersion(cacheName, currentViewId, this, 0);
+      return new GMUReplicatedVersion(cacheName, currentViewId, this, 0);
    }
 
    @Override
    public final IncrementableEntryVersion increment(IncrementableEntryVersion initialVersion) {
-      GMUCacheEntryVersion gmuEntryVersion = toGMUEntryVersion(initialVersion);
-      return new GMUCacheEntryVersion(cacheName, currentViewId, this, gmuEntryVersion.getThisNodeVersionValue() + 1);
+      GMUVersion gmuEntryVersion = toGMUVersion(initialVersion);
+      return new GMUReplicatedVersion(cacheName, currentViewId, this, gmuEntryVersion.getThisNodeVersionValue() + 1);
    }
 
    @Override
-   public final GMUEntryVersion mergeAndMax(EntryVersion... entryVersions) {
+   public final GMUVersion mergeAndMax(EntryVersion... entryVersions) {
       //validate the entry versions
       for (EntryVersion entryVersion : entryVersions) {
-         if (entryVersion instanceof GMUCacheEntryVersion) {
+         if (entryVersion instanceof GMUReplicatedVersion) {
             continue;
          }
          throw new IllegalArgumentException("Expected an array of GMU entry version but it has " +
                                                   entryVersion.getClass().getSimpleName());
       }
 
-      return new GMUCacheEntryVersion(cacheName, currentViewId, this, merge(entryVersions));
+      return new GMUReplicatedVersion(cacheName, currentViewId, this, merge(entryVersions));
    }
 
    @Override
-   public final GMUEntryVersion calculateCommitVersion(EntryVersion mergedPrepareVersion,
-                                                       Collection<Address> affectedOwners) {
+   public final GMUVersion calculateCommitVersion(EntryVersion mergedPrepareVersion,
+                                                  Collection<Address> affectedOwners) {
       return updatedVersion(mergedPrepareVersion);
    }
 
    @Override
-   public final GMUEntryVersion convertVersionToWrite(EntryVersion version) {
-      GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(version);
-      return new GMUCacheEntryVersion(cacheName, currentViewId, this, gmuEntryVersion.getThisNodeVersionValue());
+   public final GMUCacheEntryVersion convertVersionToWrite(EntryVersion version, int subVersion) {
+      GMUVersion gmuVersion = toGMUVersion(version);
+      return new GMUCacheEntryVersion(cacheName, currentViewId, this, gmuVersion.getThisNodeVersionValue(), subVersion);
    }
 
    @Override
-   public GMUEntryVersion calculateMaxVersionToRead(EntryVersion transactionVersion,
-                                                    Collection<Address> alreadyReadFrom) {
+   public final GMUReadVersion convertVersionToRead(EntryVersion version) {
+      if (version == null) {
+         return null;
+      }
+      GMUVersion gmuVersion = toGMUVersion(version);
+      return new GMUReadVersion(cacheName, currentViewId, this, gmuVersion.getThisNodeVersionValue());
+   }
+
+   @Override
+   public GMUVersion calculateMaxVersionToRead(EntryVersion transactionVersion,
+                                               Collection<Address> alreadyReadFrom) {
       if (alreadyReadFrom == null || alreadyReadFrom.isEmpty()) {
          return null;
       }
@@ -92,29 +102,29 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public GMUEntryVersion calculateMinVersionToRead(EntryVersion transactionVersion,
-                                                    Collection<Address> alreadyReadFrom) {
+   public GMUVersion calculateMinVersionToRead(EntryVersion transactionVersion,
+                                               Collection<Address> alreadyReadFrom) {
       return updatedVersion(transactionVersion);
    }
 
    @Override
-   public GMUEntryVersion setNodeVersion(EntryVersion version, long value) {
-      return new GMUCacheEntryVersion(cacheName, currentViewId, this, value);
+   public GMUVersion setNodeVersion(EntryVersion version, long value) {
+      return new GMUReplicatedVersion(cacheName, currentViewId, this, value);
    }
 
    @Override
-   public GMUEntryVersion updatedVersion(EntryVersion entryVersion) {
-      if (entryVersion instanceof GMUCacheEntryVersion) {
-         return new GMUCacheEntryVersion(cacheName, currentViewId, this,
-                                         ((GMUCacheEntryVersion) entryVersion).getThisNodeVersionValue());
-      } else if (entryVersion instanceof GMUClusterEntryVersion) {
+   public GMUVersion updatedVersion(EntryVersion entryVersion) {
+      if (entryVersion instanceof GMUReplicatedVersion) {
+         return new GMUReplicatedVersion(cacheName, currentViewId, this,
+                                         ((GMUReplicatedVersion) entryVersion).getThisNodeVersionValue());
+      } else if (entryVersion instanceof GMUDistributedVersion) {
          int viewId = currentViewId;
          ClusterSnapshot clusterSnapshot = getClusterSnapshot(viewId);
          long[] newVersions = new long[clusterSnapshot.size()];
          for (int i = 0;  i < clusterSnapshot.size(); ++i) {
-            newVersions[i] = ((GMUClusterEntryVersion) entryVersion).getVersionValue(clusterSnapshot.get(i));
+            newVersions[i] = ((GMUDistributedVersion) entryVersion).getVersionValue(clusterSnapshot.get(i));
          }
-         return new GMUClusterEntryVersion(cacheName, viewId, this, newVersions);
+         return new GMUDistributedVersion(cacheName, viewId, this, newVersions);
       }
       throw new IllegalArgumentException("Cannot handle " + entryVersion);
    }
@@ -146,21 +156,14 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
       notifyAll();
    }
 
-   private GMUCacheEntryVersion toGMUEntryVersion(EntryVersion version) {
-      if (version instanceof GMUCacheEntryVersion) {
-         return (GMUCacheEntryVersion) version;
-      }
-      throw new IllegalArgumentException("Expected a GMU entry version but received " + version.getClass().getSimpleName());
-   }
-
    private long merge(EntryVersion... entryVersions) {
       long max = NON_EXISTING;
       for (EntryVersion entryVersion : entryVersions) {
          if (entryVersion == null) {
             continue;
          }
-         GMUEntryVersion gmuEntryVersion = toGMUEntryVersion(entryVersion);
-         max = Math.max(max, gmuEntryVersion.getThisNodeVersionValue());
+         GMUVersion gmuVersion = toGMUVersion(entryVersion);
+         max = Math.max(max, gmuVersion.getThisNodeVersionValue());
       }
       return max;
    }

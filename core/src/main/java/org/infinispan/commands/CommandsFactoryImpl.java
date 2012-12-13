@@ -58,7 +58,7 @@ import org.infinispan.container.InternalEntryFactory;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
-import org.infinispan.container.versioning.gmu.GMUEntryVersion;
+import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.dataplacement.DataPlacementManager;
@@ -540,7 +540,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
 
    @Override
    public GMUClusteredGetCommand buildGMUClusteredGetCommand(Object key, Set<Flag> flags, boolean acquireRemoteLock,
-                                                             GlobalTransaction gtx, GMUEntryVersion txVersion,
+                                                             GlobalTransaction gtx, GMUVersion txVersion,
                                                              BitSet alreadyReadFromMask) {
       return new GMUClusteredGetCommand(key, cacheName, flags, acquireRemoteLock, gtx, txVersion, alreadyReadFromMask);
    }

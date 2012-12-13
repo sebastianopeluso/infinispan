@@ -20,11 +20,11 @@ import java.util.Set;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class GMUClusterEntryVersion extends GMUEntryVersion {
+public class GMUDistributedVersion extends GMUVersion {
 
    private final long[] versions;
 
-   public GMUClusterEntryVersion(String cacheName, int viewId, GMUVersionGenerator versionGenerator, long[] versions) {
+   public GMUDistributedVersion(String cacheName, int viewId, GMUVersionGenerator versionGenerator, long[] versions) {
       super(cacheName, viewId, versionGenerator);
       if (versions.length != clusterSnapshot.size()) {
          throw new IllegalArgumentException("Version vector (size " + versions.length + ") has not the expected size " +
@@ -33,8 +33,8 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
       this.versions = Arrays.copyOf(versions, clusterSnapshot.size());
    }
 
-   private GMUClusterEntryVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, Address localAddress,
-                                  long[] versions) {
+   private GMUDistributedVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, Address localAddress,
+                                 long[] versions) {
       super(cacheName, viewId, clusterSnapshot, localAddress);
       this.versions = versions;
    }
@@ -51,8 +51,8 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
 
    @Override
    public InequalVersionComparisonResult compareTo(EntryVersion other) {
-      if (other instanceof GMUCacheEntryVersion) {
-         GMUCacheEntryVersion cacheEntryVersion = (GMUCacheEntryVersion) other;
+      if (other instanceof GMUReplicatedVersion) {
+         GMUReplicatedVersion cacheEntryVersion = (GMUReplicatedVersion) other;
          InequalVersionComparisonResult versionComparisonResult = compare(getThisNodeVersionValue(),
                                                                           cacheEntryVersion.getThisNodeVersionValue());
 
@@ -63,8 +63,8 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
          return versionComparisonResult;
       }
 
-      if (other instanceof GMUClusterEntryVersion) {
-         GMUClusterEntryVersion clusterEntryVersion = (GMUClusterEntryVersion) other;
+      if (other instanceof GMUDistributedVersion) {
+         GMUDistributedVersion clusterEntryVersion = (GMUDistributedVersion) other;
 
          boolean before = false, equal = false, after = false;
 
@@ -114,12 +114,12 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
 
    @Override
    public String toString() {
-      return "GMUClusterEntryVersion{" +
+      return "GMUDistributedVersion{" +
             "versions=" + versionsToString(versions, clusterSnapshot) +
             ", " + super.toString();
    }
 
-   public static class Externalizer extends AbstractExternalizer<GMUClusterEntryVersion> {
+   public static class Externalizer extends AbstractExternalizer<GMUDistributedVersion> {
 
       private final GlobalComponentRegistry globalComponentRegistry;
 
@@ -129,12 +129,12 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
 
       @SuppressWarnings("unchecked")
       @Override
-      public Set<Class<? extends GMUClusterEntryVersion>> getTypeClasses() {
-         return Util.<Class<? extends GMUClusterEntryVersion>>asSet(GMUClusterEntryVersion.class);
+      public Set<Class<? extends GMUDistributedVersion>> getTypeClasses() {
+         return Util.<Class<? extends GMUDistributedVersion>>asSet(GMUDistributedVersion.class);
       }
 
       @Override
-      public void writeObject(ObjectOutput output, GMUClusterEntryVersion object) throws IOException {
+      public void writeObject(ObjectOutput output, GMUDistributedVersion object) throws IOException {
          output.writeUTF(object.cacheName);
          output.writeInt(object.viewId);
          for (long v : object.versions) {
@@ -143,7 +143,7 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
       }
 
       @Override
-      public GMUClusterEntryVersion readObject(ObjectInput input) throws IOException, ClassNotFoundException {
+      public GMUDistributedVersion readObject(ObjectInput input) throws IOException, ClassNotFoundException {
          String cacheName = input.readUTF();
          GMUVersionGenerator gmuVersionGenerator = getGMUVersionGenerator(globalComponentRegistry, cacheName);
          int viewId = input.readInt();
@@ -155,12 +155,12 @@ public class GMUClusterEntryVersion extends GMUEntryVersion {
          for (int i = 0; i < versions.length; ++i) {
             versions[i] = input.readLong();
          }
-         return new GMUClusterEntryVersion(cacheName, viewId, clusterSnapshot, gmuVersionGenerator.getAddress(), versions);
+         return new GMUDistributedVersion(cacheName, viewId, clusterSnapshot, gmuVersionGenerator.getAddress(), versions);
       }
 
       @Override
       public Integer getId() {
-         return Ids.GMU_CLUSTER_VERSION;
+         return Ids.GMU_DISTRIBUTED_VERSION;
       }
    }
 }

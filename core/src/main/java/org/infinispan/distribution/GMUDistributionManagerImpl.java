@@ -28,7 +28,7 @@ import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.entries.gmu.InternalGMUCacheValue;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.ClusterSnapshot;
-import org.infinispan.container.versioning.gmu.GMUEntryVersion;
+import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.SingleKeyNonTxInvocationContext;
@@ -99,7 +99,7 @@ public class GMUDistributionManagerImpl extends DistributionManagerImpl {
       targets.retainAll(rpcManager.getTransport().getMembers());
 
       Collection<Address> alreadyReadFrom = txInvocationContext.getAlreadyReadFrom();
-      GMUEntryVersion transactionVersion = toGMUEntryVersion(txInvocationContext.getTransactionVersion());
+      GMUVersion transactionVersion = toGMUVersion(txInvocationContext.getTransactionVersion());
 
       BitSet alreadyReadFromMask;
 
@@ -168,7 +168,7 @@ public class GMUDistributionManagerImpl extends DistributionManagerImpl {
       targets.retainAll(rpcManager.getTransport().getMembers());
 
       ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, ctx.getFlags(), false, null,
-                                                               toGMUEntryVersion(commitLog.getCurrentVersion()), null);
+                                                               toGMUVersion(commitLog.getCurrentVersion()), null);
 
       if(log.isDebugEnabled()) {
          log.debugf("Perform a single remote get. %s", get);

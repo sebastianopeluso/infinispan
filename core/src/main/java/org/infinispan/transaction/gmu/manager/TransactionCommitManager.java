@@ -5,7 +5,8 @@ import org.infinispan.commands.tx.GMUCommitCommand;
 import org.infinispan.container.CommitContextEntries;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
-import org.infinispan.container.versioning.gmu.GMUEntryVersion;
+import org.infinispan.container.versioning.gmu.GMUCacheEntryVersion;
+import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.impl.LocalTxInvocationContext;
@@ -25,7 +26,7 @@ import org.infinispan.util.logging.LogFactory;
 import java.util.LinkedList;
 import java.util.List;
 
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUEntryVersion;
+import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersion;
 import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
 import static org.infinispan.transaction.gmu.manager.SortedTransactionQueue.TransactionEntry;
 
@@ -94,7 +95,7 @@ public class TransactionCommitManager {
    }
 
    public synchronized void commitTransaction(CacheTransaction cacheTransaction, EntryVersion version) {
-      GMUEntryVersion commitVersion = toGMUEntryVersion(version);
+      GMUVersion commitVersion = toGMUVersion(version);
       lastPreparedVersion = Math.max(commitVersion.getThisNodeVersionValue(), lastPreparedVersion);
       if (!sortedTransactionQueue.commit(cacheTransaction, commitVersion)) {
          commitLog.updateMostRecentVersion(commitVersion);
@@ -123,14 +124,14 @@ public class TransactionCommitManager {
    }
 
    private class CommitThread extends Thread {
-      private final List<CacheTransaction> committedTransactions;
+      private final List<CommittedTransaction> committedTransactions;
       private final List<SortedTransactionQueue.TransactionEntry> commitList;
       private boolean running;
 
       private CommitThread(String threadName) {
          super(threadName);
          running = false;
-         committedTransactions = new LinkedList<CacheTransaction>();
+         committedTransactions = new LinkedList<CommittedTransaction>();
          commitList = new LinkedList<SortedTransactionQueue.TransactionEntry>();
       }
 
@@ -144,6 +145,7 @@ public class TransactionCommitManager {
                   continue;
                }
 
+               int subVersion = 0;
                for (TransactionEntry transactionEntry : commitList) {
                   try {
                      if (log.isTraceEnabled()) {
@@ -151,8 +153,11 @@ public class TransactionCommitManager {
                      }
 
                      CacheTransaction cacheTransaction = transactionEntry.getCacheTransactionForCommit();
-                     commitContextEntries.commitContextEntries(createInvocationContext(cacheTransaction));
-                     committedTransactions.add(cacheTransaction);
+
+                     CommittedTransaction committedTransaction = new CommittedTransaction(cacheTransaction, subVersion);
+
+                     commitContextEntries.commitContextEntries(createInvocationContext(cacheTransaction, subVersion));
+                     committedTransactions.add(committedTransaction);
 
                      if (log.isTraceEnabled()) {
                         log.tracef("Transaction entries committed for %s", transactionEntry);
@@ -161,6 +166,7 @@ public class TransactionCommitManager {
                      log.warnf("Error occurs while committing transaction entries for %s", transactionEntry);
                   } finally {
                      icc.clearThreadLocal();
+                     subVersion++;
                   }
                }
 
@@ -189,7 +195,10 @@ public class TransactionCommitManager {
          super.interrupt();
       }
 
-      private TxInvocationContext createInvocationContext(CacheTransaction cacheTransaction) {
+      private TxInvocationContext createInvocationContext(CacheTransaction cacheTransaction, int subVersion) {
+         GMUCacheEntryVersion cacheEntryVersion = versionGenerator.convertVersionToWrite(cacheTransaction.getTransactionVersion(),
+                                                                                         subVersion);
+         cacheTransaction.setTransactionVersion(cacheEntryVersion);
          if (cacheTransaction instanceof LocalTransaction) {
             LocalTxInvocationContext localTxInvocationContext = icc.createTxInvocationContext();
             localTxInvocationContext.setLocalTransaction((LocalTransaction) cacheTransaction);

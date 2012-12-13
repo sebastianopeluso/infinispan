@@ -15,7 +15,7 @@ import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public abstract class GMUEntryVersion implements IncrementableEntryVersion {
+public abstract class GMUVersion implements IncrementableEntryVersion {
 
    public static final long NON_EXISTING = -1;
 
@@ -24,7 +24,7 @@ public abstract class GMUEntryVersion implements IncrementableEntryVersion {
    protected transient ClusterSnapshot clusterSnapshot;
    protected transient int nodeIndex;
 
-   protected GMUEntryVersion(String cacheName, int viewId, GMUVersionGenerator versionGenerator) {
+   protected GMUVersion(String cacheName, int viewId, GMUVersionGenerator versionGenerator) {
       this.cacheName = cacheName;
       this.viewId = viewId;
       clusterSnapshot = versionGenerator.getClusterSnapshot(viewId);
@@ -32,7 +32,7 @@ public abstract class GMUEntryVersion implements IncrementableEntryVersion {
       checkState();
    }
 
-   protected GMUEntryVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, Address localAddress) {
+   protected GMUVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, Address localAddress) {
       this.cacheName = cacheName;
       this.viewId = viewId;
       this.clusterSnapshot = clusterSnapshot;
@@ -113,7 +113,7 @@ public abstract class GMUEntryVersion implements IncrementableEntryVersion {
    }
 
    protected static GMUVersionGenerator getGMUVersionGenerator(GlobalComponentRegistry globalComponentRegistry,
-                                                                     String cacheName) {
+                                                               String cacheName) {
       ComponentRegistry componentRegistry = globalComponentRegistry.getNamedComponentRegistry(cacheName);
       VersionGenerator versionGenerator = componentRegistry.getComponent(VersionGenerator.class);
       return toGMUVersionGenerator(versionGenerator);

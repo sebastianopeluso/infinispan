@@ -8,7 +8,7 @@ import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.InequalVersionComparisonResult;
 import org.infinispan.container.versioning.VersionGenerator;
-import org.infinispan.container.versioning.gmu.GMUEntryVersion;
+import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.interceptors.locking.ClusteringDependentLogic;
@@ -37,7 +37,11 @@ public class GMUHelper {
    public static void performReadSetValidation(GMUPrepareCommand prepareCommand,
                                                DataContainer dataContainer,
                                                ClusteringDependentLogic keyLogic) {
+      GlobalTransaction gtx = prepareCommand.getGlobalTransaction();
       if (prepareCommand.getReadSet() == null || prepareCommand.getReadSet().length == 0) {
+         if (log.isDebugEnabled()) {
+            log.debugf("Validation of [%s] OK. no read set", gtx.prettyPrint());
+         }
          return;
       }
       EntryVersion prepareVersion = prepareCommand.getPrepareVersion();
@@ -45,6 +49,9 @@ public class GMUHelper {
          if (keyLogic.localNodeIsOwner(key)) {
             InternalCacheEntry cacheEntry = dataContainer.get(key, null); //get the most recent
             EntryVersion currentVersion = cacheEntry.getVersion();
+            if (log.isDebugEnabled()) {
+               log.debugf("[%s] Validate [%s]: Compare %s vs %s", gtx.prettyPrint(), key, currentVersion, prepareVersion);
+            }
             if (currentVersion == null) {
                //this should only happens if the key does not exits. However, this can create some
                //consistency issues when eviction is enabled
@@ -52,6 +59,10 @@ public class GMUHelper {
             }
             if (currentVersion.compareTo(prepareVersion) == InequalVersionComparisonResult.AFTER) {
                throw new ValidationException("Validation failed for key [" + key + "]", key);
+            }
+         } else {
+            if (log.isDebugEnabled()) {
+               log.debugf("[%s] Validate [%s]: keys is not local", gtx.prettyPrint(), key);
             }
          }
       }
@@ -70,8 +81,8 @@ public class GMUHelper {
       return convert(entry, InternalGMUCacheEntry.class);
    }
 
-   public static GMUEntryVersion toGMUEntryVersion(EntryVersion version) {
-      return convert(version, GMUEntryVersion.class);
+   public static GMUVersion toGMUVersion(EntryVersion version) {
+      return convert(version, GMUVersion.class);
    }
 
    public static GMUVersionGenerator toGMUVersionGenerator(VersionGenerator versionGenerator) {

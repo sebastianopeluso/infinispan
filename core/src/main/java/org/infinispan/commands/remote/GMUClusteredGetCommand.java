@@ -28,7 +28,7 @@ import org.infinispan.container.entries.InternalCacheValue;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.ClusterSnapshot;
-import org.infinispan.container.versioning.gmu.GMUEntryVersion;
+import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
@@ -61,7 +61,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    private static final Log log = LogFactory.getLog(GMUClusteredGetCommand.class);
 
    //the transaction version. from this version and with the bit set, it calculates the max and min version to read
-   private GMUEntryVersion transactionVersion;
+   private GMUVersion transactionVersion;
    private BitSet alreadyReadFrom;
    private CommitLog commitLog;
    private GMUVersionGenerator versionGenerator;
@@ -72,7 +72,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    }
 
    public GMUClusteredGetCommand(Object key, String cacheName, Set<Flag> flags, boolean acquireRemoteLock,
-                                 GlobalTransaction globalTransaction, GMUEntryVersion txVersion, BitSet alreadyReadFrom) {
+                                 GlobalTransaction globalTransaction, GMUVersion txVersion, BitSet alreadyReadFrom) {
       super(key,  cacheName, flags, acquireRemoteLock, globalTransaction);
       this.transactionVersion = txVersion;
       this.alreadyReadFrom = alreadyReadFrom == null || alreadyReadFrom.isEmpty() ? null : alreadyReadFrom;
@@ -89,8 +89,8 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    protected InvocationContext createInvocationContext(GetKeyValueCommand command) {
       InvocationContext context = super.createInvocationContext(command);
 
-      GMUEntryVersion minGMUVersion;
-      GMUEntryVersion maxGMUVersion;
+      GMUVersion minGMUVersion;
+      GMUVersion maxGMUVersion;
 
       boolean alreadyReadOnThisNode;
       if (alreadyReadFrom != null) {
@@ -122,7 +122,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
          if (log.isTraceEnabled()) {
             log.tracef("Max GMU version=%s, this node value=%s, Non-Existing=%s", maxGMUVersion,
                        (maxGMUVersion != null ? maxGMUVersion.getThisNodeVersionValue() : "N/A"),
-                       GMUEntryVersion.NON_EXISTING);
+                       GMUVersion.NON_EXISTING);
          }
          if (minGMUVersion == null) {
             throw new NullPointerException("Min Version cannot be null");
@@ -172,7 +172,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    public void setParameters(int commandId, Object[] args) {
       int index = args.length - 3;
       super.setParameters(commandId, args);
-      transactionVersion = (GMUEntryVersion) args[index++];
+      transactionVersion = (GMUVersion) args[index++];
       alreadyReadFrom = (BitSet) args[index];
    }
 

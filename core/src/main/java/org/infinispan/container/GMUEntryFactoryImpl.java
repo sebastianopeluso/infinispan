@@ -78,10 +78,10 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
          }
       }
 
-      EntryVersion realVersionToRead = hasAlreadyReadFromThisNode ? versionToRead :
+      EntryVersion maxVersionToRead = hasAlreadyReadFromThisNode ? versionToRead :
             commitLog.getAvailableVersionLessThan(versionToRead);
 
-      InternalGMUCacheEntry entry = toInternalGMUCacheEntry(container.get(key, realVersionToRead));
+      InternalGMUCacheEntry entry = toInternalGMUCacheEntry(container.get(key, maxVersionToRead));
 
       context.addKeyReadInCommand(key, entry);
 
