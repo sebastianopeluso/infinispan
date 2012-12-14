@@ -218,6 +218,94 @@ public class DistConsistencyTest3 extends AbstractGMUTest {
       assertNoTransactions();
    }
 
+   public void testWriteConsistency() throws Exception{
+      assertAtLeastCaches(2);
+      rewireMagicKeyAwareConsistentHash();
+
+      final int initialValue = 1000;
+      final int numberOfKeys = 5;
+
+      final Object cache0Key0 = newKey(0, Arrays.asList(1));
+      final Object cache0Key1 = newKey(0, Arrays.asList(1));
+      final Object cache0Key2 = newKey(0, Arrays.asList(1));
+      final Object cache1Key0 = newKey(1, Arrays.asList(0));
+      final Object cache1Key1 = newKey(1, Arrays.asList(0));
+
+      logKeysUsedInTest("testConcurrentTransactionConsistency", cache0Key0, cache0Key1, cache0Key2, cache1Key0,
+                        cache1Key1);
+
+      assertKeyOwners(cache0Key0, Arrays.asList(0), Arrays.asList(1));
+      assertKeyOwners(cache0Key1, Arrays.asList(0), Arrays.asList(1));
+      assertKeyOwners(cache0Key2, Arrays.asList(0), Arrays.asList(1));
+      assertKeyOwners(cache1Key0, Arrays.asList(1), Arrays.asList(0));
+      assertKeyOwners(cache1Key1, Arrays.asList(1), Arrays.asList(0));
+
+
+      final DelayCommit cache0DelayCommit = addDelayCommit(0, -1);
+      final DelayCommit cache1DelayCommit = addDelayCommit(1, -1);
+
+      //init all keys with value_1
+      tm(0).begin();
+      txPut(0, cache0Key0, initialValue, null);
+      txPut(0, cache0Key1, initialValue, null);
+      txPut(0, cache0Key2, initialValue, null);
+      txPut(0, cache1Key0, initialValue, null);
+      txPut(0, cache1Key1, initialValue, null);
+      tm(0).commit();
+
+      //first concurrent transaction starts and prepares in cache 0 (coord) and cache 1
+      tm(1).begin();
+      int value = (Integer) cache(1).get(cache0Key0);
+      txPut(1, cache0Key0, value - 200, value);
+      value = (Integer) cache(1).get(cache1Key0);
+      txPut(1, cache1Key0, value + 200, value);
+      Transaction concurrentTx1 = tm(1).suspend();
+      //transaction is prepared with [2,1,1] and [1,1,2]
+      Thread threadTx1 = prepareInAllNodes(concurrentTx1, cache1DelayCommit, 1);
+
+      //second concurrent transaction stats and prepares in cache 0 (coord) and cache 1
+      tm(0).begin();
+      value = (Integer) cache(0).get(cache0Key1);
+      txPut(0, cache0Key1, value - 300, value);
+      value = (Integer) cache(0).get(cache0Key2);
+      txPut(0, cache0Key2, value + 300, value);
+      Transaction concurrentTx2 = tm(0).suspend();
+      Thread threadTx2 = prepareInAllNodes(concurrentTx2, cache0DelayCommit, 0);
+
+      //all transactions are prepared. Commit first transaction first, and then the second one
+      cache0DelayCommit.unblock();
+      cache1DelayCommit.unblock();
+      threadTx1.join();
+      threadTx2.join();
+
+      //Problem: sometimes, the transaction reads an old version and does not aborts
+      tm(0).begin();
+      value = (Integer) cache(0).get(cache0Key0);
+      txPut(0, cache0Key0, value - 500, value);
+      value = (Integer) cache(0).get(cache1Key1);
+      txPut(0, cache1Key1, value + 500, value);
+      tm(0).commit();
+
+      int[] allValues = new int[numberOfKeys];
+      tm(0).begin();
+      allValues[0] = (Integer) cache(0).get(cache0Key0);
+      allValues[1] = (Integer) cache(0).get(cache0Key1);
+      allValues[2] = (Integer) cache(0).get(cache0Key2);
+      allValues[3] = (Integer) cache(0).get(cache1Key0);
+      allValues[4] = (Integer) cache(0).get(cache1Key1);
+      tm(0).commit();
+
+      int sum = 0;
+      for (int v : allValues) {
+         sum += v;
+      }
+
+      assert sum == (initialValue * numberOfKeys) : "Read an inconsistent snapshot";
+
+      printDataContainer();
+      assertNoTransactions();
+   }
+
    @Override
    protected void decorate(ConfigurationBuilder builder) {
       builder.clustering().clustering().hash().numOwners(1);

@@ -39,7 +39,7 @@ public class CommitLog {
 
    private static final Log log = LogFactory.getLog(CommitLog.class);
 
-   //private GMUVersion mostRecentVersion;
+   private GMUVersion mostRecentVersion;
    private VersionEntry currentVersion;
    private GMUVersionGenerator versionGenerator;
    private boolean enabled = false;
@@ -59,7 +59,7 @@ public class CommitLog {
          return;
       }
       currentVersion = new VersionEntry(toGMUVersion(versionGenerator.generateNew()), Collections.emptySet(), 0);
-      //mostRecentVersion = toGMUVersion(versionGenerator.generateNew());
+      mostRecentVersion = toGMUVersion(versionGenerator.generateNew());
    }
 
    @Stop
@@ -70,8 +70,8 @@ public class CommitLog {
    public synchronized GMUVersion getCurrentVersion() {
       assertEnabled();
       //versions are immutable
-      //GMUVersion version = versionGenerator.updatedVersion(mostRecentVersion);
-      GMUVersion version = versionGenerator.updatedVersion(currentVersion.getVersion());
+      GMUVersion version = versionGenerator.updatedVersion(mostRecentVersion);
+      //GMUVersion version = versionGenerator.updatedVersion(currentVersion.getVersion());
       if (log.isTraceEnabled()) {
          log.tracef("getCurrentVersion() ==> %s", version);
       }
@@ -83,7 +83,8 @@ public class CommitLog {
       assertEnabled();
       if (other == null) {
          synchronized (this) {
-            return versionGenerator.updatedVersion(currentVersion.getVersion());
+            return versionGenerator.updatedVersion(mostRecentVersion);
+            //return versionGenerator.updatedVersion(currentVersion.getVersion());
          }
       }
       GMUVersion gmuVersion = toGMUVersion(other);
@@ -157,7 +158,7 @@ public class CommitLog {
                                                  transaction.getSubVersion());
          current.setPrevious(currentVersion);
          currentVersion = current;
-         //mostRecentVersion = versionGenerator.mergeAndMax(mostRecentVersion, currentVersion.getVersion());
+         mostRecentVersion = versionGenerator.mergeAndMax(mostRecentVersion, currentVersion.getVersion());
       }
       if (log.isTraceEnabled()) {
          log.tracef("insertNewCommittedVersions(...) ==> %s", currentVersion.getVersion());
