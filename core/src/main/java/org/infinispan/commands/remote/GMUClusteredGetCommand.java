@@ -38,6 +38,7 @@ import org.infinispan.transaction.gmu.VersionNotAvailableException;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+import org.jgroups.blocks.RequestHandler;
 
 import java.util.BitSet;
 import java.util.LinkedList;
@@ -83,6 +84,14 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
       this.commitLog = commitLog;
       this.configuration = configuration;
       this.versionGenerator = toGMUVersionGenerator(versionGenerator);
+   }
+
+   @Override
+   public Object perform(InvocationContext context) throws Throwable {
+      PerformRemoteGet performRemoteGet = new PerformRemoteGet(context);
+      performRemoteGet.setDaemon(true);
+      performRemoteGet.start();
+      return RequestHandler.DO_NOT_REPLY;
    }
 
    @Override
@@ -183,5 +192,25 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
             ", flags=" + getFlags() +
             ", transactionVersion=" + transactionVersion +
             ", alreadyReadFrom=" + alreadyReadFrom + "}";
+   }
+
+   private class PerformRemoteGet extends Thread {
+
+      private final InvocationContext context;
+
+      public PerformRemoteGet(InvocationContext context) {
+         super("remote-get-" + getKey());
+         this.context = context;
+      }
+
+      @Override
+      public void run() {
+         try {
+            Object retVal = GMUClusteredGetCommand.super.perform(context);
+            GMUClusteredGetCommand.this.sendReply(retVal, false);
+         } catch (Throwable throwable) {
+            GMUClusteredGetCommand.this.sendReply(throwable, true);
+         }
+      }
    }
 }
