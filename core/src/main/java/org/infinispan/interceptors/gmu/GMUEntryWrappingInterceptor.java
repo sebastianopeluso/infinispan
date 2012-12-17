@@ -34,16 +34,14 @@ import java.util.List;
 import static org.infinispan.transaction.gmu.GMUHelper.*;
 
 /**
- *
  * @author Pedro Ruivo
  * @since 5.2
  */
 public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
 
    private static final Log log = LogFactory.getLog(GMUEntryWrappingInterceptor.class);
-
-   private TransactionCommitManager transactionCommitManager;
    protected GMUVersionGenerator versionGenerator;
+   private TransactionCommitManager transactionCommitManager;
 
    @Inject
    public void inject(TransactionCommitManager transactionCommitManager, DataContainer dataContainer,
@@ -98,6 +96,9 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       Object retVal = null;
       try {
          retVal = invokeNextInterceptor(ctx, command);
+      } catch (Throwable throwable) {
+         //let ignore the exception. we cannot have some nodes applying the write set and another not another one
+         //receives the rollback and don't applies the write set
       } finally {
          transactionCommitManager.awaitUntilCommitted(ctx.getCacheTransaction(), ctx.isOriginLocal() ? null : gmuCommitCommand);
       }
@@ -129,7 +130,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
    @Override
    public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
       ctx.clearKeyReadInCommand();
-      Object retVal =  super.visitPutKeyValueCommand(ctx, command);
+      Object retVal = super.visitPutKeyValueCommand(ctx, command);
       updateTransactionVersion(ctx);
       return retVal;
    }
@@ -137,7 +138,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
    @Override
    public Object visitRemoveCommand(InvocationContext ctx, RemoveCommand command) throws Throwable {
       ctx.clearKeyReadInCommand();
-      Object retVal =  super.visitRemoveCommand(ctx, command);
+      Object retVal = super.visitRemoveCommand(ctx, command);
       updateTransactionVersion(ctx);
       return retVal;
    }
@@ -145,7 +146,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
    @Override
    public Object visitReplaceCommand(InvocationContext ctx, ReplaceCommand command) throws Throwable {
       ctx.clearKeyReadInCommand();
-      Object retVal =  super.visitReplaceCommand(ctx, command);
+      Object retVal = super.visitReplaceCommand(ctx, command);
       updateTransactionVersion(ctx);
       return retVal;
    }
@@ -155,7 +156,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
     *
     * @param ctx     the context
     * @param command the prepare command
-    * @throws InterruptedException  if interrupted
+    * @throws InterruptedException if interrupted
     */
    protected void performValidation(TxInvocationContext ctx, GMUPrepareCommand command) throws InterruptedException {
       boolean hasToUpdateLocalKeys = false;
@@ -186,7 +187,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          }
       }
 
-      if(log.isDebugEnabled()) {
+      if (log.isDebugEnabled()) {
          log.debugf("Transaction %s can commit on this node. Prepare Version is %s",
                     command.getGlobalTransaction().prettyPrint(), ctx.getTransactionVersion());
       }
