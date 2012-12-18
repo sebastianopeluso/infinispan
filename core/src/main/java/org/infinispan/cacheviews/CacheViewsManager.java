@@ -81,4 +81,8 @@ public interface CacheViewsManager {
     * @return The last prepared view id for each cache that's running on this node.
     */
    Map<String, CacheView> handleRecoverViews();
+
+   void gcViewHistory(String cacheName, int minimumViewId);
+
+   int getViewHistorySize(String cacheName);
 }

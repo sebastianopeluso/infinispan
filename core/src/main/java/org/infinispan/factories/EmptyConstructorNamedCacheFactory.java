@@ -63,6 +63,7 @@ import org.infinispan.statetransfer.StateTransferLockImpl;
 import org.infinispan.statetransfer.totalorder.TotalOrderStateTransferLockImpl;
 import org.infinispan.transaction.TransactionCoordinator;
 import org.infinispan.transaction.gmu.CommitLog;
+import org.infinispan.transaction.gmu.manager.GarbageCollectorManager;
 import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.totalorder.ParallelTotalOrderManager;
 import org.infinispan.transaction.totalorder.SequentialTotalOrderManager;
@@ -92,7 +93,8 @@ import static org.infinispan.util.Util.getInstance;
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
                               ClusteringDependentLogic.class, LockContainer.class, TotalOrderManager.class, DataPlacementManager.class,
                               ReconfigurableReplicationManager.class, ProtocolTable.class, CommitContextEntries.class,
-                              L1GMUContainer.class, L1Manager.class, CommitLog.class, TransactionCommitManager.class})
+                              L1GMUContainer.class, L1Manager.class, CommitLog.class, TransactionCommitManager.class,
+                              GarbageCollectorManager.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -215,6 +217,8 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
          return configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE ?
                (T) new GMUL1Manager() :
                (T) new L1ManagerImpl();
+      } else if (componentType.equals(GarbageCollectorManager.class)) {
+         return (T) new GarbageCollectorManager();
       }
 
       throw new ConfigurationException("Don't know how to create a " + componentType.getName());

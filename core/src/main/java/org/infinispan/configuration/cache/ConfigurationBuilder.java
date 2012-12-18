@@ -39,7 +39,8 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
    private final VersioningConfigurationBuilder versioning;
    private final UnsafeConfigurationBuilder unsafe;
    private final DataPlacementConfigurationBuilder dataPlacement;
-   
+   private final GarbageCollectorConfigurationBuilder garbageCollector;
+
    public ConfigurationBuilder() {
       this.clustering = new ClusteringConfigurationBuilder(this);
       this.customInterceptors = new CustomInterceptorsConfigurationBuilder(this);
@@ -57,13 +58,14 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
       this.versioning = new VersioningConfigurationBuilder(this);
       this.unsafe = new UnsafeConfigurationBuilder(this);
       this.dataPlacement = new DataPlacementConfigurationBuilder(this);
+      this.garbageCollector = new GarbageCollectorConfigurationBuilder(this);
    }
 
    public ConfigurationBuilder classLoader(ClassLoader cl) {
       this.classLoader = cl;
       return this;
    }
-   
+
    ClassLoader classLoader() {
       return classLoader;
    }
@@ -72,62 +74,62 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
    public ClusteringConfigurationBuilder clustering() {
       return clustering;
    }
-   
+
    @Override
    public CustomInterceptorsConfigurationBuilder customInterceptors() {
       return customInterceptors;
    }
-   
+
    @Override
    public DataContainerConfigurationBuilder dataContainer() {
       return dataContainer;
-   } 
-   
+   }
+
    @Override
    public DeadlockDetectionConfigurationBuilder deadlockDetection() {
       return deadlockDetection;
    }
-   
+
    @Override
    public EvictionConfigurationBuilder eviction() {
       return eviction;
    }
-   
+
    @Override
    public ExpirationConfigurationBuilder expiration() {
       return expiration;
    }
-   
+
    @Override
    public IndexingConfigurationBuilder indexing() {
       return indexing;
    }
-   
+
    @Override
    public InvocationBatchingConfigurationBuilder invocationBatching() {
       return invocationBatching;
    }
-   
+
    @Override
    public JMXStatisticsConfigurationBuilder jmxStatistics() {
       return jmxStatistics;
    }
-   
+
    @Override
    public StoreAsBinaryConfigurationBuilder storeAsBinary() {
       return storeAsBinary;
    }
-   
+
    @Override
    public LoadersConfigurationBuilder loaders() {
       return loaders;
    }
-   
+
    @Override
    public LockingConfigurationBuilder locking() {
       return locking;
    }
-   
+
    @Override
    public TransactionConfigurationBuilder transaction() {
       return transaction;
@@ -137,7 +139,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
    public VersioningConfigurationBuilder versioning() {
       return versioning;
    }
-   
+
    @Override
    public UnsafeConfigurationBuilder unsafe() {
       return unsafe;
@@ -148,12 +150,17 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
       return dataPlacement;
    }
 
+   @Override
+   public GarbageCollectorConfigurationBuilder garbageCollector() {
+      return garbageCollector;
+   }
+
    @SuppressWarnings("unchecked")
    public void validate() {
       for (AbstractConfigurationChildBuilder<?> validatable:
             asList(clustering, dataContainer, deadlockDetection, eviction, expiration, indexing,
                    invocationBatching, jmxStatistics, loaders, locking, storeAsBinary, transaction,
-                   versioning, unsafe, dataPlacement)) {
+                   versioning, unsafe, dataPlacement, garbageCollector)) {
          validatable.validate();
       }
 
@@ -164,7 +171,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
    public Configuration build() {
       return build(true);
    }
-   
+
    public Configuration build(boolean validate) {
       if (validate) {
          validate();
@@ -173,7 +180,8 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
                dataContainer.create(), deadlockDetection.create(), eviction.create(),
                expiration.create(), indexing.create(), invocationBatching.create(),
                jmxStatistics.create(), loaders.create(), locking.create(), storeAsBinary.create(),
-               transaction.create(), unsafe.create(), versioning.create(), classLoader, dataPlacement.create());// TODO
+               transaction.create(), unsafe.create(), versioning.create(), classLoader, dataPlacement.create(),
+               garbageCollector.create());// TODO
    }
 
    public ConfigurationBuilder read(Configuration template) {
@@ -194,7 +202,8 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
       this.unsafe.read(template.unsafe());
       this.versioning.read(template.versioning());
       this.dataPlacement.read(template.dataPlacement());
-      
+      this.garbageCollector.read(template.garbageCollector());
+
       return this;
    }
 
@@ -218,6 +227,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
             ", versioning=" + versioning +
             ", unsafe=" + unsafe +
             ", dataPlacement=" + dataPlacement +
+            ", garbageCollector=" + garbageCollector +
             '}';
    }
 

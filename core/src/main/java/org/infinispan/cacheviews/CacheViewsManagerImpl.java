@@ -594,6 +594,21 @@ public class CacheViewsManagerImpl implements CacheViewsManager {
       return result;
    }
 
+   @Override
+   public void gcViewHistory(String cacheName, int minimumViewId) {
+      CacheViewInfo cacheViewInfo = viewsInfo.get(cacheName);
+      if (cacheViewInfo == null) {
+         return;
+      }
+      cacheViewInfo.gc(minimumViewId);
+   }
+
+   @Override
+   public int getViewHistorySize(String cacheName) {
+      CacheViewInfo cacheViewInfo = viewsInfo.get(cacheName);
+      return cacheViewInfo == null ? 0 : cacheViewInfo.getViewHistory().size();
+   }
+
    private void handleNewView(List<Address> newMembers, boolean mergeView, boolean initialView) {
       boolean wasCoordinator = isCoordinator;
       coordinator = transport.getCoordinator();

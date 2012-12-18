@@ -35,6 +35,7 @@ import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
+import org.infinispan.commands.remote.GarbageCollectorControlCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.ReconfigurableProtocolCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
@@ -417,4 +418,15 @@ public interface CommandsFactory {
                                                       BitSet alreadyReadFromMask);
 
    ReconfigurableProtocolCommand buildReconfigurableProtocolCommand(ReconfigurableProtocolCommand.Type type, String protocolId);
+
+   /**
+    * builds a garbage collector control command
+    *
+    * @param type                   the control type
+    * @param minimumVisibleViewId   the minimum visible view id, used when the {@param type} is
+    *                               {@code GarbageCollectorControlCommand.Type.SET_VIEW_ID}
+    * @return                       the garbage collector control command
+    */
+   GarbageCollectorControlCommand buildGarbageCollectorControlCommand(GarbageCollectorControlCommand.Type type,
+                                                                      int minimumVisibleViewId);
 }

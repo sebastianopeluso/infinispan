@@ -125,6 +125,10 @@ public class L1GMUContainer {
       return stringBuilder.toString();
    }
 
+   public final VersionChain<?> getVersionChain(Object key) {
+      return l1Container.get(key);
+   }
+
    @ManagedOperation(description = "Resets statistics gathered by this component")
    @Operation(displayName = "Reset Statistics")
    public void resetStatistics() {
@@ -167,6 +171,12 @@ public class L1GMUContainer {
    @Metric(displayName = "cacheHits", description = "Number of caches hit")
    public long getCacheHits() {
       return stats.get(Stat.CACHE_HIT).get();
+   }
+
+   public final void gc(GMUVersion version) {
+      for (Map.Entry<Object, L1VersionChain> entry : l1Container.entrySet()) {
+         entry.getValue().gc(version);
+      }
    }
 
    private boolean isValid(L1Entry entry, EntryVersion txVersion, Address owner) {
@@ -243,6 +253,17 @@ public class L1GMUContainer {
       @Override
       public void reincarnate(VersionBody<L1Entry> other) {
          getValue().setReadVersion(other.getValue().getReadVersion());
+      }
+
+      @Override
+      public VersionBody<L1Entry> gc(EntryVersion minVersion) {
+         if (minVersion == null || isOlderOrEquals(getValue().getCreationVersion(), minVersion)) {
+            VersionBody<L1Entry> previous = getPrevious();
+            setPrevious(null);
+            return previous;
+         } else {
+            return getPrevious();
+         }
       }
 
       @Override
