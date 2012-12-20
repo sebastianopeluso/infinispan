@@ -173,6 +173,8 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
    GarbageCollectorType garbageCollector  = new GarbageCollectorType().setConfiguration(this);
 
+   ConditionalExecutorServiceType conditionalExecutorService = new ConditionalExecutorServiceType().setConfiguration(this);
+
    private org.infinispan.configuration.cache.Configuration newConfig;
 
    public Configuration(org.infinispan.configuration.cache.Configuration config) {
@@ -1151,6 +1153,18 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    // ------------------------------------------------------------------------------------------------------------
    //   GETTERS
    // ------------------------------------------------------------------------------------------------------------
+
+   public int getCorePoolSizeForConditionalExecutorService() {
+      return conditionalExecutorService.corePoolSize;
+   }
+
+   public int getMaxPoolSizeForConditionalExecutorService() {
+      return conditionalExecutorService.maxPoolSize;
+   }
+
+   public long getKeepAliveTimeForConditionalExecutorService() {
+      return conditionalExecutorService.keepAliveTime;
+   }
 
    public boolean isGarbageCollectorEnabled() {
       return garbageCollector.enabled;
@@ -4924,6 +4938,63 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          result = 31 * result + versionGCMaxIdle;
          result = 31 * result + l1GCInterval;
          result = 31 * result + viewGCBackOff;
+         return result;
+      }
+   }
+
+   @Deprecated
+   public static class ConditionalExecutorServiceType extends AbstractFluentConfigurationBean implements ConditionalExecutorServiceConfig {
+
+      private int corePoolSize;
+      private int maxPoolSize;
+      private long keepAliveTime;
+
+      @Override
+      public ConditionalExecutorServiceConfig setCorePoolSize(int size) {
+         testImmutability("corePoolSize");
+         this.corePoolSize = size;
+         return this;
+      }
+
+      @Override
+      public ConditionalExecutorServiceConfig setMaxPoolSize(int size) {
+         testImmutability("maxPoolSize");
+         this.maxPoolSize = size;
+         return this;
+      }
+
+      @Override
+      public ConditionalExecutorServiceConfig setKeepAliveTime(long time) {
+         testImmutability("keepAliveTime");
+         this.keepAliveTime = time;
+         return this;
+      }
+
+      @Override
+      protected ConditionalExecutorServiceType setConfiguration(Configuration config) {
+         super.setConfiguration(config);
+         return this;
+      }
+
+      @Override
+      public boolean equals(Object o) {
+         if (this == o) return true;
+         if (o == null || getClass() != o.getClass()) return false;
+
+         ConditionalExecutorServiceType that = (ConditionalExecutorServiceType) o;
+
+         if (corePoolSize != that.corePoolSize) return false;
+         if (keepAliveTime != that.keepAliveTime) return false;
+         if (maxPoolSize != that.maxPoolSize) return false;
+
+         return true;
+      }
+
+      @Override
+      public int hashCode() {
+         int result = corePoolSize;
+         result = 31 * result + maxPoolSize;
+         result = 31 * result + (int) (keepAliveTime ^ (keepAliveTime >>> 32));
          return result;
       }
    }

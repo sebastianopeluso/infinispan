@@ -847,6 +847,13 @@ public class FluentConfiguration extends AbstractFluentConfigurationBean {
       GarbageCollectorConfig setL1GCInterval(int interval);
       GarbageCollectorConfig setViewGCBackOff(int backOff);
    }
+
+   @Deprecated
+   public static interface ConditionalExecutorServiceConfig extends FluentTypes {
+      ConditionalExecutorServiceConfig setCorePoolSize(int size);
+      ConditionalExecutorServiceConfig setMaxPoolSize(int size);
+      ConditionalExecutorServiceConfig setKeepAliveTime(long time);
+   }
 }
 
 @Deprecated
@@ -909,6 +916,8 @@ interface FluentTypes {
    FluentConfiguration.DataPlacementConfig dataPlacement();
 
    FluentConfiguration.GarbageCollectorConfig garbageCollector();
+
+   FluentConfiguration.ConditionalExecutorServiceConfig conditionalExecutorService();
 
    Configuration build();
 }
@@ -1081,6 +1090,11 @@ abstract class AbstractFluentConfigurationBean extends AbstractNamedCacheConfigu
    @Override
    public FluentConfiguration.GarbageCollectorConfig garbageCollector() {
       return config.garbageCollector;
+   }
+
+   @Override
+   public FluentConfiguration.ConditionalExecutorServiceConfig conditionalExecutorService() {
+      return config.conditionalExecutorService;
    }
 }
 

@@ -13,6 +13,7 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.rhq.helpers.pluginAnnotations.agent.DataType;
 import org.rhq.helpers.pluginAnnotations.agent.DisplayType;
 import org.rhq.helpers.pluginAnnotations.agent.MeasurementType;
@@ -47,6 +48,7 @@ public class L1GMUContainer {
    private DistributionManager distributionManager;
    private GMUVersionGenerator gmuVersionGenerator;
    private volatile boolean statisticsEnabled;
+   private boolean enabled;
 
    public L1GMUContainer() {
       this.l1Container = new ConcurrentHashMap<Object, L1VersionChain>();
@@ -56,6 +58,11 @@ public class L1GMUContainer {
    @Inject
    public void injectConfiguration(Configuration configuration, DistributionManager distributionManager,
                                    VersionGenerator versionGenerator) {
+      this.enabled = configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE &&
+            configuration.clustering().l1().enabled();
+      if (!enabled) {
+         return;
+      }
       this.configuration = configuration;
       this.distributionManager = distributionManager;
       this.gmuVersionGenerator = toGMUVersionGenerator(versionGenerator);
@@ -63,10 +70,16 @@ public class L1GMUContainer {
 
    @Start
    public void setStatisticEnabled() {
+      if (!enabled) {
+         return;
+      }
       this.statisticsEnabled = configuration.jmxStatistics().enabled();
    }
 
    public final InternalGMUCacheEntry getValidVersion(Object key, EntryVersion txVersion, Collection<Address> readFrom) {
+      if (!enabled) {
+         return null;
+      }
       L1VersionChain versionChain = l1Container.get(key);
       if (versionChain != null) {
          VersionEntry<L1Entry> versionEntry = findMaxVersion(versionChain, txVersion, readFrom);
@@ -92,6 +105,9 @@ public class L1GMUContainer {
    }
 
    public final void insertOrUpdate(Object key, InternalGMUCacheEntry value) {
+      if (!enabled) {
+         return;
+      }
       L1VersionChain versionChain = l1Container.get(key);
       if (versionChain == null) {
          versionChain = new L1VersionChain();

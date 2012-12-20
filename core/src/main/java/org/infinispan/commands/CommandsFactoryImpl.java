@@ -84,6 +84,7 @@ import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.transaction.xa.DldGlobalTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.transaction.xa.recovery.RecoveryManager;
+import org.infinispan.executors.ConditionalExecutorService;
 import org.infinispan.util.concurrent.locks.LockManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -137,6 +138,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
    private CommitLog commitLog;
    private VersionGenerator versionGenerator;
    private GarbageCollectorManager garbageCollectorManager;
+   private ConditionalExecutorService conditionalExecutorService;
 
    @Inject
    public void setupDependencies(DataContainer container, CacheNotifier notifier, Cache<Object, Object> cache,
@@ -146,7 +148,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
                                  RecoveryManager recoveryManager, StateTransferManager stateTransferManager, LockManager lockManager,
                                  InternalEntryFactory entryFactory, TotalOrderManager totalOrderManager, DataPlacementManager dataPlacementManager,
                                  CommitLog commitLog, VersionGenerator versionGenerator, ReconfigurableReplicationManager reconfigurableReplicationManager,
-                                 GarbageCollectorManager garbageCollectorManager) {
+                                 GarbageCollectorManager garbageCollectorManager, ConditionalExecutorService conditionalExecutorService) {
       this.dataContainer = container;
       this.notifier = notifier;
       this.cache = cache;
@@ -166,6 +168,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
       this.versionGenerator = versionGenerator;
       this.reconfigurableReplicationManager = reconfigurableReplicationManager;
       this.garbageCollectorManager = garbageCollectorManager;
+      this.conditionalExecutorService = conditionalExecutorService;
    }
 
    @Start(priority = 1)
@@ -381,7 +384,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
             break;
          case GMUClusteredGetCommand.COMMAND_ID:
             GMUClusteredGetCommand gmuClusteredGetCommand = (GMUClusteredGetCommand) c;
-            gmuClusteredGetCommand.initializeGMUComponents(commitLog, configuration, versionGenerator);
+            gmuClusteredGetCommand.initializeGMUComponents(commitLog, conditionalExecutorService, versionGenerator);
          case ClusteredGetCommand.COMMAND_ID:
             ClusteredGetCommand clusteredGetCommand = (ClusteredGetCommand) c;
             clusteredGetCommand.initialize(icc, this, entryFactory, interceptorChain, distributionManager, txTable,

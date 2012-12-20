@@ -54,5 +54,7 @@ public interface ConfigurationChildBuilder {
 
    GarbageCollectorConfigurationBuilder garbageCollector();
 
+   ConditionalExecutorServiceConfigurationBuilder conditionalExecutorService();
+
    Configuration build();
 }

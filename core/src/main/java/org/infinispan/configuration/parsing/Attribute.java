@@ -137,7 +137,10 @@ public enum Attribute {
    TRANSACTION_THRESHOLD("transactionThreshold"),
    VERSION_GC_MAX_IDLE("versionGCMaxIdle"),
    L1_GC_INTERVAL("l1GCInterval"),
-   VIEW_GC_BACK_OFF("viewGCBackOff")
+   VIEW_GC_BACK_OFF("viewGCBackOff"),
+   CORE_POOL_SIZE("corePoolSize"),
+   MAX_POOL_SIZE("maxPoolSize"),
+   KEEP_ALIVE_TIME("keepAliveTime")
    ;
 
    private final String name;

@@ -38,6 +38,7 @@ public class Configuration {
    private final UnsafeConfiguration unsafeConfiguration;
    private final DataPlacementConfiguration dataPlacementConfiguration;
    private final GarbageCollectorConfiguration garbageCollectorConfiguration;
+   private final ConditionalExecutorServiceConfiguration conditionalExecutorServiceConfiguration;
 
    Configuration(ClusteringConfiguration clusteringConfiguration,
                  CustomInterceptorsConfiguration customInterceptorsConfiguration,
@@ -48,7 +49,7 @@ public class Configuration {
                  LoadersConfiguration loadersConfiguration,
                  LockingConfiguration lockingConfiguration, StoreAsBinaryConfiguration storeAsBinaryConfiguration,
                  TransactionConfiguration transactionConfiguration, UnsafeConfiguration unsafeConfiguration,
-                 VersioningConfiguration versioningConfiguration, ClassLoader cl, DataPlacementConfiguration dataPlacementConfiguration, GarbageCollectorConfiguration garbageCollectorConfiguration) {
+                 VersioningConfiguration versioningConfiguration, ClassLoader cl, DataPlacementConfiguration dataPlacementConfiguration, GarbageCollectorConfiguration garbageCollectorConfiguration, ConditionalExecutorServiceConfiguration conditionalExecutorServiceConfiguration) {
       this.clusteringConfiguration = clusteringConfiguration;
       this.customInterceptorsConfiguration = customInterceptorsConfiguration;
       this.dataContainerConfiguration = dataContainerConfiguration;
@@ -67,6 +68,7 @@ public class Configuration {
       this.classLoader = cl;
       this.dataPlacementConfiguration = dataPlacementConfiguration;
       this.garbageCollectorConfiguration = garbageCollectorConfiguration;
+      this.conditionalExecutorServiceConfiguration = conditionalExecutorServiceConfiguration;
    }
 
    /**
@@ -146,6 +148,9 @@ public class Configuration {
       return garbageCollectorConfiguration;
    }
 
+   public ConditionalExecutorServiceConfiguration conditionalExecutorService() {
+      return conditionalExecutorServiceConfiguration;
+   }
 
    @Override
    public String toString() {
@@ -168,6 +173,7 @@ public class Configuration {
             ", unsafe=" + unsafeConfiguration +
             ", dataPlacement=" + dataPlacementConfiguration +
             ", garbageCollector=" + garbageCollectorConfiguration +
+            ", conditionalExecutorServiceConfiguration=" + conditionalExecutorServiceConfiguration +
             '}';
    }
 
@@ -216,6 +222,10 @@ public class Configuration {
       if (garbageCollectorConfiguration != null ? !garbageCollectorConfiguration.equals(that.garbageCollectorConfiguration) :
       that.garbageCollectorConfiguration != null)
          return false;
+      if (conditionalExecutorServiceConfiguration != null ?
+            !conditionalExecutorServiceConfiguration.equals(that.conditionalExecutorServiceConfiguration) :
+            that.conditionalExecutorServiceConfiguration != null)
+         return false;
 
       return true;
    }
@@ -240,6 +250,8 @@ public class Configuration {
       result = 31 * result + (unsafeConfiguration != null ? unsafeConfiguration.hashCode() : 0);
       result = 31 * result + (dataPlacementConfiguration != null ? dataPlacementConfiguration.hashCode() : 0);
       result = 31 * result + (garbageCollectorConfiguration != null ? garbageCollectorConfiguration.hashCode() : 0);
+      result = 31 * result + (conditionalExecutorServiceConfiguration != null ?
+                                    conditionalExecutorServiceConfiguration.hashCode() : 0);
       return result;
    }
 

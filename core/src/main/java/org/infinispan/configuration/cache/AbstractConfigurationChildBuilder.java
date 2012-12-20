@@ -111,6 +111,11 @@ abstract class AbstractConfigurationChildBuilder<T> implements ConfigurationChil
       return builder.garbageCollector();
    }
 
+   @Override
+   public ConditionalExecutorServiceConfigurationBuilder conditionalExecutorService() {
+      return builder.conditionalExecutorService();
+   }
+
    protected ConfigurationBuilder getBuilder() {
       return builder;
    }

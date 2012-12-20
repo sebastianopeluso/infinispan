@@ -298,6 +298,10 @@ public class LegacyConfigurationAdaptor {
                .setViewGCBackOff(config.garbageCollector().viewGCBackOff());
       }
 
+      legacy.conditionalExecutorService().setCorePoolSize(config.conditionalExecutorService().corePoolSize())
+            .setMaxPoolSize(config.conditionalExecutorService().maxPoolSize())
+            .setKeepAliveTime(config.conditionalExecutorService().keepAliveTime());
+
       return legacy.build();
    }
 
@@ -534,6 +538,10 @@ public class LegacyConfigurationAdaptor {
             .transactionThreshold(legacy.getTransactionThreshold())
             .l1GCInterval(legacy.getL1GCInterval())
             .viewGCBackOff(legacy.getViewGCBackOff());
+
+      builder.conditionalExecutorService().corePoolSize(legacy.getCorePoolSizeForConditionalExecutorService())
+            .maxPoolSize(legacy.getMaxPoolSizeForConditionalExecutorService())
+            .keepAliveTime(legacy.getKeepAliveTimeForConditionalExecutorService());
 
       return builder.build();
    }

@@ -68,6 +68,11 @@ public class GarbageCollectorManager {
                       Configuration configuration, VersionGenerator versionGenerator, DataContainer dataContainer,
                       TransactionTable transactionTable, L1GMUContainer l1GMUContainer, CacheViewsManager cacheViewsManager,
                       CacheManagerNotifier cacheManagerNotifier) {
+      this.enabled = configuration.garbageCollector().enabled() &&
+            configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE;
+      if (!enabled) {
+         return;
+      }
       this.commitLog = commitLog;
       this.commandsFactory = commandsFactory;
       this.rpcManager = rpcManager;
@@ -82,11 +87,10 @@ public class GarbageCollectorManager {
 
    @Start
    public void start() {
-      this.enabled = configuration.garbageCollector().enabled() &&
-            configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE;
-
-      versionGarbageCollectorThread = new VersionGarbageCollectorThread(configuration.garbageCollector().transactionThreshold(),
-                                                                        configuration.garbageCollector().versionGCMaxIdle());
+      if (!enabled) {
+         return;
+      }
+      versionGarbageCollectorThread = new VersionGarbageCollectorThread(configuration.garbageCollector().transactionThreshold(), configuration.garbageCollector().versionGCMaxIdle());
       l1GarbageCollectorThread = new L1GarbageCollectorThread(configuration.garbageCollector().l1GCInterval());
       viewGarbageCollectorThread = new ViewGarbageCollectorThread(configuration.garbageCollector().viewGCBackOff());
 
@@ -100,6 +104,9 @@ public class GarbageCollectorManager {
 
    @Stop
    public void stop() {
+      if (!enabled) {
+         return;
+      }
       versionGarbageCollectorThread.interrupt();
       l1GarbageCollectorThread.interrupt();
       viewGarbageCollectorThread.interrupt();
@@ -158,6 +165,9 @@ public class GarbageCollectorManager {
    }
 
    public final GMUVersion handleGetMinimumVisibleVersion() {
+      if (!enabled) {
+         return null;
+      }
       List<EntryVersion> localTransactionsCommitLogEntries = new LinkedList<EntryVersion>();
       for (LocalTransaction localTransaction : transactionTable.getLocalTransactions()) {
          localTransactionsCommitLogEntries.add(localTransaction.getTransactionVersion());
@@ -176,6 +186,9 @@ public class GarbageCollectorManager {
    }
 
    public final int handleGetMinimumVisibleViewId() {
+      if (!enabled) {
+         return -1;
+      }
       int minimumVisibleViewId = commitLog.calculateMinimumViewId();
       if (log.isTraceEnabled()) {
          log.tracef("handleGetMinimumVisibleViewId() ==> %s", minimumVisibleViewId);
@@ -184,6 +197,9 @@ public class GarbageCollectorManager {
    }
 
    public final void handleDeleteOlderViewId(int minimumVisibleId) {
+      if (!enabled) {
+         return;
+      }
       if (log.isTraceEnabled()) {
          log.tracef("Deleting older view than %s", minimumVisibleId);
       }
@@ -201,6 +217,9 @@ public class GarbageCollectorManager {
    @ViewChanged
    @Merged
    public final void handle(Event event) {
+      if (!enabled) {
+         return;
+      }
       viewGarbageCollectorThread.trigger();
    }
 

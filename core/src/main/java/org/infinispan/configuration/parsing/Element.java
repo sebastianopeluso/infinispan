@@ -79,9 +79,9 @@ public enum Element {
    TRANSPORT("transport"),
    UNSAFE("unsafe"),
    VERSIONING("versioning"),
-   TOTAL_ORDER_EXECUTOR("totalOrderExecutor"),
    DATA_PLACEMENT("dataPlacement"),
-   GARBAGE_COLLECTOR("garbageCollector")
+   GARBAGE_COLLECTOR("garbageCollector"),
+   CONDITIONAL_EXECUTOR_SERVICE("conditionalExecutorService")
    ;
 
    private final String name;

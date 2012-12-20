@@ -336,6 +336,10 @@ public class CommitLog {
       return minimumViewId;
    }
 
+   public boolean tryWaitForVersion(GMUVersion minGMUVersion) {
+      return currentVersion.getVersion().getThisNodeVersionValue() >= minGMUVersion.getThisNodeVersionValue();
+   }
+
    private void assertEnabled() {
       if (!enabled) {
          throw new IllegalStateException("Commit Log not enabled!");

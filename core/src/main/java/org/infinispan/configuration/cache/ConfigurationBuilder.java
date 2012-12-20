@@ -40,6 +40,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
    private final UnsafeConfigurationBuilder unsafe;
    private final DataPlacementConfigurationBuilder dataPlacement;
    private final GarbageCollectorConfigurationBuilder garbageCollector;
+   private final ConditionalExecutorServiceConfigurationBuilder conditionalExecutorService;
 
    public ConfigurationBuilder() {
       this.clustering = new ClusteringConfigurationBuilder(this);
@@ -59,6 +60,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
       this.unsafe = new UnsafeConfigurationBuilder(this);
       this.dataPlacement = new DataPlacementConfigurationBuilder(this);
       this.garbageCollector = new GarbageCollectorConfigurationBuilder(this);
+      this.conditionalExecutorService = new ConditionalExecutorServiceConfigurationBuilder(this);
    }
 
    public ConfigurationBuilder classLoader(ClassLoader cl) {
@@ -155,12 +157,17 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
       return garbageCollector;
    }
 
+   @Override
+   public ConditionalExecutorServiceConfigurationBuilder conditionalExecutorService() {
+      return conditionalExecutorService;
+   }
+
    @SuppressWarnings("unchecked")
    public void validate() {
       for (AbstractConfigurationChildBuilder<?> validatable:
             asList(clustering, dataContainer, deadlockDetection, eviction, expiration, indexing,
                    invocationBatching, jmxStatistics, loaders, locking, storeAsBinary, transaction,
-                   versioning, unsafe, dataPlacement, garbageCollector)) {
+                   versioning, unsafe, dataPlacement, garbageCollector, conditionalExecutorService)) {
          validatable.validate();
       }
 
@@ -181,7 +188,7 @@ public class ConfigurationBuilder implements ConfigurationChildBuilder {
                expiration.create(), indexing.create(), invocationBatching.create(),
                jmxStatistics.create(), loaders.create(), locking.create(), storeAsBinary.create(),
                transaction.create(), unsafe.create(), versioning.create(), classLoader, dataPlacement.create(),
-               garbageCollector.create());// TODO
+               garbageCollector.create(), conditionalExecutorService.create());// TODO
    }
 
    public ConfigurationBuilder read(Configuration template) {
