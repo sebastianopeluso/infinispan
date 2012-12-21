@@ -242,6 +242,7 @@ public class Parser52 implements ConfigurationParser<ConfigurationBuilderHolder>
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
+      ParseUtils.requireNoContent(reader);
    }
    
    private void parseModules(XMLExtendedStreamReader reader, ConfigurationBuilderHolder holder)
