@@ -345,6 +345,7 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
+      ParseUtils.requireNoContent(reader);
    }
 
    private void parseGarbageCollector(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
@@ -372,6 +373,7 @@ public class Parser {
                throw ParseUtils.unexpectedAttribute(reader, i);
          }
       }
+      ParseUtils.requireNoContent(reader);
    }
 
    private void parseDataPlacement(XMLStreamReader reader, ConfigurationBuilder builder) throws XMLStreamException {
