@@ -85,8 +85,9 @@
     </ciManagement>
     <distributionManagement>
         <repository>
-            <id>ssh-repository</id>
-            <url>scp://kyle.gsd.inesc-id.pt/home/pruivo/public_html/maven-repo</url>
+            <id>cloudtm-repository</id>
+            <name>Cloud-TM Maven Repository</name>
+            <url>scp://cloudtm.ist.utl.pt/var/www/maven</url>
         </repository>
     </distributionManagement>
     <properties>
