@@ -567,4 +567,9 @@ public class CommandsFactoryImpl implements CommandsFactory {
                                                                              int minimumVisibleViewId) {
       return new GarbageCollectorControlCommand(cacheName, type, minimumVisibleViewId);
    }
+
+   @Override
+   public SetClassCommand buildSetClassCommand(String transactionalClass) {
+      return new SetClassCommand(transactionalClass);
+   }
 }
