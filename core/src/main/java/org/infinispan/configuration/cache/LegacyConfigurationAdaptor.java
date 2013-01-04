@@ -539,7 +539,8 @@ public class LegacyConfigurationAdaptor {
             .l1GCInterval(legacy.getL1GCInterval())
             .viewGCBackOff(legacy.getViewGCBackOff());
 
-      builder.conditionalExecutorService().corePoolSize(legacy.getCorePoolSizeForConditionalExecutorService())
+      builder.conditionalExecutorService()
+            .corePoolSize(legacy.getCorePoolSizeForConditionalExecutorService())
             .maxPoolSize(legacy.getMaxPoolSizeForConditionalExecutorService())
             .keepAliveTime(legacy.getKeepAliveTimeForConditionalExecutorService());
 

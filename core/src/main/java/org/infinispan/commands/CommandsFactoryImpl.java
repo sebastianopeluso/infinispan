@@ -35,6 +35,7 @@ import org.infinispan.commands.read.MapReduceCommand;
 import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.commands.remote.ConfigurationStateCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.GarbageCollectorControlCommand;
@@ -66,6 +67,7 @@ import org.infinispan.dataplacement.DataPlacementManager;
 import org.infinispan.distexec.mapreduce.Mapper;
 import org.infinispan.distexec.mapreduce.Reducer;
 import org.infinispan.distribution.DistributionManager;
+import org.infinispan.executors.ConditionalExecutorService;
 import org.infinispan.factories.KnownComponentNames;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
@@ -84,7 +86,6 @@ import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.transaction.xa.DldGlobalTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.transaction.xa.recovery.RecoveryManager;
-import org.infinispan.executors.ConditionalExecutorService;
 import org.infinispan.util.concurrent.locks.LockManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -452,6 +453,9 @@ public class CommandsFactoryImpl implements CommandsFactory {
             GarbageCollectorControlCommand gccc = (GarbageCollectorControlCommand) c;
             gccc.init(garbageCollectorManager);
             break;
+         case ConfigurationStateCommand.COMMAND_ID:
+            ConfigurationStateCommand csc = (ConfigurationStateCommand) c;
+            csc.initialize(distributionManager, reconfigurableReplicationManager);
          default:
             ModuleCommandInitializer mci = moduleCommandInitializers.get(c.getCommandId());
             if (mci != null) {

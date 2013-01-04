@@ -33,6 +33,7 @@ import org.infinispan.commands.read.GetKeyValueCommand;
 import org.infinispan.commands.read.MapReduceCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.commands.remote.ConfigurationStateCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.GarbageCollectorControlCommand;
@@ -243,6 +244,9 @@ public class RemoteCommandsFactory {
                break;
             case GarbageCollectorControlCommand.COMMAND_ID:
                command = new GarbageCollectorControlCommand(cacheName);
+               break;
+            case ConfigurationStateCommand.COMMAND_ID:
+               command = new ConfigurationStateCommand(cacheName);
                break;
             default:
                throw new CacheException("Unknown command id " + id + "!");

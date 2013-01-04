@@ -26,6 +26,7 @@ import org.infinispan.commands.control.StateTransferControlCommand;
 import org.infinispan.commands.read.MapReduceCommand;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.commands.remote.ConfigurationStateCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.GarbageCollectorControlCommand;
@@ -93,7 +94,7 @@ public final class CacheRpcCommandExternalizer extends AbstractExternalizer<Cach
             GetInDoubtTxInfoCommand.class, CompleteTransactionCommand.class,
             CacheViewControlCommand.class, VersionedPrepareCommand.class, VersionedCommitCommand.class,
             DataPlacementCommand.class, GMUPrepareCommand.class, GMUCommitCommand.class, GMUClusteredGetCommand.class,
-            ReconfigurableProtocolCommand.class, GarbageCollectorControlCommand.class);
+            ReconfigurableProtocolCommand.class, GarbageCollectorControlCommand.class, ConfigurationStateCommand.class);
       // Only interested in cache specific replicable commands
       coreCommands.addAll(gcr.getModuleProperties().moduleCacheRpcCommands());
       return coreCommands;

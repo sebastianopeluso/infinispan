@@ -33,6 +33,7 @@ import org.infinispan.commands.read.MapReduceCommand;
 import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.commands.remote.ConfigurationStateCommand;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.remote.GarbageCollectorControlCommand;
@@ -430,7 +431,7 @@ public interface CommandsFactory {
    GarbageCollectorControlCommand buildGarbageCollectorControlCommand(GarbageCollectorControlCommand.Type type,
                                                                       int minimumVisibleViewId);
    /**
-    * Builds a SetClassCommand used to apply a specific transactional class to a transaction
-    */
-    SetClassCommand buildSetClassCommand(String transactionalClass);
+    * Builds a SetClassCommand used to apply a specific transactional class to a transaction
+    */
+   SetClassCommand buildSetClassCommand(String transactionalClass);
 }
