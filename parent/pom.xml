@@ -85,10 +85,15 @@
     </ciManagement>
     <distributionManagement>
         <repository>
-            <id>cloudtm-repository</id>
-            <name>Cloud-TM Maven Repository</name>
-            <url>scp://cloudtm.ist.utl.pt/var/www/maven</url>
+            <id>deployment</id>
+            <name>Internal Releases</name>
+            <url>http://cloudtm.ist.utl.pt:8083/nexus/content/repositories/releases/</url>
         </repository>
+        <snapshotRepository>
+            <id>deployment</id>
+            <name>Internal Releases</name>
+            <url>http://cloudtm.ist.utl.pt:8083/nexus/content/repositories/snapshots/</url>
+        </snapshotRepository>
     </distributionManagement>
     <properties>
         <buildDirectory>target</buildDirectory>
