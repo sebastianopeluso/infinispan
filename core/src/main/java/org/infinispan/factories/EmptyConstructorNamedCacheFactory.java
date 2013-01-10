@@ -199,7 +199,7 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
       } else if (componentType.equals(CommitContextEntries.class)) {
          if (configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
             return (T) new GMUCommitContextEntries();
-         } else if (configuration.isRequireVersioning()) {
+         } else if (configuration.isRequireVersioning() && configuration.getCacheMode().isClustered()) {
             if (configuration.isTotalOrder()) {
                return (T) new TotalOrderVersionedCommitContextEntries();
             } else {

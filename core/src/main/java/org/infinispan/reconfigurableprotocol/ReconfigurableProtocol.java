@@ -456,7 +456,7 @@ public abstract class ReconfigurableProtocol {
       if (serializability) {
          defaultIC.put(InterceptorType.WRAPPER,
                        createInterceptor(new GMUEntryWrappingInterceptor(), GMUEntryWrappingInterceptor.class));
-      } else if (needsVersionAwareComponents()) {
+      } else if (needsVersionAwareComponents() && configuration.clustering().cacheMode().isClustered()) {
          defaultIC.put(InterceptorType.WRAPPER,
                        createInterceptor(new VersionedEntryWrappingInterceptor(), VersionedEntryWrappingInterceptor.class));
 
