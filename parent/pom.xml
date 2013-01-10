@@ -95,6 +95,7 @@
             <url>http://cloudtm.ist.utl.pt:8083/nexus/content/repositories/snapshots/</url>
         </snapshotRepository>
     </distributionManagement>
+
     <properties>
         <buildDirectory>target</buildDirectory>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -834,32 +835,39 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
     <repositories>
         <repository>
+            <id>cloudtm-repository</id>
+            <name>Cloud-TM's Maven Repository</name>
+            <url>http://cloudtm.ist.utl.pt:8083/nexus/content/groups/public/</url>
             <releases>
                 <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
             </releases>
             <snapshots>
                 <enabled>true</enabled>
+                <updatePolicy>daily</updatePolicy>
             </snapshots>
-            <id>jboss-public-repository</id>
-            <name>JBoss Public Repository and Proxy for third party repositories</name>
-            <url>https://repository.jboss.org/nexus/content/groups/public</url>
         </repository>
     </repositories>
+
     <pluginRepositories>
         <pluginRepository>
+            <id>cloudtm-plugin-repository</id>
+            <name>Cloud-TM's Maven Repository</name>
+            <url>http://cloudtm.ist.utl.pt:8083/nexus/content/groups/public/</url>
             <releases>
                 <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
             </releases>
             <snapshots>
                 <enabled>true</enabled>
+                <updatePolicy>daily</updatePolicy>
             </snapshots>
-            <id>jboss-public-plugin-repository</id>
-            <name>JBoss Public Plugin Repository and Proxy for third party plugin repositories</name>
-            <url>https://repository.jboss.org/nexus/content/groups/public</url>
         </pluginRepository>
     </pluginRepositories>
+
     <build>
         <extensions>
             <extension>
