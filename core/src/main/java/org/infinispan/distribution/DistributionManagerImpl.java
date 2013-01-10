@@ -106,6 +106,7 @@ public class DistributionManagerImpl implements DistributionManager {
    private void start() throws Exception {
       if (trace) log.tracef("starting distribution manager on %s", getAddress());
       consistentHash = ConsistentHashHelper.createConsistentHash(configuration, Collections.singleton(rpcManager.getAddress()));
+      setReplicationDegree(configuration.getNumOwners());
    }
 
    @Override

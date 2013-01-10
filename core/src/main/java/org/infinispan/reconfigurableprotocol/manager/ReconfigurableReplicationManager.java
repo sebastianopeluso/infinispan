@@ -100,6 +100,7 @@ public class ReconfigurableReplicationManager {
          //this exception is catch when you inject the extended statistics
          log.errorf("Tried to register Total Order protocol but it is already register.");
       }
+      initialProtocol(configuration.transaction().transactionProtocol());
    }
 
    /**

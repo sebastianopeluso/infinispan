@@ -181,8 +181,6 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
          if (log.isDebugEnabled()) {
             log.debug("No State found. Using original configuration parameters");
          }
-         manager.initialProtocol(configuration.getTransactionProtocol());
-         distributionManager.setReplicationDegree(configuration.getNumOwners());
       } else {
          if (log.isDebugEnabled()) {
             log.debugf("Configuration State found: %s", configurationState);
