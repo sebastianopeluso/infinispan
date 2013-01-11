@@ -4,7 +4,6 @@ import org.infinispan.Cache;
 import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.infinispan.dataplacement.DataPlacementManager;
-import org.infinispan.dataplacement.hm.HashMapObjectLookupFactory;
 import org.infinispan.distribution.DistributionManager;
 import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.reconfigurableprotocol.protocol.TotalOrderCommitProtocol;
@@ -21,41 +20,18 @@ import static org.infinispan.test.TestingUtil.sleepThread;
  * @author Pedro Ruivo
  * @since 5.2
  */
-@Test(groups = "functional", testName = "tx.SelfTunningTest")
-public class SelfTunningTest extends MultipleCacheManagersTest {
+@Test(groups = "functional")
+public abstract class AbstractSelfTunningTest extends MultipleCacheManagersTest {
 
    private static final String KEY_1 = "KEY_1";
    private static final String KEY_2 = "KEY_2";
    private static final String KEY_3 = "KEY_3";
    private static final String VALUE = "VALUE";
-   private final ConfigurationBuilder builder;
+   protected final ConfigurationBuilder builder;
 
-   public SelfTunningTest() {
-      builder = getDefaultClusteredCacheConfig(CacheMode.DIST_SYNC, true);
+   protected AbstractSelfTunningTest(CacheMode cacheMode) {
+      builder = getDefaultClusteredCacheConfig(cacheMode, true);
       cleanup = CleanupPhase.AFTER_METHOD;
-   }
-
-   public void testReplicationDegree() throws Exception {
-      populate();
-      DistributionManager cache0DM = extractComponent(cache(0), DistributionManager.class);
-      DistributionManager cache1DM = extractComponent(cache(1), DistributionManager.class);
-      DataPlacementManager dataPlacementManager = extractComponent(cache(0), DataPlacementManager.class);
-
-      assertReplicationDegree(cache0DM, 1);
-      assertReplicationDegree(cache1DM, 1);
-
-      triggerTunningReplicationDegree(dataPlacementManager, 2);
-
-      assertReplicationDegree(cache0DM, 2);
-      assertReplicationDegree(cache1DM, 2);
-
-      addClusterEnabledCacheManager(builder);
-      waitForClusterToForm();
-
-      assertReplicationDegree(cache0DM, 2);
-      assertReplicationDegree(cache1DM, 2);
-      assertReplicationDegree(extractComponent(cache(2), DistributionManager.class), 2);
-      assertKeysValue();
    }
 
    public void testSwitch() throws Exception {
@@ -91,16 +67,12 @@ public class SelfTunningTest extends MultipleCacheManagersTest {
 
    @Override
    protected void createCacheManagers() throws Throwable {
-      builder.clustering().hash().numOwners(1);
-      builder.dataPlacement().enabled(true)
-            .objectLookupFactory(new HashMapObjectLookupFactory())
-            .coolDownTime(1000);
       builder.clustering().stateTransfer().fetchInMemoryState(true);
       createCluster(builder, 2);
       waitForClusterToForm();
    }
 
-   private void assertReplicationDegree(final DistributionManager distributionManager, final int expectedReplicationDegree) {
+   protected void assertReplicationDegree(final DistributionManager distributionManager, final int expectedReplicationDegree) {
       eventually(new Condition() {
          @Override
          public boolean isSatisfied() throws Exception {
@@ -109,41 +81,18 @@ public class SelfTunningTest extends MultipleCacheManagersTest {
       });
    }
 
-   private void assertProtocol(final ReconfigurableReplicationManager manager, final String protocolId) {
-      eventually(new Condition() {
-         @Override
-         public boolean isSatisfied() throws Exception {
-            return manager.getCurrentProtocolId().equals(protocolId);
-         }
-      });
-   }
-
-   private void assertEpoch(final ReconfigurableReplicationManager manager, final long epoch) {
-      eventually(new Condition() {
-         @Override
-         public boolean isSatisfied() throws Exception {
-            return epoch == manager.getCurrentEpoch();
-         }
-      });
-   }
-
-   private void triggerTunningReplicationDegree(DataPlacementManager dataPlacementManager, int replicationDegree) throws Exception {
+   protected void triggerTunningReplicationDegree(DataPlacementManager dataPlacementManager, int replicationDegree) throws Exception {
       sleepThread(DataPlacementManager.INITIAL_COOL_DOWN_TIME);
       dataPlacementManager.setReplicationDegree(replicationDegree);
    }
 
-   private void triggerTunningProtocol(ReconfigurableReplicationManager manager, String protocolId) throws Exception {
-      sleepThread(manager.getSwitchCoolDownTime() * 1000);
-      manager.switchTo(protocolId, false, false);
-   }
-
-   private void populate() {
+   protected void populate() {
       cache(0).put(KEY_1, VALUE);
       cache(0).put(KEY_2, VALUE);
       cache(0).put(KEY_3, VALUE);
    }
 
-   private void assertKeysValue() {
+   protected void assertKeysValue() {
       for (final Cache cache : caches()) {
          eventually(new Condition() {
             @Override
@@ -164,5 +113,28 @@ public class SelfTunningTest extends MultipleCacheManagersTest {
             }
          });
       }
+   }
+
+   private void assertProtocol(final ReconfigurableReplicationManager manager, final String protocolId) {
+      eventually(new Condition() {
+         @Override
+         public boolean isSatisfied() throws Exception {
+            return manager.getCurrentProtocolId().equals(protocolId);
+         }
+      });
+   }
+
+   private void assertEpoch(final ReconfigurableReplicationManager manager, final long epoch) {
+      eventually(new Condition() {
+         @Override
+         public boolean isSatisfied() throws Exception {
+            return epoch == manager.getCurrentEpoch();
+         }
+      });
+   }
+
+   private void triggerTunningProtocol(ReconfigurableReplicationManager manager, String protocolId) throws Exception {
+      sleepThread(manager.getSwitchCoolDownTime() * 1000);
+      manager.switchTo(protocolId, false, false);
    }
 }

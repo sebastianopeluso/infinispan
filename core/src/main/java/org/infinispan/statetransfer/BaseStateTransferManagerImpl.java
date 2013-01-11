@@ -186,7 +186,9 @@ public abstract class BaseStateTransferManagerImpl implements StateTransferManag
             log.debugf("Configuration State found: %s", configurationState);
          }
          manager.initialProtocol(configurationState.getProtocolName(), configurationState.getEpoch());
-         distributionManager.setReplicationDegree(configurationState.getNumberOfOwners());
+         if (distributionManager != null) {
+            distributionManager.setReplicationDegree(configurationState.getNumberOfOwners());
+         }
       }
    }
 

@@ -31,8 +31,9 @@ public class ConfigurationStateCommand extends BaseRpcCommand {
 
    @Override
    public Object perform(InvocationContext ctx) throws Throwable {
-      ProtocolManager.CurrentProtocolInfo protocolName = reconfigurableReplicationManager.getProtocolManager().getCurrentProtocolInfo();
-      int replicationDegree = distributionManager.getReplicationDegree();
+      ProtocolManager.CurrentProtocolInfo protocolName = reconfigurableReplicationManager.getProtocolManager()
+            .getCurrentProtocolInfo();
+      int replicationDegree = distributionManager != null ? distributionManager.getReplicationDegree() : 0;
       return new ConfigurationState(replicationDegree, protocolName.getCurrent().getUniqueProtocolName(),
                                     protocolName.getEpoch());
    }
