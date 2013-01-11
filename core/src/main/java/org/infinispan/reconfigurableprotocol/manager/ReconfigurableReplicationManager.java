@@ -59,6 +59,7 @@ public class ReconfigurableReplicationManager {
    private CommandsFactory commandsFactory;
    private Configuration configuration;
    private ComponentRegistry componentRegistry;
+   private volatile boolean allowSwitch = false;
 
    public ReconfigurableReplicationManager() {
       statisticManager = new StatisticManager();
@@ -70,6 +71,7 @@ public class ReconfigurableReplicationManager {
    @Inject
    public final void inject(InterceptorChain interceptorChain, RpcManager rpcManager, CommandsFactory commandsFactory,
                             Configuration configuration, ComponentRegistry componentRegistry) {
+      allowSwitch = configuration.clustering().cacheMode().isClustered();
       registry.inject(interceptorChain);
       this.rpcManager = rpcManager;
       this.commandsFactory = commandsFactory;
@@ -393,6 +395,9 @@ public class ReconfigurableReplicationManager {
    @ManagedOperation(description = "Registers a new replication protocol. The new protocol must extend the " +
          "ReconfigurableProtocol")
    public final void register(String clazzName) throws Exception {
+      if (!allowSwitch) {
+         return;
+      }
       try {
          internalRegister(clazzName);
          ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.REGISTER, clazzName);
@@ -405,6 +410,9 @@ public class ReconfigurableReplicationManager {
    @ManagedOperation(description = "Switch the current replication protocol for the new one. It fails if the protocol " +
          "does not exists or it is equals to the current")
    public final void switchTo(String protocolId, boolean forceStopTheWorld, boolean abortOnStop) throws Exception {
+      if (!allowSwitch) {
+         return;
+      }
       if (!rpcManager.getTransport().isCoordinator()) {
          ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.SWITCH_REQ, protocolId);
          command.setForceStop(forceStopTheWorld);
@@ -477,6 +485,9 @@ public class ReconfigurableReplicationManager {
 
    @ManagedOperation(description = "Sets the new cool down time period (in seconds) to wait before two consecutive switches")
    public final void setSwitchCoolDownTime(int seconds) {
+      if (!allowSwitch) {
+         return;
+      }
       internalSetSwitchCoolDownTime(seconds);
       ReconfigurableProtocolCommand command = commandsFactory.buildReconfigurableProtocolCommand(Type.SET_COOL_DOWN_TIME, null);
       command.setData(seconds);
@@ -560,6 +571,11 @@ public class ReconfigurableReplicationManager {
    @ManagedOperation(description = "Resets the switch statistics")
    public final void resetSwitchStats() {
       statisticManager.reset();
+   }
+
+   @ManagedAttribute(description = "Returns true if it is possible to change the reconfigurable protocol", writable = false)
+   public final boolean allowProtocolSwitch() {
+      return allowSwitch;
    }
 
    /**

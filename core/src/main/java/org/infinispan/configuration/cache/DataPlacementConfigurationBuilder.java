@@ -65,9 +65,22 @@ public class DataPlacementConfigurationBuilder extends AbstractConfigurationChil
    }
 
    @Override
+   public ConfigurationChildBuilder read(DataPlacementConfiguration template) {
+      this.enabled = template.enabled();
+      this.coolDownTime = template.coolDownTime();
+      this.maxNumberOfKeysToRequest = template.maxNumberOfKeysToRequest();
+      this.objectLookupFactory = template.objectLookupFactory();
+      this.properties = template.properties();
+      return this;
+   }
+
+   @Override
    void validate() {
       if (!enabled) {
          return;
+      }
+      if (!clustering().create().cacheMode().isDistributed()) {
+         throw new ConfigurationException("Data Placement Optimizer only works in distributed mode");
       }
       if (objectLookupFactory == null) {
          throw new ConfigurationException("Object Lookup Factory cannot be null");
@@ -84,15 +97,5 @@ public class DataPlacementConfigurationBuilder extends AbstractConfigurationChil
    DataPlacementConfiguration create() {
       return new DataPlacementConfiguration(TypedProperties.toTypedProperties(properties), enabled, coolDownTime,
                                             objectLookupFactory, maxNumberOfKeysToRequest);
-   }
-
-   @Override
-   public ConfigurationChildBuilder read(DataPlacementConfiguration template) {
-      this.enabled = template.enabled();
-      this.coolDownTime = template.coolDownTime();
-      this.maxNumberOfKeysToRequest = template.maxNumberOfKeysToRequest();
-      this.objectLookupFactory = template.objectLookupFactory();
-      this.properties = template.properties();
-      return this;
    }
 }

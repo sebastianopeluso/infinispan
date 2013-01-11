@@ -33,7 +33,8 @@ public class DistributionManagerFactory extends AbstractNamedCacheComponentFacto
    @Override
    @SuppressWarnings("unchecked")
    public <T> T construct(Class<T> componentType) {
-      if (configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
+      if (configuration.getCacheMode().isDistributed() &&
+            configuration.getIsolationLevel() == IsolationLevel.SERIALIZABLE) {
          return (T) new GMUDistributionManagerImpl();
       } else if (configuration.getCacheMode().isDistributed())
          return (T) new DistributionManagerImpl();
