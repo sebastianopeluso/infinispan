@@ -44,18 +44,14 @@ public class ReentrantPerEntryLockContainer extends AbstractPerEntryLockContaine
 
    @Override
    public boolean ownsExclusiveLock(Object key, Object ignored) {
-      ReentrantLock l = getLockFromMap(key);
+      ReentrantLock l = getLockFromMap(key, false);
       return l != null && l.isHeldByCurrentThread();
    }
 
    @Override
    public boolean isExclusiveLocked(Object key) {
-      ReentrantLock l = getLockFromMap(key);
+      ReentrantLock l = getLockFromMap(key, false);
       return l != null && l.isLocked();
-   }
-
-   private ReentrantLock getLockFromMap(Object key) {
-      return locks.get(key);
    }
 
    @Override
@@ -80,6 +76,6 @@ public class ReentrantPerEntryLockContainer extends AbstractPerEntryLockContaine
 
    @Override
    public ReentrantLock getExclusiveLock(Object key) {
-      return getLockFromMap(key);
+      return getLockFromMap(key, true);
    }
 }
