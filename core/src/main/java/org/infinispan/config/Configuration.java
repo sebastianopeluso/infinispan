@@ -4945,9 +4945,9 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    @Deprecated
    public static class ConditionalExecutorServiceType extends AbstractFluentConfigurationBean implements ConditionalExecutorServiceConfig {
 
-      private int corePoolSize;
-      private int maxPoolSize;
-      private long keepAliveTime;
+      private int corePoolSize = 2;
+      private int maxPoolSize = 16;
+      private long keepAliveTime = 60000;
 
       @Override
       public ConditionalExecutorServiceConfig setCorePoolSize(int size) {
