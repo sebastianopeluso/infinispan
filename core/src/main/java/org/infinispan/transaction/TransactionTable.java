@@ -300,6 +300,7 @@ public class TransactionTable {
       if (current == null) {
          Address localAddress = rpcManager != null ? rpcManager.getTransport().getAddress() : null;
          GlobalTransaction tx = txFactory.newGlobalTransaction(localAddress, false);
+         tx.setProtocolId(ctx.getProtocolId());
          current = txFactory.newLocalTransaction(transaction, tx, ctx.isImplicitTransaction(), currentViewId);
          log.tracef("Created a new local transaction: %s", current);
          localTransactions.put(transaction, current);
