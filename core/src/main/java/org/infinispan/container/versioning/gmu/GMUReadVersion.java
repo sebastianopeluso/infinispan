@@ -28,15 +28,17 @@ public class GMUReadVersion extends GMUVersion {
 
    @Override
    public final long getVersionValue(Address address) {
-      return getVersionValue(clusterSnapshot.indexOf(address));
+      return getThisNodeVersionValue();
    }
 
    @Override
    public final long getVersionValue(int addressIndex) {
-      if (addressIndex == nodeIndex) {
-         return version;
-      }
-      return NON_EXISTING;
+      return getThisNodeVersionValue();
+   }
+
+   @Override
+   public long getThisNodeVersionValue() {
+      return version;
    }
 
    public final void addNotVisibleSubversion(long version, int subVersion) {

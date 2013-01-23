@@ -149,13 +149,12 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
                interceptors.put(InterceptorType.CLUSTER,
                                 createInterceptor(new TotalOrderVersionedReplicationInterceptor(),
                                                   TotalOrderVersionedReplicationInterceptor.class));
-               break;
             } else {
                interceptors.put(InterceptorType.CLUSTER,
                                 createInterceptor(new TotalOrderReplicationInterceptor(),
                                                   TotalOrderReplicationInterceptor.class));
-               break;
             }
+            break;
          case DIST_SYNC:
             if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
                interceptors.put(InterceptorType.CLUSTER,
@@ -165,13 +164,12 @@ public class TotalOrderCommitProtocol extends ReconfigurableProtocol {
                interceptors.put(InterceptorType.CLUSTER,
                                 createInterceptor(new TotalOrderVersionedDistributionInterceptor(),
                                                   TotalOrderVersionedDistributionInterceptor.class));
-               break;
             } else {
                interceptors.put(InterceptorType.CLUSTER,
                                 createInterceptor(new TotalOrderDistributionInterceptor(),
                                                   TotalOrderDistributionInterceptor.class));
-               break;
             }
+            break;
       }
 
       if (log.isTraceEnabled()) {

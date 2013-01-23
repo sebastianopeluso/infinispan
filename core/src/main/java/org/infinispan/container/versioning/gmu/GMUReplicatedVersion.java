@@ -32,19 +32,24 @@ public class GMUReplicatedVersion extends GMUVersion {
       this.version = version;
    }
 
-   private GMUReplicatedVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, Address localAddress, long version) {
-      super(cacheName, viewId, clusterSnapshot, localAddress);
+   private GMUReplicatedVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, long version) {
+      super(cacheName, viewId, clusterSnapshot);
       this.version = version;
    }
 
    @Override
    public long getVersionValue(Address address) {
-      return getVersionValue(clusterSnapshot.indexOf(address));
+      return getThisNodeVersionValue();
    }
 
    @Override
    public long getVersionValue(int addressIndex) {
-      return addressIndex == nodeIndex ? version : NON_EXISTING;
+      return getThisNodeVersionValue();
+   }
+
+   @Override
+   public long getThisNodeVersionValue() {
+      return version;
    }
 
    @Override
@@ -120,7 +125,7 @@ public class GMUReplicatedVersion extends GMUVersion {
             throw new IllegalArgumentException("View Id " + viewId + " not found in this node");
          }
          long version = input.readLong();
-         return new GMUReplicatedVersion(cacheName, viewId, clusterSnapshot, gmuVersionGenerator.getAddress(), version);
+         return new GMUReplicatedVersion(cacheName, viewId, clusterSnapshot, version);
       }
 
       @Override

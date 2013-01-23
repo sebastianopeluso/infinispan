@@ -33,24 +33,26 @@ public class GMUCacheEntryVersion extends GMUVersion {
       this.subVersion = subVersion;
    }
 
-   private GMUCacheEntryVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, Address localAddress,
+   private GMUCacheEntryVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot,
                                 long version, int subVersion) {
-      super(cacheName, viewId, clusterSnapshot, localAddress);
+      super(cacheName, viewId, clusterSnapshot);
       this.version = version;
       this.subVersion = subVersion;
    }
 
    @Override
    public final long getVersionValue(Address address) {
-      return getVersionValue(clusterSnapshot.indexOf(address));
+      return getThisNodeVersionValue();
    }
 
    @Override
    public final long getVersionValue(int addressIndex) {
-      if (addressIndex == nodeIndex) {
-         return version;
-      }
-      return NON_EXISTING;
+      return getThisNodeVersionValue();
+   }
+
+   @Override
+   public final long getThisNodeVersionValue() {
+      return version;
    }
 
    public final int getSubVersion() {
@@ -135,8 +137,7 @@ public class GMUCacheEntryVersion extends GMUVersion {
          }
          long version = input.readLong();
          int subVersion = input.readInt();
-         return new GMUCacheEntryVersion(cacheName, viewId, clusterSnapshot, gmuVersionGenerator.getAddress(), version,
-                                         subVersion);
+         return new GMUCacheEntryVersion(cacheName, viewId, clusterSnapshot, version, subVersion);
       }
 
       @Override

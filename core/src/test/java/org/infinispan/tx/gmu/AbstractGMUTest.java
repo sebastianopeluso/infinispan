@@ -194,12 +194,16 @@ public abstract class AbstractGMUTest extends MultipleCacheManagersTest {
    protected final void assertKeyOwners(Object key, Collection<Integer> mapTo, Collection<Integer> notMapTo) {
       if (mapTo != null) {
          for (int index : mapTo) {
-            assert isOwner(cache(index), key) : key + " does not belong to " + addressOf(cache(index));
+            if (cache(index).getAdvancedCache().getDistributionManager() != null) {
+               assert isOwner(cache(index), key) : key + " does not belong to " + addressOf(cache(index));
+            }
          }
       }
       if (notMapTo != null) {
          for (int index : notMapTo) {
-            assert !isOwner(cache(index), key) : key + " belong to " + addressOf(cache(index));
+            if (cache(index).getAdvancedCache().getDistributionManager() != null) {
+               assert !isOwner(cache(index), key) : key + " belong to " + addressOf(cache(index));
+            }
          }
       }
    }
@@ -226,9 +230,12 @@ public abstract class AbstractGMUTest extends MultipleCacheManagersTest {
    protected final void rewireMagicKeyAwareConsistentHash() {
       for (int i = 0; i < cacheManagers.size(); ++i) {
          DistributionManager distributionManager = advancedCache(i).getDistributionManager();
-         ConsistentHash delegate = distributionManager.getConsistentHash();
-         MagicKeyAwareConsistentHash ch = new MagicKeyAwareConsistentHash(delegate);
-         distributionManager.setConsistentHash(ch);
+         //only in distributed mode we have DistributionManager
+         if (distributionManager != null) {
+            ConsistentHash delegate = distributionManager.getConsistentHash();
+            MagicKeyAwareConsistentHash ch = new MagicKeyAwareConsistentHash(delegate);
+            distributionManager.setConsistentHash(ch);
+         }
       }
    }
 

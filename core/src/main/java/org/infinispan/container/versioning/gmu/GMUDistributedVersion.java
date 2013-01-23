@@ -23,6 +23,7 @@ import java.util.Set;
 public class GMUDistributedVersion extends GMUVersion {
 
    private final long[] versions;
+   private final int nodeIndex;
 
    public GMUDistributedVersion(String cacheName, int viewId, GMUVersionGenerator versionGenerator, long[] versions) {
       super(cacheName, viewId, versionGenerator);
@@ -31,12 +32,14 @@ public class GMUDistributedVersion extends GMUVersion {
                                                   clusterSnapshot.size());
       }
       this.versions = Arrays.copyOf(versions, clusterSnapshot.size());
+      this.nodeIndex = clusterSnapshot.indexOf(versionGenerator.getAddress());
    }
 
    private GMUDistributedVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot, Address localAddress,
                                  long[] versions) {
-      super(cacheName, viewId, clusterSnapshot, localAddress);
+      super(cacheName, viewId, clusterSnapshot);
       this.versions = versions;
+      this.nodeIndex = clusterSnapshot.indexOf(localAddress);
    }
 
    @Override
@@ -47,6 +50,11 @@ public class GMUDistributedVersion extends GMUVersion {
    @Override
    public long getVersionValue(int addressIndex) {
       return validIndex(addressIndex) ? versions[addressIndex] : NON_EXISTING;
+   }
+
+   @Override
+   public long getThisNodeVersionValue() {
+      return getVersionValue(nodeIndex);
    }
 
    @Override
