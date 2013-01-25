@@ -7,6 +7,7 @@ import org.infinispan.commands.tx.GMUCommitCommand;
 import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
+import org.infinispan.commands.write.ApplyDeltaCommand;
 import org.infinispan.commands.write.ClearCommand;
 import org.infinispan.commands.write.PutKeyValueCommand;
 import org.infinispan.commands.write.RemoveCommand;
@@ -159,24 +160,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
     * @throws InterruptedException if interrupted
     */
    protected void performValidation(TxInvocationContext ctx, GMUPrepareCommand command) throws InterruptedException {
-      boolean hasToUpdateLocalKeys = false;
+      boolean hasToUpdateLocalKeys = hasLocalKeysToUpdate(command.getModifications());
       boolean isReadOnly = command.getModifications().length == 0;
-
-      for (Object key : command.getAffectedKeys()) {
-         if (cll.localNodeIsOwner(key)) {
-            hasToUpdateLocalKeys = true;
-            break;
-         }
-      }
-
-      if (!hasToUpdateLocalKeys) {
-         for (WriteCommand writeCommand : command.getModifications()) {
-            if (writeCommand instanceof ClearCommand) {
-               hasToUpdateLocalKeys = true;
-               break;
-            }
-         }
-      }
 
       if (!isReadOnly) {
          cll.performReadSetValidation(ctx, command);
@@ -240,6 +225,25 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          EntryVersion[] txVersionArray = new EntryVersion[entryVersionList.size()];
          txInvocationContext.setTransactionVersion(versionGenerator.mergeAndMax(entryVersionList.toArray(txVersionArray)));
       }
+   }
+
+   private boolean hasLocalKeysToUpdate(WriteCommand[] modifications) {
+      for (WriteCommand writeCommand : modifications) {
+         if (writeCommand instanceof ClearCommand) {
+            return true;
+         } else if (writeCommand instanceof ApplyDeltaCommand) {
+            if (cll.localNodeIsOwner(((ApplyDeltaCommand) writeCommand).getDeltaAwareKey())) {
+               return true;
+            }
+         } else {
+            for (Object key : writeCommand.getAffectedKeys()) {
+               if (cll.localNodeIsOwner(key)) {
+                  return true;
+               }
+            }
+         }
+      }
+      return false;
    }
 
 }
