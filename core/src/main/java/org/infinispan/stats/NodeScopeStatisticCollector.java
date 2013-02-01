@@ -395,7 +395,7 @@ public class NodeScopeStatisticCollector {
           case LOCAL_GET_EXECUTION:
             long num = localTransactionStatistics.getValue(IspnStats.NUM_GET);
 			if(num == 0){
-		       return new Long(0L);;
+		       return new Long(0L);
             }
             else{
 			   long local_get_time = localTransactionStatistics.getValue(ALL_GET_EXECUTION) -
