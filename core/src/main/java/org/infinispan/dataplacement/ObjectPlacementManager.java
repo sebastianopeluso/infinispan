@@ -1,9 +1,7 @@
 package org.infinispan.dataplacement;
 
-import org.infinispan.commons.hash.Hash;
-import org.infinispan.distribution.DistributionManager;
+import org.infinispan.dataplacement.ch.DataPlacementConsistentHash;
 import org.infinispan.distribution.ch.ConsistentHash;
-import org.infinispan.distribution.ch.DataPlacementConsistentHash;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -38,15 +36,9 @@ public class ObjectPlacementManager {
    //this can be quite big. save it as an array to save some memory
    private Object[] allKeysMoved;
 
-   private final DistributionManager distributionManager;
-   private final Hash hash;
-   private final int defaultNumberOfOwners;
+   private ConsistentHash consistentHash;
 
-   public ObjectPlacementManager(DistributionManager distributionManager, Hash hash, int defaultNumberOfOwners){
-      this.distributionManager = distributionManager;
-      this.hash = hash;
-      this.defaultNumberOfOwners = defaultNumberOfOwners;
-
+   public ObjectPlacementManager() {
       requestReceived = new BitSet();
       allKeysMoved = new Object[0];
    }
@@ -56,8 +48,9 @@ public class ObjectPlacementManager {
     *
     * @param roundClusterSnapshot the current cluster members
     */
-   public final synchronized void resetState(ClusterSnapshot roundClusterSnapshot) {
+   public final synchronized void resetState(ClusterSnapshot roundClusterSnapshot, ConsistentHash consistentHash) {
       clusterSnapshot = roundClusterSnapshot;
+      this.consistentHash = consistentHash;
       objectRequests = new ObjectRequest[clusterSnapshot.size()];
       requestReceived.clear();
    }
@@ -95,7 +88,7 @@ public class ObjectPlacementManager {
     *
     * @return  a map with the keys to be moved and the new owners
     */
-   public final synchronized Map<Object, OwnersInfo> calculateObjectsToMove() {
+   public final synchronized Collection<SegmentMapping> calculateObjectsToMove() {
       Map<Object, OwnersInfo> newOwnersMap = new HashMap<Object, OwnersInfo>();
 
       for (int requesterIdx = 0; requesterIdx < clusterSnapshot.size(); ++requesterIdx) {
@@ -125,8 +118,20 @@ public class ObjectPlacementManager {
 
       //update all the keys moved array
       allKeysMoved = newOwnersMap.keySet().toArray(new Object[newOwnersMap.size()]);
+      
+      Map<Integer, SegmentMapping> segmentMappingMap = new HashMap<Integer, SegmentMapping>(consistentHash.getNumSegments());
+      
+      for (Map.Entry<Object, OwnersInfo> entry : newOwnersMap.entrySet()) {
+         int segmentId = consistentHash.getSegment(entry.getKey());
+         SegmentMapping segmentMapping = segmentMappingMap.get(segmentId);
+         if (segmentMapping == null) {
+            segmentMapping = new SegmentMapping(segmentId);
+            segmentMappingMap.put(segmentId, segmentMapping);
+         }
+         segmentMapping.add(entry.getKey(), entry.getValue());
+      }
 
-      return newOwnersMap;
+      return segmentMappingMap.values();
    }
 
    /**
@@ -136,6 +141,10 @@ public class ObjectPlacementManager {
     */
    public final Collection<Object> getKeysToMove() {
       return Arrays.asList(allKeysMoved);
+   }
+   
+   public final int getNumberOfOwners() {
+      return consistentHash.getNumOwners();
    }
 
    /**
@@ -219,7 +228,7 @@ public class ObjectPlacementManager {
     * @return     the new owners information.
     */
    private OwnersInfo createOwnersInfo(Object key) {
-      Collection<Address> replicas = distributionManager.locate(key);
+      Collection<Address> replicas = consistentHash.locateOwners(key);
       Map<Integer, Long> localAccesses = getLocalAccesses(key);
 
       OwnersInfo ownersInfo = new OwnersInfo(replicas.size());
@@ -260,7 +269,7 @@ public class ObjectPlacementManager {
          return 0;
       }
 
-      int startIndex = hash.hash(key) % size;
+      int startIndex = consistentHash.getHashFunction().hash(key) % size;
 
       for (int index = startIndex + 1; index != startIndex; index = (index + 1) % size) {
          if (!alreadyOwner.contains(clusterSnapshot.get(index))) {
@@ -278,10 +287,9 @@ public class ObjectPlacementManager {
     * @return  the actual consistent hashing
     */
    private ConsistentHash getDefaultConsistentHash() {
-      ConsistentHash hash = this.distributionManager.getConsistentHash();
-      return hash instanceof DataPlacementConsistentHash ?
-            ((DataPlacementConsistentHash) hash).getDefaultHash() :
-            hash;
+      return consistentHash instanceof DataPlacementConsistentHash ?
+            ((DataPlacementConsistentHash) consistentHash).getConsistentHash() :
+            consistentHash;
    }
 
    private boolean hasReceivedAllRequests() {

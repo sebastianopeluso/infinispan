@@ -1,8 +1,8 @@
 package org.infinispan.dataplacement;
 
-import org.infinispan.distribution.DistributionManager;
+import org.infinispan.dataplacement.ch.DataPlacementConsistentHash;
 import org.infinispan.distribution.ch.ConsistentHash;
-import org.infinispan.distribution.ch.DataPlacementConsistentHash;
+import org.infinispan.distribution.group.GroupManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.stats.topK.StreamLibContainer;
 import org.infinispan.util.logging.Log;
@@ -25,32 +25,26 @@ import static org.infinispan.stats.topK.StreamLibContainer.Stat.*;
  */
 public class AccessesManager {
    private static final Log log = LogFactory.getLog(AccessesManager.class);
-
-   private final DistributionManager distributionManager;
-
-   private ClusterSnapshot clusterSnapshot;
-
-   private Accesses[] accessesByPrimaryOwner;
-
    private final StreamLibContainer streamLibContainer;
-
+   private ConsistentHash consistentHash;
+   private ClusterSnapshot clusterSnapshot;
+   private Accesses[] accessesByPrimaryOwner;
    private boolean hasAccessesCalculated;
-
    private int maxNumberOfKeysToRequest;
+   private GroupManager groupManager;
 
-   public AccessesManager(DistributionManager distributionManager, int maxNumberOfKeysToRequest) {
-      this.distributionManager = distributionManager;
-      this.maxNumberOfKeysToRequest = maxNumberOfKeysToRequest;
+   public AccessesManager() {
       streamLibContainer = StreamLibContainer.getInstance();
    }
 
    /**
     * reset the state (before each round)
     *
-    * @param clusterSnapshot  the current cluster snapshot
+    * @param clusterSnapshot the current cluster snapshot
     */
-   public final synchronized void resetState(ClusterSnapshot clusterSnapshot) {
+   public final synchronized void resetState(ClusterSnapshot clusterSnapshot, ConsistentHash consistentHash) {
       this.clusterSnapshot = clusterSnapshot;
+      this.consistentHash = consistentHash;
       accessesByPrimaryOwner = new Accesses[clusterSnapshot.size()];
       for (int i = 0; i < accessesByPrimaryOwner.length; ++i) {
          accessesByPrimaryOwner[i] = new Accesses();
@@ -58,11 +52,15 @@ public class AccessesManager {
       hasAccessesCalculated = false;
    }
 
+   public final void setGroupManager(GroupManager groupManager) {
+      this.groupManager = groupManager;
+   }
+
    /**
     * returns the request object list for the {@code member}
     *
-    * @param member  the destination member
-    * @return        the request object list. It can be empty if no requests are necessary
+    * @param member the destination member
+    * @return the request object list. It can be empty if no requests are necessary
     */
    public synchronized final ObjectRequest getObjectRequestForAddress(Address member) {
       int addressIndex = clusterSnapshot.indexOf(member);
@@ -83,9 +81,18 @@ public class AccessesManager {
    }
 
    /**
+    * returns the max number of keys to request
+    *
+    * @return returns the max number of keys to request
+    */
+   public int getMaxNumberOfKeysToRequest() {
+      return maxNumberOfKeysToRequest;
+   }
+
+   /**
     * sets the max number of keys to request to a new value, only if is higher than zero
     *
-    * @param maxNumberOfKeysToRequest  the new value
+    * @param maxNumberOfKeysToRequest the new value
     */
    public synchronized final void setMaxNumberOfKeysToRequest(int maxNumberOfKeysToRequest) {
       if (maxNumberOfKeysToRequest > 0) {
@@ -94,18 +101,9 @@ public class AccessesManager {
    }
 
    /**
-    * returns the max number of keys to request
-    *
-    * @return  returns the max number of keys to request
-    */
-   public int getMaxNumberOfKeysToRequest() {
-      return maxNumberOfKeysToRequest;
-   }
-
-   /**
     * calculates the object request list to request to each member
     */
-   public synchronized final void calculateAccesses(){
+   public synchronized final void calculateAccesses() {
       if (hasAccessesCalculated) {
          return;
       }
@@ -117,8 +115,8 @@ public class AccessesManager {
 
       RemoteTopKeyRequest request = new RemoteTopKeyRequest(streamLibContainer.getCapacity() * 2);
 
-      request.merge(streamLibContainer.getTopKFrom(REMOTE_PUT, maxNumberOfKeysToRequest), 2);
-      request.merge(streamLibContainer.getTopKFrom(REMOTE_GET, maxNumberOfKeysToRequest), 1);
+      request.merge(streamLibContainer.getTopKFrom(REMOTE_PUT, maxNumberOfKeysToRequest), 2, groupManager);
+      request.merge(streamLibContainer.getTopKFrom(REMOTE_GET, maxNumberOfKeysToRequest), 1, groupManager);
 
       sortObjectsByPrimaryOwner(request.toRequestMap(maxNumberOfKeysToRequest), true);
 
@@ -158,12 +156,11 @@ public class AccessesManager {
    /**
     * sort the keys and number of access by primary owner
     *
-    *
-    * @param accesses   the remote accesses
-    * @param remote     true if the accesses to process are from remote access, false otherwise
+    * @param accesses the remote accesses
+    * @param remote   true if the accesses to process are from remote access, false otherwise
     */
    @SuppressWarnings("unchecked")
-   private void sortObjectsByPrimaryOwner(Map<Object, Long> accesses, boolean remote) {      
+   private void sortObjectsByPrimaryOwner(Map<Object, Long> accesses, boolean remote) {
       for (Entry<Object, Long> entry : accesses.entrySet()) {
          Object key = entry.getKey();
          Address primaryOwner = getDefaultConsistentHash().locatePrimaryOwner(key);
@@ -181,41 +178,12 @@ public class AccessesManager {
    /**
     * returns the actual consistent hashing
     *
-    * @return  the actual consistent hashing
+    * @return the actual consistent hashing
     */
    public final ConsistentHash getDefaultConsistentHash() {
-      ConsistentHash hash = this.distributionManager.getConsistentHash();
-      return hash instanceof DataPlacementConsistentHash ?
-            ((DataPlacementConsistentHash) hash).getDefaultHash() :
-            hash;
-   }
-
-   private class Accesses {
-      private final Map<Object, Long> localAccesses;
-      private final Map<Object, Long> remoteAccesses;
-
-      private Accesses() {
-         localAccesses = new HashMap<Object, Long>();
-         remoteAccesses = new HashMap<Object, Long>();
-      }
-
-      private void add(Object key, long accesses, boolean remote) {
-         Map<Object, Long> toPut = remote ? remoteAccesses : localAccesses;
-         toPut.put(key, accesses);
-      }
-
-      private ObjectRequest toObjectRequest() {
-         return new ObjectRequest(remoteAccesses.size() == 0 ? null : remoteAccesses,
-                                  localAccesses.size() == 0 ? null : localAccesses);
-      }
-
-      @Override
-      public String toString() {
-         return "Accesses{" +
-               "localAccesses=" + localAccesses.size() +
-               ", remoteAccesses=" + remoteAccesses.size() +
-               '}';
-      }
+      return consistentHash instanceof DataPlacementConsistentHash ?
+            ((DataPlacementConsistentHash) consistentHash).getConsistentHash() :
+            consistentHash;
    }
 
    public static class RemoteTopKeyRequest {
@@ -296,9 +264,11 @@ public class AccessesManager {
          return sortedKeyAccess;
       }
 
-      public final void merge(Map<Object, Long> toMerge, double multiplierFactor) {
+      public final void merge(Map<Object, Long> toMerge, double multiplierFactor, GroupManager groupManager) {
          for (Entry<Object, Long> entry : toMerge.entrySet()) {
-            add(entry.getKey(), (long) (entry.getValue() * multiplierFactor));
+            String group = groupManager != null ? groupManager.getGroup(entry.getKey()) : null;
+            Object realKey = group != null ? group : entry.getKey();
+            add(realKey, (long) (entry.getValue() * multiplierFactor));
          }
       }
 
@@ -409,6 +379,34 @@ public class AccessesManager {
          return "KeyAccess{" +
                "key=" + key +
                ", accesses=" + accesses +
+               '}';
+      }
+   }
+
+   private class Accesses {
+      private final Map<Object, Long> localAccesses;
+      private final Map<Object, Long> remoteAccesses;
+
+      private Accesses() {
+         localAccesses = new HashMap<Object, Long>();
+         remoteAccesses = new HashMap<Object, Long>();
+      }
+
+      private void add(Object key, long accesses, boolean remote) {
+         Map<Object, Long> toPut = remote ? remoteAccesses : localAccesses;
+         toPut.put(key, accesses);
+      }
+
+      private ObjectRequest toObjectRequest() {
+         return new ObjectRequest(remoteAccesses.size() == 0 ? null : remoteAccesses,
+                                  localAccesses.size() == 0 ? null : localAccesses);
+      }
+
+      @Override
+      public String toString() {
+         return "Accesses{" +
+               "localAccesses=" + localAccesses.size() +
+               ", remoteAccesses=" + remoteAccesses.size() +
                '}';
       }
    }

@@ -8,6 +8,8 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.Map;
+
 /**
  * The command used to send information among nodes
  *
@@ -59,7 +61,7 @@ public class DataPlacementCommand extends BaseRpcCommand {
    private long roundId;
    private int coolDownTime;
    private ObjectRequest objectRequest;
-   private ObjectLookup objectLookup;
+   private Map<Integer, ObjectLookup> objectLookup;
    private Address[] members;
 
 
@@ -81,7 +83,7 @@ public class DataPlacementCommand extends BaseRpcCommand {
       this.objectRequest = objectRequest;
    }
 
-   public void setObjectLookup(ObjectLookup objectLookup) {
+   public void setObjectLookup(Map<Integer, ObjectLookup> objectLookup) {
       this.objectLookup = objectLookup;
    }
 
@@ -176,7 +178,7 @@ public class DataPlacementCommand extends BaseRpcCommand {
             break;
          case OBJECT_LOOKUP_PHASE:
             roundId = (Long) parameters[1];
-            objectLookup = (ObjectLookup) parameters[2];
+            objectLookup = (Map<Integer, ObjectLookup>) parameters[2];
             break;
          case SET_COOL_DOWN_TIME:
             coolDownTime = (Integer) parameters[1];

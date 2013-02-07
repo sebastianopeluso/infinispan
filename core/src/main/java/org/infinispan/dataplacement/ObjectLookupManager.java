@@ -2,11 +2,11 @@ package org.infinispan.dataplacement;
 
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.remoting.transport.Address;
-import org.infinispan.statetransfer.DistributedStateTransferManagerImpl;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.BitSet;
+import java.util.Map;
 
 /**
  * Collects all the Object Lookup from all the members. In the coordinator side, it collects all the acks before
@@ -21,15 +21,13 @@ public class ObjectLookupManager {
 
    private ClusterSnapshot clusterSnapshot;
 
-   //the state transfer manager
-   private final DistributedStateTransferManagerImpl stateTransfer;
-
    private final BitSet objectLookupReceived;
 
    private final BitSet acksReceived;
+   
+   private ObjectLookup[] receivedObjectLookup;
 
-   public ObjectLookupManager(DistributedStateTransferManagerImpl stateTransfer) {
-      this.stateTransfer = stateTransfer;
+   public ObjectLookupManager() {
       objectLookupReceived = new BitSet();
       acksReceived = new BitSet();
    }
@@ -39,11 +37,11 @@ public class ObjectLookupManager {
     *
     * @param roundClusterSnapshot the current cluster members                    
     */
-   public final synchronized void resetState(ClusterSnapshot roundClusterSnapshot) {
+   public final synchronized void resetState(ClusterSnapshot roundClusterSnapshot, int numberOfSegments) {
       clusterSnapshot = roundClusterSnapshot;
       objectLookupReceived.clear();
       acksReceived.clear();
-      stateTransfer.createDataPlacementConsistentHashing(clusterSnapshot);
+      receivedObjectLookup = new ObjectLookup[numberOfSegments];
    }
 
    /**
@@ -53,10 +51,10 @@ public class ObjectLookupManager {
     *       invocations return false
     *
     * @param from          the creator member
-    * @param objectLookup  the Object Lookup instance
+    * @param segmentObjectLookups  the Object Lookup instance
     * @return              true if it has all the object lookup, false otherwise (see Note)
     */
-   public final synchronized boolean addObjectLookup(Address from, ObjectLookup objectLookup) {
+   public final synchronized boolean addObjectLookup(Address from, Map<Integer, ObjectLookup> segmentObjectLookups) {
       if (hasAllObjectLookup()) {
          return false;
       }
@@ -68,10 +66,15 @@ public class ObjectLookupManager {
          return false;
       }
 
-      stateTransfer.addObjectLookup(from, objectLookup);
+      for (Map.Entry<Integer, ObjectLookup> entry : segmentObjectLookups.entrySet()) {
+         if (entry.getKey() < 0 || entry.getKey() >= receivedObjectLookup.length) {
+            throw new IllegalStateException("This should not happen");
+         }
+         receivedObjectLookup[entry.getKey()] = entry.getValue();
+      }      
       objectLookupReceived.set(senderId);
 
-      logObjectLookupReceived(from, objectLookup);
+      logObjectLookupReceived(from);
 
       return hasAllObjectLookup();
    }
@@ -121,18 +124,8 @@ public class ObjectLookupManager {
       return clusterSnapshot.size() == acksReceived.cardinality();
    }
 
-   private void logObjectLookupReceived(Address from, ObjectLookup objectLookup) {
-      if (log.isTraceEnabled()) {
-         StringBuilder missingMembers = new StringBuilder();
-
-         for (int i = 0; i < clusterSnapshot.size(); ++i) {
-            if (!objectLookupReceived.get(i)) {
-               missingMembers.append(clusterSnapshot.get(i)).append(" ");
-            }
-         }
-         log.debugf("Objects lookup received from %s. Missing objects lookup are %s. Objects lookup received is %s",
-                    from, missingMembers, objectLookup);
-      } else if (log.isDebugEnabled()) {
+   private void logObjectLookupReceived(Address from) {
+      if (log.isDebugEnabled()) {
          log.debugf("Objects lookup received from %s. Missing objects lookup are %s",
                     from, (clusterSnapshot.size() - objectLookupReceived.cardinality()));
       }

@@ -3,16 +3,16 @@ package org.infinispan.dataplacement;
 import org.infinispan.Cache;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.DataPlacementCommand;
-import org.infinispan.commons.hash.Hash;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
 import org.infinispan.dataplacement.stats.AccessesMessageSizeTask;
 import org.infinispan.dataplacement.stats.CheckKeysMovedTask;
-import org.infinispan.dataplacement.stats.ObjectLookupTask;
 import org.infinispan.dataplacement.stats.SaveStatsTask;
 import org.infinispan.dataplacement.stats.Stats;
 import org.infinispan.distribution.DistributionManager;
+import org.infinispan.distribution.ch.ConsistentHash;
+import org.infinispan.distribution.group.GroupManager;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.jmx.annotations.ManagedAttribute;
@@ -23,7 +23,6 @@ import org.infinispan.notifications.cachelistener.annotation.DataRehashed;
 import org.infinispan.notifications.cachelistener.event.DataRehashedEvent;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
-import org.infinispan.statetransfer.DistributedStateTransferManagerImpl;
 import org.infinispan.statetransfer.StateTransferManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -32,6 +31,7 @@ import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,16 +56,14 @@ public class DataPlacementManager {
    private static final boolean SAVE = false;
 
    private RpcManager rpcManager;
-   private CommandsFactory commandsFactory;   
-   private Hash hashFunction;
+   private CommandsFactory commandsFactory;
    private String cacheName;
-   private int defaultNumberOfOwners;
 
    private Boolean expectPre = true;
 
-   private AccessesManager accessesManager;
-   private ObjectPlacementManager objectPlacementManager;
-   private ObjectLookupManager objectLookupManager;
+   private final AccessesManager accessesManager;
+   private final ObjectPlacementManager objectPlacementManager;
+   private final ObjectLookupManager objectLookupManager;
 
    private ObjectLookupFactory objectLookupFactory;
 
@@ -74,18 +72,23 @@ public class DataPlacementManager {
 
    private Stats stats;
 
+   private DistributionManager distributionManager;
+
    public DataPlacementManager() {
       roundManager = new RoundManager(INITIAL_COOL_DOWN_TIME);
+      accessesManager = new AccessesManager();
+      objectPlacementManager = new ObjectPlacementManager();
+      objectLookupManager = new ObjectLookupManager();
    }
 
    @Inject
    public void inject(CommandsFactory commandsFactory, DistributionManager distributionManager, RpcManager rpcManager,
-                      Cache cache, StateTransferManager stateTransfer,
-                      CacheNotifier cacheNotifier, Configuration configuration) {
+                      Cache cache, StateTransferManager stateTransfer, CacheNotifier cacheNotifier, 
+                      Configuration configuration, GroupManager groupManager) {
       this.rpcManager = rpcManager;
-      this.commandsFactory = commandsFactory;      
+      this.commandsFactory = commandsFactory;
       this.cacheName = cache.getName();
-      this.hashFunction = configuration.clustering().hash().hash();
+      this.distributionManager = distributionManager;      
 
       if (!configuration.dataPlacement().enabled()) {
          log.info("Data placement not enabled in Configuration");
@@ -100,14 +103,11 @@ public class DataPlacementManager {
       //this is needed because the custom statistics invokes this method twice. the seconds time, it replaces
       //the original object placement and remote accesses manager (== problems!!)
       synchronized (this) {
-         if (stateTransfer instanceof DistributedStateTransferManagerImpl && !roundManager.isEnabled()) {
-            defaultNumberOfOwners = configuration.clustering().hash().numOwners();
-            accessesManager = new AccessesManager(distributionManager,
-                                                  configuration.dataPlacement().maxNumberOfKeysToRequest());
-            objectPlacementManager = new ObjectPlacementManager(distributionManager,
-                                                                configuration.clustering().hash().hash(),
-                                                                defaultNumberOfOwners);
-            objectLookupManager = new ObjectLookupManager((DistributedStateTransferManagerImpl) stateTransfer);
+         if (roundManager.isEnabled()) {
+            log.info("Data Placement is already enabled!");
+         } else if (configuration.clustering().cacheMode().isDistributed()) {
+            accessesManager.setMaxNumberOfKeysToRequest(configuration.dataPlacement().maxNumberOfKeysToRequest());
+            accessesManager.setGroupManager(groupManager);
             roundManager.enable();
             cacheNotifier.addListener(this);
             log.info("Data placement enabled");
@@ -130,7 +130,7 @@ public class DataPlacementManager {
       }
       stats = new Stats(newRoundId, objectLookupFactory.getNumberOfQueryProfilingPhases());
 
-      ClusterSnapshot roundClusterSnapshot = new ClusterSnapshot(members, hashFunction);
+      ClusterSnapshot roundClusterSnapshot = new ClusterSnapshot(members, distributionManager.getConsistentHash().getHashFunction());
 
       if (!roundClusterSnapshot.contains(rpcManager.getAddress())) {
          log.warnf("Data placement start received but I [%s] am not in the member list %s", rpcManager.getAddress(),
@@ -138,9 +138,10 @@ public class DataPlacementManager {
          return;
       }
 
-      objectPlacementManager.resetState(roundClusterSnapshot);
-      objectLookupManager.resetState(roundClusterSnapshot);
-      accessesManager.resetState(roundClusterSnapshot);
+      ConsistentHash consistentHash = distributionManager.getConsistentHash();
+      accessesManager.resetState(roundClusterSnapshot, consistentHash);
+      objectPlacementManager.resetState(roundClusterSnapshot, consistentHash);
+      objectLookupManager.resetState(roundClusterSnapshot,consistentHash.getNumSegments());
       if (!roundManager.startNewRound(newRoundId, roundClusterSnapshot, rpcManager.getAddress())) {
          log.info("Data placement not started!");
          return;
@@ -177,36 +178,45 @@ public class DataPlacementManager {
 
       if(objectPlacementManager.aggregateRequest(sender, objectRequest)){
          stats.receivedAccesses();
-         Map<Object, OwnersInfo> objectsToMove = objectPlacementManager.calculateObjectsToMove();
+         Collection<SegmentMapping> objectsToMove = objectPlacementManager.calculateObjectsToMove();
 
          if (log.isTraceEnabled()) {
             log.tracef("All keys request list received. Object to move are " + objectsToMove);
          }
 
-         saveObjectsToMoveToFile(objectsToMove);
+         //saveObjectsToMoveToFile(objectsToMove);
+         Map<Integer, ObjectLookup> segmentObjectLookup = new HashMap<Integer, ObjectLookup>(objectsToMove.size());
+         int numberOfOwners = objectPlacementManager.getNumberOfOwners();
 
          long start = System.nanoTime();
-         ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(objectsToMove, defaultNumberOfOwners);
 
-         if (objectLookup == null) {
-            log.errorf("Object lookup created is null");
+         for (SegmentMapping segmentMapping : objectsToMove) {
+            ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(segmentMapping, numberOfOwners);
+            if (objectLookup == null) {
+               log.errorf("Object lookup created is null for segment " + segmentMapping.getSegmentId());
+            }
+            segmentObjectLookup.put(segmentMapping.getSegmentId(), objectLookup);
          }
 
          stats.setObjectLookupCreationDuration(System.nanoTime() - start);
 
-         statsAsync.submit(new ObjectLookupTask(objectsToMove, objectLookup, stats));
+         //statsAsync.submit(new ObjectLookupTask(objectsToMove, objectLookup, stats));
 
          if (log.isDebugEnabled()) {
-            log.debugf("Created %s bloom filters and machine learner rules for each key", defaultNumberOfOwners);
+            log.debugf("Created %s bloom filters and machine learner rules for each key", objectPlacementManager.getNumberOfOwners());
          }
 
          stats.calculatedNewOwners();
-         DataPlacementCommand command = commandsFactory.buildDataPlacementCommand(DataPlacementCommand.Type.OBJECT_LOOKUP_PHASE,
-                                                                                  roundManager.getCurrentRoundId());
-         command.setObjectLookup(objectLookup);
 
-         rpcManager.broadcastRpcCommand(command, false, false);
-         addObjectLookup(rpcManager.getAddress(), objectLookup, roundId);
+         if (rpcManager.getTransport().isCoordinator()) {
+            addObjectLookup(rpcManager.getAddress(), segmentObjectLookup, roundId);
+         } else {
+            DataPlacementCommand command = commandsFactory.buildDataPlacementCommand(DataPlacementCommand.Type.OBJECT_LOOKUP_PHASE,
+                                                                                     roundManager.getCurrentRoundId());
+            command.setObjectLookup(segmentObjectLookup);
+
+            rpcManager.invokeRemotely(Collections.singleton(rpcManager.getTransport().getCoordinator()), command, false, false);
+         }
       }
    }
 
@@ -215,10 +225,10 @@ public class DataPlacementManager {
     * coordinator
     *
     * @param sender                 the sender
-    * @param objectLookup           the object lookup
+    * @param objectLookups           the object lookup
     * @param roundId                the round id
     */
-   public final void addObjectLookup(Address sender, ObjectLookup objectLookup, long roundId) {
+   public final void addObjectLookup(Address sender, Map<Integer, ObjectLookup> objectLookups, long roundId) {
       if (log.isDebugEnabled()) {
          log.debugf("Remote Object Lookup received from %s in round %s", sender, roundId);
       }
@@ -228,9 +238,9 @@ public class DataPlacementManager {
          return;
       }
 
-      objectLookupFactory.init(objectLookup);
-      if (objectLookupManager.addObjectLookup(sender, objectLookup)) {
-         stats.receivedObjectLookup();
+      objectLookupFactory.init(objectLookups.values());
+      if (objectLookupManager.addObjectLookup(sender, objectLookups)) {
+         /*stats.receivedObjectLookup();
          if (log.isTraceEnabled()) {
             log.tracef("All remote Object Lookup received. Send Ack to coordinator");
          }
@@ -240,7 +250,8 @@ public class DataPlacementManager {
             addAck(roundId, rpcManager.getAddress());
          } else {
             rpcManager.invokeRemotely(Collections.singleton(rpcManager.getTransport().getCoordinator()), command, false, false);
-         }
+         }*/
+         // TODO trigger state transfer!!
       }
    }
 

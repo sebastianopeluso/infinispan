@@ -1,11 +1,11 @@
 package org.infinispan.dataplacement.hm;
 
 import org.infinispan.configuration.cache.Configuration;
-import org.infinispan.dataplacement.OwnersInfo;
+import org.infinispan.dataplacement.SegmentMapping;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
 
-import java.util.Map;
+import java.util.Collection;
 
 /**
  * Object Lookup Factory when Hash Map based technique is used
@@ -21,12 +21,12 @@ public class HashMapObjectLookupFactory implements ObjectLookupFactory {
    }
 
    @Override
-   public ObjectLookup createObjectLookup(Map<Object, OwnersInfo> keysToMove, int numberOfOwners) {
-      return new HashMapObjectLookup(keysToMove);
+   public ObjectLookup createObjectLookup(SegmentMapping keysToMove, int numberOfOwners) {
+      return new HashMapObjectLookup(keysToMove.iterator());
    }
 
    @Override
-   public void init(ObjectLookup objectLookup) {
+   public void init(Collection<ObjectLookup> objectLookup) {
       //nothing to init
    }
 

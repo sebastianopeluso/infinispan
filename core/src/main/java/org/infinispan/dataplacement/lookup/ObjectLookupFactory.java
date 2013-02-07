@@ -2,7 +2,9 @@ package org.infinispan.dataplacement.lookup;
 
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.dataplacement.OwnersInfo;
+import org.infinispan.dataplacement.SegmentMapping;
 
+import java.util.Collection;
 import java.util.Map;
 
 /**
@@ -23,18 +25,20 @@ public interface ObjectLookupFactory {
    /**
     * creates the {@link ObjectLookup} corresponding to the keys to be moved       
     *
+    *
+    *
     * @param keysToMove       the keys to move and the new owners
     * @param numberOfOwners   the number of owners (a.k.a. replication degree)
     * @return                 the object lookup or null if it is not possible to create it    
     */
-   ObjectLookup createObjectLookup(Map<Object, OwnersInfo> keysToMove, int numberOfOwners);
+   ObjectLookup createObjectLookup(SegmentMapping keysToMove, int numberOfOwners);
 
    /**
     * init the object lookup
     *
     * @param objectLookup  the object lookup
     */
-   void init(ObjectLookup objectLookup);
+   void init(Collection<ObjectLookup> objectLookup);
 
    /**
     * returns the number of phases when the query profiling

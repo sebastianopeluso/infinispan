@@ -1,10 +1,12 @@
 package org.infinispan.dataplacement.hm;
 
-import org.infinispan.dataplacement.OwnersInfo;
+import org.infinispan.dataplacement.SegmentMapping;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.dataplacement.stats.IncrementableLong;
 
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -18,11 +20,16 @@ public class HashMapObjectLookup implements ObjectLookup {
 
    private final Map<Object, List<Integer>> lookup;
 
-   public HashMapObjectLookup(Map<Object, OwnersInfo> keysToMove) {
+   public HashMapObjectLookup(Iterator<SegmentMapping.KeyOwners> iterator) {
       lookup = new HashMap<Object, List<Integer>>();
 
-      for (Map.Entry<Object, OwnersInfo> entry : keysToMove.entrySet()) {
-         lookup.put(entry.getKey(), entry.getValue().getNewOwnersIndexes());
+      while (iterator.hasNext()) {
+         SegmentMapping.KeyOwners owners = iterator.next();
+         List<Integer> list = new LinkedList<Integer>();
+         for (int index : owners.getOwnerIndexes()) {
+            list.add(index);
+         }
+         lookup.put(owners.getKey(), list);
       }
    }
 

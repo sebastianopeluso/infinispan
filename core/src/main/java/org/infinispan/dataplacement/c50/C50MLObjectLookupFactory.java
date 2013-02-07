@@ -1,7 +1,7 @@
 package org.infinispan.dataplacement.c50;
 
 import org.infinispan.configuration.cache.Configuration;
-import org.infinispan.dataplacement.OwnersInfo;
+import org.infinispan.dataplacement.SegmentMapping;
 import org.infinispan.dataplacement.c50.keyfeature.Feature;
 import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 import org.infinispan.dataplacement.c50.keyfeature.KeyFeatureManager;
@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -97,22 +99,28 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    }
 
    @Override
-   public void init(ObjectLookup objectLookup) {
-      if (objectLookup instanceof C50MLObjectLookup) {
-         ((C50MLObjectLookup) objectLookup).setKeyFeatureManager(keyFeatureManager);
+   public void init(Collection<ObjectLookup> objectLookupCollection) {
+      for (ObjectLookup objectLookup : objectLookupCollection) {
+         if (objectLookup instanceof C50MLObjectLookup) {
+            ((C50MLObjectLookup) objectLookup).setKeyFeatureManager(keyFeatureManager);
+         }
       }
    }
 
    @Override
-   public ObjectLookup createObjectLookup(Map<Object, OwnersInfo> toMoveObj, int numberOfOwners) {
-      BloomFilter bloomFilter = createBloomFilter(toMoveObj.keySet());
+   public ObjectLookup createObjectLookup(SegmentMapping segmentMapping, int numberOfOwners) {
+      List<Object> keys = new LinkedList<Object>();
+      for (Iterator<SegmentMapping.KeyOwners> iterator = segmentMapping.iterator(); iterator.hasNext(); ) {
+         keys.add(iterator.next().getKey());         
+      }
+      BloomFilter bloomFilter = createBloomFilter(keys);
       C50MLObjectLookup objectLookup = new C50MLObjectLookup(numberOfOwners, bloomFilter);
       objectLookup.setKeyFeatureManager(keyFeatureManager);
       deleteAll();
 
       for (int iteration = 0; iteration < numberOfOwners; ++iteration) {
          Set<Integer> ownersIndexes = new TreeSet<Integer>();
-         boolean success = writeObjectsToInputData(toMoveObj, ownersIndexes, iteration);
+         boolean success = writeObjectsToInputData(segmentMapping.iterator(), ownersIndexes, iteration);
 
          if (!success) {
             log.errorf("Cannot create Object Lookup. Error writing input.data");
@@ -277,33 +285,37 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    /**
     * writes the input.data with the objects to move and their new owner
     *
-    * @param toMoveObj     the objects to move and new location
+    *
+    * @param iterator     the objects to move and new location
     * @param ownersIndexes the new owners indexes. to write in the .names file
     * @param iteration     the iteration number
     * @return              true if the file was correctly wrote, false otherwise
     */
-   private boolean writeObjectsToInputData(Map<Object, OwnersInfo> toMoveObj, Set<Integer> ownersIndexes, int iteration) {
+   private boolean writeObjectsToInputData(Iterator<SegmentMapping.KeyOwners> iterator, Set<Integer> ownersIndexes, int iteration) {
       BufferedWriter writer = getBufferedWriter(String.format(INPUT_ML_DATA_FORMAT, machineLearnerPath, iteration));
 
       if (writer == null) {
          log.errorf("Cannot create writer when tried to write the input.data");
          return false;
       }
-
-      for (Map.Entry<Object, OwnersInfo> entry : toMoveObj.entrySet()) {
-         try {
-            //TODO: hack
-            int owner = entry.getValue().getOwner(0) + iteration;
-            owner %= 40;
-            writeInputData(entry.getKey(), owner, writer);
+      
+      try {
+      while (iterator.hasNext()) {
+         SegmentMapping.KeyOwners keyOwners = iterator.next();
+         int owner = keyOwners.getOwnerIndexes().length < iteration ? 
+               keyOwners.getOwnerIndexes()[iteration] : -1;
+         if (owner >= 0) {
+            writeInputData(keyOwners.getKey(), owner, writer);
             ownersIndexes.add(owner);
-         } catch (IOException e) {
-            log.errorf("Error writing input.data. %s", e.getMessage());
-            return false;
          }
       }
-
-      close(writer);
+      } catch (IOException e) {
+         log.errorf("Error writing input.data. %s", e.getMessage());
+         return false;
+      } finally {
+         close(writer);
+      }
+      
       return true;
    }
 
