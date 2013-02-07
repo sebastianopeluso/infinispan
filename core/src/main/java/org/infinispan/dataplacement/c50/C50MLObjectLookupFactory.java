@@ -6,7 +6,6 @@ import org.infinispan.dataplacement.c50.keyfeature.Feature;
 import org.infinispan.dataplacement.c50.keyfeature.FeatureValue;
 import org.infinispan.dataplacement.c50.keyfeature.KeyFeatureManager;
 import org.infinispan.dataplacement.c50.lookup.BloomFilter;
-import org.infinispan.dataplacement.c50.lookup.BloomFilter2;
 import org.infinispan.dataplacement.c50.tree.DecisionTree;
 import org.infinispan.dataplacement.c50.tree.DecisionTreeBuilder;
 import org.infinispan.dataplacement.c50.tree.DecisionTreeParser;
@@ -38,25 +37,19 @@ import java.util.TreeSet;
  * @author Pedro Ruivo
  * @since 5.2
  */
-@SuppressWarnings("UnusedDeclaration") //this is loaded in runtime
 public class C50MLObjectLookupFactory implements ObjectLookupFactory {
 
    public static final String LOCATION = "location";
    public static final String KEY_FEATURE_MANAGER = "keyFeatureManager";
    public static final String BF_FALSE_POSITIVE = "bfFalsePositiveProb";
-
    private static final String INPUT_FORMAT = "%1$sinput-%2$s";
    private static final String INPUT_ML_DATA_FORMAT = INPUT_FORMAT + ".data";
    private static final String INPUT_ML_NAMES_FORMAT = INPUT_FORMAT + ".names";
    private static final String INPUT_ML_TREE_FORMAT = INPUT_FORMAT + ".tree";
    private static final String EXEC_FORMAT = "%1$sc5.0 -f " + INPUT_FORMAT;
-
    private static final Log log = LogFactory.getLog(C50MLObjectLookupFactory.class);
-
-   private KeyFeatureManager keyFeatureManager;
    private final Map<String, Feature> featureMap;
-   private DecisionTreeBuilder decisionTreeBuilder;
-
+   private KeyFeatureManager keyFeatureManager;
    private String machineLearnerPath = System.getProperty("user.dir");
    private double bloomFilterFalsePositiveProbability = 0.001;
 
@@ -111,7 +104,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    public ObjectLookup createObjectLookup(SegmentMapping segmentMapping, int numberOfOwners) {
       List<Object> keys = new LinkedList<Object>();
       for (Iterator<SegmentMapping.KeyOwners> iterator = segmentMapping.iterator(); iterator.hasNext(); ) {
-         keys.add(iterator.next().getKey());         
+         keys.add(iterator.next().getKey());
       }
       BloomFilter bloomFilter = createBloomFilter(keys);
       C50MLObjectLookup objectLookup = new C50MLObjectLookup(numberOfOwners, bloomFilter);
@@ -168,26 +161,18 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
     * returns the bloom filter with the objects to move encoding on it
     *
     * @param objectsToMove the objects to move
-    * @return              the bloom filter
+    * @return the bloom filter
     */
    private BloomFilter createBloomFilter(Collection<Object> objectsToMove) {
-      BloomFilter bloomFilter = new BloomFilter(bloomFilterFalsePositiveProbability, objectsToMove.size());
-      for (Object key : objectsToMove) {
-         bloomFilter.add(key);
-      }
-      return bloomFilter;
-   }
-
-   private BloomFilter2 createBloomFilter2(Collection<Object> objectsToMove) {
-      return new BloomFilter2(objectsToMove, bloomFilterFalsePositiveProbability);
+      return new BloomFilter(objectsToMove, bloomFilterFalsePositiveProbability);
    }
 
    /**
     * it starts the machine learner and blocks until the process ends
     *
-    * @throws java.io.IOException   if an error occurs when launch the process
-    * @param iteration              the iteration number
-    * @throws InterruptedException  if interrupted while waiting
+    * @param iteration the iteration number
+    * @throws java.io.IOException  if an error occurs when launch the process
+    * @throws InterruptedException if interrupted while waiting
     */
    private void runMachineLearner(int iteration) throws IOException, InterruptedException {
       Process process = Runtime.getRuntime()
@@ -203,13 +188,12 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    /**
     * writes the input.name files needed to run the machine leaner
     *
-    *
-    * @param possibleReturnValues   the possible values of the decision
-    * @param iteration              the iteration number
-    * @return                       true if the file was correctly written, false otherwise
+    * @param possibleReturnValues the possible values of the decision
+    * @param iteration            the iteration number
+    * @return true if the file was correctly written, false otherwise
     */
    private boolean writeInputNames(Collection<Integer> possibleReturnValues, int iteration) {
-      BufferedWriter writer = getBufferedWriter(String.format(INPUT_ML_NAMES_FORMAT,machineLearnerPath,iteration));
+      BufferedWriter writer = getBufferedWriter(String.format(INPUT_ML_NAMES_FORMAT, machineLearnerPath, iteration));
 
       if (writer == null) {
          log.errorf("Cannot create writer when tried to write the input.names");
@@ -257,10 +241,9 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    /**
     * writes a single feature in the input.names
     *
-    *
-    * @param writer        the writer for the file
-    * @param feature       the feature instance (with type, etc...)
-    * @throws IOException  if it cannot write in the file
+    * @param writer  the writer for the file
+    * @param feature the feature instance (with type, etc...)
+    * @throws IOException if it cannot write in the file
     */
    private void writeInputNames(BufferedWriter writer, Feature feature) throws IOException {
       writer.write(feature.getName());
@@ -285,11 +268,10 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    /**
     * writes the input.data with the objects to move and their new owner
     *
-    *
-    * @param iterator     the objects to move and new location
+    * @param iterator      the objects to move and new location
     * @param ownersIndexes the new owners indexes. to write in the .names file
     * @param iteration     the iteration number
-    * @return              true if the file was correctly wrote, false otherwise
+    * @return true if the file was correctly wrote, false otherwise
     */
    private boolean writeObjectsToInputData(Iterator<SegmentMapping.KeyOwners> iterator, Set<Integer> ownersIndexes, int iteration) {
       BufferedWriter writer = getBufferedWriter(String.format(INPUT_ML_DATA_FORMAT, machineLearnerPath, iteration));
@@ -298,34 +280,34 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
          log.errorf("Cannot create writer when tried to write the input.data");
          return false;
       }
-      
+
       try {
-      while (iterator.hasNext()) {
-         SegmentMapping.KeyOwners keyOwners = iterator.next();
-         int owner = keyOwners.getOwnerIndexes().length < iteration ? 
-               keyOwners.getOwnerIndexes()[iteration] : -1;
-         if (owner >= 0) {
-            writeInputData(keyOwners.getKey(), owner, writer);
-            ownersIndexes.add(owner);
+         while (iterator.hasNext()) {
+            SegmentMapping.KeyOwners keyOwners = iterator.next();
+            int owner = keyOwners.getOwnerIndexes().length < iteration ?
+                  keyOwners.getOwnerIndexes()[iteration] : -1;
+            if (owner >= 0) {
+               writeInputData(keyOwners.getKey(), owner, writer);
+               ownersIndexes.add(owner);
+            }
          }
-      }
       } catch (IOException e) {
          log.errorf("Error writing input.data. %s", e.getMessage());
          return false;
       } finally {
          close(writer);
       }
-      
+
       return true;
    }
 
    /**
     * writes a single key in the input.data
     *
-    * @param key           the key
-    * @param nodeIndex     the new owner index
-    * @param writer        the writer for input.data
-    * @throws IOException  if it cannot write on it
+    * @param key       the key
+    * @param nodeIndex the new owner index
+    * @param writer    the writer for input.data
+    * @throws IOException if it cannot write on it
     */
    private void writeInputData(Object key, Integer nodeIndex, BufferedWriter writer) throws IOException {
       Map<Feature, FeatureValue> keyFeatures = keyFeatureManager.getFeatures(key);
@@ -350,8 +332,8 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    /**
     * returns a buffered writer for the file in file path
     *
-    * @param filePath   the file path
-    * @return           the buffered writer or null if the file cannot be written
+    * @param filePath the file path
+    * @return the buffered writer or null if the file cannot be written
     */
    private BufferedWriter getBufferedWriter(String filePath) {
       try {
@@ -373,7 +355,7 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
    /**
     * close closeable instance
     *
-    * @param closeable  the object to close
+    * @param closeable the object to close
     */
    private void close(Closeable closeable) {
       try {

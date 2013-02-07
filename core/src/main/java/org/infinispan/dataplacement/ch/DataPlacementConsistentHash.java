@@ -7,6 +7,7 @@ import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.remoting.transport.Address;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -149,5 +150,26 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
          }
       }
       return newOwners;
+   }
+
+   @Override
+   public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+
+      DataPlacementConsistentHash that = (DataPlacementConsistentHash) o;
+
+      return !(clusterSnapshot != null ? !clusterSnapshot.equals(that.clusterSnapshot) : that.clusterSnapshot != null) &&
+            consistentHash.equals(that.consistentHash) &&
+            Arrays.equals(objectLookups, that.objectLookups);
+
+   }
+
+   @Override
+   public int hashCode() {
+      int result = consistentHash.hashCode();
+      result = 31 * result + (objectLookups != null ? Arrays.hashCode(objectLookups) : 0);
+      result = 31 * result + (clusterSnapshot != null ? clusterSnapshot.hashCode() : 0);
+      return result;
    }
 }
