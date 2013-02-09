@@ -98,6 +98,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
          if(cmd instanceof CancellableCommand){
             cancelService.register(Thread.currentThread(), ((CancellableCommand)cmd).getUUID());
          }
+         cmd.setResponseGenerator(respGen);
          Object retval = cmd.perform(null);
          Response response = respGen.getResponse(cmd, retval);
          log.tracef("About to send back response %s for command %s", response, cmd);

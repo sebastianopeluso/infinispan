@@ -22,11 +22,13 @@
  */
 package org.infinispan.commands.tx;
 
+import org.infinispan.commands.remote.BaseRpcCommand;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.impl.RemoteTxInvocationContext;
 import org.infinispan.interceptors.InterceptorChain;
 import org.infinispan.lifecycle.ComponentStatus;
+import org.infinispan.remoting.responses.ResponseGenerator;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.remoting.transport.Address;
@@ -53,6 +55,8 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    protected TransactionTable txTable;
    private Address origin;
    private int topologyId = -1;
+   private org.jgroups.blocks.Response response;
+   private ResponseGenerator responseGenerator;
 
    public AbstractTransactionBoundaryCommand(String cacheName) {
       this.cacheName = cacheName;
@@ -179,5 +183,20 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    @Override
    public boolean isReturnValueExpected() {
       return true;
+   }
+
+   @Override
+   public void setResponse(org.jgroups.blocks.Response response) {
+      this.response = response;
+   }
+
+   @Override
+   public void setResponseGenerator(ResponseGenerator responseGenerator) {
+      this.responseGenerator = responseGenerator;
+   }
+
+   @Override
+   public void sendReply(Object reply, boolean isException) {
+      BaseRpcCommand.sendReply(response, responseGenerator, reply, isException, this);
    }
 }

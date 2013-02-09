@@ -114,6 +114,7 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
          mux.setDefaultHandler(this.prot_adapter);
       }
       channel.addChannelListener(this);
+      asyncDispatching(true);
    }
 
    private boolean isValid(Message req) {
@@ -208,30 +209,43 @@ public class CommandAwareRpcDispatcher extends RpcDispatcher {
     * Message contains a Command. Execute it against *this* object and return result.
     */
    @Override
-   public Object handle(Message req) {
+   public void handle(Message req, org.jgroups.blocks.Response response) throws Exception {
       if (isValid(req)) {
          ReplicableCommand cmd = null;
          try {
             cmd = (ReplicableCommand) req_marshaller.objectFromBuffer(req.getRawBuffer(), req.getOffset(), req.getLength());
             if (cmd == null) throw new NullPointerException("Unable to execute a null command!  Message was " + req);
+            boolean asyncInvocation = isReplicableCommandAsync(cmd, response);
+            Object retVal;
             if (req.getSrc() instanceof SiteAddress) {
-               return executeCommandFromRemoteSite(cmd, (SiteAddress)req.getSrc());
+               retVal = executeCommandFromRemoteSite(cmd, (SiteAddress)req.getSrc());
             } else {
-               return executeCommandFromLocalCluster(cmd, req);
+               retVal = executeCommandFromLocalCluster(cmd, req);
+            }
+            if (!asyncInvocation && response != null) {
+               response.send(retVal, false);
             }
          } catch (InterruptedException e) {
             log.warnf("Shutdown while handling command %s", cmd);
-            return new ExceptionResponse(new CacheException("Cache is shutting down"));
+            if (response != null) {
+               response.send(new ExceptionResponse(new CacheException("Cache is shutting down")), false);
+            }
          } catch (Throwable x) {
             if (cmd == null)
                log.warnf(x, "Problems unmarshalling remote command from byte buffer");
             else
                log.warnf(x, "Problems invoking command %s", cmd);
-            return new ExceptionResponse(new CacheException("Problems invoking command.", x));
+            if (response != null) {
+               response.send(new ExceptionResponse(new CacheException("Problems invoking command.", x)), false);
+            }
          }
-      } else {
-         return null;
+      } else if (response != null) {
+         response.send(null, false);
       }
+   }
+
+   private boolean isReplicableCommandAsync(ReplicableCommand cmd, org.jgroups.blocks.Response response) {
+      return false;
    }
 
    private Object executeCommandFromRemoteSite(ReplicableCommand cmd, SiteAddress src) throws Throwable {
