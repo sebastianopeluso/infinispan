@@ -95,6 +95,13 @@ public class LegacyGlobalConfigurationAdaptor {
       
       legacy.shutdown().hookBehavior(org.infinispan.config.GlobalConfiguration.ShutdownHookBehavior.valueOf(config.shutdown().hookBehavior().name()));
       
+      legacy.conditionalExecutor()
+            .corePoolSize(config.conditionalExecutor().corePoolSize())
+            .maxPoolSize(config.conditionalExecutor().maxPoolSize())
+            .keepAliveTime(config.conditionalExecutor().keepAliveTime())
+            .queueSize(config.conditionalExecutor().queueSize())
+            .threadPriority(config.conditionalExecutor().threadPriority());
+
       return legacy.build();
    }
    
@@ -167,6 +174,13 @@ public class LegacyGlobalConfigurationAdaptor {
          .withProperties(legacy.getReplicationQueueScheduledExecutorProperties());
       
       builder.shutdown().hookBehavior(ShutdownHookBehavior.valueOf(legacy.getShutdownHookBehavior().name()));
+
+      builder.conditionalExecutor()
+            .corePoolSize(legacy.getCorePoolSize())
+            .maxPoolSize(legacy.getMaxPoolSize())
+            .keepAliveTime(legacy.getKeepAliveTime())
+            .queueSize(legacy.getQueueSize())
+            .threadPriority(legacy.getThreadPriority());
       
       return builder.build();
    }

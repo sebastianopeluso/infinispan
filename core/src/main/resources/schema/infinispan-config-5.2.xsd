@@ -64,6 +64,50 @@
                   </xs:documentation>
                 </xs:annotation>
               </xs:element>
+                <xs:element name="conditionalExecutor" minOccurs="0">
+                    <xs:annotation>
+                        <xs:documentation>
+                            Configuration for the Conditional Executor Service used by Total Order Protocol.
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:complexType>
+                        <xs:attribute name="corePoolSize" type="xs:int">
+                            <xs:annotation>
+                                <xs:documentation>
+                                    The number of threads to keep in the pool, even if they are idle.
+                                </xs:documentation>
+                            </xs:annotation>
+                        </xs:attribute>
+                        <xs:attribute name="maxPoolSize" type="xs:int">
+                            <xs:annotation>
+                                <xs:documentation>
+                                    The maximum number of threads to allow in the pool.
+                                </xs:documentation>
+                            </xs:annotation>
+                        </xs:attribute>
+                        <xs:attribute name="threadPriority" type="xs:int">
+                            <xs:annotation>
+                                <xs:documentation>
+                                    The thread priority for the threads in the pool
+                                </xs:documentation>
+                            </xs:annotation>
+                        </xs:attribute>
+                        <xs:attribute name="keepAliveTime" type="xs:long">
+                            <xs:annotation>
+                                <xs:documentation>
+                                    When the number of threads is greater than the core, this is the maximum time that excess idle threads will wait for new tasks before terminating.
+                                </xs:documentation>
+                            </xs:annotation>
+                        </xs:attribute>
+                        <xs:attribute name="queueSize" type="xs:int">
+                            <xs:annotation>
+                                <xs:documentation>
+                                    The queue size to keep the runnables before going to a thread
+                                </xs:documentation>
+                            </xs:annotation>
+                        </xs:attribute>
+                    </xs:complexType>
+                </xs:element>
               <xs:element name="site" type="tns:site" minOccurs="0">
                 <xs:annotation>
                   <xs:documentation>
@@ -593,6 +637,13 @@
             <xs:annotation>
               <xs:documentation>
                 Before Infinispan 5.1 you could access the cache both transactionally and non-transactionally. Naturally the non-transactional access is faster and offers less consistency guarantees. From Infinispan 5.1 onwards, mixed access is no longer supported, so if you wanna speed up transactional caches and you're ready to trade some consistency guarantees, you can enable use1PcForAutoCommitTransactions. What this configuration option does is force an induced transaction, that has been started by Infinispan as a result of enabling autoCommit, to commit in a single phase. So only 1 RPC instead of 2RPCs as in the case of a full 2 Phase Commit (2PC).
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="transactionProtocol" type="tns:transactionProtocol">
+            <xs:annotation>
+              <xs:documentation>
+                Configures the commit protocol to use.
               </xs:documentation>
             </xs:annotation>
           </xs:attribute>
@@ -1343,6 +1394,18 @@
     <xs:restriction base="xs:string">
       <xs:enumeration value="NON_TRANSACTIONAL" />
       <xs:enumeration value="TRANSACTIONAL" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="transactionProtocol">
+    <xs:annotation>
+      <xs:documentation>
+        Enumeration containing the available commit protocols
+      </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="TWO_PHASE_COMMIT" />
+      <xs:enumeration value="TOTAL_ORDER" />
     </xs:restriction>
   </xs:simpleType>
 

@@ -76,6 +76,7 @@ import java.util.Properties;
  * @author Vladimir Blagojevic
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
+ * @author Pedro Ruivo
  * @since 4.0
  *
  * @see <a href="../../../config.html#ce_infinispan_global">Configuration reference</a>
@@ -134,6 +135,8 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
    
    @XmlTransient
    private final ClassLoader cl;
+
+   ConditionalExecutorType conditionalExecutor = new ConditionalExecutorType().setGlobalConfiguration(this);
 
    /**
     * Create a new GlobalConfiguration, using the Thread Context ClassLoader to load any
@@ -660,6 +663,26 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       this.replicationQueueScheduledExecutor.setProperties(toTypedProperties(replicationQueueScheduledExecutorPropertiesString));
    }
 
+   public int getCorePoolSize() {
+      return conditionalExecutor.corePoolSize;
+   }
+
+   public int getMaxPoolSize() {
+      return conditionalExecutor.maxPoolSize;
+   }
+
+   public int getThreadPriority() {
+      return conditionalExecutor.threadPriority;
+   }
+
+   public long getKeepAliveTime() {
+      return conditionalExecutor.keepAliveTime;
+   }
+
+   public int getQueueSize() {
+      return conditionalExecutor.queueSize;
+   }
+
    public short getMarshallVersion() {
       return serialization.versionShort;
    }
@@ -726,6 +749,7 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       serialization.accept(v);
       shutdown.accept(v);
       transport.accept(v);
+      conditionalExecutor.accept(v);
       v.visitGlobalConfiguration(this);
    }
 
@@ -763,6 +787,10 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
          return false;
       if (transport.properties != null ? !transport.properties.equals(that.transport.properties) : that.transport.properties != null)
          return false;
+      if (conditionalExecutor != null ? !conditionalExecutor.equals(that.conditionalExecutor) : that.conditionalExecutor != null) {
+         return false;
+      }
+
       return !(transport.distributedSyncTimeout != null && !transport.distributedSyncTimeout.equals(that.transport.distributedSyncTimeout));
 
    }
@@ -784,6 +812,7 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       result = 31 * result + (shutdown.hookBehavior.hashCode());
       result = 31 * result + serialization.version.hashCode();
       result = (int) (31 * result + transport.distributedSyncTimeout);
+      result = 31 * result + (conditionalExecutor != null ? conditionalExecutor.hashCode() : 0);
       return result;
    }
 
@@ -822,6 +851,10 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
          if (shutdown != null) {
             dolly.shutdown = (ShutdownType) shutdown.clone();
             dolly.shutdown.setGlobalConfiguration(dolly);
+         }
+         if (conditionalExecutor != null) {
+            dolly.conditionalExecutor = (ConditionalExecutorType) conditionalExecutor.clone();
+            dolly.conditionalExecutor.setGlobalConfiguration(dolly);
          }
          dolly.fluentGlobalConfig = new FluentGlobalConfiguration(dolly);
          return dolly;
@@ -1773,6 +1806,97 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       ShutdownType setGlobalConfiguration(GlobalConfiguration globalConfig) {
          super.setGlobalConfiguration(globalConfig);
          return this;
+      }
+   }
+
+   @Deprecated public static class ConditionalExecutorType extends AbstractConfigurationBeanWithGCR implements FluentGlobalConfiguration.ConditionalExecutorConfig {
+
+      int corePoolSize = 1;
+      int maxPoolSize = 2;
+      protected int threadPriority = Thread.NORM_PRIORITY;
+      long keepAliveTime = 60000;
+      int queueSize = 10000;
+
+      @Override
+      public FluentGlobalConfiguration.ConditionalExecutorConfig corePoolSize(int corePoolSize) {
+         testImmutability("corePoolSize");
+         this.corePoolSize = corePoolSize;
+         return this;
+      }
+
+      @Override
+      public FluentGlobalConfiguration.ConditionalExecutorConfig maxPoolSize(int maxPoolSize) {
+         testImmutability("maxPoolSize");
+         this.maxPoolSize = maxPoolSize;
+         return this;
+      }
+
+      @Override
+      public FluentGlobalConfiguration.ConditionalExecutorConfig threadPriority(int threadPriority) {
+         testImmutability("threadPriority");
+         this.threadPriority = threadPriority;
+         return this;
+      }
+
+      @Override
+      public FluentGlobalConfiguration.ConditionalExecutorConfig keepAliveTime(long keepAliveTime) {
+         testImmutability("keepAliveTime");
+         this.keepAliveTime = keepAliveTime;
+         return this;
+      }
+
+      @Override
+      public FluentGlobalConfiguration.ConditionalExecutorConfig queueSize(int queueSize) {
+         testImmutability("queueSize");
+         this.queueSize = queueSize;
+         return this;
+      }
+
+      @Override
+      ConditionalExecutorType setGlobalConfiguration(GlobalConfiguration globalConfig) {
+         super.setGlobalConfiguration(globalConfig);
+         return this;
+      }
+
+      @Override
+      public boolean equals(Object o) {
+         if (this == o) return true;
+         if (o == null || getClass() != o.getClass()) return false;
+
+         ConditionalExecutorType that = (ConditionalExecutorType) o;
+
+         if (corePoolSize != that.corePoolSize) return false;
+         if (keepAliveTime != that.keepAliveTime) return false;
+         if (maxPoolSize != that.maxPoolSize) return false;
+         if (queueSize != that.queueSize) return false;
+         if (threadPriority != that.threadPriority) return false;
+
+         return true;
+      }
+
+      @Override
+      public int hashCode() {
+         int result = corePoolSize;
+         result = 31 * result + maxPoolSize;
+         result = 31 * result + threadPriority;
+         result = 31 * result + (int) (keepAliveTime ^ (keepAliveTime >>> 32));
+         result = 31 * result + queueSize;
+         return result;
+      }
+
+      public void accept(ConfigurationBeanVisitor v) {
+         v.visitConditionalExecutorType(this);
+      }
+
+      @Override
+      public CloneableConfigurationComponent clone() throws CloneNotSupportedException {
+         ConditionalExecutorType dolly = (ConditionalExecutorType) super.clone();
+         dolly.corePoolSize = this.corePoolSize;
+         dolly.maxPoolSize = this.maxPoolSize;
+         dolly.threadPriority = this.threadPriority;
+         dolly.keepAliveTime = this.keepAliveTime;
+         dolly.queueSize = this.queueSize;
+         return dolly;
       }
    }
 }

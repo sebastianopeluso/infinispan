@@ -32,6 +32,7 @@ import org.infinispan.transaction.RemoteTransaction;
  * Command corresponding to a transaction rollback.
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
+ * @author Pedro Ruivo
  * @since 4.0
  */
 public class RollbackCommand extends AbstractTransactionBoundaryCommand {
@@ -50,10 +51,21 @@ public class RollbackCommand extends AbstractTransactionBoundaryCommand {
       super(cacheName);
    }
 
+   /**
+    * choose the method to invoke depending if the total order protocol is be used or not
+    *
+    * @param ctx the context
+    * @return the value to be returned to the invoked
+    * @throws Throwable if something goes wrong
+    */
    @Override
    public Object perform(InvocationContext ctx) throws Throwable {
       txTable.markTransactionCompleted(globalTx);
-      return super.perform(ctx);
+      if (configuration.transaction().transactionProtocol().isTotalOrder()) {
+         return super.performIgnoringUnexistingTransaction(ctx);
+      } else {
+         return super.perform(ctx);
+      }
    }
 
    @Override

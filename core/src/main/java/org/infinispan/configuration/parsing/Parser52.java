@@ -57,6 +57,7 @@ import org.infinispan.remoting.ReplicationQueue;
 import org.infinispan.remoting.transport.Transport;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.transaction.TransactionMode;
+import org.infinispan.transaction.TransactionProtocol;
 import org.infinispan.transaction.lookup.TransactionManagerLookup;
 import org.infinispan.util.Util;
 import org.infinispan.util.concurrent.IsolationLevel;
@@ -418,6 +419,9 @@ public class Parser52 implements ConfigurationParser<ConfigurationBuilderHolder>
                break;
             case COMPLETED_TX_TIMEOUT:
                builder.transaction().completedTxTimeout(Long.parseLong(value));
+               break;
+            case TRANSACTION_PROTOCOL:
+               builder.transaction().transactionProtocol(TransactionProtocol.valueOf(value));
                break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
@@ -1523,6 +1527,9 @@ public class Parser52 implements ConfigurationParser<ConfigurationBuilderHolder>
                parseGlobalSites(reader, holder);
                break;
             }
+            case CONDITIONAL_EXECUTOR:
+               parseConditionalExecutor(reader, holder);
+               break;
             default: {
                throw ParseUtils.unexpectedElement(reader);
             }
@@ -1886,6 +1893,39 @@ public class Parser52 implements ConfigurationParser<ConfigurationBuilderHolder>
          }
       }
 
+   }
+
+   private void parseConditionalExecutor(final XMLExtendedStreamReader reader, final ConfigurationBuilderHolder holder)
+         throws XMLStreamException {
+
+      GlobalConfigurationBuilder builder = holder.getGlobalConfigurationBuilder();
+      for (int i = 0; i < reader.getAttributeCount(); i++) {
+         ParseUtils.requireNoNamespaceAttribute(reader, i);
+         String value = replaceProperties(reader.getAttributeValue(i));
+         Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
+         switch (attribute) {
+            case CORE_POOL_SIZE:
+               builder.conditionalExecutor().corePoolSize(Integer.parseInt(value));
+               break;
+            case MAX_POOL_SIZE:
+               builder.conditionalExecutor().maxPoolSize(Integer.parseInt(value));
+               break;
+            case THREAD_PRIORITY:
+               builder.conditionalExecutor().threadPriority(Integer.parseInt(value));
+               break;
+            case KEEP_ALIVE_TIME:
+               builder.conditionalExecutor().keepAliveTime(Long.parseLong(value));
+               break;
+            case QUEUE_SIZE:
+               builder.conditionalExecutor().queueSize(Integer.parseInt(value));
+               break;
+            default: {
+               throw ParseUtils.unexpectedAttribute(reader, i);
+            }
+         }
+
+         ParseUtils.requireNoContent(reader);
+      }
    }
 
    public static Properties parseProperties(final XMLExtendedStreamReader reader) throws XMLStreamException {

@@ -295,4 +295,11 @@ public class DelegatingConfigurationVisitor implements ConfigurationBeanVisitor 
          delegate.visitVersioningConfigurationBean(config);
       }
    }
+
+   @Override
+   public void visitConditionalExecutorType(GlobalConfiguration.ConditionalExecutorType config) {
+      for (ConfigurationBeanVisitor delegate : delegates) {
+         delegate.visitConditionalExecutorType(config);
+      }
+   }
 }

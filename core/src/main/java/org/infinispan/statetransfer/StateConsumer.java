@@ -29,6 +29,7 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.topology.CacheTopology;
 
 import java.util.Collection;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * Handles inbound state transfers.
@@ -82,4 +83,6 @@ public interface StateConsumer {
     * when a ClearCommand is committed during state transfer.
     */
    void stopApplyingState();
+
+   Collection<CountDownLatch> getInboundStateTransfer(Collection<Object> affectedKeys);
 }

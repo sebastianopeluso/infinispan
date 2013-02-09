@@ -56,7 +56,7 @@ public class VersionedReplicationInterceptor extends ReplicationInterceptor {
       // logic for this step.
       if (!rpcManager.getTransport().isCoordinator()) {
          setVersionsSeenOnPrepareCommand((VersionedPrepareCommand) command, context);
-         Map<Address, Response> resps = rpcManager.invokeRemotely(null, command, true, true);
+         Map<Address, Response> resps = rpcManager.invokeRemotely(null, command, true, true, false);
          Response r = resps.get(rpcManager.getTransport().getCoordinator());  // We only really care about the coordinator's response.
          readVersionsFromResponse(r, context.getCacheTransaction());
       } else {

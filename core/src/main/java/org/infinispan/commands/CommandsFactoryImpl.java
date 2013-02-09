@@ -356,7 +356,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
          case PrepareCommand.COMMAND_ID:
          case VersionedPrepareCommand.COMMAND_ID:
             PrepareCommand pc = (PrepareCommand) c;
-            pc.init(interceptorChain, icc, txTable);
+            pc.init(interceptorChain, icc, txTable, configuration);
             pc.initialize(notifier, recoveryManager);
             if (pc.getModifications() != null)
                for (ReplicableCommand nested : pc.getModifications())  {
@@ -371,12 +371,12 @@ public class CommandsFactoryImpl implements CommandsFactory {
          case CommitCommand.COMMAND_ID:
          case VersionedCommitCommand.COMMAND_ID:
             CommitCommand commitCommand = (CommitCommand) c;
-            commitCommand.init(interceptorChain, icc, txTable);
+            commitCommand.init(interceptorChain, icc, txTable, configuration);
             commitCommand.markTransactionAsRemote(isRemote);
             break;
          case RollbackCommand.COMMAND_ID:
             RollbackCommand rollbackCommand = (RollbackCommand) c;
-            rollbackCommand.init(interceptorChain, icc, txTable);
+            rollbackCommand.init(interceptorChain, icc, txTable, configuration);
             rollbackCommand.markTransactionAsRemote(isRemote);
             break;
          case ClearCommand.COMMAND_ID:
@@ -389,7 +389,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
             break;
          case LockControlCommand.COMMAND_ID:
             LockControlCommand lcc = (LockControlCommand) c;
-            lcc.init(interceptorChain, icc, txTable);
+            lcc.init(interceptorChain, icc, txTable, configuration);
             lcc.markTransactionAsRemote(isRemote);
             if (configuration.deadlockDetection().enabled() && isRemote) {
                DldGlobalTransaction gtx = (DldGlobalTransaction) lcc.getGlobalTransaction();

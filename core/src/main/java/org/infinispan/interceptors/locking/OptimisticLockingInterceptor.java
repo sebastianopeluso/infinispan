@@ -122,7 +122,7 @@ public class OptimisticLockingInterceptor extends AbstractTxLockingInterceptor {
          log.trace("Not using lock reordering as we have a single key.");
          acquireLocksVisitingCommands(ctx, command);
       } else {
-         Object[] orderedKeys = sort(command.getModifications());
+         Object[] orderedKeys = sort(command.getModifications(), cdl);
          boolean hasClear = orderedKeys == null;
          if (hasClear) {
             log.trace("Not using lock reordering as the prepare contains a clear command.");
@@ -292,7 +292,7 @@ public class OptimisticLockingInterceptor extends AbstractTxLockingInterceptor {
       }
    }
 
-   private Object[] sort(WriteCommand[] writes) {
+   public static Object[] sort(WriteCommand[] writes, ClusteringDependentLogic cdl) {
       Set<Object> set = new HashSet<Object>();
       for (WriteCommand wc: writes) {
          switch (wc.getCommandId()) {

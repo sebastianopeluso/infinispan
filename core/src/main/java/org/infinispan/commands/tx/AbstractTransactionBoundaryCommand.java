@@ -23,6 +23,7 @@
 package org.infinispan.commands.tx;
 
 import org.infinispan.commands.remote.BaseRpcCommand;
+import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.impl.RemoteTxInvocationContext;
@@ -41,6 +42,7 @@ import org.infinispan.util.logging.LogFactory;
  *
  * @author Manik Surtani (<a href="mailto:manik@jboss.org">manik@jboss.org</a>)
  * @author Mircea.Markus@jboss.com
+ * @author Pedro Ruivo
  * @since 4.0
  */
 public abstract class AbstractTransactionBoundaryCommand implements TransactionBoundaryCommand {
@@ -53,6 +55,7 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
    protected InterceptorChain invoker;
    protected InvocationContextContainer icc;
    protected TransactionTable txTable;
+   protected Configuration configuration;
    private Address origin;
    private int topologyId = -1;
    private org.jgroups.blocks.Response response;
@@ -62,10 +65,12 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
       this.cacheName = cacheName;
    }
 
-   public void init(InterceptorChain chain, InvocationContextContainer icc, TransactionTable txTable) {
+   public void init(InterceptorChain chain, InvocationContextContainer icc, TransactionTable txTable,
+                    Configuration configuration) {
       this.invoker = chain;
       this.icc = icc;
       this.txTable = txTable;
+      this.configuration = configuration;
    }
 
    @Override
@@ -119,6 +124,35 @@ public abstract class AbstractTransactionBoundaryCommand implements TransactionB
             transaction, getOrigin());
 
       if (trace) log.tracef("About to execute tx command %s", this);
+      return invoker.invoke(ctxt, this);
+   }
+
+   /**
+    * Note: Used by total order protocol.
+    *
+    * The commit or the rollback command can be received before the prepare message
+    * we let the commands be invoked in the interceptor chain. They will be block in TotalOrderInterceptor while the
+    * prepare command doesn't arrives
+    *
+    * @param ctx the same as {@link #perform(org.infinispan.context.InvocationContext)}
+    * @return the same as {@link #perform(org.infinispan.context.InvocationContext)}
+    * @throws Throwable the same as {@link #perform(org.infinispan.context.InvocationContext)}
+    */
+   protected Object performIgnoringUnexistingTransaction(InvocationContext ctx) throws Throwable {
+      if (ctx != null) {
+         throw new IllegalStateException("Expected null context!");
+      }
+      markGtxAsRemote();
+      RemoteTransaction transaction = txTable.getOrCreateIfAbsentRemoteTransaction(globalTx);
+
+      visitRemoteTransaction(transaction);
+
+      RemoteTxInvocationContext ctxt = icc.createRemoteTxInvocationContext(
+            transaction, getOrigin());
+
+      if (trace) {
+         log.tracef("About to execute tx command %s", this);
+      }
       return invoker.invoke(ctxt, this);
    }
 

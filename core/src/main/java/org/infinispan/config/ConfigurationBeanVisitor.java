@@ -119,4 +119,6 @@ public interface ConfigurationBeanVisitor {
    void visitStoreAsBinaryType(Configuration.StoreAsBinary config);
 
    void visitVersioningConfigurationBean(VersioningConfigurationBean config);
+
+   void visitConditionalExecutorType(GlobalConfiguration.ConditionalExecutorType config);
 }
