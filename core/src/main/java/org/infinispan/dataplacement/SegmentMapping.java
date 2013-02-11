@@ -1,5 +1,6 @@
 package org.infinispan.dataplacement;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -42,7 +43,7 @@ public class SegmentMapping {
          this.ownerIndexes = new int[ownerIndexes.size()];
          int index = 0;
          for (int i : ownerIndexes) {
-            this.ownerIndexes[index] = i;
+            this.ownerIndexes[index++] = i;
          }
       }
 
@@ -53,5 +54,21 @@ public class SegmentMapping {
       public final int[] getOwnerIndexes() {
          return ownerIndexes;
       }
+
+      @Override
+      public String toString() {
+         return "KeyOwners{" +
+               "key=" + key +
+               ", ownerIndexes=" + Arrays.toString(ownerIndexes) +
+               '}';
+      }
+   }
+
+   @Override
+   public String toString() {
+      return "SegmentMapping{" +
+            "segmentId=" + segmentId +
+            ", keyOwnersList=" + keyOwnersList +
+            '}';
    }
 }

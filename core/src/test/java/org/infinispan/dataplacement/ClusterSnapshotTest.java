@@ -183,7 +183,7 @@ public class ClusterSnapshotTest {
       }
       Address[] membersArray = members.toArray(new Address[size]);
       ClusterSnapshot clusterSnapshot = new ClusterSnapshot(membersArray, HASH_FUNCTION);
-      log.infof("Created cluster snapshot: %s", clusterSnapshot);
+      log.tracef("Created cluster snapshot: %s", clusterSnapshot);
       return clusterSnapshot;
    }
 

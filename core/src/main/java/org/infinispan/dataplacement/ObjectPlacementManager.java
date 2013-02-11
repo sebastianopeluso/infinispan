@@ -109,6 +109,10 @@ public class ObjectPlacementManager {
 
       removeNotMovedObjects(newOwnersMap);
 
+      if (log.isDebugEnabled()) {
+         log.debugf("This round final Owners per key are %s", newOwnersMap);
+      }
+
       //process the old moved keys. this will set the new owners of the previous rounds
       for (Object key : allKeysMoved) {
          if (!newOwnersMap.containsKey(key)) {
@@ -116,6 +120,10 @@ public class ObjectPlacementManager {
          }
       }
 
+      if (log.isDebugEnabled()) {
+         log.debugf("Final Owners per key are %s", newOwnersMap);
+      }
+      
       //update all the keys moved array
       allKeysMoved = newOwnersMap.keySet().toArray(new Object[newOwnersMap.size()]);
       
@@ -129,6 +137,10 @@ public class ObjectPlacementManager {
             segmentMappingMap.put(segmentId, segmentMapping);
          }
          segmentMapping.add(entry.getKey(), entry.getValue());
+      }
+
+      if (log.isDebugEnabled()) {
+         log.debugf("Final Owners per segment are %s", segmentMappingMap);
       }
 
       return segmentMappingMap.values();
@@ -193,6 +205,9 @@ public class ObjectPlacementManager {
       if (newOwnersInfo == null) {
          newOwnersInfo = createOwnersInfo(key);
          newOwnersMap.put(key, newOwnersInfo);
+         if (log.isDebugEnabled()) {
+            log.debugf("Current Owners Info for key [%s] is %s", key, newOwnersInfo);
+         }
       }
       newOwnersInfo.calculateNewOwner(requesterId, numberOfRequests);
    }

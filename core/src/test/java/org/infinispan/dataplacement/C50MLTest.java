@@ -49,7 +49,8 @@ public class C50MLTest extends AbstractCacheTest{
       for (int numberOfKeys = 1000; numberOfKeys < 10000; numberOfKeys *= 2) {
          for (int replicationDegree = 1; replicationDegree < 10; replicationDegree *= 2) {
             Map<Object, OwnersInfo> ownersInfoMap = createRandomMovements(numberOfKeys, replicationDegree);
-            ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(ownersInfoMap, replicationDegree);
+            //TODO FIX ME
+            ObjectLookup objectLookup = null;//objectLookupFactory.createObjectLookup(ownersInfoMap, replicationDegree);
             assert objectLookup != null;
             checkOwnerIndex(ownersInfoMap, objectLookup, "key:" + numberOfKeys + ",replication degree=" + replicationDegree);
          }

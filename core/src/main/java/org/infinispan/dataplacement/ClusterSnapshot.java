@@ -103,7 +103,7 @@ public class ClusterSnapshot {
       return internalAddresses.length;
    }
    
-   public final Collection<Address> getMembers() {
+   public final List<Address> getMembers() {
       List<Address> members = new LinkedList<Address>();
       for (InternalAddress address : internalAddresses) {
          members.add(address.address);

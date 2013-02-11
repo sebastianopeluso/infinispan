@@ -11,7 +11,7 @@ public class BloomFilter implements Serializable {
    private final BitSet filter;
 
    //num queries = 1
-   public BloomFilter(Collection<Object> objects, double falsePositiveRate){
+   public BloomFilter(Collection<Object> objects, double falsePositiveRate) {
       double bitsPerElement = Math.log(falsePositiveRate) / Math.log(0.6185);
       numHash = (int) Math.ceil(Math.log(2) * bitsPerElement);
 
@@ -29,21 +29,20 @@ public class BloomFilter implements Serializable {
 
    private byte[] convertObjectToByteArray(Object object) {
       int value = object.hashCode();
-      return new byte[] {
-            (byte)(value >>> 24),
-            (byte)(value >>> 16),
-            (byte)(value >>> 8),
-            (byte)value};
+      return new byte[]{
+            (byte) (value >>> 24),
+            (byte) (value >>> 16),
+            (byte) (value >>> 8),
+            (byte) value};
    }
 
    private boolean accessFilterPositions(byte[] elementId, boolean set) {
       int hash1 = murmurHash(elementId, elementId.length, 0);
       int hash2 = murmurHash(elementId, elementId.length, hash1);
-      for (int i = 0; i < numHash; i++){
-         if(set)
+      for (int i = 0; i < numHash; i++) {
+         if (set)
             filter.set(Math.abs((hash1 + i * hash2) % filterSize), true);
-         else
-         if(!filter.get(Math.abs((hash1 + i * hash2) % filterSize)))
+         else if (!filter.get(Math.abs((hash1 + i * hash2) % filterSize)))
             return false;
       }
       return true;
@@ -96,5 +95,9 @@ public class BloomFilter implements Serializable {
       h ^= h >>> 15;
 
       return h;
+   }
+
+   public final int size() {
+      return filterSize;
    }
 }

@@ -1,5 +1,6 @@
 package org.infinispan.dataplacement;
 
+import junit.framework.Assert;
 import org.infinispan.dataplacement.c50.lookup.BloomFilter;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -13,6 +14,7 @@ import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 
 /**
  * // TODO: Document this
@@ -28,31 +30,11 @@ public class BloomFilterTest {
    private static final int START = 10;
    private static final int END = 100000;
    private static final double PROB = 0.001;
+   private static final int NUMBER_OF_KEYS = 1000;
 
    public void testBloomFilter() {
 
       for (int iteration = START; iteration <= END; iteration *= 10) {
-         BloomFilter bloomFilter = new BloomFilter(PROB, iteration);
-
-         for (int key = 0; key < iteration; ++key) {
-            bloomFilter.add(getKey(key));
-         }
-
-         log.infof("=== Iterator with %s objects ===", iteration);
-         log.infof("Bloom filter size = %s", bloomFilter.size());
-
-         long begin = System.currentTimeMillis();
-         for (int key = 0; key < iteration; ++key) {
-            assert bloomFilter.contains(getKey(key)) : "False Negative should not happen!";
-         }
-         long end = System.currentTimeMillis();
-
-         log.infof("Query duration:\n\ttotal=%s ms\n\tper-key=%s ms", end - begin, (end - begin) / iteration);
-
-         log.infof("[%s] Bloom Filter serialized size (bytes) = %s", iteration, serializedSize(bloomFilter));
-
-         bloomFilter.clear();
-
          LinkedList<Object> linkedList = new LinkedList<Object>();
          ArrayList<Object> arrayList = new ArrayList<Object>();
          HashSet<Object> hashSet = new HashSet<Object>();
@@ -61,7 +43,22 @@ public class BloomFilterTest {
             linkedList.add(getKey(key));
          }
          log.infof("[%s] Linked List serialized size (bytes) = %s", iteration, serializedSize(linkedList));
+
+         BloomFilter bloomFilter = new BloomFilter(linkedList, PROB);
          linkedList.clear();
+
+         log.infof("=== Iterator with %s objects ===", iteration);
+         log.infof("Bloom filter size = %s", bloomFilter.size());
+
+         long begin = System.currentTimeMillis();
+         for (int key = 0; key < iteration; ++key) {
+            Assert.assertTrue("False Negative should not happen!", bloomFilter.contains(getKey(key)));
+         }
+         long end = System.currentTimeMillis();
+
+         log.infof("Query duration:\n\ttotal=%s ms\n\tper-key=%s ms", end - begin, (end - begin) / iteration);
+
+         log.infof("[%s] Bloom Filter serialized size (bytes) = %s", iteration, serializedSize(bloomFilter));
 
          for (int key = 0; key < iteration; ++key) {
             arrayList.add(getKey(key));
@@ -79,12 +76,12 @@ public class BloomFilterTest {
    }
 
    public void testSerializable() throws IOException, ClassNotFoundException {
-      int numberOfKeys = 1000;
-      BloomFilter bloomFilter = new BloomFilter(PROB, numberOfKeys);
-
-      for (int i = 0; i < numberOfKeys; ++i) {
-         bloomFilter.add(getKey(i));
+      List<Object> keys = new ArrayList<Object>(NUMBER_OF_KEYS);
+      for (int i = 0; i < NUMBER_OF_KEYS; ++i) {
+         keys.add(getKey(i));
       }
+
+      BloomFilter bloomFilter = new BloomFilter(keys, PROB);
 
       ByteArrayOutputStream arrayOutputStream = new ByteArrayOutputStream();
       ObjectOutputStream oos = new ObjectOutputStream(arrayOutputStream);
@@ -95,18 +92,18 @@ public class BloomFilterTest {
 
       byte[] bytes = arrayOutputStream.toByteArray();
 
-      log.infof("Bloom filter size with %s keys is %s bytes", numberOfKeys, bytes.length);
+      log.infof("Bloom filter size with %s keys is %s bytes", NUMBER_OF_KEYS, bytes.length);
 
       ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes));
 
       BloomFilter readBloomFilter = (BloomFilter) ois.readObject();
       ois.close();
 
-      for (int i = 0; i < numberOfKeys; ++i) {
-         assert bloomFilter.contains(getKey(i)) : "False negative should never happen. It happened in original " +
-               "Bloom Filter";
-         assert readBloomFilter.contains(getKey(i)) : "False negative should never happen. It happened in read " +
-               "Bloom Filter";
+      for (int i = 0; i < NUMBER_OF_KEYS; ++i) {
+         Assert.assertTrue("[ORIGINAL] False negative should never happen. It happened in original",
+                           bloomFilter.contains(getKey(i)));
+         Assert.assertTrue("[COPIED] False negative should never happen. It happened in original",
+                           readBloomFilter.contains(getKey(i)));
       }
    }
 

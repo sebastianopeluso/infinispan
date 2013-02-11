@@ -1,29 +1,28 @@
 package org.infinispan.dataplacement;
 
+import junit.framework.Assert;
 import org.infinispan.commons.hash.Hash;
 import org.infinispan.commons.hash.MurmurHash3;
-import org.infinispan.distribution.DistributionManager;
 import org.infinispan.distribution.TestAddress;
-import org.infinispan.distribution.ch.DefaultConsistentHash;
+import org.infinispan.distribution.ch.ConsistentHash;
+import org.infinispan.distribution.ch.DefaultConsistentHashFactory;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.stats.topK.StreamLibContainer;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.infinispan.dataplacement.AccessesManager.*;
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Test the functionality of the Remote Accesses Manager and the Object placement manager 
@@ -34,198 +33,256 @@ import static org.mockito.Mockito.when;
 @Test(groups = "functional", testName = "dataplacement.AccessesAndPlacementTest")
 public class AccessesAndPlacementTest {
 
+   private static final Log log = LogFactory.getLog(AccessesAndPlacementTest.class);
    private static final Hash HASH = new MurmurHash3();
-   private final AtomicInteger KEY_NEXT_ID = new AtomicInteger(0);
+   private static final AtomicInteger KEY_NEXT_ID = new AtomicInteger(0);
+   private static final DefaultConsistentHashFactory DEFAULT_CONSISTENT_HASH_FACTORY = new DefaultConsistentHashFactory();
+   private static final int NUMBER_OF_SEGMENTS = 1000;
 
    public void testNoMovement() {
       ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
+      ConsistentHash consistentHash = createDefaultConsistentHash(clusterSnapshot.getMembers(), 1);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.resetState(clusterSnapshot);
-      Map<?, ?> newOwners = manager.calculateObjectsToMove();
-      assert newOwners.isEmpty();
+      manager.resetState(clusterSnapshot, consistentHash);
+      Collection<SegmentMapping> newOwners = manager.calculateObjectsToMove();
+      Assert.assertTrue(newOwners.isEmpty());
    }
 
    @SuppressWarnings("AssertWithSideEffects")
    public void testReturnValue() {
       ClusterSnapshot clusterSnapshot = createClusterSnapshot(2);
+      ConsistentHash consistentHash = createDefaultConsistentHash(clusterSnapshot.getMembers(), 1);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.resetState(clusterSnapshot);
+      manager.resetState(clusterSnapshot, consistentHash);
 
-      assert !manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(null, null));
-      assert manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(null, null));
-      assert !manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(null, null));
-      assert !manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(null, null));
+      Assert.assertFalse(manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(null, null)));
+      Assert.assertTrue(manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(null, null)));
+      Assert.assertFalse(manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(null, null)));
+      Assert.assertFalse(manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(null, null)));
    }
 
-   public void testObjectPlacement() {
+   public void testSwapOwners() {
       ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
+      ConsistentHash consistentHash = createDefaultConsistentHash(clusterSnapshot.getMembers(), 2);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.resetState(clusterSnapshot);
+      manager.resetState(clusterSnapshot, consistentHash);
 
-      Map<Object, Long> request = new HashMap<Object, Long>();
+      List<Address> key1Owners = new ArrayList<Address>(2);
+      List<Address> key2Owners = new ArrayList<Address>(2);
+      Object key1 = createKey(consistentHash, null, key1Owners);
+      Object key2 = createKey(consistentHash, key1Owners, key2Owners);
 
-      TestKey key1 = new TestKey(1, clusterSnapshot.get(0), clusterSnapshot.get(1));
-      TestKey key2 = new TestKey(2, clusterSnapshot.get(2), clusterSnapshot.get(3));
+      int[] key1OwnersIndexes = new int[key1Owners.size()];
+      int i = 0;
+      for (Address address : key1Owners) {
+         key1OwnersIndexes[i++] = clusterSnapshot.indexOf(address);
+      }
 
-      request.put(key1, 1L);
+      int[] key2OwnersIndexes = new int[key1Owners.size()];
+      i = 0;
+      for (Address address : key2Owners) {
+         key2OwnersIndexes[i++] = clusterSnapshot.indexOf(address);
+      }
 
-      manager.aggregateRequest(clusterSnapshot.get(2), new ObjectRequest(request, null));
+      log.debugf("%s: Owners: %s, owners indexes: %s", key1, key1Owners, Arrays.toString(key1OwnersIndexes));
+      log.debugf("%s: Owners: %s, owners indexes: %s", key2, key2Owners, Arrays.toString(key2OwnersIndexes));
 
-      request = new HashMap<Object, Long>();
-      request.put(key1, 1L);
+      for (int index : key2OwnersIndexes) {
+         Map<Object, Long> request = new HashMap<Object, Long>();
+         request.put(key1, 1L);
+         manager.aggregateRequest(clusterSnapshot.get(index), new ObjectRequest(request, null));
+      }
 
-      manager.aggregateRequest(clusterSnapshot.get(3), new ObjectRequest(request, null));
+      for (int index : key1OwnersIndexes) {
+         Map<Object, Long> request = new HashMap<Object, Long>();
+         request.put(key2, 1L);
+         manager.aggregateRequest(clusterSnapshot.get(index), new ObjectRequest(request, null));
+      }
 
-      request = new HashMap<Object, Long>();
-      request.put(key2, 1L);
+      Collection<SegmentMapping> newOwners = manager.calculateObjectsToMove();
+      log.debug("Swap owners final segment mapping: " + newOwners);
 
-      manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(request, null));
+      Assert.assertEquals(2, newOwners.size());
 
-      request = new HashMap<Object, Long>();
-      request.put(key2, 1L);
+      for (SegmentMapping segmentMapping : newOwners) {
+         Iterator<SegmentMapping.KeyOwners> iterator = segmentMapping.iterator();
+         while (iterator.hasNext()) {
+            SegmentMapping.KeyOwners keyOwners = iterator.next();
+            if (keyOwners.getKey().equals(key1)) {
+               assertOwner(keyOwners, key2OwnersIndexes);
+            } else if (keyOwners.getKey().equals(key2)) {
+               assertOwner(keyOwners, key1OwnersIndexes);
+            }
 
-      manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(request, null));
-
-      Map<Object, OwnersInfo> newOwners = manager.calculateObjectsToMove();
-
-      assert newOwners.size() == 2;
-
-      assertOwner(newOwners.get(key1), 2, 3);
-      assertOwner(newOwners.get(key2), 0, 1);
+         }
+      }
    }
 
-   public void testObjectPlacement2() {
+   public void testOneOwnerChange() {
       ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
+      ConsistentHash consistentHash = createDefaultConsistentHash(clusterSnapshot.getMembers(), 2);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.resetState(clusterSnapshot);
+      manager.resetState(clusterSnapshot, consistentHash);
 
       Map<Object, Long> remote = new HashMap<Object, Long>();
       Map<Object, Long> local = new HashMap<Object, Long>();
 
-      TestKey key1 = new TestKey(1, clusterSnapshot.get(0), clusterSnapshot.get(1));
-      TestKey key2 = new TestKey(2, clusterSnapshot.get(2), clusterSnapshot.get(3));
+      List<Address> key1Owners = new ArrayList<Address>(2);
+      List<Address> key2Owners = new ArrayList<Address>(2);
+      Object key1 = createKey(consistentHash, null, key1Owners);
+      Object key2 = createKey(consistentHash, key1Owners, key2Owners);
+
+      int[] key1OwnersIndexes = new int[key1Owners.size()];
+      int i = 0;
+      for (Address address : key1Owners) {
+         key1OwnersIndexes[i++] = clusterSnapshot.indexOf(address);
+      }
+
+      int[] key2OwnersIndexes = new int[key1Owners.size()];
+      i = 0;
+      for (Address address : key2Owners) {
+         key2OwnersIndexes[i++] = clusterSnapshot.indexOf(address);
+      }
+
+      log.debugf("%s: Owners: %s, owners indexes: %s", key1, key1Owners, Arrays.toString(key1OwnersIndexes));
+      log.debugf("%s: Owners: %s, owners indexes: %s", key2, key2Owners, Arrays.toString(key2OwnersIndexes));
 
       remote.put(key2, 1L);
       local.put(key1, 4L);
-
-      manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(remote, local));
+      manager.aggregateRequest(key1Owners.get(0), new ObjectRequest(remote, local));
 
       remote = new HashMap<Object, Long>();
       local = new HashMap<Object, Long>();
-
       remote.put(key2, 3L);
       local.put(key1, 1L);
-
-      manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(remote, local));
+      manager.aggregateRequest(key1Owners.get(1), new ObjectRequest(remote, local));
 
       remote = new HashMap<Object, Long>();
       local = new HashMap<Object, Long>();
-
       remote.put(key1, 2L);
       local.put(key2, 4L);
-
-      manager.aggregateRequest(clusterSnapshot.get(2), new ObjectRequest(remote, local));
+      manager.aggregateRequest(key2Owners.get(0), new ObjectRequest(remote, local));
 
       remote = new HashMap<Object, Long>();
       local = new HashMap<Object, Long>();
-
       remote.put(key1, 3L);
       local.put(key2, 2L);
+      manager.aggregateRequest(key2Owners.get(1), new ObjectRequest(remote, local));
 
-      manager.aggregateRequest(clusterSnapshot.get(3), new ObjectRequest(remote, null));
+      Collection<SegmentMapping> newOwners = manager.calculateObjectsToMove();
 
-      Map<Object, OwnersInfo> newOwners = manager.calculateObjectsToMove();
+      log.debug("One Owner change final segment mapping: " + newOwners);
+      Assert.assertEquals(2, newOwners.size());
 
-      assert newOwners.size() == 2;
+      for (SegmentMapping segmentMapping : newOwners) {
+         Iterator<SegmentMapping.KeyOwners> iterator = segmentMapping.iterator();
+         while (iterator.hasNext()) {
+            SegmentMapping.KeyOwners keyOwners = iterator.next();
+            if (keyOwners.getKey().equals(key1)) {
+               assertOwner(keyOwners, key1OwnersIndexes[0], key2OwnersIndexes[1]);
+            } else if (keyOwners.getKey().equals(key2)) {
+               assertOwner(keyOwners, key1OwnersIndexes[1], key2OwnersIndexes[0]);
+            }
 
-      assertOwner(newOwners.get(key1), 0, 3);
-      assertOwner(newOwners.get(key2), 1, 2);
+         }
+      }
    }
 
-   public void testObjectPlacement3() {
+   public void testNotEnoughRemoteAccesses() {
       ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
+      ConsistentHash consistentHash = createDefaultConsistentHash(clusterSnapshot.getMembers(), 2);
       ObjectPlacementManager manager = createObjectPlacementManager();
-      manager.resetState(clusterSnapshot);
+      manager.resetState(clusterSnapshot, consistentHash);
 
-      Map<Object, Long> request = new HashMap<Object, Long>();
+      List<Address> keyOwners = new ArrayList<Address>(2);
+      Object key = createKey(consistentHash, null, keyOwners);
 
-      TestKey key = new TestKey(2, clusterSnapshot.get(2), clusterSnapshot.get(3));
+      int[] keyOwnersIndexes = new int[keyOwners.size()];
+      int i = 0;
+      for (Address address : keyOwners) {
+         keyOwnersIndexes[i++] = clusterSnapshot.indexOf(address);
+      }
 
-      request.put(key, 2L);
+      int[] nonOwners = new int[clusterSnapshot.size() - keyOwners.size()];
+      i = 0;
+      for (int j = 0; j < clusterSnapshot.size(); ++j) {
+         if (!keyOwners.contains(clusterSnapshot.get(j))) {
+            nonOwners[i++] = j;
+         }
 
-      manager.aggregateRequest(clusterSnapshot.get(0), new ObjectRequest(request, null));
+      }
 
-      request = new HashMap<Object, Long>();
+      log.debugf("%s: Owners: %s, owners indexes: %s, nonOwners indexes: %s", key, keyOwners,
+                 Arrays.toString(keyOwnersIndexes), Arrays.toString(nonOwners));
 
-      request.put(key, 3L);
+      for (int index : keyOwnersIndexes) {
+         Map<Object, Long> request = new HashMap<Object, Long>();
+         request.put(key, 10L);
+         manager.aggregateRequest(clusterSnapshot.get(index), new ObjectRequest(null, request));
+      }
 
-      manager.aggregateRequest(clusterSnapshot.get(1), new ObjectRequest(request, null));
+      for (int index : nonOwners) {
+         Map<Object, Long> request = new HashMap<Object, Long>();
+         request.put(key, 5L);
+         manager.aggregateRequest(clusterSnapshot.get(index), new ObjectRequest(request, null));
+      }
 
-      request = new HashMap<Object, Long>();
+      Collection<SegmentMapping> newOwners = manager.calculateObjectsToMove();
 
-      request.put(key, 5L);
+      log.debug("Not enough remote accesses final segment mapping: " + newOwners);
 
-      manager.aggregateRequest(clusterSnapshot.get(2), new ObjectRequest(null, request));
-
-      request = new HashMap<Object, Long>();
-
-      request.put(key, 6L);
-
-      manager.aggregateRequest(clusterSnapshot.get(3), new ObjectRequest(null, request));
-
-      Map<Object, OwnersInfo> newOwners = manager.calculateObjectsToMove();
-
-      assert newOwners.isEmpty();
+      Assert.assertTrue(newOwners.isEmpty());
    }
 
    public void testRemoteAccesses() {
       ClusterSnapshot clusterSnapshot = createClusterSnapshot(4);
+      ConsistentHash consistentHash = createDefaultConsistentHash(clusterSnapshot.getMembers(), 2);
       AccessesManager manager = createRemoteAccessManager();
-      manager.resetState(clusterSnapshot);
+      manager.resetState(clusterSnapshot, consistentHash);
       StreamLibContainer container = StreamLibContainer.getInstance();
       container.setActive(true);
       container.setCapacity(2);
       container.resetAll();
 
-      TestKey key1 = new TestKey(1, clusterSnapshot.get(0), clusterSnapshot.get(1));
-      TestKey key2 = new TestKey(2, clusterSnapshot.get(1), clusterSnapshot.get(2));
-      TestKey key3 = new TestKey(3, clusterSnapshot.get(2), clusterSnapshot.get(3));
-      TestKey key4 = new TestKey(4, clusterSnapshot.get(3), clusterSnapshot.get(0));
+      Object key1 = createKey(consistentHash, clusterSnapshot.get(0));
+      Object key2 = createKey(consistentHash, clusterSnapshot.get(1));
+      Object key3 = createKey(consistentHash, clusterSnapshot.get(2));
+      Object key4 = createKey(consistentHash, clusterSnapshot.get(3));
 
-      addKey(key1, false, 10, container);
-      addKey(key2, true, 5, container);
-      addKey(key3, true, 15, container);
-      addKey(key4, false, 2, container);
+      log.debugf("%s: owners: %s, primary owner: %s", key1, consistentHash.locateOwners(key1), consistentHash.locatePrimaryOwner(key1));
+      log.debugf("%s: owners: %s, primary owner: %s", key2, consistentHash.locateOwners(key2), consistentHash.locatePrimaryOwner(key2));
+      log.debugf("%s: owners: %s, primary owner: %s", key3, consistentHash.locateOwners(key3), consistentHash.locatePrimaryOwner(key3));
+      log.debugf("%s: owners: %s, primary owner: %s", key4, consistentHash.locateOwners(key4), consistentHash.locatePrimaryOwner(key4));
+
+      addKey(key1, !consistentHash.isKeyLocalToNode(clusterSnapshot.get(0), key1), 10, container);
+      addKey(key2, !consistentHash.isKeyLocalToNode(clusterSnapshot.get(0), key2), 5, container);
+      addKey(key3, !consistentHash.isKeyLocalToNode(clusterSnapshot.get(0), key3), 15, container);
+      addKey(key4, !consistentHash.isKeyLocalToNode(clusterSnapshot.get(0), key4), 2, container);
 
       manager.calculateAccesses();
 
       Map<Object, Long> remote = new HashMap<Object, Long>();
       Map<Object, Long> local = new HashMap<Object, Long>();
 
-      local.put(key1, 10L);
-
+      (consistentHash.isKeyLocalToNode(clusterSnapshot.get(0), key1) ? local : remote).put(key1, 10L);
       assertAccesses(manager.getObjectRequestForAddress(clusterSnapshot.get(0)), remote, local);
-
       remote.clear();
       local.clear();
 
-      remote.put(key2, 5L);
-
+      (consistentHash.isKeyLocalToNode(clusterSnapshot.get(0), key2) ? local : remote).put(key2, 5L);
       assertAccesses(manager.getObjectRequestForAddress(clusterSnapshot.get(1)), remote, local);
-
       remote.clear();
       local.clear();
 
-      remote.put(key3, 15L);
-
+      (consistentHash.isKeyLocalToNode(clusterSnapshot.get(0), key3) ? local : remote).put(key3, 15L);
       assertAccesses(manager.getObjectRequestForAddress(clusterSnapshot.get(2)), remote, local);
-
       remote.clear();
       local.clear();
 
-      local.put(key4, 2L);
-
+      (consistentHash.isKeyLocalToNode(clusterSnapshot.get(0), key4) ? local : remote).put(key4, 2L);
       assertAccesses(manager.getObjectRequestForAddress(clusterSnapshot.get(3)), remote, local);
+      remote.clear();
+      local.clear();
    }
 
    public void testRemoteTopKeyRequest() {
@@ -242,7 +299,7 @@ public class AccessesAndPlacementTest {
       counter.put(key3, 1L);
       counter.put(key4, 1L);
 
-      request.merge(counter, 1);
+      request.merge(counter, 1, null);
 
       assertKeyAccess(key1, request, 1);
       assertKeyAccess(key2, request, 1);
@@ -254,7 +311,7 @@ public class AccessesAndPlacementTest {
       counter.put(key3, 3L);
       counter.put(key4, 4L);
 
-      request.merge(counter, 2);
+      request.merge(counter, 2, null);
 
       assertKeyAccess(key1, request, 3);
       assertKeyAccess(key2, request, 5);
@@ -278,7 +335,7 @@ public class AccessesAndPlacementTest {
          counter.put(key, (long) i);
       }
 
-      request.merge(counter, 1);
+      request.merge(counter, 1, null);
 
       assertKeyAccess(key1, request, 3);
       assertKeyAccess(key2, request, 5);
@@ -416,7 +473,7 @@ public class AccessesAndPlacementTest {
    }
 
    private TestKey createRandomKey() {
-      return new TestKey(KEY_NEXT_ID.incrementAndGet(), new TestAddress(0), new TestAddress(1));
+      return new TestKey("KEY_" + KEY_NEXT_ID.incrementAndGet());
    }
 
    private void assertAccesses(ObjectRequest request, Map<Object, Long> remote, Map<Object, Long> local) {
@@ -442,19 +499,23 @@ public class AccessesAndPlacementTest {
    }
 
    private void addKey(Object key, boolean remote, int count, StreamLibContainer container) {
+      log.debugf("Add %s accesses for key %s [is remote? %s]", count, key, remote);
       for (int i = 0; i < count; ++i) {
          container.addGet(key, remote);
       }
    }
 
-   private void assertOwner(OwnersInfo ownersInfo, Integer... newOwners) {
-      assert ownersInfo != null;
+   private void assertOwner(SegmentMapping.KeyOwners keyOwners, int... expected) {
+      Assert.assertNotNull(keyOwners);
+      int[] actual = keyOwners.getOwnerIndexes();
+      Assert.assertEquals(expected.length, actual.length);
 
-      List<Integer> expectedOwners = Arrays.asList(newOwners);
-      List<Integer> owners = ownersInfo.getNewOwnersIndexes();
+      Arrays.sort(actual);
+      Arrays.sort(expected);
 
-      assert expectedOwners.size() == owners.size();
-      assert expectedOwners.containsAll(owners);
+      for (int i = 0; i < expected.length; ++i) {
+         Assert.assertEquals(expected[i], actual[i]);
+      }
    }
 
    private ClusterSnapshot createClusterSnapshot(int size) {
@@ -466,66 +527,21 @@ public class AccessesAndPlacementTest {
    }
 
    private ObjectPlacementManager createObjectPlacementManager() {
-      return new ObjectPlacementManager(getMockDistributionManager(), new MurmurHash3(), 2);
+      return new ObjectPlacementManager();
    }
 
    private AccessesManager createRemoteAccessManager() {
-      return new AccessesManager(getMockDistributionManager(), 1000);
-   }
-
-   private DistributionManager getMockDistributionManager() {
-      DefaultConsistentHash consistentHash = mock(DefaultConsistentHash.class);      
-      when(consistentHash.locateOwners(isA(TestKey.class))).thenAnswer(new Answer<List<Address>>() {
-         @Override
-         public List<Address> answer(InvocationOnMock invocationOnMock) throws Throwable {
-            return new LinkedList<Address>(((TestKey) invocationOnMock.getArguments()[0]).getOwners());
-         }
-      });
-
-      when(consistentHash.locateAllOwners(anyCollectionOf(Object.class))).thenAnswer(new Answer<Object>() {
-         @SuppressWarnings("unchecked")
-         @Override
-         public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-            Collection<Object> keys = (Collection<Object>) invocationOnMock.getArguments()[0];
-
-            Map<Object, List<Address>> addresses = new HashMap<Object, List<Address>>();
-            for (Object key : keys) {
-               if (key instanceof TestKey) {
-                  addresses.put(key, new LinkedList<Address>(((TestKey) key).getOwners()));
-               }
-            }
-
-            return addresses;
-         }
-      });
-
-      DistributionManager distributionManager = mock(DistributionManager.class);
-      when(distributionManager.locate(isA(TestKey.class))).thenAnswer(new Answer<List<Address>>() {
-         @Override
-         public List<Address> answer(InvocationOnMock invocationOnMock) throws Throwable {
-            return new LinkedList<Address>(((TestKey) invocationOnMock.getArguments()[0]).getOwners());
-         }
-      });
-      when(distributionManager.getConsistentHash()).thenReturn(consistentHash);
-      return distributionManager;
+      AccessesManager manager = new AccessesManager();
+      manager.setMaxNumberOfKeysToRequest(100);
+      return manager;
    }
 
    private class TestKey {
 
-      private final Collection<Address> owners;
-      private final int id;
+      private final String name;
 
-      private TestKey(int id, Address... owners) {
-         this.id = id;
-         this.owners = Arrays.asList(owners);
-      }
-
-      public Collection<Address> getOwners() {
-         return owners;
-      }
-
-      public int getId() {
-         return id;
+      private TestKey(String name) {
+         this.name = name;
       }
 
       @Override
@@ -535,21 +551,54 @@ public class AccessesAndPlacementTest {
 
          TestKey testKey = (TestKey) o;
 
-         return id == testKey.id;
+         return !(name != null ? !name.equals(testKey.name) : testKey.name != null);
 
       }
 
       @Override
       public int hashCode() {
-         return id;
+         return name != null ? name.hashCode() : 0;
       }
 
       @Override
       public String toString() {
          return "TestKey{" +
-               "id=" + id +
+               "name='" + name + '\'' +
                '}';
       }
    }
 
+   private ConsistentHash createDefaultConsistentHash(List<Address> members, int numberOfOwners) {
+      return DEFAULT_CONSISTENT_HASH_FACTORY.create(HASH, numberOfOwners, NUMBER_OF_SEGMENTS, members);
+   }
+
+   private Object createKey(ConsistentHash consistentHash, Collection<Address> differentFrom, List<Address> owners) {
+      TestKey key;
+      while (true) {
+         key = new TestKey("KEY_" + KEY_NEXT_ID.incrementAndGet());
+         if (differentFrom == null || differentFrom.isEmpty()) {
+            owners.addAll(consistentHash.locateOwners(key));
+            return key;
+         }
+         List<Address> copy = new LinkedList<Address>(differentFrom);
+         copy.removeAll(consistentHash.locateOwners(key));
+         if (copy.equals(differentFrom)) {
+            owners.addAll(consistentHash.locateOwners(key));
+            return key;
+         }
+      }
+   }
+
+   private Object createKey(ConsistentHash consistentHash, Address primaryOwner) {
+      TestKey key;
+      while (true) {
+         key = new TestKey("KEY_" + KEY_NEXT_ID.incrementAndGet());
+         if (primaryOwner == null) {
+            return key;
+         }
+         if (consistentHash.locatePrimaryOwner(key).equals(primaryOwner)) {
+            return key;
+         }
+      }
+   }
 }

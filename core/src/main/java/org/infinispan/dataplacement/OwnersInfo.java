@@ -26,10 +26,15 @@ public class OwnersInfo implements Serializable {
    }
 
    public void calculateNewOwner(int requestIdx, long numberOfAccesses) {
+      if (ownersIndexes.contains(requestIdx)) {
+         //already there
+         return;
+      }
+      
       int toReplaceIndex = -1;
       long minAccesses = numberOfAccesses;
 
-      for (int index = 0; index < ownersAccesses.size(); ++index) {
+      for (int index = 0; index < ownersAccesses.size(); ++index) {         
          if (ownersAccesses.get(index) < minAccesses) {
             minAccesses = ownersAccesses.get(index);
             toReplaceIndex = index;
