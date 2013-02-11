@@ -19,6 +19,8 @@
 
 package org.infinispan.topology;
 
+import org.infinispan.dataplacement.ClusterSnapshot;
+import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.remoting.transport.Address;
@@ -38,6 +40,13 @@ public interface ClusterTopologyManager {
     */
    void triggerRebalance(String cacheName) throws Exception;
 
+   /**
+    * Used by Data Placement optimizer
+    *
+    * @param cacheName        the cache name
+    * @param clusterSnapshot  the cluster snapshot
+    */
+   void triggerAutoPlacer(String cacheName, ObjectLookup[] segmentMappings, ClusterSnapshot clusterSnapshot);
 
    /**
     * Updates the members list and notifies the {@link RebalancePolicy}.

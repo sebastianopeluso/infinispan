@@ -24,6 +24,7 @@ import org.infinispan.notifications.cachelistener.event.DataRehashedEvent;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.StateTransferManager;
+import org.infinispan.topology.ClusterTopologyManager;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -73,6 +74,7 @@ public class DataPlacementManager {
    private Stats stats;
 
    private DistributionManager distributionManager;
+   private ClusterTopologyManager clusterTopologyManager;
 
    public DataPlacementManager() {
       roundManager = new RoundManager(INITIAL_COOL_DOWN_TIME);
@@ -84,11 +86,12 @@ public class DataPlacementManager {
    @Inject
    public void inject(CommandsFactory commandsFactory, DistributionManager distributionManager, RpcManager rpcManager,
                       Cache cache, StateTransferManager stateTransfer, CacheNotifier cacheNotifier, 
-                      Configuration configuration, GroupManager groupManager) {
+                      Configuration configuration, GroupManager groupManager, ClusterTopologyManager clusterTopologyManager) {
       this.rpcManager = rpcManager;
       this.commandsFactory = commandsFactory;
       this.cacheName = cache.getName();
-      this.distributionManager = distributionManager;      
+      this.distributionManager = distributionManager;
+      this.clusterTopologyManager = clusterTopologyManager;
 
       if (!configuration.dataPlacement().enabled()) {
          log.info("Data placement not enabled in Configuration");
@@ -240,18 +243,7 @@ public class DataPlacementManager {
 
       objectLookupFactory.init(objectLookups.values());
       if (objectLookupManager.addObjectLookup(sender, objectLookups)) {
-         /*stats.receivedObjectLookup();
-         if (log.isTraceEnabled()) {
-            log.tracef("All remote Object Lookup received. Send Ack to coordinator");
-         }
-         DataPlacementCommand command = commandsFactory.buildDataPlacementCommand(DataPlacementCommand.Type.ACK_COORDINATOR_PHASE,
-                                                                                  roundId);
-         if (rpcManager.getTransport().isCoordinator()) {
-            addAck(roundId, rpcManager.getAddress());
-         } else {
-            rpcManager.invokeRemotely(Collections.singleton(rpcManager.getTransport().getCoordinator()), command, false, false);
-         }*/
-         // TODO trigger state transfer!!
+         clusterTopologyManager.triggerAutoPlacer(cacheName, objectLookupManager.getNewSegmentMappings(), null);
       }
    }
 

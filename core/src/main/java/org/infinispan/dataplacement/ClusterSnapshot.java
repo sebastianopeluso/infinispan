@@ -4,8 +4,11 @@ import org.infinispan.commons.hash.Hash;
 import org.infinispan.remoting.transport.Address;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -26,6 +29,16 @@ public class ClusterSnapshot {
    private final Hash hashFunction;
 
    public ClusterSnapshot(Address[] members, Hash hashFunction) {
+      this.hashFunction = hashFunction;
+      Set<InternalAddress> unique = new HashSet<InternalAddress>();
+      for (Address address : members) {
+         unique.add(new InternalAddress(address));
+      }
+      internalAddresses = unique.toArray(new InternalAddress[unique.size()]);
+      Arrays.sort(internalAddresses, COMPARATOR);
+   }
+
+   public ClusterSnapshot(Collection<Address> members, Hash hashFunction) {
       this.hashFunction = hashFunction;
       Set<InternalAddress> unique = new HashSet<InternalAddress>();
       for (Address address : members) {
@@ -88,6 +101,14 @@ public class ClusterSnapshot {
     */
    public final int size() {
       return internalAddresses.length;
+   }
+   
+   public final Collection<Address> getMembers() {
+      List<Address> members = new LinkedList<Address>();
+      for (InternalAddress address : internalAddresses) {
+         members.add(address.address);
+      }
+      return members;            
    }
 
    private int checkIndex(int index, InternalAddress internalAddress) {

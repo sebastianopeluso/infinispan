@@ -105,6 +105,10 @@ public class ObjectLookupManager {
 
       return hasAllAcks();
    }
+   
+   public final ObjectLookup[] getNewSegmentMappings() {
+      return receivedObjectLookup;
+   }      
 
    /**
     * returns true if it has all the Object Lookup from all members

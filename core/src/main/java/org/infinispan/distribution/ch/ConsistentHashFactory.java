@@ -22,6 +22,8 @@ package org.infinispan.distribution.ch;
 import java.util.List;
 
 import org.infinispan.commons.hash.Hash;
+import org.infinispan.dataplacement.ClusterSnapshot;
+import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.remoting.transport.Address;
 
 /**
@@ -80,4 +82,6 @@ public interface ConsistentHashFactory<CH extends ConsistentHash> {
     * parameters).
     */
    CH union(CH ch1, CH ch2);
+
+   CH rebalanceAutoPlacer(CH baseCH, ObjectLookup[] segmentMappings, ClusterSnapshot clusterSnapshot);
 }

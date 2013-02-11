@@ -26,6 +26,8 @@ import java.io.Serializable;
 import java.util.*;
 
 import org.infinispan.commons.hash.Hash;
+import org.infinispan.dataplacement.ClusterSnapshot;
+import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.marshall.AbstractExternalizer;
 import org.infinispan.marshall.Ids;
 import org.infinispan.remoting.transport.Address;
@@ -118,6 +120,11 @@ public class DefaultConsistentHashFactory implements ConsistentHashFactory<Defau
    @Override
    public DefaultConsistentHash union(DefaultConsistentHash dch1, DefaultConsistentHash dch2) {
       return dch1.union(dch2);
+   }
+
+   @Override
+   public DefaultConsistentHash rebalanceAutoPlacer(DefaultConsistentHash baseCH, ObjectLookup[] segmentMappings, ClusterSnapshot clusterSnapshot) {
+      return baseCH;
    }
 
    protected void rebalanceBuilder(Builder builder) {
