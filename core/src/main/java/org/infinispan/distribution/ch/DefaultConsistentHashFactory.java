@@ -22,12 +22,9 @@ package org.infinispan.distribution.ch;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.io.Serializable;
 import java.util.*;
 
 import org.infinispan.commons.hash.Hash;
-import org.infinispan.dataplacement.ClusterSnapshot;
-import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.marshall.AbstractExternalizer;
 import org.infinispan.marshall.Ids;
 import org.infinispan.remoting.transport.Address;
@@ -94,7 +91,7 @@ public class DefaultConsistentHashFactory implements ConsistentHashFactory<Defau
    }
 
    @Override
-   public DefaultConsistentHash rebalance(DefaultConsistentHash baseCH) {
+   public DefaultConsistentHash rebalance(DefaultConsistentHash baseCH, Object customData) {
 
       // This method assign new owners to the segments so that
       // * num_owners(s) == numOwners, for each segment s
@@ -120,11 +117,6 @@ public class DefaultConsistentHashFactory implements ConsistentHashFactory<Defau
    @Override
    public DefaultConsistentHash union(DefaultConsistentHash dch1, DefaultConsistentHash dch2) {
       return dch1.union(dch2);
-   }
-
-   @Override
-   public DefaultConsistentHash rebalanceAutoPlacer(DefaultConsistentHash baseCH, ObjectLookup[] segmentMappings, ClusterSnapshot clusterSnapshot) {
-      return baseCH;
    }
 
    protected void rebalanceBuilder(Builder builder) {

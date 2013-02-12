@@ -33,8 +33,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.infinispan.commons.hash.Hash;
-import org.infinispan.dataplacement.ClusterSnapshot;
-import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.marshall.AbstractExternalizer;
 import org.infinispan.marshall.Ids;
 import org.infinispan.remoting.transport.Address;
@@ -201,7 +199,7 @@ public class SyncConsistentHashFactory implements ConsistentHashFactory<DefaultC
    }
 
    @Override
-   public DefaultConsistentHash rebalance(DefaultConsistentHash baseCH) {
+   public DefaultConsistentHash rebalance(DefaultConsistentHash baseCH, Object customData) {
       DefaultConsistentHash rebalancedCH = create(baseCH.getHashFunction(), baseCH.getNumOwners(), baseCH.getNumSegments(), baseCH.getMembers());
 
       // the ConsistentHashFactory contract says we should return the same instance if we're not making changes
@@ -214,11 +212,6 @@ public class SyncConsistentHashFactory implements ConsistentHashFactory<DefaultC
    @Override
    public DefaultConsistentHash union(DefaultConsistentHash ch1, DefaultConsistentHash ch2) {
       return ch1.union(ch2);
-   }
-
-   @Override
-   public DefaultConsistentHash rebalanceAutoPlacer(DefaultConsistentHash baseCH, ObjectLookup[] segmentMappings, ClusterSnapshot clusterSnapshot) {
-      return baseCH;
    }
 
    protected static class Builder {

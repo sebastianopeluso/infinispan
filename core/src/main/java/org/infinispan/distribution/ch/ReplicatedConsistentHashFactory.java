@@ -20,8 +20,6 @@
 package org.infinispan.distribution.ch;
 
 import org.infinispan.commons.hash.Hash;
-import org.infinispan.dataplacement.ClusterSnapshot;
-import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.marshall.AbstractExternalizer;
 import org.infinispan.marshall.Ids;
 import org.infinispan.remoting.transport.Address;
@@ -29,7 +27,6 @@ import org.infinispan.remoting.transport.Address;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -57,7 +54,7 @@ public class ReplicatedConsistentHashFactory implements ConsistentHashFactory<Re
    }
 
    @Override
-   public ReplicatedConsistentHash rebalance(ReplicatedConsistentHash baseCH) {
+   public ReplicatedConsistentHash rebalance(ReplicatedConsistentHash baseCH, Object customData) {
       return baseCH;
    }
 
@@ -67,11 +64,6 @@ public class ReplicatedConsistentHashFactory implements ConsistentHashFactory<Re
       membersUnion.addAll(ch1.getMembers());
       membersUnion.addAll(ch2.getMembers());
       return new ReplicatedConsistentHash(new ArrayList<Address>(membersUnion));
-   }
-
-   @Override
-   public ReplicatedConsistentHash rebalanceAutoPlacer(ReplicatedConsistentHash baseCH, ObjectLookup[] segmentMappings, ClusterSnapshot clusterSnapshot) {
-      return baseCH;
    }
 
    public static class Externalizer extends AbstractExternalizer<ReplicatedConsistentHashFactory> {

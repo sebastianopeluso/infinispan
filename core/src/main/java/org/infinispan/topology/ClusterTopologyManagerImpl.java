@@ -23,8 +23,6 @@ package org.infinispan.topology;
 import org.infinispan.CacheException;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.configuration.global.GlobalConfiguration;
-import org.infinispan.dataplacement.ClusterSnapshot;
-import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.distribution.ch.ConsistentHashFactory;
 import org.infinispan.factories.GlobalComponentRegistry;
@@ -123,29 +121,12 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
    }
 
    @Override
-   public void triggerRebalance(final String cacheName) throws Exception {
+   public void triggerRebalance(final String cacheName, final Object customData) throws Exception {
       asyncTransportExecutor.submit(new Callable<Object>() {
          @Override
          public Object call() throws Exception {
             try {
-               startRebalance(cacheName, null, null);
-               return null;
-            } catch (Throwable t) {
-               log.errorf(t, "Failed to start rebalance: %s", t.getMessage());
-               throw new Exception(t);
-            }
-         }
-      });
-   }
-
-   @Override
-   public void triggerAutoPlacer(final String cacheName, final ObjectLookup[] segmentMappings,
-                                 final ClusterSnapshot clusterSnapshot) {
-      asyncTransportExecutor.submit(new Callable<Object>() {
-         @Override
-         public Object call() throws Exception {
-            try {
-               startRebalance(cacheName, segmentMappings, clusterSnapshot);
+               startRebalance(cacheName, customData);
                return null;
             } catch (Throwable t) {
                log.errorf(t, "Failed to start rebalance: %s", t.getMessage());
@@ -351,7 +332,7 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
          broadcastRebalanceStart(cacheName, cacheStatus);
       } else {
          // Trigger another rebalance in case the CH is not balanced (even though there was no rebalance in progress)
-         triggerRebalance(cacheName);
+         triggerRebalance(cacheName, null);
       }
    }
 
@@ -370,7 +351,7 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
       }
    }
 
-   private void startRebalance(String cacheName, ObjectLookup[] segmentMappings, ClusterSnapshot clusterSnapshot) throws Exception {
+   private void startRebalance(String cacheName, Object customData) throws Exception {
       ClusterCacheStatus cacheStatus = cacheStatusMap.get(cacheName);
 
       synchronized (cacheStatus) {
@@ -405,12 +386,7 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
          ConsistentHashFactory chFactory = cacheStatus.getJoinInfo().getConsistentHashFactory();
          // This update will only add the joiners to the CH, we have already checked that we don't have leavers
          ConsistentHash updatedMembersCH = chFactory.updateMembers(currentCH, newMembers);
-         ConsistentHash balancedCH;
-         if (segmentMappings != null && segmentMappings.length != 0) {
-            balancedCH = chFactory.rebalanceAutoPlacer(updatedMembersCH, segmentMappings, clusterSnapshot);
-         } else {
-            balancedCH = chFactory.rebalance(updatedMembersCH);
-         }
+         ConsistentHash balancedCH = chFactory.rebalance(updatedMembersCH, customData);         
          if (balancedCH.equals(currentCH)) {
             log.tracef("The balanced CH is the same as the current CH, not rebalancing");
             return;

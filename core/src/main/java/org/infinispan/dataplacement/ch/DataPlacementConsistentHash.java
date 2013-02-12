@@ -1,20 +1,20 @@
 package org.infinispan.dataplacement.ch;
 
 import org.infinispan.commons.hash.Hash;
-import org.infinispan.dataplacement.ClusterSnapshot;
-import org.infinispan.dataplacement.lookup.ObjectLookup;
+import org.infinispan.dataplacement.ClusterObjectLookup;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.marshall.AbstractExternalizer;
 import org.infinispan.marshall.Ids;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.util.InfinispanCollections;
 import org.infinispan.util.Util;
 
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -33,17 +33,23 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
    //one object lookup per segment
    private final List<ClusterObjectLookup> clusterObjectLookupList;
 
-   public DataPlacementConsistentHash(CH consistentHash, ObjectLookup[] objectLookups, ClusterSnapshot clusterSnapshot) {
+   public DataPlacementConsistentHash(CH consistentHash) {
       this.consistentHash = consistentHash;
-      this.clusterObjectLookupList = new LinkedList<ClusterObjectLookup>();
-      if (objectLookups != null) {
-         this.clusterObjectLookupList.add(new ClusterObjectLookup(objectLookups, clusterSnapshot));
-      }
+      this.clusterObjectLookupList = InfinispanCollections.emptyList();
+   }
+
+   public DataPlacementConsistentHash(CH consistentHash, ClusterObjectLookup clusterObjectLookup) {
+      this.consistentHash = consistentHash;
+      this.clusterObjectLookupList = Collections.singletonList(clusterObjectLookup);
    }
 
    public DataPlacementConsistentHash(DataPlacementConsistentHash<CH> baseCH, CH consistentHash) {
+      this(consistentHash, baseCH.getClusterObjectLookupList());
+   }
+
+   public DataPlacementConsistentHash(CH consistentHash, List<ClusterObjectLookup> clusterObjectLookups) {
       this.consistentHash = consistentHash;
-      this.clusterObjectLookupList = new LinkedList<ClusterObjectLookup>(baseCH.clusterObjectLookupList);
+      this.clusterObjectLookupList = clusterObjectLookups;
    }
 
    @Override
@@ -185,28 +191,8 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
       return result;
    }
 
-   public Object[] toParameters() {
-      if (clusterObjectLookupList.isEmpty()) {
-         return null;
-      }
-      Object[] parameters = new Object[clusterObjectLookupList.size() * 2];
-      int index = 0;
-      for (ClusterObjectLookup clusterObjectLookup : clusterObjectLookupList) {
-         parameters[index++] = clusterObjectLookup.objectLookups;
-         parameters[index++] = clusterObjectLookup.clusterSnapshot.getMembers();
-      }
-      return parameters;
-   }
-
-   public void fromParameters(Object[] parameters) {
-      if (parameters == null) {
-         return;
-      }
-      for (int i = 0; i < parameters.length; ++i) {
-         ObjectLookup[] lookups = (ObjectLookup[]) parameters[i++];
-         Collection<Address> members = (Collection<Address>) parameters[i];
-         clusterObjectLookupList.add(new ClusterObjectLookup(lookups, new ClusterSnapshot(members, consistentHash.getHashFunction())));
-      }
+   public final List<ClusterObjectLookup> getClusterObjectLookupList() {
+      return clusterObjectLookupList;
    }
 
    public static class Externalizer extends AbstractExternalizer<DataPlacementConsistentHash> {
@@ -219,65 +205,27 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
       @Override
       public void writeObject(ObjectOutput output, DataPlacementConsistentHash object) throws IOException {
          output.writeObject(object.consistentHash);
-         output.writeObject(object.toParameters());
+         List<ClusterObjectLookup> list = object.getClusterObjectLookupList();
+         output.writeInt(list.size());
+         for (ClusterObjectLookup clusterObjectLookup : list) {
+            ClusterObjectLookup.write(output, clusterObjectLookup);
+         }
       }
 
       @Override
       public DataPlacementConsistentHash readObject(ObjectInput input) throws IOException, ClassNotFoundException {
          ConsistentHash consistentHash = (ConsistentHash) input.readObject();
-         Object[] parameters = (Object[]) input.readObject();
-         DataPlacementConsistentHash dataPlacementConsistentHash = new DataPlacementConsistentHash(consistentHash, null, null);
-         dataPlacementConsistentHash.fromParameters(parameters);
-         return dataPlacementConsistentHash;
+         int size = input.readInt();
+         List<ClusterObjectLookup> clusterObjectLookups = new ArrayList<ClusterObjectLookup>(size);
+         for (int i = 0; i < size; ++i) {
+            clusterObjectLookups.add(ClusterObjectLookup.read(input, consistentHash.getHashFunction()));
+         }
+         return new DataPlacementConsistentHash(consistentHash, clusterObjectLookups);
       }
 
       @Override
       public Integer getId() {
          return Ids.DATA_PLACEMENT_CONSISTENT_HASH;
-      }
-   }
-
-   private class ClusterObjectLookup {
-      private final ObjectLookup[] objectLookups;
-      private final ClusterSnapshot clusterSnapshot;
-
-      private ClusterObjectLookup(ObjectLookup[] objectLookups, ClusterSnapshot clusterSnapshot) {
-         this.objectLookups = objectLookups;
-         this.clusterSnapshot = clusterSnapshot;
-      }
-
-      public final List<Address> getNewOwnersForKey(Object key, ConsistentHash consistentHash, int numberOfOwners) {
-         List<Integer> newOwnersIndexes = objectLookups[consistentHash.getSegment(key)].query(key);
-         if (newOwnersIndexes == null || newOwnersIndexes.isEmpty()) {
-            return null;
-         }
-         List<Address> newOwners = new ArrayList<Address>(Math.min(numberOfOwners, newOwnersIndexes.size()));
-         for (Iterator<Integer> iterator = newOwnersIndexes.iterator(); iterator.hasNext() && newOwners.size() < numberOfOwners; ) {
-            Address owner = clusterSnapshot.get(iterator.next());
-            if (owner != null && consistentHash.getMembers().contains(owner)) {
-               newOwners.add(owner);
-            }
-         }
-         return newOwners;
-      }
-
-      @Override
-      public boolean equals(Object o) {
-         if (this == o) return true;
-         if (o == null || getClass() != o.getClass()) return false;
-
-         ClusterObjectLookup that = (ClusterObjectLookup) o;
-
-         return !(clusterSnapshot != null ? !clusterSnapshot.equals(that.clusterSnapshot) : that.clusterSnapshot != null) && 
-               Arrays.equals(objectLookups, that.objectLookups);
-
-      }
-
-      @Override
-      public int hashCode() {
-         int result = objectLookups != null ? Arrays.hashCode(objectLookups) : 0;
-         result = 31 * result + (clusterSnapshot != null ? clusterSnapshot.hashCode() : 0);
-         return result;
       }
    }
 }

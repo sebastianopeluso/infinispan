@@ -24,7 +24,7 @@ import org.infinispan.notifications.cachelistener.event.DataRehashedEvent;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.StateTransferManager;
-import org.infinispan.topology.ClusterTopologyManager;
+import org.infinispan.topology.RebalancePolicy;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -74,7 +74,7 @@ public class DataPlacementManager {
    private Stats stats;
 
    private DistributionManager distributionManager;
-   private ClusterTopologyManager clusterTopologyManager;
+   private DataPlacementRebalancePolicy rebalancePolicy;
 
    public DataPlacementManager() {
       roundManager = new RoundManager(INITIAL_COOL_DOWN_TIME);
@@ -86,16 +86,23 @@ public class DataPlacementManager {
    @Inject
    public void inject(CommandsFactory commandsFactory, DistributionManager distributionManager, RpcManager rpcManager,
                       Cache cache, StateTransferManager stateTransfer, CacheNotifier cacheNotifier, 
-                      Configuration configuration, GroupManager groupManager, ClusterTopologyManager clusterTopologyManager) {
+                      Configuration configuration, GroupManager groupManager, RebalancePolicy rebalancePolicy) {
       this.rpcManager = rpcManager;
       this.commandsFactory = commandsFactory;
       this.cacheName = cache.getName();
       this.distributionManager = distributionManager;
-      this.clusterTopologyManager = clusterTopologyManager;
+      if (rebalancePolicy instanceof DataPlacementRebalancePolicy) {
+         this.rebalancePolicy = (DataPlacementRebalancePolicy) rebalancePolicy; 
+      } else {
+         this.rebalancePolicy = null;
+      }
 
       if (!configuration.dataPlacement().enabled()) {
          log.info("Data placement not enabled in Configuration");
          return;
+      } else if (this.rebalancePolicy == null) {
+         log.info("Data placement not enabled because the Rebalance Policy is not the expected: " + 
+                        rebalancePolicy.getClass().getSimpleName());
       }
 
       objectLookupFactory = configuration.dataPlacement().objectLookupFactory();
@@ -243,7 +250,11 @@ public class DataPlacementManager {
 
       objectLookupFactory.init(objectLookups.values());
       if (objectLookupManager.addObjectLookup(sender, objectLookups)) {
-         clusterTopologyManager.triggerAutoPlacer(cacheName, objectLookupManager.getNewSegmentMappings(), null);
+         try {
+            rebalancePolicy.setNewSegmentMappings(cacheName, null); //TODO         
+         } catch (Exception e) {
+            log.error("Error triggering State Transfer with the new mappings", e);
+         }
       }
    }
 
@@ -367,6 +378,11 @@ public class DataPlacementManager {
 
       if (rpcManager.getTransport().getMembers().size() == 1) {
          log.warn("Data placement request received but we are the only member. ignoring...");
+         return;
+      }
+
+      if (rebalancePolicy == null) {
+         log.error("Cannot start Data Placement protocol. No Rebalance Policy set!");
          return;
       }
 

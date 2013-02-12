@@ -71,11 +71,13 @@ public interface ConsistentHashFactory<CH extends ConsistentHash> {
     * <p/>
     * {@code rebalance(rebalance(ch))} must be equivalent to {@code rebalance(ch)}.
     *
+    *
     * @param baseCH An existing consistent hash instance, should not be {@code null}
+    * @param customData
     * @return A new {@link ConsistentHash} instance, or {@code baseCH} if the existing instance
     *         does not need any changes.
     */
-   CH rebalance(CH baseCH);
+   CH rebalance(CH baseCH, Object customData);
 
    /**
     * Creates a union of two compatible ConsistentHashes (use the same hashing function and have the same configuration
@@ -83,5 +85,4 @@ public interface ConsistentHashFactory<CH extends ConsistentHash> {
     */
    CH union(CH ch1, CH ch2);
 
-   CH rebalanceAutoPlacer(CH baseCH, ObjectLookup[] segmentMappings, ClusterSnapshot clusterSnapshot);
 }

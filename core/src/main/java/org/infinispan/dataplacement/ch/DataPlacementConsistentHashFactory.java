@@ -1,8 +1,7 @@
 package org.infinispan.dataplacement.ch;
 
 import org.infinispan.commons.hash.Hash;
-import org.infinispan.dataplacement.ClusterSnapshot;
-import org.infinispan.dataplacement.lookup.ObjectLookup;
+import org.infinispan.dataplacement.ClusterObjectLookup;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.distribution.ch.ConsistentHashFactory;
 import org.infinispan.marshall.AbstractExternalizer;
@@ -34,7 +33,7 @@ public class DataPlacementConsistentHashFactory<CH extends ConsistentHash>
    @Override
    public DataPlacementConsistentHash<CH> create(Hash hashFunction, int numOwners, int numSegments, List<Address> members) {
       CH ch = consistentHashFactory.create(hashFunction, numOwners, numSegments, members);
-      return new DataPlacementConsistentHash<CH>(ch, null, null);
+      return new DataPlacementConsistentHash<CH>(ch);
    }
 
    @Override
@@ -44,28 +43,33 @@ public class DataPlacementConsistentHashFactory<CH extends ConsistentHash>
    }
 
    @Override
-   public DataPlacementConsistentHash<CH> rebalance(DataPlacementConsistentHash<CH> baseCH) {
-      CH ch = consistentHashFactory.rebalance(baseCH.getConsistentHash());
+   public DataPlacementConsistentHash<CH> rebalance(DataPlacementConsistentHash<CH> baseCH, Object customData) {
+      CH ch = consistentHashFactory.rebalance(baseCH.getConsistentHash(), customData);
       if (ch.equals(baseCH.getConsistentHash())) {
-         return baseCH;
+         if (customData != null && customData instanceof ClusterObjectLookup) {
+            ClusterObjectLookup clusterObjectLookup = (ClusterObjectLookup) customData;
+            if (baseCH.getClusterObjectLookupList().size() == 1 && baseCH.getClusterObjectLookupList().get(0).equals(clusterObjectLookup)) {
+               //same CH and same ClusterObjectLookup
+               return baseCH;
+            } else {
+               return new DataPlacementConsistentHash<CH>(baseCH.getConsistentHash(), clusterObjectLookup);
+            }
+         } else {
+            return baseCH;
+         }
+      } else {
+         if (customData != null && customData instanceof ClusterObjectLookup){
+            ClusterObjectLookup clusterObjectLookup = (ClusterObjectLookup) customData;
+            return new DataPlacementConsistentHash<CH>(ch, clusterObjectLookup);
+         } else {
+            return new DataPlacementConsistentHash<CH>(baseCH, ch);
+         }
       }
-      return new DataPlacementConsistentHash<CH>(baseCH, ch);
    }
 
    @Override
    public DataPlacementConsistentHash<CH> union(DataPlacementConsistentHash<CH> ch1, DataPlacementConsistentHash<CH> ch2) {
       return null;  // TODO: Customise this generated block
-   }
-
-   @Override
-   public DataPlacementConsistentHash<CH> rebalanceAutoPlacer(DataPlacementConsistentHash<CH> baseCH,
-                                                              ObjectLookup[] segmentMappings,
-                                                              ClusterSnapshot clusterSnapshot) {
-      CH ch = consistentHashFactory.rebalance(baseCH.getConsistentHash());
-      if (ch.equals(baseCH.getConsistentHash())) {
-         return new DataPlacementConsistentHash<CH>(baseCH.getConsistentHash(), segmentMappings, clusterSnapshot);
-      }
-      return new DataPlacementConsistentHash<CH>(ch, segmentMappings, clusterSnapshot);
    }
 
    public static class Externalizer extends AbstractExternalizer<DataPlacementConsistentHashFactory> {
