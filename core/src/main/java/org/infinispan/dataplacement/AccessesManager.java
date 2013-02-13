@@ -25,7 +25,7 @@ import static org.infinispan.stats.topK.StreamLibContainer.Stat.*;
  */
 public class AccessesManager {
    private static final Log log = LogFactory.getLog(AccessesManager.class);
-   private final StreamLibContainer streamLibContainer;
+   private StreamLibContainer streamLibContainer;
    private ConsistentHash consistentHash;
    private ClusterSnapshot clusterSnapshot;
    private Accesses[] accessesByPrimaryOwner;
@@ -33,8 +33,8 @@ public class AccessesManager {
    private int maxNumberOfKeysToRequest;
    private GroupManager groupManager;
 
-   public AccessesManager() {
-      streamLibContainer = StreamLibContainer.getInstance();
+   public void setStreamLibContainer(StreamLibContainer streamLibContainer) {
+      this.streamLibContainer = streamLibContainer;
    }
 
    /**

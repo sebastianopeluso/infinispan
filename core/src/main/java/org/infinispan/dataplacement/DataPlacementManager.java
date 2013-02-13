@@ -24,6 +24,7 @@ import org.infinispan.notifications.cachelistener.event.DataRehashedEvent;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.StateTransferManager;
+import org.infinispan.stats.topK.StreamSummaryManager;
 import org.infinispan.topology.RebalancePolicy;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -113,6 +114,7 @@ public class DataPlacementManager {
          if (roundManager.isEnabled()) {
             log.info("Data Placement is already enabled!");
          } else if (configuration.clustering().cacheMode().isDistributed()) {
+            accessesManager.setStreamLibContainer(StreamSummaryManager.getStreamLibForCache(cacheName));
             accessesManager.setMaxNumberOfKeysToRequest(configuration.dataPlacement().maxNumberOfKeysToRequest());
             accessesManager.setGroupManager(groupManager);
             roundManager.enable();

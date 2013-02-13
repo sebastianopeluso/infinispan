@@ -20,11 +20,10 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class StreamLibContainer {
 
-   private static final StreamLibContainer instance = new StreamLibContainer();
-   public static final int MAX_CAPACITY = 20000;
+   public static final int MAX_CAPACITY = 100000;
 
-   private int capacity = 100;
-   private boolean active = false;
+   private volatile int capacity = 1000;
+   private volatile boolean active = false;
 
    private final Map<Stat, StreamSummary<Object>> streamSummaryEnumMap;
    private final Map<Stat, Lock> lockMap;
@@ -41,20 +40,15 @@ public class StreamLibContainer {
       MOST_WRITE_SKEW_FAILED_KEYS
    }
 
-   private StreamLibContainer() {
+   public StreamLibContainer() {
       streamSummaryEnumMap = Collections.synchronizedMap(new EnumMap<Stat, StreamSummary<Object>>(Stat.class));
       lockMap = new EnumMap<Stat, Lock>(Stat.class);
 
       for (Stat stat : Stat.values()) {
          lockMap.put(stat, new ReentrantLock());
       }
-
-      clearAll();
-      setActive(false);
-   }
-
-   public static StreamLibContainer getInstance() {
-      return instance;
+      
+      resetAll(1);
    }
 
    public boolean isActive() {
@@ -62,6 +56,11 @@ public class StreamLibContainer {
    }
 
    public void setActive(boolean active) {
+      if (!this.active && active) {
+         resetAll(capacity);
+      } else if (!active) {
+         resetAll(1);
+      }
       this.active = active;
    }
 
@@ -137,25 +136,29 @@ public class StreamLibContainer {
    }
 
    public void resetAll(){
-      clearAll();
+      resetAll(capacity);
+   }
+   
+   public void resetStat(Stat stat) {
+      resetStat(stat, capacity);
    }
 
-   public void resetStat(Stat stat){
+   private void resetStat(Stat stat, int customCapacity){
       try {
          lockMap.get(stat).lock();
-         streamSummaryEnumMap.put(stat, createNewStreamSummary());
+         streamSummaryEnumMap.put(stat, createNewStreamSummary(customCapacity));
       } finally {
          lockMap.get(stat).unlock();
       }
    }
 
-   private StreamSummary<Object> createNewStreamSummary() {
-      return new StreamSummary<Object>(Math.max(MAX_CAPACITY, capacity));
+   private StreamSummary<Object> createNewStreamSummary(int customCapacity) {
+      return new StreamSummary<Object>(Math.min(MAX_CAPACITY, customCapacity));
    }
 
-   private void clearAll() {
+   private void resetAll(int customCapacity) {
       for (Stat stat : Stat.values()) {
-         resetStat(stat);
+         resetStat(stat, customCapacity);
       }
    }
 

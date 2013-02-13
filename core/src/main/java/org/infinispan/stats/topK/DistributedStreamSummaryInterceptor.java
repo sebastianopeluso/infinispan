@@ -7,7 +7,7 @@ import org.infinispan.distribution.DistributionManager;
  * @author Pedro Ruivo
  * @since 5.2
  */
-public class DistributedStreamLibInterceptor extends StreamLibInterceptor {
+public class DistributedStreamSummaryInterceptor extends StreamSummaryInterceptor {
    private DistributionManager distributionManager;
 
    @Override
