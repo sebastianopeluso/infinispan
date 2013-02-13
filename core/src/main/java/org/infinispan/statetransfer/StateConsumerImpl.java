@@ -85,11 +85,11 @@ public class StateConsumerImpl implements StateConsumer {
 
    private ExecutorService executorService;
    private StateTransferManager stateTransferManager;
-   private String cacheName;
+   protected String cacheName;
    private Configuration configuration;
-   private RpcManager rpcManager;
+   protected RpcManager rpcManager;
    private TransactionManager transactionManager;   // optional
-   private CommandsFactory commandsFactory;
+   protected CommandsFactory commandsFactory;
    private TransactionTable transactionTable;       // optional
    private DataContainer dataContainer;
    private CacheLoaderManager cacheLoaderManager;
@@ -97,12 +97,12 @@ public class StateConsumerImpl implements StateConsumer {
    private InvocationContextContainer icc;
    private StateTransferLock stateTransferLock;
    private TotalOrderManager totalOrderManager;
-   private long timeout;
+   protected long timeout;
    private boolean useVersionedPut;
    private boolean isFetchEnabled;
    private boolean isTransactional;
 
-   private volatile CacheTopology cacheTopology;
+   protected volatile CacheTopology cacheTopology;
 
    /**
     * Keeps track of all keys updated by user code during state transfer. If this is null no keys are being recorded and
@@ -127,7 +127,7 @@ public class StateConsumerImpl implements StateConsumer {
     * flowing in from the same source (but for different segments) so the values are lists. This works in tandem with
     * transfersBySegment so they always need to be kept in sync and updates to both of them need to be atomic.
     */
-   private final Map<Address, List<InboundTransferTask>> transfersBySource = new HashMap<Address, List<InboundTransferTask>>();
+   protected final Map<Address, List<InboundTransferTask>> transfersBySource = new HashMap<Address, List<InboundTransferTask>>();
 
    /**
     * A map that keeps track of current inbound state transfers by segment id. There is at most one transfers per segment.
@@ -139,7 +139,7 @@ public class StateConsumerImpl implements StateConsumer {
    /**
     * Tasks ready to be executed by the transfer thread. These tasks are also present if transfersBySegment and transfersBySource.
     */
-   private final BlockingDeque<InboundTransferTask> taskQueue = new LinkedBlockingDeque<InboundTransferTask>();
+   protected final BlockingDeque<InboundTransferTask> taskQueue = new LinkedBlockingDeque<InboundTransferTask>();
 
    private final AtomicBoolean isTransferThreadRunning = new AtomicBoolean();
 
@@ -328,6 +328,7 @@ public class StateConsumerImpl implements StateConsumer {
             if (!addedSegments.isEmpty()) {
                addTransfers(addedSegments);  // add transfers for new or restarted segments
             }
+            afterStateTransferStarted(previousCh, cacheTopology.getWriteConsistentHash());            
          }
       } finally {
          stateTransferLock.notifyTransactionDataReceived(cacheTopology.getTopologyId());
@@ -336,6 +337,10 @@ public class StateConsumerImpl implements StateConsumer {
             notifyEndOfTopologyUpdate(cacheTopology.getTopologyId());
          }
       }
+   }
+   
+   protected void afterStateTransferStarted(ConsistentHash oldCh, ConsistentHash newCh) {
+      //no-op
    }
 
    private void notifyEndOfTopologyUpdate(int topologyId) {
@@ -855,7 +860,7 @@ public class StateConsumerImpl implements StateConsumer {
             return null;
          }
       }
-   }
+   }      
 
    private boolean removeTransfer(InboundTransferTask inboundTransfer) {
       synchronized (this) {
