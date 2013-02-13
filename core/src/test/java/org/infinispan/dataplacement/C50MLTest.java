@@ -9,8 +9,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -48,22 +48,27 @@ public class C50MLTest extends AbstractCacheTest{
 
       for (int numberOfKeys = 1000; numberOfKeys < 10000; numberOfKeys *= 2) {
          for (int replicationDegree = 1; replicationDegree < 10; replicationDegree *= 2) {
-            Map<Object, OwnersInfo> ownersInfoMap = createRandomMovements(numberOfKeys, replicationDegree);
+            SegmentMapping segmentMapping = createRandomMovements(numberOfKeys, replicationDegree);
             //TODO FIX ME
-            ObjectLookup objectLookup = null;//objectLookupFactory.createObjectLookup(ownersInfoMap, replicationDegree);
+            ObjectLookup objectLookup = objectLookupFactory.createObjectLookup(segmentMapping, replicationDegree);
             assert objectLookup != null;
-            checkOwnerIndex(ownersInfoMap, objectLookup, "key:" + numberOfKeys + ",replication degree=" + replicationDegree);
+            checkOwnerIndex(segmentMapping, objectLookup, "key:" + numberOfKeys + ",replication degree=" + replicationDegree);
          }
       }
    }
 
-   private void checkOwnerIndex(Map<Object, OwnersInfo> ownersInfoMap, ObjectLookup objectLookup, String test) {
+   private void checkOwnerIndex(SegmentMapping segmentMapping, ObjectLookup objectLookup, String test) {
       int errors = 0, wrongReplicationDegree = 0;
       long start, end, duration = 0;
-      for (Map.Entry<Object, OwnersInfo> entry : ownersInfoMap.entrySet()) {
-         Set<Integer> expectedOwners = new TreeSet<Integer>(entry.getValue().getNewOwnersIndexes());
+      Iterator<SegmentMapping.KeyOwners> keyOwnersIterator = segmentMapping.iterator();
+      while (keyOwnersIterator.hasNext()) {
+         SegmentMapping.KeyOwners keyOwners = keyOwnersIterator.next();
+         Set<Integer> expectedOwners = new TreeSet<Integer>();
+         for (int index : keyOwners.getOwnerIndexes()) {
+            expectedOwners.add(index);
+         }
          start = System.currentTimeMillis();
-         Collection<Integer> owners = objectLookup.query(entry.getKey());
+         Collection<Integer> owners = objectLookup.query(keyOwners.getKey());
          end = System.currentTimeMillis();
          Set<Integer> ownersQuery = new TreeSet<Integer>(owners);
 
@@ -75,10 +80,11 @@ public class C50MLTest extends AbstractCacheTest{
                 test, errors, wrongReplicationDegree, duration);
    }
 
-   private Map<Object, OwnersInfo> createRandomMovements(int numberOfKeys, int replicationDegree) {
+   private SegmentMapping createRandomMovements(int numberOfKeys, int replicationDegree) {
       Random random = new Random();
-      Map<Object, OwnersInfo> ownersInfoMap = new HashMap<Object, OwnersInfo>();
-      while (ownersInfoMap.size() < numberOfKeys) {
+      Set<Object> keys = new HashSet<Object>();
+      SegmentMapping segmentMapping = new SegmentMapping(1);
+      while (keys.size() < numberOfKeys) {
          Object key;
          if (random.nextInt(100) < 50) {
             key = DummyKeyFeatureManager.getKey(random.nextInt(1000));
@@ -94,8 +100,11 @@ public class C50MLTest extends AbstractCacheTest{
          for (int ownerIndex : owners) {
             ownersInfo.add(ownerIndex, 0);
          }
-         ownersInfoMap.put(key, ownersInfo);
+         if (keys.add(key)) {
+            segmentMapping.add(key, ownersInfo);
+         }
       }
-      return ownersInfoMap;
+
+      return segmentMapping;
    }
 }

@@ -28,8 +28,6 @@ import org.infinispan.topology.RebalancePolicy;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.io.FileOutputStream;
-import java.io.ObjectOutputStream;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,7 +52,6 @@ public class DataPlacementManager {
    private static final Log log = LogFactory.getLog(DataPlacementManager.class);
 
    private static final int INITIAL_COOL_DOWN_TIME = 30000; //30 seconds
-   private static final boolean SAVE = false;
 
    private RpcManager rpcManager;
    private CommandsFactory commandsFactory;
@@ -251,35 +248,10 @@ public class DataPlacementManager {
       objectLookupFactory.init(objectLookups.values());
       if (objectLookupManager.addObjectLookup(sender, objectLookups)) {
          try {
-            rebalancePolicy.setNewSegmentMappings(cacheName, null); //TODO         
+            rebalancePolicy.setNewSegmentMappings(cacheName, objectLookupManager.getClusterObjectLookup());         
          } catch (Exception e) {
             log.error("Error triggering State Transfer with the new mappings", e);
          }
-      }
-   }
-
-   /**
-    * collects all acks from all members. when all acks are collects, the state transfer is triggered
-    *
-    * @param roundId the round id
-    * @param sender  the sender
-    */
-   public final void addAck(long roundId, Address sender) {
-      if (log.isDebugEnabled()) {
-         log.debugf("Ack received in round %s", roundId);
-      }
-
-      if (!roundManager.ensure(roundId, sender)) {
-         log.warn("Not possible to process Ack");
-         return;
-      }
-
-      if (objectLookupManager.addAck(sender)) {
-         stats.receivedAcks();
-         if (log.isTraceEnabled()) {
-            log.tracef("All Acks received. Trigger state transfer");
-         }
-         //TODO
       }
    }
 
@@ -290,21 +262,6 @@ public class DataPlacementManager {
     */
    public final void internalSetCoolDownTime(int milliseconds) {
       roundManager.setCoolDownTime(milliseconds);
-   }
-
-   private void saveObjectsToMoveToFile(Map<Object, OwnersInfo> ownersInfoMap) {
-      if (SAVE) {
-         try {
-            ObjectOutputStream objectOutputStream = new ObjectOutputStream(
-                  new FileOutputStream("round-" + roundManager.getCurrentRoundId()));
-            objectOutputStream.writeObject(ownersInfoMap);
-            objectOutputStream.flush();
-            objectOutputStream.close();
-         } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(-1);
-         }
-      }
    }
 
    /**

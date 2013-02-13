@@ -10,6 +10,7 @@ import org.infinispan.util.concurrent.ConcurrentMapFactory;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentMap;
 
 /**
@@ -21,7 +22,7 @@ import java.util.concurrent.ConcurrentMap;
 public class DataPlacementRebalancePolicy implements RebalancePolicy {
 
    private static final Log log = LogFactory.getLog(DataPlacementRebalancePolicy.class);
-   private final ConcurrentMap<String, Object> newSegmentMappings = ConcurrentMapFactory.makeConcurrentMap();
+   private final ConcurrentMap<String, ClusterObjectLookup> newSegmentMappings = ConcurrentMapFactory.makeConcurrentMap();
    private ClusterTopologyManager clusterTopologyManager;
 
    @Inject
@@ -43,11 +44,10 @@ public class DataPlacementRebalancePolicy implements RebalancePolicy {
          return;
       }
 
-      if (!cacheStatus.hasJoiners() && isBalanced(cacheStatus.getCacheTopology().getCurrentCH()) &&
-            isSegmentsMappingsApplied(cacheStatus.getCacheTopology().getCurrentCH(), newSegmentMappings.get(cacheName))) {
+      ClusterObjectLookup clusterObjectLookup = getSegmentsToApply(cacheName, cacheStatus.getCacheTopology().getCurrentCH());
+      if (!cacheStatus.hasJoiners() && isBalanced(cacheStatus.getCacheTopology().getCurrentCH()) && clusterObjectLookup != null) {
          log.tracef("Not triggering rebalance for cache %s, no joiners and the current consistent hash is already balanced",
-                    cacheName);
-         newSegmentMappings.remove(cacheName); //TODO synchronize this!
+                    cacheName);         
          return;
       }
 
@@ -57,19 +57,25 @@ public class DataPlacementRebalancePolicy implements RebalancePolicy {
       }
 
       log.tracef("Triggering rebalance for cache %s", cacheName);
-      clusterTopologyManager.triggerRebalance(cacheName, newSegmentMappings.get(cacheName)); //TODO synchronize this!
+      clusterTopologyManager.triggerRebalance(cacheName, clusterObjectLookup);
    }
 
-   private boolean isSegmentsMappingsApplied(ConsistentHash currentCH, Object mappings) {
-      if (currentCH instanceof DataPlacementConsistentHash) {
-         //TODO get current mapping
-         //TODO check with mappings
+   private ClusterObjectLookup getSegmentsToApply(String cacheName, ConsistentHash consistentHash) {
+      if (consistentHash instanceof DataPlacementConsistentHash) {
+         ClusterObjectLookup clusterObjectLookup = newSegmentMappings.get(cacheName);
+         List<ClusterObjectLookup> list = ((DataPlacementConsistentHash) consistentHash).getClusterObjectLookupList();
+         if (clusterObjectLookup != null && list.size() == 1 && clusterObjectLookup.equals(list.get(0))) {
+            //in this case, the ConsistentHash already has the most recent mappings. remove from the newMapping map
+            newSegmentMappings.remove(cacheName, clusterObjectLookup);
+            return null;
+         }
+         return clusterObjectLookup;
       }
-      return true;
+      return null;
    }
 
-   public void setNewSegmentMappings(String cacheName, Object segmentMappings) throws Exception {
-      newSegmentMappings.put(cacheName, segmentMappings);      
+   public void setNewSegmentMappings(String cacheName, ClusterObjectLookup segmentMappings) throws Exception {
+      newSegmentMappings.put(cacheName, segmentMappings);
       clusterTopologyManager.triggerRebalance(cacheName, segmentMappings);
    }
 

@@ -195,6 +195,12 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
       return clusterObjectLookupList;
    }
 
+   public final DataPlacementConsistentHash<CH> union(DataPlacementConsistentHash<CH> baseCH, CH unionCH) {
+      List<ClusterObjectLookup> clusterObjectLookups = getClusterObjectLookupList();
+      clusterObjectLookups.addAll(baseCH.getClusterObjectLookupList());
+      return new DataPlacementConsistentHash<CH>(unionCH, clusterObjectLookups);
+   }
+
    public static class Externalizer extends AbstractExternalizer<DataPlacementConsistentHash> {
 
       @Override

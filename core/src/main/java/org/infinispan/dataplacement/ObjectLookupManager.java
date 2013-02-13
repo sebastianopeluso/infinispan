@@ -106,8 +106,8 @@ public class ObjectLookupManager {
       return hasAllAcks();
    }
    
-   public final ObjectLookup[] getNewSegmentMappings() {
-      return receivedObjectLookup;
+   public final ClusterObjectLookup getClusterObjectLookup() {
+      return new ClusterObjectLookup(receivedObjectLookup, clusterSnapshot);
    }      
 
    /**

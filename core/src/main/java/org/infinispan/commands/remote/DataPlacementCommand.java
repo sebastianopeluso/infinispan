@@ -44,11 +44,6 @@ public class DataPlacementCommand extends BaseRpcCommand {
       OBJECT_LOOKUP_PHASE,
 
       /**
-       * contains the final ACK to start the state transfer
-       */
-      ACK_COORDINATOR_PHASE,
-
-      /**
        * sets the new cool down period
        */
       SET_COOL_DOWN_TIME
@@ -111,9 +106,6 @@ public class DataPlacementCommand extends BaseRpcCommand {
             case OBJECT_LOOKUP_PHASE:
                dataPlacementManager.addObjectLookup(getOrigin(), objectLookup, roundId);
                break;
-            case ACK_COORDINATOR_PHASE:
-               dataPlacementManager.addAck(roundId, getOrigin());
-               break;
             case SET_COOL_DOWN_TIME:
                dataPlacementManager.internalSetCoolDownTime(coolDownTime);
                break;
@@ -142,8 +134,6 @@ public class DataPlacementCommand extends BaseRpcCommand {
                System.arraycopy(members, 0, retVal, 2, members.length);
             }
             return retVal;
-         case ACK_COORDINATOR_PHASE:
-            return new Object[] {(byte) type.ordinal(), roundId};
          case REMOTE_TOP_LIST_PHASE:
             return new Object[] {(byte) type.ordinal(), roundId, objectRequest};
          case OBJECT_LOOKUP_PHASE:
@@ -168,10 +158,6 @@ public class DataPlacementCommand extends BaseRpcCommand {
                   members[i] = (Address) parameters[i + 2];
                }
             }
-            break;
-         case ACK_COORDINATOR_PHASE:
-            roundId = (Long) parameters[1];
-            break;
          case REMOTE_TOP_LIST_PHASE:
             roundId = (Long) parameters[1];
             objectRequest = (ObjectRequest) parameters[2];

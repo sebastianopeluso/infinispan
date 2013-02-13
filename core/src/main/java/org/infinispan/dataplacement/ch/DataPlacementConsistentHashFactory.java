@@ -69,7 +69,8 @@ public class DataPlacementConsistentHashFactory<CH extends ConsistentHash>
 
    @Override
    public DataPlacementConsistentHash<CH> union(DataPlacementConsistentHash<CH> ch1, DataPlacementConsistentHash<CH> ch2) {
-      return null;  // TODO: Customise this generated block
+      CH union = consistentHashFactory.union(ch1.getConsistentHash(), ch2.getConsistentHash());
+      return ch1.union(ch2, union);
    }
 
    public static class Externalizer extends AbstractExternalizer<DataPlacementConsistentHashFactory> {
