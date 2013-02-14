@@ -27,9 +27,14 @@ public abstract class StreamSummaryInterceptor extends BaseCustomInterceptor {
 
    @Override
    protected void start() {
-      super.start();
-      streamLibContainer = StreamSummaryManager.getStreamLibForCache(cache.getName());
+      super.start();                  
+      streamLibContainer = StreamLibContainer.getOrCreateStreamLibContainer(cache);
       streamLibContainer.setActive(true);
+   }
+
+   @Override
+   protected void stop() {
+      streamLibContainer.setActive(false);
    }
 
    protected abstract boolean isRemote(Object key);

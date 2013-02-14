@@ -2,6 +2,8 @@ package org.infinispan.stats.topK;
 
 import com.clearspring.analytics.stream.Counter;
 import com.clearspring.analytics.stream.StreamSummary;
+import org.infinispan.Cache;
+import org.infinispan.factories.ComponentRegistry;
 
 import java.util.Collections;
 import java.util.EnumMap;
@@ -21,34 +23,31 @@ import java.util.concurrent.locks.ReentrantLock;
 public class StreamLibContainer {
 
    public static final int MAX_CAPACITY = 100000;
-
+   private final String cacheName;
+   private final Map<Stat, StreamSummary<Object>> streamSummaryEnumMap;
+   private final Map<Stat, Lock> lockMap;
    private volatile int capacity = 1000;
    private volatile boolean active = false;
 
-   private final Map<Stat, StreamSummary<Object>> streamSummaryEnumMap;
-   private final Map<Stat, Lock> lockMap;
-
-   public static enum Stat {
-      REMOTE_GET,
-      LOCAL_GET,
-      REMOTE_PUT,
-      LOCAL_PUT,
-
-      MOST_LOCKED_KEYS,
-      MOST_CONTENDED_KEYS,
-      MOST_FAILED_KEYS,
-      MOST_WRITE_SKEW_FAILED_KEYS
-   }
-
-   public StreamLibContainer() {
+   public StreamLibContainer(String cacheName) {
+      this.cacheName = cacheName;
       streamSummaryEnumMap = Collections.synchronizedMap(new EnumMap<Stat, StreamSummary<Object>>(Stat.class));
       lockMap = new EnumMap<Stat, Lock>(Stat.class);
 
       for (Stat stat : Stat.values()) {
          lockMap.put(stat, new ReentrantLock());
       }
-      
+
       resetAll(1);
+   }
+
+   public static StreamLibContainer getOrCreateStreamLibContainer(Cache cache) {
+      ComponentRegistry componentRegistry = cache.getAdvancedCache().getComponentRegistry();
+      StreamLibContainer streamLibContainer = componentRegistry.getComponent(StreamLibContainer.class);
+      if (streamLibContainer == null) {
+         componentRegistry.registerComponent(new StreamLibContainer(cache.getName()), StreamLibContainer.class);
+      }
+      return componentRegistry.getComponent(StreamLibContainer.class);
    }
 
    public boolean isActive() {
@@ -64,27 +63,27 @@ public class StreamLibContainer {
       this.active = active;
    }
 
+   public int getCapacity() {
+      return capacity;
+   }
+
    public void setCapacity(int capacity) {
-      if(capacity <= 0) {
+      if (capacity <= 0) {
          this.capacity = 1;
       } else {
          this.capacity = capacity;
       }
    }
 
-   public int getCapacity(){
-	   return capacity;
-   }
-
    public void addGet(Object key, boolean remote) {
-      if(!isActive()) {
+      if (!isActive()) {
          return;
       }
       syncOffer(remote ? Stat.REMOTE_GET : Stat.LOCAL_GET, key);
    }
 
    public void addPut(Object key, boolean remote) {
-      if(!isActive()) {
+      if (!isActive()) {
          return;
       }
 
@@ -92,16 +91,16 @@ public class StreamLibContainer {
    }
 
    public void addLockInformation(Object key, boolean contention, boolean abort) {
-      if(!isActive()) {
+      if (!isActive()) {
          return;
       }
 
       syncOffer(Stat.MOST_LOCKED_KEYS, key);
 
-      if(contention) {
+      if (contention) {
          syncOffer(Stat.MOST_CONTENDED_KEYS, key);
       }
-      if(abort) {
+      if (abort) {
          syncOffer(Stat.MOST_FAILED_KEYS, key);
       }
    }
@@ -128,22 +127,22 @@ public class StreamLibContainer {
       List<Counter<Object>> counters = ss.topK(topK <= 0 ? 1 : topK);
       Map<Object, Long> results = new HashMap<Object, Long>(topK);
 
-      for(Counter<Object> c : counters) {
+      for (Counter<Object> c : counters) {
          results.put(c.getItem(), c.getCount());
       }
 
       return results;
    }
 
-   public void resetAll(){
+   public void resetAll() {
       resetAll(capacity);
    }
-   
+
    public void resetStat(Stat stat) {
       resetStat(stat, capacity);
    }
 
-   private void resetStat(Stat stat, int customCapacity){
+   private void resetStat(Stat stat, int customCapacity) {
       try {
          lockMap.get(stat).lock();
          streamSummaryEnumMap.put(stat, createNewStreamSummary(customCapacity));
@@ -169,5 +168,33 @@ public class StreamLibContainer {
       } finally {
          lockMap.get(stat).unlock();
       }
+   }
+
+   @Override
+   public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+
+      StreamLibContainer that = (StreamLibContainer) o;
+
+      return !(cacheName != null ? !cacheName.equals(that.cacheName) : that.cacheName != null);
+
+   }
+
+   @Override
+   public int hashCode() {
+      return cacheName != null ? cacheName.hashCode() : 0;
+   }
+
+   public static enum Stat {
+      REMOTE_GET,
+      LOCAL_GET,
+      REMOTE_PUT,
+      LOCAL_PUT,
+
+      MOST_LOCKED_KEYS,
+      MOST_CONTENDED_KEYS,
+      MOST_FAILED_KEYS,
+      MOST_WRITE_SKEW_FAILED_KEYS
    }
 }

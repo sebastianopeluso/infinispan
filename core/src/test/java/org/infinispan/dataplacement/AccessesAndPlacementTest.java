@@ -239,7 +239,7 @@ public class AccessesAndPlacementTest {
       ConsistentHash consistentHash = createDefaultConsistentHash(clusterSnapshot.getMembers(), 2);
       AccessesManager manager = createRemoteAccessManager();
       manager.resetState(clusterSnapshot, consistentHash);
-      StreamLibContainer container = new StreamLibContainer();
+      StreamLibContainer container = new StreamLibContainer("access-test");
       container.setCapacity(2);
       container.setActive(true);
       manager.setStreamLibContainer(container);

@@ -23,7 +23,7 @@ import org.infinispan.remoting.transport.Transport;
 import org.infinispan.remoting.transport.jgroups.CommandAwareRpcDispatcher;
 import org.infinispan.remoting.transport.jgroups.JGroupsTransport;
 import org.infinispan.stats.TransactionsStatisticsRegistry;
-import org.infinispan.stats.topK.StreamSummaryManager;
+import org.infinispan.stats.topK.StreamLibContainer;
 import org.infinispan.stats.translations.ExposedStatistics.IspnStats;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.WriteSkewException;
@@ -261,7 +261,7 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
    private void replaceLockManager(ComponentRegistry componentRegistry) {
       LockManager lockManager = componentRegistry.getComponent(LockManager.class);
       LockManagerWrapper lockManagerWrapper = new LockManagerWrapper(lockManager,
-                                                                     StreamSummaryManager.getStreamLibForCache(cache.getName()));
+                                                                     StreamLibContainer.getOrCreateStreamLibContainer(cache));
       componentRegistry.registerComponent(lockManagerWrapper, LockManager.class);
    }
 
