@@ -24,13 +24,15 @@ public class StreamLibContainer {
 
    public static final int MAX_CAPACITY = 100000;
    private final String cacheName;
+   private final String address;
    private final Map<Stat, StreamSummary<Object>> streamSummaryEnumMap;
    private final Map<Stat, Lock> lockMap;
    private volatile int capacity = 1000;
    private volatile boolean active = false;
 
-   public StreamLibContainer(String cacheName) {
+   public StreamLibContainer(String cacheName, String address) {
       this.cacheName = cacheName;
+      this.address = address;
       streamSummaryEnumMap = Collections.synchronizedMap(new EnumMap<Stat, StreamSummary<Object>>(Stat.class));
       lockMap = new EnumMap<Stat, Lock>(Stat.class);
 
@@ -45,7 +47,9 @@ public class StreamLibContainer {
       ComponentRegistry componentRegistry = cache.getAdvancedCache().getComponentRegistry();
       StreamLibContainer streamLibContainer = componentRegistry.getComponent(StreamLibContainer.class);
       if (streamLibContainer == null) {
-         componentRegistry.registerComponent(new StreamLibContainer(cache.getName()), StreamLibContainer.class);
+         String cacheName = cache.getName();
+         String address = String.valueOf(cache.getCacheManager().getAddress()); 
+         componentRegistry.registerComponent(new StreamLibContainer(cacheName, address), StreamLibContainer.class);
       }
       return componentRegistry.getComponent(StreamLibContainer.class);
    }
@@ -177,13 +181,23 @@ public class StreamLibContainer {
 
       StreamLibContainer that = (StreamLibContainer) o;
 
-      return !(cacheName != null ? !cacheName.equals(that.cacheName) : that.cacheName != null);
+      return !(address != null ? !address.equals(that.address) : that.address != null) && !(cacheName != null ? !cacheName.equals(that.cacheName) : that.cacheName != null);
 
    }
 
    @Override
    public int hashCode() {
-      return cacheName != null ? cacheName.hashCode() : 0;
+      int result = cacheName != null ? cacheName.hashCode() : 0;
+      result = 31 * result + (address != null ? address.hashCode() : 0);
+      return result;
+   }
+
+   @Override
+   public String toString() {
+      return "StreamLibContainer{" +
+            "cacheName='" + cacheName + '\'' +
+            ", address='" + address + '\'' +
+            '}';
    }
 
    public static enum Stat {

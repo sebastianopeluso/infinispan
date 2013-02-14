@@ -173,7 +173,7 @@ public class TestingUtil {
          // and StateTransferManager.isStateTransferInProgress() doesn't do that.
          StateConsumer stateConsumer = extractComponent(c, StateConsumer.class);
          StateTransferLock stateTransferLock = extractComponent(c, StateTransferLock.class);
-         RebalancePolicy rebalancePolicy = (DefaultRebalancePolicy) TestingUtil.extractGlobalComponent(c.getCacheManager(), RebalancePolicy.class);
+         RebalancePolicy rebalancePolicy = TestingUtil.extractGlobalComponent(c.getCacheManager(), RebalancePolicy.class);
          Address cacheAddress = c.getAdvancedCache().getRpcManager().getAddress();
          while (true) {
             CacheTopology cacheTopology = stateTransferManager.getCacheTopology();
