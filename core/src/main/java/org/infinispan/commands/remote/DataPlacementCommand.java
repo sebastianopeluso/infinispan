@@ -158,6 +158,7 @@ public class DataPlacementCommand extends BaseRpcCommand {
                   members[i] = (Address) parameters[i + 2];
                }
             }
+            break;
          case REMOTE_TOP_LIST_PHASE:
             roundId = (Long) parameters[1];
             objectRequest = (ObjectRequest) parameters[2];

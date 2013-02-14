@@ -34,6 +34,11 @@ public class RoundManager {
       roundInProgress = false;
       updateNextRoundTimestamp();
    }
+   
+   public final synchronized void init(long coolDownTime) {
+      this.coolDownTime = coolDownTime;
+      nextRoundTimestamp = System.currentTimeMillis();
+   }
 
    /**
     * enables the data placement optimization

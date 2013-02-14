@@ -42,7 +42,7 @@ public abstract class StreamSummaryInterceptor extends BaseCustomInterceptor {
    @Override
    public Object visitGetKeyValueCommand(InvocationContext ctx, GetKeyValueCommand command) throws Throwable {
 
-      if (streamLibContainer.isActive() && ctx.isOriginLocal() && ctx.isInTxScope()) {
+      if (streamLibContainer.isActive() && ctx.isOriginLocal()) {
          streamLibContainer.addGet(command.getKey(), isRemote(command.getKey()));
       }
       return invokeNextInterceptor(ctx, command);
@@ -51,7 +51,7 @@ public abstract class StreamSummaryInterceptor extends BaseCustomInterceptor {
    @Override
    public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
       try {
-         if (streamLibContainer.isActive() && ctx.isOriginLocal() && ctx.isInTxScope()) {
+         if (streamLibContainer.isActive() && ctx.isOriginLocal()) {
             streamLibContainer.addPut(command.getKey(), isRemote(command.getKey()));
          }
          return invokeNextInterceptor(ctx, command);

@@ -28,6 +28,9 @@ public class ClusterObjectLookup {
    }
 
    public final List<Address> getNewOwnersForKey(Object key, ConsistentHash consistentHash, int numberOfOwners) {
+      if (objectLookups == null || objectLookups.length == 0 || objectLookups[consistentHash.getSegment(key)] == null) {
+         return null;
+      }
       List<Integer> newOwnersIndexes = objectLookups[consistentHash.getSegment(key)].query(key);
       if (newOwnersIndexes == null || newOwnersIndexes.isEmpty()) {
          return null;

@@ -43,9 +43,8 @@ public class DataPlacementRebalancePolicy implements RebalancePolicy {
          log.tracef("Not triggering rebalance for zero-members cache %s", cacheName);
          return;
       }
-
-      ClusterObjectLookup clusterObjectLookup = getSegmentsToApply(cacheName, cacheStatus.getCacheTopology().getCurrentCH());
-      if (!cacheStatus.hasJoiners() && isBalanced(cacheStatus.getCacheTopology().getCurrentCH()) && clusterObjectLookup != null) {
+      
+      if (!cacheStatus.hasJoiners() && isBalanced(cacheName, cacheStatus.getCacheTopology().getCurrentCH())) {
          log.tracef("Not triggering rebalance for cache %s, no joiners and the current consistent hash is already balanced",
                     cacheName);         
          return;
@@ -56,6 +55,7 @@ public class DataPlacementRebalancePolicy implements RebalancePolicy {
          return;
       }
 
+      ClusterObjectLookup clusterObjectLookup = getSegmentsToApply(cacheName, cacheStatus.getCacheTopology().getCurrentCH());
       log.tracef("Triggering rebalance for cache %s", cacheName);
       clusterTopologyManager.triggerRebalance(cacheName, clusterObjectLookup);
    }
@@ -79,7 +79,7 @@ public class DataPlacementRebalancePolicy implements RebalancePolicy {
       clusterTopologyManager.triggerRebalance(cacheName, segmentMappings);
    }
 
-   private boolean isBalanced(ConsistentHash ch) {
+   public boolean isBalanced(String cacheName, ConsistentHash ch) {
       int numSegments = ch.getNumSegments();
       for (int i = 0; i < numSegments; i++) {
          int actualNumOwners = Math.min(ch.getMembers().size(), ch.getNumOwners());
@@ -87,6 +87,7 @@ public class DataPlacementRebalancePolicy implements RebalancePolicy {
             return false;
          }
       }
-      return true;
+      ClusterObjectLookup clusterObjectLookup = getSegmentsToApply(cacheName, ch);
+      return clusterObjectLookup == null;
    }
 }

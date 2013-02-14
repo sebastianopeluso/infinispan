@@ -90,14 +90,16 @@ public class InboundTransferTask {
    private final String cacheName;
 
    public InboundTransferTask(Set<Integer> segments, Address source, int topologyId, StateConsumerImpl stateConsumer, RpcManager rpcManager, CommandsFactory commandsFactory, long timeout, String cacheName) {
-      if (segments == null || segments.isEmpty()) {
+      /*if (segments == null || segments.isEmpty()) {
          throw new IllegalArgumentException("segments must not be null or empty");
-      }
+      }*/ //Pedro: for data placement, it is set to null to indicate dp changes
       if (source == null) {
          throw new IllegalArgumentException("Source address cannot be null");
       }
 
-      this.segments.addAll(segments);
+      if (segments != null) {
+         this.segments.addAll(segments);
+      }
       this.source = source;
       this.topologyId = topologyId;
       this.stateConsumer = stateConsumer;

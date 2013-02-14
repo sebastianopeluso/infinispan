@@ -14,6 +14,7 @@ import org.infinispan.distribution.DistributionManager;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.distribution.group.GroupManager;
 import org.infinispan.factories.annotations.Inject;
+import org.infinispan.factories.annotations.Start;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
@@ -55,8 +56,8 @@ public class DataPlacementManager {
    private static final int INITIAL_COOL_DOWN_TIME = 30000; //30 seconds
 
    private RpcManager rpcManager;
-   private CommandsFactory commandsFactory;
-   private String cacheName;
+   private CommandsFactory commandsFactory;   
+   private Cache cache;
 
    private Boolean expectPre = true;
 
@@ -87,7 +88,7 @@ public class DataPlacementManager {
                       Configuration configuration, GroupManager groupManager, RebalancePolicy rebalancePolicy) {
       this.rpcManager = rpcManager;
       this.commandsFactory = commandsFactory;
-      this.cacheName = cache.getName();
+      this.cache = cache;
       this.distributionManager = distributionManager;
       if (rebalancePolicy instanceof DataPlacementRebalancePolicy) {
          this.rebalancePolicy = (DataPlacementRebalancePolicy) rebalancePolicy; 
@@ -106,15 +107,14 @@ public class DataPlacementManager {
       objectLookupFactory = configuration.dataPlacement().objectLookupFactory();
       objectLookupFactory.setConfiguration(configuration);
 
-      roundManager.setCoolDownTime(configuration.dataPlacement().coolDownTime());
+      roundManager.init(configuration.dataPlacement().coolDownTime());
 
       //this is needed because the custom statistics invokes this method twice. the seconds time, it replaces
       //the original object placement and remote accesses manager (== problems!!)
       synchronized (this) {
          if (roundManager.isEnabled()) {
             log.info("Data Placement is already enabled!");
-         } else if (configuration.clustering().cacheMode().isDistributed()) {
-            accessesManager.setStreamLibContainer(StreamLibContainer.getOrCreateStreamLibContainer(cache));
+         } else if (configuration.clustering().cacheMode().isDistributed()) {            
             accessesManager.setMaxNumberOfKeysToRequest(configuration.dataPlacement().maxNumberOfKeysToRequest());
             accessesManager.setGroupManager(groupManager);
             roundManager.enable();
@@ -124,8 +124,13 @@ public class DataPlacementManager {
             log.info("Data placement disabled. Not in Distributed mode");
          }
       }
-
    }
+   
+   @Start
+   public void start() {
+      accessesManager.setStreamLibContainer(StreamLibContainer.getOrCreateStreamLibContainer(cache));
+   }
+   
 
    /**
     * starts a new round of data placement protocol
@@ -250,7 +255,7 @@ public class DataPlacementManager {
       objectLookupFactory.init(objectLookups.values());
       if (objectLookupManager.addObjectLookup(sender, objectLookups)) {
          try {
-            rebalancePolicy.setNewSegmentMappings(cacheName, objectLookupManager.getClusterObjectLookup());         
+            rebalancePolicy.setNewSegmentMappings(cache.getName(), objectLookupManager.getClusterObjectLookup());         
          } catch (Exception e) {
             log.error("Error triggering State Transfer with the new mappings", e);
          }
@@ -379,7 +384,7 @@ public class DataPlacementManager {
 
    @ManagedAttribute(description = "The cache name", writable = false)
    public final String getCacheName() {
-      return cacheName;
+      return cache.getName();
    }
 
    @ManagedAttribute(description = "The current cool down time between rounds", writable = false)

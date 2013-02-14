@@ -23,32 +23,6 @@
 
 package org.infinispan.test;
 
-import static java.io.File.separator;
-
-import java.io.File;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.LockSupport;
-
-import javax.management.MBeanServer;
-import javax.management.MalformedObjectNameException;
-import javax.management.ObjectName;
-import javax.transaction.Status;
-import javax.transaction.TransactionManager;
-
 import org.infinispan.AdvancedCache;
 import org.infinispan.Cache;
 import org.infinispan.CacheImpl;
@@ -58,6 +32,7 @@ import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.InvocationContextContainer;
+import org.infinispan.dataplacement.DataPlacementRebalancePolicy;
 import org.infinispan.factories.ComponentRegistry;
 import org.infinispan.factories.GlobalComponentRegistry;
 import org.infinispan.factories.KnownComponentNames;
@@ -78,7 +53,6 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.remoting.transport.Transport;
 import org.infinispan.remoting.transport.jgroups.JGroupsTransport;
 import org.infinispan.statetransfer.StateConsumer;
-import org.infinispan.statetransfer.StateConsumerImpl;
 import org.infinispan.statetransfer.StateTransferLock;
 import org.infinispan.statetransfer.StateTransferManager;
 import org.infinispan.topology.CacheTopology;
@@ -93,6 +67,28 @@ import org.jgroups.protocols.DELAY;
 import org.jgroups.protocols.DISCARD;
 import org.jgroups.protocols.TP;
 import org.jgroups.stack.ProtocolStack;
+
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import javax.transaction.Status;
+import javax.transaction.TransactionManager;
+import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
+
+import static java.io.File.separator;
 
 public class TestingUtil {
 
@@ -177,12 +173,17 @@ public class TestingUtil {
          // and StateTransferManager.isStateTransferInProgress() doesn't do that.
          StateConsumer stateConsumer = extractComponent(c, StateConsumer.class);
          StateTransferLock stateTransferLock = extractComponent(c, StateTransferLock.class);
-         DefaultRebalancePolicy rebalancePolicy = (DefaultRebalancePolicy) TestingUtil.extractGlobalComponent(c.getCacheManager(), RebalancePolicy.class);
+         RebalancePolicy rebalancePolicy = (DefaultRebalancePolicy) TestingUtil.extractGlobalComponent(c.getCacheManager(), RebalancePolicy.class);
          Address cacheAddress = c.getAdvancedCache().getRpcManager().getAddress();
          while (true) {
             CacheTopology cacheTopology = stateTransferManager.getCacheTopology();
             boolean chContainsAllMembers = cacheTopology.getCurrentCH().getMembers().size() == caches.length;
-            boolean chIsBalanced = cacheTopology.getPendingCH() == null && rebalancePolicy.isBalanced(cacheTopology.getCurrentCH());
+            boolean chIsBalanced = cacheTopology.getPendingCH() == null;            
+            if (rebalancePolicy instanceof DefaultRebalancePolicy) {
+               chIsBalanced = chIsBalanced && ((DefaultRebalancePolicy) rebalancePolicy).isBalanced(cacheTopology.getCurrentCH());
+            } else if (rebalancePolicy instanceof DataPlacementRebalancePolicy) {
+               chIsBalanced = chIsBalanced && ((DataPlacementRebalancePolicy) rebalancePolicy).isBalanced(c.getName(), cacheTopology.getCurrentCH());
+            }            
             if (chContainsAllMembers && chIsBalanced) {
                // This is the part where we wait for the old entries to be invalidated
                // because the "transaction data received" flag is only set after the invalidation.
