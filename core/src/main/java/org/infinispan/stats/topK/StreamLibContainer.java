@@ -4,6 +4,8 @@ import com.clearspring.analytics.stream.Counter;
 import com.clearspring.analytics.stream.StreamSummary;
 import org.infinispan.Cache;
 import org.infinispan.factories.ComponentRegistry;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 
 import java.util.Collections;
 import java.util.EnumMap;
@@ -23,6 +25,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class StreamLibContainer {
 
    public static final int MAX_CAPACITY = 100000;
+   private static final Log log = LogFactory.getLog(StreamLibContainer.class);
    private final String cacheName;
    private final String address;
    private final Map<Stat, StreamSummary<Object>> streamSummaryEnumMap;
@@ -168,6 +171,9 @@ public class StreamLibContainer {
    private void syncOffer(final Stat stat, Object key) {
       try {
          lockMap.get(stat).lock();
+         if (log.isTraceEnabled()) {
+            log.tracef("Offer key=%s to stat=%s in %s", key, stat, this);
+         }
          streamSummaryEnumMap.get(stat).offer(key);
       } finally {
          lockMap.get(stat).unlock();

@@ -11,7 +11,7 @@ import org.infinispan.statetransfer.OutboundTransferTask;
 import org.infinispan.statetransfer.StateChunk;
 import org.infinispan.statetransfer.StateProviderImpl;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -35,12 +35,16 @@ public class DataPlacementOutboundTransferTask extends OutboundTransferTask {
    @Override
    protected boolean isKeyMoved(Object key) {
       int segmentId = readCh.getSegment(key);
-      if (segments == null) {
+      if (segments.isEmpty()) {
          //Data Placement
          boolean isSegmentMoved = !readCh.getSegmentsForOwner(destination).contains(segmentId) &&
                writeCh.getSegmentsForOwner(destination).contains(segmentId);
          boolean shouldIPush = readCh.locatePrimaryOwner(key).equals(rpcManager.getAddress());
          boolean destinationIsOwner = writeCh.isKeyLocalToNode(destination, key);
+         if (log.isDebugEnabled()) {
+            log.debugf("Analyzing key %s. Is the segment moved?=%s, Should I push it?=%s, Destination is an owner?=%s",
+                       key, isSegmentMoved, shouldIPush, destinationIsOwner);
+         }
          return !isSegmentMoved && shouldIPush && destinationIsOwner;
       } else {
          return segments.contains(segmentId);
@@ -49,19 +53,21 @@ public class DataPlacementOutboundTransferTask extends OutboundTransferTask {
 
    @Override
    protected void sendEntries(boolean isLast) {
-      if (segments == null) {
-         List<StateChunk> chunks = new ArrayList<StateChunk>();
+      if (segments.isEmpty()) {
+         List<InternalCacheEntry> allEntries = new LinkedList<InternalCacheEntry>();
+
          for (List<InternalCacheEntry> entries : entriesBySegment.values()) {
-            if (!entries.isEmpty() || isLast) {
-               chunks.add(new StateChunk(-1, new ArrayList<InternalCacheEntry>(entries), isLast));
+            if (!entries.isEmpty()) {
+               allEntries.addAll(entries);
                entries.clear();
             }
          }
-
-         sendChunks(chunks, isLast);         
+         List<StateChunk> chunks = new LinkedList<StateChunk>();
+         chunks.add(new StateChunk(-1, allEntries, isLast));
+         sendChunks(chunks, isLast);
       } else {
          super.sendEntries(isLast);
       }
-      
+
    }
 }

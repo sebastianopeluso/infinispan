@@ -29,20 +29,15 @@ public class DataPlacementTest extends MultipleCacheManagersTest {
 
    @Override
    protected void createCacheManagers() throws Throwable {
-      ConfigurationBuilder builder = getDefaultClusteredCacheConfig(CacheMode.DIST_SYNC, true);
-      builder.dataPlacement().enabled(true).objectLookupFactory(new HashMapObjectLookupFactory());
-      builder.clustering().stateTransfer().fetchInMemoryState(true);
-      builder.clustering().hash().numOwners(1).numSegments(50)
-            .l1().disable();
-      builder.customInterceptors().addInterceptor().before(TxInterceptor.class).interceptor(new DistributedStreamSummaryInterceptor());
-      createCluster(builder, 2);
+      addClusterEnabledCacheManager(getConfigurationBuilder());
+      addClusterEnabledCacheManager(getConfigurationBuilder());
       waitForClusterToForm();
    }
 
    public void testKeySwap() throws Exception {
       //init 
       for (int i = 0; i < NUMBER_OF_KEYS; ++i) {
-         cache(0).put(getKey(i), "1"); //dummy value
+         cache(0).put(getKey(i), i % 2); //dummy value
       }
 
       //reset top key in both caches
@@ -51,7 +46,7 @@ public class DataPlacementTest extends MultipleCacheManagersTest {
       //cache 0 will read the even keys and the cache 1 the odd keys      
       for (int key = 0; key < NUMBER_OF_KEYS; ++key) {
          for (int iteration = 0; iteration < NUMBER_OF_ITERATIONS; ++iteration) {
-            (key % 2 == 0 ? cache(0) : cache(1)).get(getKey(key));
+            cache(key % 2).get(getKey(key));
          }
       }
 
@@ -88,11 +83,21 @@ public class DataPlacementTest extends MultipleCacheManagersTest {
    }
 
    private void assertKeyLocation(int cache, Object key) {
-      DataContainer dataContainer = cache(cache).getAdvancedCache().getDataContainer();
-      Assert.assertTrue(dataContainer.containsKey(key), "Cache " + cache + " does not contains " + key +
-            " in data container");
       ConsistentHash consistentHash = TestingUtil.extractComponent(cache(cache), DistributionManager.class).getConsistentHash();
       Assert.assertTrue(consistentHash.locateOwners(key).contains(manager(cache).getAddress()), "Cache " + cache +
             " does not contains key " + key + " in consistent hash");
+      DataContainer dataContainer = cache(cache).getAdvancedCache().getDataContainer();
+      Assert.assertTrue(dataContainer.containsKey(key), "Cache " + cache + " does not contains " + key +
+            " in data container");      
+   }
+
+   private ConfigurationBuilder getConfigurationBuilder() {
+      ConfigurationBuilder builder = getDefaultClusteredCacheConfig(CacheMode.DIST_SYNC, true);
+      builder.dataPlacement().enabled(true).objectLookupFactory(new HashMapObjectLookupFactory());
+      builder.clustering().stateTransfer().fetchInMemoryState(true);
+      builder.clustering().hash().numOwners(1).numSegments(50)
+            .l1().disable();
+      builder.customInterceptors().addInterceptor().before(TxInterceptor.class).interceptor(new DistributedStreamSummaryInterceptor());
+      return builder;
    }
 }

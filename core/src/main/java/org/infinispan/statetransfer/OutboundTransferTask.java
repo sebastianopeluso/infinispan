@@ -55,7 +55,7 @@ import java.util.concurrent.FutureTask;
  */
 public class OutboundTransferTask implements Runnable {
 
-   private static final Log log = LogFactory.getLog(OutboundTransferTask.class);
+   protected static final Log log = LogFactory.getLog(OutboundTransferTask.class);
 
    private final boolean trace = log.isTraceEnabled();
 
@@ -70,7 +70,7 @@ public class OutboundTransferTask implements Runnable {
    private final int stateTransferChunkSize;
 
    protected final ConsistentHash readCh;
-   
+
    protected final ConsistentHash writeCh;
 
    private final DataContainer dataContainer;
@@ -113,7 +113,9 @@ public class OutboundTransferTask implements Runnable {
       }
       this.stateProvider = stateProvider;
       this.destination = destination;
-      this.segments.addAll(segments);
+      if (segments != null) {
+         this.segments.addAll(segments);
+      }
       this.stateTransferChunkSize = stateTransferChunkSize;
       this.topologyId = topologyId;
       this.readCh = readCh;
@@ -198,9 +200,9 @@ public class OutboundTransferTask implements Runnable {
          log.tracef("Outbound transfer of segments %s of cache %s to node %s is complete", segments, cacheName, destination);
       }
    }
-   
+
    protected boolean isKeyMoved(Object key) {
-      return segments.contains(readCh.getSegment(key));      
+      return segments.contains(readCh.getSegment(key));
    }
 
    /**
@@ -251,7 +253,7 @@ public class OutboundTransferTask implements Runnable {
 
       sendChunks(chunks, isLast);
    }
-   
+
    protected final void sendChunks(List<StateChunk> chunks, boolean isLast) {
       if (!chunks.isEmpty()) {
          if (trace) {
@@ -271,8 +273,8 @@ public class OutboundTransferTask implements Runnable {
             cancel();
          } catch (Exception e) {
             log.errorf(e, "Failed to send entries to node %s : %s", destination, e.getMessage());
-         }      
-      }      
+         }
+      }
    }
 
    /**

@@ -190,7 +190,7 @@ public class StateProviderImpl implements StateProvider {
       final ConsistentHash readCh = cacheTopology.getReadConsistentHash();
 
       Set<Integer> ownedSegments = readCh.getSegmentsForOwner(rpcManager.getAddress());
-      if (!ownedSegments.containsAll(segments)) {
+      if (segments != null && !ownedSegments.containsAll(segments)) {
          segments.removeAll(ownedSegments);
          throw new IllegalArgumentException("Segments " + segments + " are not owned by " + rpcManager.getAddress());
       }

@@ -88,6 +88,8 @@ public class InboundTransferTask {
    private final long timeout;
 
    private final String cacheName;
+   
+   private final boolean dataPlacementTransfer;
 
    public InboundTransferTask(Set<Integer> segments, Address source, int topologyId, StateConsumerImpl stateConsumer, RpcManager rpcManager, CommandsFactory commandsFactory, long timeout, String cacheName) {
       /*if (segments == null || segments.isEmpty()) {
@@ -99,6 +101,9 @@ public class InboundTransferTask {
 
       if (segments != null) {
          this.segments.addAll(segments);
+         dataPlacementTransfer = false;
+      } else {
+         dataPlacementTransfer = true;
       }
       this.source = source;
       this.topologyId = topologyId;
@@ -107,6 +112,10 @@ public class InboundTransferTask {
       this.commandsFactory = commandsFactory;
       this.timeout = timeout;
       this.cacheName = cacheName;
+   }
+
+   public boolean isDataPlacementTransfer() {
+      return dataPlacementTransfer;
    }
 
    public Set<Integer> getSegments() {
@@ -197,7 +206,12 @@ public class InboundTransferTask {
    }
 
    public void onStateReceived(int segmentId, boolean isLastChunk) {
-      if (!isCancelled && isLastChunk && segments.contains(segmentId)) {
+      if (!isCancelled && segmentId == -1 && isLastChunk) {
+         if (trace) {
+            log.tracef("Finished receiving state for Data Placement of cache %s", cacheName);
+         }
+         notifyCompletion();
+      } else if (!isCancelled && isLastChunk && segments.contains(segmentId)) {
          finishedSegments.add(segmentId);
          if (finishedSegments.containsAll(segments)) {
             if (trace) {

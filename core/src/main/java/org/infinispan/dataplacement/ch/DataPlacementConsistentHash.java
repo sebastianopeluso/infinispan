@@ -32,24 +32,30 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
    private final CH consistentHash;
    //one object lookup per segment
    private final List<ClusterObjectLookup> clusterObjectLookupList;
+   private final boolean union;
 
    public DataPlacementConsistentHash(CH consistentHash) {
       this.consistentHash = consistentHash;
       this.clusterObjectLookupList = InfinispanCollections.emptyList();
+      this.union = false;
    }
 
    public DataPlacementConsistentHash(CH consistentHash, ClusterObjectLookup clusterObjectLookup) {
       this.consistentHash = consistentHash;
       this.clusterObjectLookupList = Collections.singletonList(clusterObjectLookup);
+      this.union = false;
    }
 
    public DataPlacementConsistentHash(DataPlacementConsistentHash<CH> baseCH, CH consistentHash) {
-      this(consistentHash, baseCH.getClusterObjectLookupList());
+      this.consistentHash = consistentHash;
+      this.clusterObjectLookupList = baseCH.getClusterObjectLookupList();
+      this.union = false;
    }
 
-   public DataPlacementConsistentHash(CH consistentHash, List<ClusterObjectLookup> clusterObjectLookups) {
+   private DataPlacementConsistentHash(CH consistentHash, List<ClusterObjectLookup> clusterObjectLookups, boolean union) {
       this.consistentHash = consistentHash;
       this.clusterObjectLookupList = clusterObjectLookups;
+      this.union = union;
    }
 
    @Override
@@ -74,6 +80,9 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
 
    @Override
    public Address locatePrimaryOwner(Object key) {
+      if (union) {
+         return consistentHash.locatePrimaryOwner(key);
+      }
       List<Address> newOwners = getNewOwnersForKey(key, 1);
       return newOwners == null || newOwners.isEmpty() ? consistentHash.locatePrimaryOwner(key) :
             newOwners.get(0);
@@ -83,6 +92,11 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
    public List<Address> locateOwners(Object key) {
       List<Address> newOwners = getNewOwnersForKey(key, consistentHash.getNumOwners());
       List<Address> defaultOwners = consistentHash.locateOwners(key);
+      
+      if (union) {
+         mergeUnique(defaultOwners, newOwners   );
+         return defaultOwners;
+      }
 
       return newOwners == null || newOwners.isEmpty() ? defaultOwners :
             merge(defaultOwners, newOwners, defaultOwners.size());
@@ -126,6 +140,44 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
       return consistentHash;
    }
 
+   @Override
+   public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+
+      DataPlacementConsistentHash that = (DataPlacementConsistentHash) o;
+
+      return !(clusterObjectLookupList != null ? !clusterObjectLookupList.equals(that.clusterObjectLookupList) : that.clusterObjectLookupList != null) &&
+            !(consistentHash != null ? !consistentHash.equals(that.consistentHash) : that.consistentHash != null);
+
+   }
+
+   @Override
+   public int hashCode() {
+      int result = consistentHash != null ? consistentHash.hashCode() : 0;
+      result = 31 * result + (clusterObjectLookupList != null ? clusterObjectLookupList.hashCode() : 0);
+      return result;
+   }
+
+   public final List<ClusterObjectLookup> getClusterObjectLookupList() {
+      return clusterObjectLookupList;
+   }
+
+   public final DataPlacementConsistentHash<CH> union(DataPlacementConsistentHash<CH> baseCH, CH unionCH) {
+      List<ClusterObjectLookup> union = new LinkedList<ClusterObjectLookup>();
+      union.addAll(getClusterObjectLookupList());
+      union.addAll(baseCH.getClusterObjectLookupList());
+      return new DataPlacementConsistentHash<CH>(unionCH, union, true);
+   }
+
+   @Override
+   public String toString() {
+      return "DataPlacementConsistentHash{" +
+            "consistentHash=" + consistentHash +
+            ", clusterObjectLookupList=" + clusterObjectLookupList +
+            '}';
+   }
+
    private List<Address> merge(List<Address> defaultOwners, List<Address> newOwners, int numberOfOwners) {
       List<Address> merged = new ArrayList<Address>(numberOfOwners);
       //first put owners that are in the default and new owners list
@@ -140,8 +192,8 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
       }
 
       //then add the remaining new owners list (if needed)
-      for (Iterator<Address> iterator = newOwners.iterator(); iterator.hasNext() && merged.size() < numberOfOwners; ) {
-         merged.add(iterator.next());
+      for (Address newOwner : newOwners) {
+         merged.add(newOwner);
       }
 
       //finally the default owners list (if needed)
@@ -172,36 +224,6 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
       }
    }
 
-   @Override
-   public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
-
-      DataPlacementConsistentHash that = (DataPlacementConsistentHash) o;
-
-      return !(clusterObjectLookupList != null ? !clusterObjectLookupList.equals(that.clusterObjectLookupList) : that.clusterObjectLookupList != null) &&
-            !(consistentHash != null ? !consistentHash.equals(that.consistentHash) : that.consistentHash != null);
-
-   }
-
-   @Override
-   public int hashCode() {
-      int result = consistentHash != null ? consistentHash.hashCode() : 0;
-      result = 31 * result + (clusterObjectLookupList != null ? clusterObjectLookupList.hashCode() : 0);
-      return result;
-   }
-
-   public final List<ClusterObjectLookup> getClusterObjectLookupList() {
-      return clusterObjectLookupList;
-   }
-
-   public final DataPlacementConsistentHash<CH> union(DataPlacementConsistentHash<CH> baseCH, CH unionCH) {
-      List<ClusterObjectLookup> union = new LinkedList<ClusterObjectLookup>();
-      union.addAll(getClusterObjectLookupList());
-      union.addAll(baseCH.getClusterObjectLookupList());
-      return new DataPlacementConsistentHash<CH>(unionCH, union);
-   }
-
    public static class Externalizer extends AbstractExternalizer<DataPlacementConsistentHash> {
 
       @Override
@@ -212,6 +234,7 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
       @Override
       public void writeObject(ObjectOutput output, DataPlacementConsistentHash object) throws IOException {
          output.writeObject(object.consistentHash);
+         output.writeBoolean(object.union);
          List<ClusterObjectLookup> list = object.getClusterObjectLookupList();
          output.writeInt(list.size());
          for (ClusterObjectLookup clusterObjectLookup : list) {
@@ -222,12 +245,13 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
       @Override
       public DataPlacementConsistentHash readObject(ObjectInput input) throws IOException, ClassNotFoundException {
          ConsistentHash consistentHash = (ConsistentHash) input.readObject();
+         boolean union = input.readBoolean();
          int size = input.readInt();
          List<ClusterObjectLookup> clusterObjectLookups = new ArrayList<ClusterObjectLookup>(size);
          for (int i = 0; i < size; ++i) {
             clusterObjectLookups.add(ClusterObjectLookup.read(input, consistentHash.getHashFunction()));
          }
-         return new DataPlacementConsistentHash(consistentHash, clusterObjectLookups);
+         return new DataPlacementConsistentHash(consistentHash, clusterObjectLookups, union);
       }
 
       @Override
