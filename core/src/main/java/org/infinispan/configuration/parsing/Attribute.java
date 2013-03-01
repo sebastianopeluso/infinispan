@@ -150,6 +150,9 @@ public enum Attribute {
     REAPER_WAKE_UP_INTERVAL("reaperWakeUpInterval"),
     COMPLETED_TX_TIMEOUT("completedTxTimeout"),
     TRANSACTION_PROTOCOL("transactionProtocol"),
+    OBJECT_LOOKUP_FACTORY("objectLookupFactory"),
+    COOL_DOWN_TIME("coolDownTime"),
+    MAX_KEYS_TO_REQUEST("maxNumberOfKeysToRequest"),
     ;
 
     private final String name;

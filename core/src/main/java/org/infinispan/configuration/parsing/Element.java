@@ -90,6 +90,7 @@ public enum Element {
     BACKUP_FOR("backupFor"),
     TAKE_OFFLINE("takeOffline"),
     TOTAL_ORDER_EXECUTOR("totalOrderExecutor"),
+    DATA_PLACEMENT("dataPlacement"),
     ;
 
     private final String name;

@@ -34,6 +34,7 @@ import org.infinispan.commands.TopologyAffectedCommand;
 import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.global.GlobalConfiguration;
+import org.infinispan.dataplacement.ch.DataPlacementConsistentHashFactory;
 import org.infinispan.distribution.ch.*;
 import org.infinispan.distribution.group.GroupManager;
 import org.infinispan.distribution.group.GroupingConsistentHash;
@@ -148,6 +149,9 @@ public class StateTransferManagerImpl implements StateTransferManager {
                factory = new ReplicatedConsistentHashFactory();
             }
          }
+      }
+      if (configuration.dataPlacement().enabled()) {
+         return new DataPlacementConsistentHashFactory(factory);
       }
       return factory;
    }

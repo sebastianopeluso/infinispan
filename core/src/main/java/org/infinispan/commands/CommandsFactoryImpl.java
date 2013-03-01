@@ -36,6 +36,7 @@ import org.infinispan.commands.read.ReduceCommand;
 import org.infinispan.commands.read.SizeCommand;
 import org.infinispan.commands.read.ValuesCommand;
 import org.infinispan.commands.remote.ClusteredGetCommand;
+import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.commands.remote.MultipleRpcCommand;
 import org.infinispan.commands.remote.SingleRpcCommand;
 import org.infinispan.commands.remote.recovery.CompleteTransactionCommand;
@@ -69,6 +70,7 @@ import org.infinispan.container.InternalEntryFactory;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContextContainer;
+import org.infinispan.dataplacement.DataPlacementManager;
 import org.infinispan.distexec.mapreduce.MapReduceManager;
 import org.infinispan.distexec.mapreduce.Mapper;
 import org.infinispan.distexec.mapreduce.Reducer;
@@ -142,6 +144,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
    private StateTransferManager stateTransferManager;
    private BackupSender backupSender;
    private CancellationService cancellationService;
+   private DataPlacementManager dataPlacementManager;
 
    private Map<Byte, ModuleCommandInitializer> moduleCommandInitializers;
 
@@ -151,8 +154,9 @@ public class CommandsFactoryImpl implements CommandsFactory {
                                  InvocationContextContainer icc, TransactionTable txTable, Configuration configuration,
                                  @ComponentName(KnownComponentNames.MODULE_COMMAND_INITIALIZERS) Map<Byte, ModuleCommandInitializer> moduleCommandInitializers,
                                  RecoveryManager recoveryManager, StateProvider stateProvider, StateConsumer stateConsumer,
-                                 LockManager lockManager, InternalEntryFactory entryFactory, MapReduceManager mapReduceManager, 
-                                 StateTransferManager stm, BackupSender backupSender, CancellationService cancellationService) {
+                                 LockManager lockManager, InternalEntryFactory entryFactory, MapReduceManager mapReduceManager,
+                                 StateTransferManager stm, BackupSender backupSender, CancellationService cancellationService,
+                                 DataPlacementManager dataPlacementManager) {
       this.dataContainer = container;
       this.notifier = notifier;
       this.cache = cache;
@@ -171,6 +175,7 @@ public class CommandsFactoryImpl implements CommandsFactory {
       this.stateTransferManager = stm;
       this.backupSender = backupSender;
       this.cancellationService = cancellationService;
+      this.dataPlacementManager = dataPlacementManager;
    }
 
    @Start(priority = 1)
@@ -471,6 +476,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
             CancelCommand cancelCommand = (CancelCommand)c;
             cancelCommand.init(cancellationService);
             break;
+         case DataPlacementCommand.COMMAND_ID:
+            DataPlacementCommand dataPlacementRequestCommand = (DataPlacementCommand)c;
+            dataPlacementRequestCommand.initialize(dataPlacementManager);
+            break;
          default:
             ModuleCommandInitializer mci = moduleCommandInitializers.get(c.getCommandId());
             if (mci != null) {
@@ -577,5 +586,10 @@ public class CommandsFactoryImpl implements CommandsFactory {
    @Override
    public SetClassCommand buildSetClassCommand(String transactionalClass) {
       return new SetClassCommand(transactionalClass);
+   }
+
+   @Override
+   public DataPlacementCommand buildDataPlacementCommand(DataPlacementCommand.Type type, long roundId) {
+      return new DataPlacementCommand(cacheName, type, roundId);
    }
 }

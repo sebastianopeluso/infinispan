@@ -31,6 +31,7 @@ import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.NonTransactionalInvocationContextContainer;
 import org.infinispan.context.TransactionalInvocationContextContainer;
+import org.infinispan.dataplacement.DataPlacementManager;
 import org.infinispan.distribution.L1Manager;
 import org.infinispan.distribution.L1ManagerImpl;
 import org.infinispan.eviction.ActivationManager;
@@ -75,7 +76,7 @@ import static org.infinispan.util.Util.getInstance;
                               TransactionCoordinator.class, RecoveryAdminOperations.class, StateTransferLock.class,
                               ClusteringDependentLogic.class, LockContainer.class,
                               L1Manager.class, TransactionFactory.class, BackupSender.class,
-                              TotalOrderManager.class})
+                              TotalOrderManager.class, DataPlacementManager.class})
 public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheComponentFactory implements AutoInstantiableFactory {
 
    @Override
@@ -135,6 +136,8 @@ public class EmptyConstructorNamedCacheFactory extends AbstractNamedCacheCompone
             return (T) new BackupSenderImpl(globalConfiguration.sites().localSite());
          } else if (componentType.equals(TotalOrderManager.class)) {
             return (T) new TotalOrderManager();
+         } else if (componentType.equals(DataPlacementManager.class)){
+               return (T) new DataPlacementManager();
          }
       }
 

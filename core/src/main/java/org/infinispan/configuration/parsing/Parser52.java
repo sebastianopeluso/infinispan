@@ -40,6 +40,7 @@ import org.infinispan.configuration.global.ExecutorFactoryConfigurationBuilder;
 import org.infinispan.configuration.global.GlobalConfigurationBuilder;
 import org.infinispan.configuration.global.ShutdownHookBehavior;
 import org.infinispan.container.DataContainer;
+import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
 import org.infinispan.distribution.ch.ConsistentHashFactory;
 import org.infinispan.distribution.group.Grouper;
 import org.infinispan.eviction.EvictionStrategy;
@@ -202,6 +203,9 @@ public class Parser52 implements ConfigurationParser<ConfigurationBuilderHolder>
                break;
             case SITES:
                parseLocalSites(reader, holder);
+               break;
+            case DATA_PLACEMENT:
+               parseDataPlacement(reader, holder);
                break;
             default:
                throw ParseUtils.unexpectedElement(reader);
@@ -1926,6 +1930,62 @@ public class Parser52 implements ConfigurationParser<ConfigurationBuilderHolder>
          }
       }
 
+   }
+
+   private void parseDataPlacement(final XMLExtendedStreamReader reader, final ConfigurationBuilderHolder holder) throws XMLStreamException {
+      ConfigurationBuilder builder = holder.getCurrentConfigurationBuilder();
+      for (int i = 0; i < reader.getAttributeCount(); i++) {
+         ParseUtils.requireNoNamespaceAttribute(reader, i);
+         String value = replaceProperties(reader.getAttributeValue(i));
+         Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
+         switch (attribute) {
+            case OBJECT_LOOKUP_FACTORY:
+               ObjectLookupFactory objectLookupFactory = Util.getInstance(value, holder.getClassLoader());
+               builder.dataPlacement().objectLookupFactory(objectLookupFactory);
+               break;
+            case ENABLED:
+               if (Boolean.parseBoolean(value)) {
+                  builder.dataPlacement().enable();
+               } else {
+                  builder.dataPlacement().disable();
+               }
+               break;
+            case COOL_DOWN_TIME:
+               try {
+                  int coolDownTime = Integer.parseInt(value);
+                  builder.dataPlacement().coolDownTime(coolDownTime);
+               }  catch (NumberFormatException nfe) {
+                  log.warn("Cannot parse the cool down time value. Setting to default");
+               }
+               break;
+            case MAX_KEYS_TO_REQUEST:
+               try {
+                  int maxNumberOfKeys = Integer.parseInt(value);
+                  builder.dataPlacement().maxNumberOfKeysToRequest(maxNumberOfKeys);
+               }  catch (NumberFormatException nfe) {
+                  log.warn("Cannot parse the max number of key to request value. Setting to default");
+               }
+               break;
+            default:
+               throw ParseUtils.unexpectedAttribute(reader, i);
+         }
+      }
+
+      Properties dataPlacementProperties = null;
+      while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
+         Element element = Element.forName(reader.getLocalName());
+         switch (element) {
+            case PROPERTIES:
+               dataPlacementProperties = parseProperties(reader);
+               break;
+            default:
+               throw ParseUtils.unexpectedElement(reader);
+         }
+      }
+
+      if (dataPlacementProperties != null) {
+         builder.dataPlacement().withProperties(dataPlacementProperties);
+      }
    }
 
    public static Properties parseProperties(final XMLExtendedStreamReader reader) throws XMLStreamException {

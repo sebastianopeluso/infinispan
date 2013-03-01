@@ -22,14 +22,14 @@ import java.util.Map;
 @MBean(objectName = "StreamLibStatistics", description = "Show analytics for workload monitor")
 public class StreamLibInterceptor extends BaseCustomInterceptor {
 
-   private static final StreamLibContainer streamLibContainer = StreamLibContainer.getInstance();
+   private StreamLibContainer streamLibContainer;
    private boolean statisticEnabled = false;
    private DistributionManager distributionManager;
 
    @Override
    public Object visitGetKeyValueCommand(InvocationContext ctx, GetKeyValueCommand command) throws Throwable {
 
-      if (statisticEnabled && ctx.isOriginLocal() && ctx.isInTxScope()) {
+      if (statisticEnabled && ctx.isOriginLocal()) {
          streamLibContainer.addGet(command.getKey(), isRemote(command.getKey()));
       }
       return invokeNextInterceptor(ctx, command);
@@ -38,7 +38,7 @@ public class StreamLibInterceptor extends BaseCustomInterceptor {
    @Override
    public Object visitPutKeyValueCommand(InvocationContext ctx, PutKeyValueCommand command) throws Throwable {
       try {
-         if (statisticEnabled && ctx.isOriginLocal() && ctx.isInTxScope()) {
+         if (statisticEnabled && ctx.isOriginLocal()) {
             streamLibContainer.addPut(command.getKey(), isRemote(command.getKey()));
          }
          return invokeNextInterceptor(ctx, command);
@@ -191,18 +191,19 @@ public class StreamLibInterceptor extends BaseCustomInterceptor {
    @ManagedOperation(description = "Show the top n keys whose write skew check was failed",
                      displayName = "Top Keys whose Write Skew Check was failed")
    public void setStatisticsEnabled(@Parameter(name = "Enabled?") boolean enabled) {
-      statisticEnabled = true;
+      statisticEnabled = enabled;
       streamLibContainer.setActive(enabled);
    }
 
    @Override
    protected void start() {
       super.start();
-      setStatisticsEnabled(true);
       this.distributionManager = cache.getAdvancedCache().getDistributionManager();
+      this.streamLibContainer = StreamLibContainer.getOrCreateStreamLibContainer(cache);
+      setStatisticsEnabled(true);
    }
 
    private boolean isRemote(Object k) {
-      return distributionManager != null && distributionManager.getLocality(k).isLocal();
+      return distributionManager != null && !distributionManager.getLocality(k).isLocal();
    }
 }
