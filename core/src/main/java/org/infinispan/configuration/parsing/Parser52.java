@@ -36,6 +36,7 @@ import org.infinispan.config.ConfigurationException;
 import org.infinispan.configuration.cache.*;
 import org.infinispan.configuration.cache.FileCacheStoreConfigurationBuilder.FsyncMode;
 import org.infinispan.configuration.cache.InterceptorConfiguration.Position;
+import org.infinispan.configuration.global.ExecutorFactoryConfigurationBuilder;
 import org.infinispan.configuration.global.GlobalConfigurationBuilder;
 import org.infinispan.configuration.global.ShutdownHookBehavior;
 import org.infinispan.container.DataContainer;
@@ -57,6 +58,7 @@ import org.infinispan.remoting.ReplicationQueue;
 import org.infinispan.remoting.transport.Transport;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.transaction.TransactionMode;
+import org.infinispan.transaction.TransactionProtocol;
 import org.infinispan.transaction.lookup.TransactionManagerLookup;
 import org.infinispan.util.Util;
 import org.infinispan.util.concurrent.IsolationLevel;
@@ -418,6 +420,9 @@ public class Parser52 implements ConfigurationParser<ConfigurationBuilderHolder>
                break;
             case COMPLETED_TX_TIMEOUT:
                builder.transaction().completedTxTimeout(Long.parseLong(value));
+               break;
+            case TRANSACTION_PROTOCOL:
+               builder.transaction().transactionProtocol(TransactionProtocol.valueOf(value));
                break;
             default:
                throw ParseUtils.unexpectedAttribute(reader, i);
@@ -1491,6 +1496,10 @@ public class Parser52 implements ConfigurationParser<ConfigurationBuilderHolder>
                parseAsyncTransportExecutor(reader, holder);
                break;
             }
+            case TOTAL_ORDER_EXECUTOR:
+               parseExecutor(reader, holder.getGlobalConfigurationBuilder().totalOrderExecutor(),
+                             holder.getClassLoader());
+               break;
             case EVICTION_SCHEDULED_EXECUTOR: {
                parseEvictionScheduledExecutor(reader, holder);
                break;
@@ -1846,6 +1855,37 @@ public class Parser52 implements ConfigurationParser<ConfigurationBuilderHolder>
          switch (element) {
             case PROPERTIES: {
                builder.asyncTransportExecutor().withProperties(parseProperties(reader));
+               break;
+            }
+            default: {
+               throw ParseUtils.unexpectedElement(reader);
+            }
+         }
+      }
+   }
+
+   private void parseExecutor(final XMLExtendedStreamReader reader, final ExecutorFactoryConfigurationBuilder factoryBuilder,
+                              final ClassLoader classLoader) throws XMLStreamException {
+      for (int i = 0; i < reader.getAttributeCount(); i++) {
+         ParseUtils.requireNoNamespaceAttribute(reader, i);
+         String value = replaceProperties(reader.getAttributeValue(i));
+         Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
+         switch (attribute) {
+            case FACTORY: {
+               factoryBuilder.factory(Util.<ExecutorFactory>getInstance(value, classLoader));
+               break;
+            }
+            default: {
+               throw ParseUtils.unexpectedAttribute(reader, i);
+            }
+         }
+      }
+
+      while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
+         Element element = Element.forName(reader.getLocalName());
+         switch (element) {
+            case PROPERTIES: {
+               factoryBuilder.withProperties(parseProperties(reader));
                break;
             }
             default: {

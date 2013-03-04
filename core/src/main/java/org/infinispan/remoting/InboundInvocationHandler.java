@@ -25,8 +25,8 @@ package org.infinispan.remoting;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
-import org.infinispan.remoting.responses.Response;
 import org.infinispan.remoting.transport.Address;
+import org.jgroups.blocks.Response;
 
 /**
  * A globally scoped component, that is able to locate named caches and invoke remotely originating calls on the
@@ -43,8 +43,9 @@ public interface InboundInvocationHandler {
     * Invokes a command on the cache, from a remote source.
     *
     * @param command command to invoke
-    * @return results, if any, from the invocation
+    * @param response the asynchronous request reference from {@code org.infinispan.remoting.transport.Transport}.
+    *                A {@code null} value means that the request does not expect a return value.
     * @throws Throwable in the event of problems executing the command
     */
-   Response handle(CacheRpcCommand command, Address origin) throws Throwable;
+   void handle(CacheRpcCommand command, Address origin, Response response) throws Throwable;
 }
