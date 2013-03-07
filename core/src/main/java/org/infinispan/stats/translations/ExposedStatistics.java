@@ -163,7 +163,12 @@ public class ExposedStatistics {
       NTBC_COUNT(true,false),
       NTBC(false,false), //Time between Transactions in a thread   // ONLY FOR QUERY, derived on the fly
 
-      RESPONSE_TIME(true,false);
+      RESPONSE_TIME(true,false),
+
+      NUM_FRESHNESS_REAL_DATA(true, true),
+      FRESHNESS_REAL_DATA(true, true),
+      NUM_FRESHNESS_LOGICAL_DATA(true, true),
+      FRESHNESS_LOGICAL_DATA(true, true);
 
       private boolean local;
       private boolean remote;

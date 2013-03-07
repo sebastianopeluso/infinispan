@@ -22,9 +22,11 @@
  */
 package org.infinispan.container.entries.gmu;
 
+import com.sun.tools.internal.ws.wsdl.parser.Internalizer;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.InternalCacheValue;
+import org.infinispan.container.gmu.FreshnessData;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.marshall.AbstractExternalizer;
 import org.infinispan.marshall.Ids;
@@ -39,6 +41,7 @@ import java.util.Set;
  * // TODO: Document this
  *
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
@@ -49,6 +52,8 @@ public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
    private EntryVersion maxValidVersion;
    private final boolean mostRecent;
 
+   private FreshnessData freshnessData;
+
    public InternalGMUValueCacheEntry(InternalCacheEntry internalCacheEntry, EntryVersion maxTxVersion,
                                      boolean mostRecent, EntryVersion creationVersion, EntryVersion maxValidVersion) {
       this.internalCacheEntry = internalCacheEntry;
@@ -57,6 +62,8 @@ public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
       this.maxValidVersion = maxValidVersion;
       this.mostRecent = mostRecent;
    }
+
+
 
    @Override
    public boolean isExpired(long now) {
@@ -268,7 +275,16 @@ public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
       return internalCacheEntry;
    }
 
+   public void setFreshnessData(FreshnessData freshnessData){
+      this.freshnessData = freshnessData;
+   }
+
    @Override
+   public FreshnessData getFreshnessData() {
+      return this.freshnessData;  //To change body of implemented methods use File | Settings | File Templates.
+   }
+
+    @Override
    public void setCreationVersion(EntryVersion entryVersion) {
       this.creationVersion = entryVersion;
    }
@@ -305,6 +321,7 @@ public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
          output.writeObject(object.maxTxVersion);
          output.writeObject(object.maxValidVersion);
          output.writeBoolean(object.mostRecent);
+         output.writeObject(object.freshnessData);
       }
 
       @Override
@@ -314,8 +331,10 @@ public class InternalGMUValueCacheEntry implements InternalGMUCacheEntry {
          EntryVersion maxTxVersion = (EntryVersion) input.readObject();
          EntryVersion maxValidVersion = (EntryVersion) input.readObject();
          boolean mostRecent = input.readBoolean();
-         return new InternalGMUValueCacheEntry(internalCacheEntry, maxTxVersion, mostRecent, creationVersion, maxValidVersion
-         );
+         FreshnessData freshnessData = (FreshnessData) input.readObject();
+         InternalGMUValueCacheEntry gmuCacheEntry = new InternalGMUValueCacheEntry(internalCacheEntry, maxTxVersion, mostRecent, creationVersion, maxValidVersion);
+         gmuCacheEntry.setFreshnessData(freshnessData);
+         return gmuCacheEntry;
       }
 
       @Override

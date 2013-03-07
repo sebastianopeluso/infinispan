@@ -58,12 +58,18 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
 
    public static InternalGMUCacheEntry wrap(Object key, InternalCacheEntry entry, boolean mostRecent,
                                             EntryVersion maxTxVersion, EntryVersion creationVersion,
-                                            EntryVersion maxValidVersion) {
+                                            EntryVersion maxValidVersion,
+                                            FreshnessData freshnessData) {
       if (entry == null || entry.isNull()) {
          return new InternalGMUNullCacheEntry(key, (entry == null ? null : entry.getVersion()), maxTxVersion, mostRecent,
                                               creationVersion, maxValidVersion);
       }
-      return new InternalGMUValueCacheEntry(entry, maxTxVersion, mostRecent, creationVersion, maxValidVersion);
+
+      InternalGMUValueCacheEntry valueCacheEntry = new InternalGMUValueCacheEntry(entry, maxTxVersion, mostRecent, creationVersion, maxValidVersion);
+
+      valueCacheEntry.setFreshnessData(freshnessData);
+
+      return valueCacheEntry;
    }
 
    @Inject

@@ -116,7 +116,7 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Dat
          if (log.isTraceEnabled()) {
             log.tracef("DataContainer.peek(%s,%s) => NOT_FOUND", k, version);
          }
-         return wrap(k, null, true, version, null, null);
+         return wrap(k, null, true, version, null, null, null);
       }
       VersionEntry<InternalCacheEntry> entry = chain.get(getReadVersion(version));
 
@@ -125,7 +125,7 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Dat
       }
       EntryVersion creationVersion = entry.getEntry() == null ? null : entry.getEntry().getVersion();
 
-      return wrap(k, entry.getEntry(), entry.isMostRecent(), version, creationVersion, entry.getNextVersion());
+      return wrap(k, entry.getEntry(), entry.isMostRecent(), version, creationVersion, entry.getNextVersion(), entry.getFreshnessData());
    }
 
    @Override
@@ -189,14 +189,14 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Dat
          if (log.isTraceEnabled()) {
             log.tracef("DataContainer.remove(%s,%s) => NOT_FOUND", k, version);
          }
-         return wrap(k, null, true, null, null, null);
+         return wrap(k, null, true, null, null, null, null);
       }
       VersionEntry<InternalCacheEntry> entry = chain.remove(new InternalGMURemovedCacheEntry(k, assertGMUCacheEntryVersion(version)));
 
       if (log.isTraceEnabled()) {
          log.tracef("DataContainer.remove(%s,%s) => %s", k, version, entry);
       }
-      return wrap(k, entry.getEntry(), entry.isMostRecent(), null, null, null);
+      return wrap(k, entry.getEntry(), entry.isMostRecent(), null, null, null, null);
    }
 
    @Override
@@ -326,25 +326,87 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Dat
       return gmuReadVersion;
    }
 
-   public static class DataContainerVersionChain extends VersionChain<InternalCacheEntry> {
+    public static class DataContainerVersionChain extends VersionChain<InternalCacheEntry> {
 
-      @Override
-      protected VersionBody<InternalCacheEntry> newValue(InternalCacheEntry value) {
-         return new DataContainerVersionBody(value);
-      }
+        @Override
+        protected VersionBody<InternalCacheEntry> newValue(InternalCacheEntry value) {
+            return new DataContainerVersionBody(value);
+        }
 
-      @Override
-      protected void writeValue(BufferedWriter writer, InternalCacheEntry value) throws IOException {
-         writer.write(String.valueOf(value.getValue()));
-         writer.write("=");
-         writer.write(String.valueOf(value.getVersion()));
-      }
-   }
+        @Override
+        protected void writeValue(BufferedWriter writer, InternalCacheEntry value) throws IOException {
+            writer.write(String.valueOf(value.getValue()));
+            writer.write("=");
+            writer.write(String.valueOf(value.getVersion()));
+        }
+
+        @Override
+        public VersionEntry<InternalCacheEntry> get(EntryVersion version) {
+            VersionBody<InternalCacheEntry> iterator;
+            VersionBody<InternalCacheEntry> nextIterator = null;
+            VersionEntry<InternalCacheEntry> versionEntry = null;
+            synchronized (this) {
+                iterator = first;
+            }
+
+            if (log.isTraceEnabled()) {
+                log.tracef("[%s] find value for version %s", Thread.currentThread().getName(), version);
+            }
+
+            long numJumpedVersions = 0L;
+
+
+            if (version == null) {
+                InternalCacheEntry entry = iterator == null ? null : iterator.getValue();
+                if (log.isTraceEnabled()) {
+                    log.tracef("[%s] version is null... returning the most recent: %s", Thread.currentThread().getName(), entry);
+                }
+
+                versionEntry = new VersionEntry<InternalCacheEntry>(entry, null, true);
+                versionEntry.setFreshnessData(new FreshnessData(0L, 0L));
+                return versionEntry;
+            }
+
+            EntryVersion nextVersion = null;
+
+            while (iterator != null) {
+                if (iterator.isOlderOrEquals(version)) {
+                    if (log.isTraceEnabled()) {
+                        log.tracef("[%s] value found: %s", Thread.currentThread().getName(), iterator);
+                    }
+
+                    versionEntry = new VersionEntry<InternalCacheEntry>(iterator.getValue(), nextVersion, true);
+                    if(numJumpedVersions == 0L){
+                       versionEntry.setFreshnessData(new FreshnessData(0L, 0L));
+                    }
+                    else{
+                       versionEntry.setFreshnessData(new FreshnessData(numJumpedVersions, System.nanoTime() - ((DataContainerVersionBody)nextIterator).realTimestamp));
+                    }
+                    return versionEntry;
+                }
+                nextVersion = iterator.getVersion();
+                nextIterator = iterator;
+                iterator = iterator.getPrevious();
+                numJumpedVersions++;
+            }
+
+            if (log.isTraceEnabled()) {
+                log.tracef("[%s] No value found!", Thread.currentThread().getName());
+            }
+
+            versionEntry = new VersionEntry<InternalCacheEntry>(null, nextVersion, false);
+            versionEntry.setFreshnessData(new FreshnessData(numJumpedVersions, System.nanoTime() - ((DataContainerVersionBody)nextIterator).realTimestamp));
+            return versionEntry;
+        }
+    }
 
    public static class DataContainerVersionBody extends VersionBody<InternalCacheEntry> {
 
+      private final long realTimestamp;
+
       protected DataContainerVersionBody(InternalCacheEntry value) {
          super(value);
+         realTimestamp = System.nanoTime();
       }
 
       @Override

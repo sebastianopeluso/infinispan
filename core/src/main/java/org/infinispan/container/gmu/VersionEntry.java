@@ -28,12 +28,14 @@ import org.infinispan.container.versioning.EntryVersion;
  * // TODO: Document this
  *
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 public class VersionEntry<T> {
    private final T entry;
    private final EntryVersion nextVersion;
    private final boolean found;
+   private FreshnessData freshnessData;
 
    public VersionEntry(T entry, EntryVersion nextVersion, boolean found) {
       this.entry = entry;
@@ -57,12 +59,21 @@ public class VersionEntry<T> {
       return found;
    }
 
+   public final void setFreshnessData(FreshnessData freshnessData){
+      this.freshnessData = freshnessData;
+   }
+
+   public final FreshnessData getFreshnessData(){
+      return this.freshnessData;
+   }
+
    @Override
    public String toString() {
       return "VersionEntry{" +
             "entry=" + entry +
             ", nextVersion=" + nextVersion +
             ", found=" + found +
+            ", freshnessData=" + freshnessData +
             '}';
    }
 }

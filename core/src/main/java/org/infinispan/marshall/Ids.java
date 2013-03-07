@@ -118,4 +118,5 @@ public interface Ids {
    int GMU_REPLICATED_VERSION = 89;
    int GMU_DISTRIBUTED_VERSION = 90;
    int GMU_CACHE_VERSION = 91;
+   int GMU_FRESHNESS_DATA = 92;
 }

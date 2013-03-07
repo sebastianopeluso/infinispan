@@ -25,12 +25,14 @@ package org.infinispan.container.entries.gmu;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.InternalCacheValue;
+import org.infinispan.container.gmu.FreshnessData;
 import org.infinispan.container.versioning.EntryVersion;
 
 /**
  * // TODO: Document this
  *
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 public class InternalGMURemovedCacheEntry implements InternalGMUCacheEntry {
@@ -221,7 +223,12 @@ public class InternalGMURemovedCacheEntry implements InternalGMUCacheEntry {
       return null;
    }
 
-   @Override
+    @Override
+    public FreshnessData getFreshnessData() {
+        return null;
+    }
+
+    @Override
    public void setCreationVersion(EntryVersion entryVersion) {
       //no-op
    }

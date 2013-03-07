@@ -34,14 +34,15 @@ import java.io.IOException;
  * // TODO: Document this
  *
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 public abstract class VersionChain<T> {
 
    private static final Log log = LogFactory.getLog(VersionChain.class);
-   private VersionBody<T> first;
+   protected VersionBody<T> first;
 
-   public final VersionEntry<T> get(EntryVersion version) {
+   public VersionEntry<T> get(EntryVersion version) {
       VersionBody<T> iterator;
       synchronized (this) {
          iterator = first;

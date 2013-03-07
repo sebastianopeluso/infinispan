@@ -29,6 +29,8 @@ import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.write.PutKeyValueCommand;
 import org.infinispan.configuration.cache.Configuration;
+import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
+import org.infinispan.container.gmu.FreshnessData;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.distribution.DistributionManager;
@@ -58,6 +60,7 @@ import org.rhq.helpers.pluginAnnotations.agent.Metric;
 import org.rhq.helpers.pluginAnnotations.agent.Operation;
 
 import java.lang.reflect.Field;
+import java.util.Map;
 
 /**
  * Massive hack for a noble cause!
@@ -65,6 +68,7 @@ import java.lang.reflect.Field;
  * @author Mircea Markus <mircea.markus@jboss.com> (C) 2011 Red Hat Inc.
  * @author Diego Didona <didona@gsd.inesc-id.pt>
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 @MBean(objectName = "ExtendedStatistics", description = "Component that manages and exposes extended statistics " +
@@ -177,10 +181,28 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
          TransactionsStatisticsRegistry.addValue(IspnStats.ALL_GET_EXECUTION, lastTimeOp - currTimeForAllGetCommand);
          TransactionsStatisticsRegistry.incrementValue(IspnStats.NUM_GET);
          TransactionsStatisticsRegistry.setLastOpTimestamp(lastTimeOp);
+
+
+          Map<Object, InternalGMUCacheEntry> mapKeysRead = ctx.getKeysReadInCommand();
+          InternalGMUCacheEntry igce;
+          FreshnessData freshnessData;
+          if(mapKeysRead != null){
+              igce = mapKeysRead.get(command.getKey());
+              if(igce != null){
+                  freshnessData = igce.getFreshnessData();
+                  if(freshnessData != null){
+                      TransactionsStatisticsRegistry.incrementValue(IspnStats.NUM_FRESHNESS_REAL_DATA);
+                      TransactionsStatisticsRegistry.addValue(IspnStats.FRESHNESS_REAL_DATA, freshnessData.getRealTimeFreshness());
+                      TransactionsStatisticsRegistry.incrementValue(IspnStats.NUM_FRESHNESS_LOGICAL_DATA);
+                      TransactionsStatisticsRegistry.addValue(IspnStats.FRESHNESS_LOGICAL_DATA, freshnessData.getRealTimeFreshness());
+                  }
+              }
+          }
       }
       else{
          ret = invokeNextInterceptor(ctx,command);
       }
+
       return ret;
    }
 
@@ -835,6 +857,18 @@ public abstract class CustomStatsInterceptor extends BaseCustomInterceptor {
    public long getAvgResponseTime() {
 
        return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(IspnStats.RESPONSE_TIME));
+   }
+
+   @ManagedAttribute(description = "Logical Data Freshness")
+   @Metric(displayName = "Logical Data Freshness")
+   public double getLogicalDataFreshness(){
+      return handleDouble((Double)TransactionsStatisticsRegistry.getAttribute(IspnStats.FRESHNESS_LOGICAL_DATA));
+   }
+
+   @ManagedAttribute(description = "Real Data Freshness")
+   @Metric(displayName = "Real Data Freshness")
+   public double getRealDataFreshness(){
+      return handleDouble((Double)TransactionsStatisticsRegistry.getAttribute(IspnStats.FRESHNESS_REAL_DATA));
    }
 
    //JMX with Transactional class xxxxxxxxx

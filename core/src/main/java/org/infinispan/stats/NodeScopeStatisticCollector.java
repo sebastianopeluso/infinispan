@@ -442,6 +442,26 @@ public class NodeScopeStatisticCollector {
 			}else{
 			   return 0;
 			}
+         case FRESHNESS_LOGICAL_DATA:{
+            long numFreshnessLogicalData = localTransactionStatistics.getValue(IspnStats.NUM_FRESHNESS_LOGICAL_DATA);
+            if(numFreshnessLogicalData != 0){
+               double result = localTransactionStatistics.getValue(IspnStats.FRESHNESS_LOGICAL_DATA) * 1.0D;
+
+               return new Double(result/numFreshnessLogicalData);
+            }
+            return new Long(0);
+
+         }
+         case FRESHNESS_REAL_DATA:{
+            long numFreshnessRealData = localTransactionStatistics.getValue(IspnStats.NUM_FRESHNESS_REAL_DATA);
+            if(numFreshnessRealData != 0){
+               double result = localTransactionStatistics.getValue(IspnStats.FRESHNESS_REAL_DATA) * 1.0D;
+
+               return new Double(result/numFreshnessRealData);
+            }
+            return new Long(0);
+
+         }
          default:
             throw new NoIspnStatException("Invalid statistic "+param);
       }

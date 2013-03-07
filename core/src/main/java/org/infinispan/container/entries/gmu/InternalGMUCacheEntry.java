@@ -23,12 +23,14 @@
 package org.infinispan.container.entries.gmu;
 
 import org.infinispan.container.entries.InternalCacheEntry;
+import org.infinispan.container.gmu.FreshnessData;
 import org.infinispan.container.versioning.EntryVersion;
 
 /**
  * // TODO: Document this
  *
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 public interface InternalGMUCacheEntry extends InternalCacheEntry {
@@ -61,5 +63,7 @@ public interface InternalGMUCacheEntry extends InternalCacheEntry {
     * @return  the internal cache entry encapsulated by this instance
     */
    InternalCacheEntry getInternalCacheEntry();
+
+   FreshnessData getFreshnessData();
 
 }
