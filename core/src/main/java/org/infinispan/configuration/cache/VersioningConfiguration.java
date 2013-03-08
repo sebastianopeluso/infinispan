@@ -26,10 +26,12 @@ package org.infinispan.configuration.cache;
 public class VersioningConfiguration {
    private final boolean enabled;
    private final VersioningScheme scheme;
+   private final boolean freshness;
 
-   VersioningConfiguration(boolean enabled, VersioningScheme scheme) {
+   VersioningConfiguration(boolean enabled, VersioningScheme scheme, boolean freshness) {
       this.enabled = enabled;
       this.scheme = scheme;
+      this.freshness = freshness;
    }
 
    public boolean enabled() {
@@ -40,11 +42,16 @@ public class VersioningConfiguration {
       return scheme;
    }
 
+   public boolean freshness() {
+      return freshness;
+   }
+
    @Override
    public String toString() {
       return "VersioningConfiguration{" +
             "enabled=" + enabled +
             ", scheme=" + scheme +
+            ", freshness=" + freshness +
             '}';
    }
 
@@ -57,6 +64,7 @@ public class VersioningConfiguration {
 
       if (enabled != that.enabled) return false;
       if (scheme != that.scheme) return false;
+      if (freshness != that.freshness) return false;
 
       return true;
    }
@@ -65,6 +73,8 @@ public class VersioningConfiguration {
    public int hashCode() {
       int result = (enabled ? 1 : 0);
       result = 31 * result + (scheme != null ? scheme.hashCode() : 0);
+      result = 31 * result + (freshness ? 1 : 0);
+
       return result;
    }
 

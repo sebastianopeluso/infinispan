@@ -792,6 +792,7 @@ public class FluentConfiguration extends AbstractFluentConfigurationBean {
       VersioningConfig enable();
       VersioningConfig disable();
       VersioningConfig versioningScheme(VersioningScheme scheme);
+      VersioningConfig freshness(boolean freshness);
    }
 
    @Deprecated public static interface DataContainerConfig extends FluentTypes {

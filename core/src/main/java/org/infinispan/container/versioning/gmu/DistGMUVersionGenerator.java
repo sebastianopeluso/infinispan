@@ -51,16 +51,17 @@ import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersion;
  * // TODO: Document this
  *
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 public class DistGMUVersionGenerator implements GMUVersionGenerator {
 
    private static final Hash HASH = new MurmurHash3();
-   private static final Log log = LogFactory.getLog(DistGMUVersionGenerator.class);
+   protected static final Log log = LogFactory.getLog(DistGMUVersionGenerator.class);
    private final TreeMap<Integer, ClusterSnapshot> viewIdClusterSnapshot;
    private RpcManager rpcManager;
-   private String cacheName;
-   private volatile int currentViewId;
+   protected String cacheName;
+   protected volatile int currentViewId;
 
    public DistGMUVersionGenerator() {
       viewIdClusterSnapshot = new TreeMap<Integer, ClusterSnapshot>();
@@ -356,7 +357,7 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
       return viewIdClusterSnapshot.size();
    }
 
-   private long[] create(boolean fill, int size) {
+   protected long[] create(boolean fill, int size) {
       long[] versions = new long[size];
       if (fill) {
          Arrays.fill(versions, NON_EXISTING);

@@ -689,6 +689,11 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       this.versioning.setEnabled(enabled);
    }
 
+   @Deprecated
+   public void setFreshnessVersioning(boolean freshness) {
+      this.versioning.setFreshness(freshness);
+   }
+
    /**
     * Expiration lifespan, in milliseconds
     */
@@ -704,6 +709,11 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
    @Deprecated
    public boolean isEnableVersioning() {
       return this.versioning.enabled;
+   }
+
+   @Deprecated
+   public boolean isFreshnessVersioning() {
+      return this.versioning.freshness;
    }
 
 
@@ -4355,6 +4365,9 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       @ConfigurationDocRef(bean = Configuration.class, targetElement = "setVersioningScheme")
       protected VersioningScheme versioningScheme = VersioningScheme.NONE;
 
+      @ConfigurationDocRef(bean = Configuration.class, targetElement = "setFreshnessVersioning")
+      protected Boolean freshness = true;
+
       public void accept(ConfigurationBeanVisitor v) {
          v.visitVersioningConfigurationBean(this);
       }
@@ -4378,6 +4391,11 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
          return versioningScheme;
       }
 
+      @XmlAttribute
+      public Boolean isFreshness() {
+         return freshness;
+      }
+
       /**
        * @deprecated The visibility of this will be reduced, use {@link #versioningScheme(org.infinispan.configuration.cache.VersioningScheme)}
        */
@@ -4385,6 +4403,12 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       public void setVersioningScheme(VersioningScheme versioningScheme) {
          testImmutability("versioningScheme");
          this.versioningScheme = versioningScheme;
+      }
+
+      @Deprecated
+      public void setFreshness(boolean freshness) {
+         testImmutability("freshness");
+         this.freshness = freshness;
       }
 
       @Override
@@ -4412,6 +4436,12 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       }
 
       @Override
+      public VersioningConfigurationBean freshness(boolean freshness) {
+         setFreshness(freshness);
+         return this;
+      }
+
+      @Override
       public boolean equals(Object o) {
          if (this == o) return true;
          if (!(o instanceof VersioningConfigurationBean)) return false;
@@ -4420,6 +4450,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
 
          if (!Util.safeEquals(enabled, that.enabled)) return false;
          if (!Util.safeEquals(versioningScheme, that.versioningScheme)) return false;
+         if (!Util.safeEquals(freshness, that.freshness)) return false;
 
          return true;
       }
@@ -4428,6 +4459,7 @@ public class Configuration extends AbstractNamedCacheConfigurationBean {
       public int hashCode() {
          int result = enabled != null ? enabled.hashCode() : 0;
          result = 31 * result + (versioningScheme != null ? versioningScheme.hashCode() : 0);
+         result = 31 * result + (freshness != null ? freshness.hashCode() : 0);
          return result;
       }
    }

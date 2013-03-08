@@ -26,6 +26,7 @@ public class VersioningConfigurationBuilder extends AbstractConfigurationChildBu
 
    boolean enabled = false;
    VersioningScheme scheme = VersioningScheme.NONE;
+   boolean freshness = true;
 
    protected VersioningConfigurationBuilder(ConfigurationBuilder builder) {
       super(builder);
@@ -51,6 +52,11 @@ public class VersioningConfigurationBuilder extends AbstractConfigurationChildBu
       return this;
    }
 
+   public VersioningConfigurationBuilder freshness(boolean freshness) {
+      this.freshness = freshness;
+      return this;
+   }
+
    @Override
    void validate() {
       if (locking().create().isolationLevel() == IsolationLevel.SERIALIZABLE && 
@@ -61,13 +67,14 @@ public class VersioningConfigurationBuilder extends AbstractConfigurationChildBu
 
    @Override
    VersioningConfiguration create() {
-      return new VersioningConfiguration(enabled, scheme);
+      return new VersioningConfiguration(enabled, scheme, freshness);
    }
    
    @Override
    public VersioningConfigurationBuilder read(VersioningConfiguration template) {
       this.enabled = template.enabled();
       this.scheme = template.scheme();
+      this.freshness = template.freshness();
       
       return this;
    }
@@ -77,6 +84,7 @@ public class VersioningConfigurationBuilder extends AbstractConfigurationChildBu
       return "VersioningConfigurationBuilder{" +
             "enabled=" + enabled +
             ", scheme=" + scheme +
+            ", freshness=" + freshness +
             '}';
    }
 

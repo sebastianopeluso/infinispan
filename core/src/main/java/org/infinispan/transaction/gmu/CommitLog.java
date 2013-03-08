@@ -27,6 +27,7 @@ import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.InequalVersionComparisonResult;
 import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.DistNoFreshnessGMUVersionGenerator;
 import org.infinispan.container.versioning.gmu.GMUReadVersion;
 import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
@@ -145,6 +146,12 @@ public class CommitLog {
             //return versionGenerator.updatedVersion(currentVersion.getVersion());
          }
       }
+
+       //This is an hack to simulate a protocol that does not maximize fresheness. Change this after having re-implemented state-transfer for GMU.
+      if(versionGenerator instanceof DistNoFreshnessGMUVersionGenerator){
+         return versionGenerator.updatedVersion(other);
+      }
+
       GMUVersion gmuVersion = toGMUVersion(other);
 
       if (gmuVersion.getThisNodeVersionValue() != NON_EXISTING) {
@@ -198,6 +205,14 @@ public class CommitLog {
       GMUVersion gmuVersion = toGMUVersion(other);
       GMUReadVersion gmuReadVersion = versionGenerator.convertVersionToRead(gmuVersion);
       VersionEntry iterator;
+
+
+      //This is an hack to simulate a protocol that does not maximize fresheness. Change this after having re-implemented state-transfer for GMU.
+      if(versionGenerator instanceof DistNoFreshnessGMUVersionGenerator){
+
+         return gmuReadVersion;
+      }
+
 
       VersionEntry firstFoundPossible = null; //These are used to optimize the search
       long concurrentClockNumber = 0L;

@@ -22,6 +22,7 @@ package org.infinispan.factories;
 import org.infinispan.container.versioning.SimpleClusteredVersionGenerator;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.DistGMUVersionGenerator;
+import org.infinispan.container.versioning.gmu.DistNoFreshnessGMUVersionGenerator;
 import org.infinispan.container.versioning.gmu.ReplGMUVersionGenerator;
 import org.infinispan.factories.annotations.DefaultFactoryFor;
 
@@ -44,7 +45,10 @@ public class VersioningMetaFactory extends AbstractNamedCacheComponentFactory im
             if (configuration.getCacheMode().isReplicated()) {
                return (T) new ReplGMUVersionGenerator();
             } else if (configuration.getCacheMode().isDistributed()) {
-               return (T) new DistGMUVersionGenerator();
+               if(configuration.isFreshnessVersioning())
+                  return (T) new DistGMUVersionGenerator();
+               else
+                  return (T) new DistNoFreshnessGMUVersionGenerator();
             }
          default:
             return null;
