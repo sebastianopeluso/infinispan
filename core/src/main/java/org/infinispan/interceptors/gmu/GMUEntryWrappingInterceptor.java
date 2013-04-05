@@ -343,7 +343,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          if (writeCommand instanceof ClearCommand) {
             return true;
          } else if (writeCommand instanceof ApplyDeltaCommand) {
-            if (cdl.localNodeIsOwner(((ApplyDeltaCommand) writeCommand).getDeltaAwareKey())) {
+            if (cdl.localNodeIsOwner(((ApplyDeltaCommand) writeCommand).getKey())) {
                return true;
             }
          } else {
