@@ -49,7 +49,7 @@
             oob_thread_pool.rejection_policy="discard"
             />
     <MPING
-            mcast_addr="${jgroups.udp.mcast_addr:228.88.88.88}"
+            mcast_addr="${jgroups.udp.mcast_addr:224.0.0.6}"
             mcast_port="${jgroups.udp.mcast_port:46666}"
             ip_ttl="${jgroups.udp.ip_ttl:8}"
             num_initial_members="5"

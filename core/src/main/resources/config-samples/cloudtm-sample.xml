@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <infinispan
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="urn:infinispan:config:5.2 http://www.infinispan.org/schemas/infinispan-config-5.2.xsd"
+        xsi:schemaLocation="urn:infinispan:config:5.2 file://schema/infinispan-config-5.2.xsd"
         xmlns="urn:infinispan:config:5.2">
     <global>
         <globalJmxStatistics
@@ -34,7 +34,7 @@
                 lockingMode="OPTIMISTIC"
                 eagerLockSingleNode="false"
                 use1PcForAutoCommitTransactions="false"
-                transactionProtocol="TWO_PHASE_COMMIT"
+                transactionProtocol="DEFAULT"
                 autoCommit="true"
                 />
         <jmxStatistics
