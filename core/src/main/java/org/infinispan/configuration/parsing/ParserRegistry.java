@@ -32,6 +32,7 @@ import org.infinispan.config.ConfigurationException;
 import org.infinispan.util.FileLookup;
 import org.infinispan.util.FileLookupFactory;
 import org.infinispan.util.Util;
+import org.infinispan.util.logging.LogFactory;
 import org.jboss.staxmapper.XMLMapper;
 
 /**
@@ -53,6 +54,14 @@ public class ParserRegistry {
          for (Namespace ns : parser.getSupportedNamespaces()) {
             xmlMapper.registerRootElement(new QName(ns.getUri(), ns.getRootElement()), parser);
          }
+      }
+      if (!parsers.iterator().hasNext()) {
+         LogFactory.getLog(ParserRegistry.class).info("Adding the configuration parser.");
+         Parser52 parser52 = new Parser52();
+         for (Namespace ns : parser52.getSupportedNamespaces()) {
+            xmlMapper.registerRootElement(new QName(ns.getUri(), ns.getRootElement()), parser52);
+         }
+
       }
    }
 
