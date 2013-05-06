@@ -30,8 +30,9 @@ import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.commands.remote.ConfigurationStateCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
 import org.infinispan.commands.tx.GMUCommitCommand;
-import org.infinispan.commands.tx.PrepareCommand;
+import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.totalorder.TotalOrderPrepareCommand;
+import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.global.GlobalConfiguration;
 import org.infinispan.factories.ComponentRegistry;
 import org.infinispan.factories.GlobalComponentRegistry;
@@ -55,6 +56,7 @@ import org.infinispan.transaction.totalorder.TotalOrderLatch;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.util.concurrent.BlockingRunnable;
 import org.infinispan.util.concurrent.BlockingTaskAwareExecutorService;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -238,6 +240,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
                }
                //the ResponseGenerated is null in this case because the return value is a Response
                reply(response, resp);
+               gmuExecutorService.checkForReadyTasks();
             }
          });
          return;
@@ -250,6 +253,10 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
          log.tracef("Unable to execute command, got invalid response %s", resp);
       }
       reply(response, resp);
+      if (cr.getComponent(Configuration.class).locking().isolationLevel() == IsolationLevel.SERIALIZABLE &&
+            cmd instanceof RollbackCommand) {
+         gmuExecutorService.checkForReadyTasks();
+      }
    }
 
    private void reply(org.jgroups.blocks.Response response, Object retVal) {

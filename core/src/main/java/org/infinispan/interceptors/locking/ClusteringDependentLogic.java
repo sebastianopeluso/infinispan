@@ -506,11 +506,7 @@ public interface ClusteringDependentLogic {
       }
 
       private Collection<Address> getReadOwners(CacheTransaction cacheTransaction) {
-         Collection<Object> readKeys = cacheTransaction.getReadKeys();
-         if (readKeys == null) {
-            return Collections.emptyList();
-         }
-         return dm.getAffectedNodes(readKeys);
+         return dm.getAffectedNodes(cacheTransaction.getReadKeys());
       }
    }
 }

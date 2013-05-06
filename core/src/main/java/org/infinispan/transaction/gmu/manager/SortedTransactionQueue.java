@@ -112,10 +112,12 @@ public class SortedTransactionQueue {
       Node entry = new TransactionEntryImpl(cacheTransaction, concurrentClockNumber);
       concurrentHashMap.put(globalTransaction, entry);
       addNew(entry);
+      hasTransactionReadyToCommit();
    }
 
    public final void rollback(CacheTransaction cacheTransaction) {
       remove(concurrentHashMap.remove(cacheTransaction.getGlobalTransaction()));
+      hasTransactionReadyToCommit();
    }
 
    //return true if it is a read-write transaction
@@ -129,6 +131,7 @@ public class SortedTransactionQueue {
          return entry;
       }
       update(entry, commitVersion);
+      hasTransactionReadyToCommit();
       return entry;
    }
 
