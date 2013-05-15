@@ -159,6 +159,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          }
 
          List<CommittedTransaction> committedTransactions = new ArrayList<CommittedTransaction>(4);
+         List<TransactionEntry> committedTransactionEntries = new ArrayList<TransactionEntry>(4);
          int subVersion = 0;
          CacheTransaction cacheTransaction = transactionEntry.getCacheTransactionForCommit();
          CommittedTransaction committedTransaction = new CommittedTransaction(cacheTransaction, subVersion,
@@ -167,7 +168,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          commitContextEntries(ctx, false, isFromStateTransfer(ctx));
 
          committedTransactions.add(committedTransaction);
-         transactionEntry.committed();
+         committedTransactionEntries.add(transactionEntry);
 
          //in case of transaction has the same version... should be rare...
          while (toCommit.hasNext()) {
@@ -179,9 +180,9 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
             InvocationContext context = createInvocationContext(cacheTransaction, subVersion);
             commitContextEntries(context, false, isFromStateTransfer(ctx));
             committedTransactions.add(committedTransaction);
-            transactionEntry.committed();
+            committedTransactionEntries.add(transactionEntry);
          }
-         transactionCommitManager.transactionCommitted(committedTransactions);
+         transactionCommitManager.transactionCommitted(committedTransactions, committedTransactionEntries);
       } catch (Throwable throwable) {
          //let ignore the exception. we cannot have some nodes applying the write set and another not another one
          //receives the rollback and don't applies the write set
