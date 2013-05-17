@@ -41,16 +41,19 @@ import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.container.versioning.gmu.GMUCacheEntryVersion;
+import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.context.impl.LocalTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
+import org.infinispan.dataplacement.ClusterSnapshot;
 import org.infinispan.factories.KnownComponentNames;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.EntryWrappingInterceptor;
+import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.gmu.CommitLog;
@@ -62,6 +65,8 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -77,6 +82,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
 
    private static final Log log = LogFactory.getLog(GMUEntryWrappingInterceptor.class);
    protected GMUVersionGenerator versionGenerator;
+   private CommitLog commitLog;
    private TransactionCommitManager transactionCommitManager;
    private InvocationContextContainer invocationContextContainer;
    private BlockingTaskAwareExecutorService gmuExecutor;
@@ -89,6 +95,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       this.versionGenerator = toGMUVersionGenerator(versionGenerator);
       this.invocationContextContainer = invocationContextContainer;
       this.gmuExecutor = gmuExecutor;
+      this.commitLog = commitLog;
    }
 
    @Override
@@ -98,6 +105,23 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       if (ctx.isOriginLocal()) {
          spc.setVersion(ctx.getTransactionVersion());
          spc.setReadSet(ctx.getReadSet());
+         Collection<Address> alreadyReadFrom = ctx.getAlreadyReadFrom();
+
+
+         if (alreadyReadFrom != null) {
+            int txViewId = ((GMUVersion) spc.getPrepareVersion()).getViewId();
+            ClusterSnapshot clusterSnapshot = versionGenerator.getClusterSnapshot(txViewId);
+            BitSet alreadyReadFromMask = new BitSet(clusterSnapshot.size());
+
+            for (Address address : alreadyReadFrom) {
+               int idx = clusterSnapshot.indexOf(address);
+               if (idx != -1) {
+                  alreadyReadFromMask.set(idx);
+               }
+            }
+
+            spc.setAlreadyReadFrom(alreadyReadFromMask);
+         }
       } else {
          ctx.setTransactionVersion(spc.getPrepareVersion());
       }
@@ -266,15 +290,9 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
     * @throws InterruptedException if interrupted
     */
    protected void performValidation(TxInvocationContext ctx, GMUPrepareCommand command) throws InterruptedException {
-      boolean hasToUpdateLocalKeys = hasLocalKeysToUpdate(command.getModifications());
+      boolean fromStateTransfer = ctx.isOriginLocal() && ((LocalTransaction) ctx.getCacheTransaction()).isFromStateTransfer();
+      boolean hasToUpdateLocalKeys = fromStateTransfer || hasLocalKeysToUpdate(command.getModifications());
       boolean isReadOnly = command.getModifications().length == 0;
-
-      for (Object key : command.getAffectedKeys()) {
-         if (cdl.localNodeIsOwner(key)) {
-            hasToUpdateLocalKeys = true;
-            break;
-         }
-      }
 
       if (!hasToUpdateLocalKeys) {
          for (WriteCommand writeCommand : command.getModifications()) {
@@ -285,10 +303,11 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          }
       }
 
-      if (!isReadOnly) {
+      if (!isReadOnly || fromStateTransfer) {
+         updatePrepareVersion(command);
          cdl.performReadSetValidation(ctx, command);
          if (hasToUpdateLocalKeys) {
-            transactionCommitManager.prepareTransaction(ctx.getCacheTransaction());
+            transactionCommitManager.prepareTransaction(ctx.getCacheTransaction(), fromStateTransfer);
          } else {
             transactionCommitManager.prepareReadOnlyTransaction(ctx.getCacheTransaction());
          }
@@ -297,6 +316,33 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       if (log.isDebugEnabled()) {
          log.debugf("Transaction %s can commit on this node. Prepare Version is %s",
                     command.getGlobalTransaction().globalId(), ctx.getTransactionVersion());
+      }
+   }
+
+   private void updatePrepareVersion(GMUPrepareCommand prepareCommand) {
+      BitSet alreadyReadFrom = prepareCommand.getAlreadyReadFrom();
+      GMUVersion transactionVersion = toGMUVersion(prepareCommand.getPrepareVersion());
+      boolean alreadyReadOnThisNode = false;
+      EntryVersion maxGMUVersion = null;
+      if (alreadyReadFrom != null) {
+         int txViewId = transactionVersion.getViewId();
+         ClusterSnapshot clusterSnapshot = versionGenerator.getClusterSnapshot(txViewId);
+         List<Address> addressList = new LinkedList<Address>();
+         for (int i = 0; i < clusterSnapshot.size(); ++i) {
+            if (alreadyReadFrom.get(i)) {
+               addressList.add(clusterSnapshot.get(i));
+            }
+         }
+         maxGMUVersion = versionGenerator.calculateMaxVersionToRead(transactionVersion, addressList);
+         int myIndex = clusterSnapshot.indexOf(versionGenerator.getAddress());
+         //to be safe, is better to wait...
+         alreadyReadOnThisNode = myIndex != -1 && alreadyReadFrom.get(myIndex);
+
+      }
+
+      if (!alreadyReadOnThisNode) {
+         EntryVersion readVersion = commitLog.getAvailableVersionLessThan(maxGMUVersion);
+         prepareCommand.setVersion(versionGenerator.mergeAndMax(transactionVersion, readVersion));
       }
    }
 

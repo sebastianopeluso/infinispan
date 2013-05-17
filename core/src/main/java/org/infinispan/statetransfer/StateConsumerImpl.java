@@ -30,8 +30,12 @@ import org.infinispan.commands.write.InvalidateCommand;
 import org.infinispan.commands.write.PutKeyValueCommand;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.cache.Configurations;
+import org.infinispan.configuration.cache.VersioningScheme;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.InternalCacheEntry;
+import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.InvocationContextContainer;
@@ -61,6 +65,7 @@ import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.util.InfinispanCollections;
 import org.infinispan.util.ReadOnlyDataContainerBackedKeySet;
 import org.infinispan.util.concurrent.ConcurrentHashSet;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -99,6 +104,7 @@ public class StateConsumerImpl implements StateConsumer {
    private StateTransferLock stateTransferLock;
    private CacheNotifier cacheNotifier;
    private TotalOrderManager totalOrderManager;
+   private VersionGenerator versionGenerator;
    protected long timeout;
    private boolean useVersionedPut;
    protected boolean isFetchEnabled;
@@ -175,6 +181,7 @@ public class StateConsumerImpl implements StateConsumer {
       final Set<Object> localUpdatedKeys = updatedKeys;
       if (localUpdatedKeys != null) {
          if (cacheTopology.getWriteConsistentHash().isKeyLocalToNode(rpcManager.getAddress(), key)) {
+            log.tracef("Mark key [%s] as updated", key);
             localUpdatedKeys.add(key);
          }
       }
@@ -190,7 +197,9 @@ public class StateConsumerImpl implements StateConsumer {
    public boolean isKeyUpdated(Object key) {
       // grab a copy of the reference to prevent issues if another thread calls stopApplyingState() between null check and actual usage
       final Set<Object> localUpdatedKeys = updatedKeys;
-      return localUpdatedKeys == null || localUpdatedKeys.contains(key);
+      boolean updated = localUpdatedKeys == null || localUpdatedKeys.contains(key);
+      log.tracef("Is key [%s] updated? %s (collection is null? %s)", key, updated, localUpdatedKeys == null);
+      return updated;
    }
 
    @Inject
@@ -208,7 +217,8 @@ public class StateConsumerImpl implements StateConsumer {
                     TransactionTable transactionTable,
                     StateTransferLock stateTransferLock,
                     CacheNotifier cacheNotifier,
-                    TotalOrderManager totalOrderManager) {
+                    TotalOrderManager totalOrderManager,
+                    VersionGenerator versionGenerator) {
       this.cacheName = cache.getName();
       this.executorService = executorService;
       this.stateTransferManager = stateTransferManager;
@@ -224,6 +234,7 @@ public class StateConsumerImpl implements StateConsumer {
       this.stateTransferLock = stateTransferLock;
       this.cacheNotifier = cacheNotifier;
       this.totalOrderManager = totalOrderManager;
+      this.versionGenerator = versionGenerator;
 
       isInvalidationMode = configuration.clustering().cacheMode().isInvalidation();
 
@@ -442,7 +453,7 @@ public class StateConsumerImpl implements StateConsumer {
             : InfinispanCollections.<Integer>emptySet();
    }
 
-   public void applyState(Address sender, int topologyId, Collection<StateChunk> stateChunks) {
+   public void applyState(Address sender, int topologyId, Collection<StateChunk> stateChunks, EntryVersion txVersion) {
       ConsistentHash wCh = cacheTopology.getWriteConsistentHash();
       // ignore responses received after we are no longer a member
       if (!wCh.getMembers().contains(rpcManager.getAddress())) {
@@ -483,7 +494,7 @@ public class StateConsumerImpl implements StateConsumer {
          }
          if (inboundTransfer != null) {
             if (stateChunk.getCacheEntries() != null) {
-               doApplyState(sender, stateChunk.getSegmentId(), stateChunk.getCacheEntries());
+               doApplyState(sender, stateChunk.getSegmentId(), stateChunk.getCacheEntries(), txVersion);
             }
 
             inboundTransfer.onStateReceived(stateChunk.getSegmentId(), stateChunk.isLastChunk());
@@ -500,7 +511,7 @@ public class StateConsumerImpl implements StateConsumer {
       }
    }
 
-   private void doApplyState(Address sender, int segmentId, Collection<InternalCacheEntry> cacheEntries) {
+   private void doApplyState(Address sender, int segmentId, Collection<InternalCacheEntry> cacheEntries, EntryVersion txVersion) {
       log.debugf("Applying new state for segment %d of cache %s from node %s: received %d cache entries", segmentId, cacheName, sender, cacheEntries.size());
       if (trace) {
          List<Object> keys = new ArrayList<Object>(cacheEntries.size());
@@ -538,6 +549,13 @@ public class StateConsumerImpl implements StateConsumer {
                if (ctx.isInTxScope()) {
                   if (success) {
                      ((LocalTransaction)((TxInvocationContext)ctx).getCacheTransaction()).setFromStateTransfer(true);
+                     if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE &&
+                           versionGenerator != null && versionGenerator instanceof GMUVersionGenerator &&
+                           txVersion != null) {
+                        TxInvocationContext tctx = (TxInvocationContext) ctx;
+                        EntryVersion currentVersion = tctx.getTransactionVersion();
+                        tctx.setTransactionVersion(((GMUVersionGenerator) versionGenerator).mergeAndMax(currentVersion, txVersion));
+                     }
                      try {
                         transactionManager.commit();
                      } catch (Throwable ex) {
@@ -833,6 +851,10 @@ public class StateConsumerImpl implements StateConsumer {
    }
 
    private void invalidateSegments(ConsistentHash consistentHash, Set<Integer> segmentsToL1) {
+      if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+         return; //cannot remove the old value due to inconsistencies.
+      }
+
       // The actual owners keep track of the nodes that hold a key in L1 ("requestors") and
       // they invalidate the key on every requestor after a change.
       // But this information is only present on the owners where the ClusteredGetKeyValueCommand

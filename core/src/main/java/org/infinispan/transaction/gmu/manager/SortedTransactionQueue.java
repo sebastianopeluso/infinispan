@@ -61,6 +61,9 @@ public class SortedTransactionQueue {
          @Override
          public void setNext(Node next) {
             this.first = next;
+            synchronized (SortedTransactionQueue.this) {
+               SortedTransactionQueue.this.notifyAll();
+            }
          }
 
          @Override
@@ -239,6 +242,12 @@ public class SortedTransactionQueue {
          node = node.getNext();
       }
       return count;
+   }
+
+   public final synchronized void awaitUntilEmpty() throws InterruptedException {
+      while (firstEntry.getNext() != lastEntry) {
+         wait();
+      }
    }
 
    private void commitUntil(Node exclusive, List<TransactionEntry> transactionEntryList) {

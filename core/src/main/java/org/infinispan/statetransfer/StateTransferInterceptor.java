@@ -38,6 +38,7 @@ import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.base.CommandInterceptor;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.topology.CacheTopology;
+import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.WriteSkewHelper;
@@ -208,9 +209,18 @@ public class StateTransferInterceptor extends CommandInterceptor {   //todo [ani
       log.tracef("handleTopologyAffectedCommand for command %s", command);
 
       if (isLocalOnly(ctx, command)) {
+         if (log.isTraceEnabled()) {
+            log.tracef("Command %s is local-only...", command);
+         }
          return invokeNextInterceptor(ctx, command);
       }
-      updateTopologyIdAndWaitForTransactionData((TopologyAffectedCommand) command);
+      boolean fromStateTransfer = ctx.isOriginLocal() && ctx.isInTxScope() &&
+            ((TxInvocationContext) ctx).getCacheTransaction() != null &&
+            ((LocalTransaction) ((TxInvocationContext) ctx).getCacheTransaction()).isFromStateTransfer();
+      updateTopologyIdAndWaitForTransactionData((TopologyAffectedCommand) command, fromStateTransfer);
+      if (log.isTraceEnabled()) {
+         log.tracef("Processing %s", command);
+      }
 
       // TODO we may need to skip local invocation for read/write/tx commands if the command is too old and none of its keys are local
       Object localResult = invokeNextInterceptor(ctx, command);
@@ -228,7 +238,7 @@ public class StateTransferInterceptor extends CommandInterceptor {   //todo [ani
       return localResult;
    }
 
-   private void updateTopologyIdAndWaitForTransactionData(TopologyAffectedCommand command) throws InterruptedException {
+   private void updateTopologyIdAndWaitForTransactionData(TopologyAffectedCommand command, boolean fromStateTransfer) throws InterruptedException {
       // set the topology id if it was not set before (ie. this is local command)
       // TODO Make tx commands extend FlagAffectedCommand so we can use CACHE_MODE_LOCAL in TransactionTable.cleanupStaleTransactions
       if (command.getTopologyId() == -1) {
@@ -240,6 +250,9 @@ public class StateTransferInterceptor extends CommandInterceptor {   //todo [ani
 
       // remote/forwarded command
       int cmdTopologyId = command.getTopologyId();
+      if (fromStateTransfer) {
+         return;
+      }
       stateTransferLock.waitForTransactionData(cmdTopologyId);
    }
 

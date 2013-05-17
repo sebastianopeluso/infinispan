@@ -102,7 +102,9 @@ public abstract class BaseRpcInterceptor extends CommandInterceptor {
                shouldInvokeRemotely, ctx.hasModifications(), !localCtx.getRemoteLocksAcquired().isEmpty());
       }
 
-      return shouldInvokeRemotely;
+      boolean fromStateTransfer = ((LocalTransaction) ctx.getCacheTransaction()).isFromStateTransfer();
+
+      return shouldInvokeRemotely && !fromStateTransfer;
    }
 
    protected static void totalOrderTxPrepare(TxInvocationContext ctx) {

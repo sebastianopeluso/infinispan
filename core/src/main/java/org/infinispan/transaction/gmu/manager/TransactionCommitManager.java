@@ -74,11 +74,14 @@ public class TransactionCommitManager {
     * add a transaction to the queue. A temporary commit vector clock is associated and with it, it order the
     * transactions
     *
-    * @param cacheTransaction the transaction to be prepared
+    * @param cacheTransaction  the transaction to be prepared
+    * @param fromStateTransfer {@code true} if the transaction is from state transfer.
     */
-   public synchronized void prepareTransaction(CacheTransaction cacheTransaction) {
+   public synchronized void prepareTransaction(CacheTransaction cacheTransaction, boolean fromStateTransfer) {
       long concurrentClockNumber = commitLog.getCurrentVersion().getThisNodeVersionValue();
-      EntryVersion preparedVersion = versionGenerator.setNodeVersion(commitLog.getCurrentVersion(),
+      EntryVersion txVersion = !fromStateTransfer ? commitLog.getCurrentVersion() :
+            versionGenerator.mergeAndMax(commitLog.getCurrentVersion(), cacheTransaction.getTransactionVersion());
+      EntryVersion preparedVersion = versionGenerator.setNodeVersion(txVersion,
                                                                      ++lastPreparedVersion);
 
       cacheTransaction.setTransactionVersion(preparedVersion);
@@ -128,5 +131,9 @@ public class TransactionCommitManager {
 
    public final int size() {
       return sortedTransactionQueue.size();
+   }
+
+   public final void awaitUntilCommitQueueIsEmpty() throws InterruptedException {
+      sortedTransactionQueue.awaitUntilEmpty();
    }
 }

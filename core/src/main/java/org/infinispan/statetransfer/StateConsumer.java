@@ -23,6 +23,7 @@
 
 package org.infinispan.statetransfer;
 
+import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.factories.scopes.Scope;
 import org.infinispan.factories.scopes.Scopes;
 import org.infinispan.remoting.transport.Address;
@@ -54,7 +55,7 @@ public interface StateConsumer {
     */
    void onTopologyUpdate(CacheTopology cacheTopology, boolean isRebalance);
 
-   void applyState(Address sender, int topologyId, Collection<StateChunk> stateChunks);
+   void applyState(Address sender, int topologyId, Collection<StateChunk> stateChunks, EntryVersion txVersion);
 
    /**
     * Cancels all incoming state transfers. The already received data is not discarded.

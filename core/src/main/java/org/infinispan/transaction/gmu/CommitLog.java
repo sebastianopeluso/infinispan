@@ -92,6 +92,10 @@ public class CommitLog {
 
    }
 
+   public final boolean isEnabled() {
+      return enabled;
+   }
+
    public final void initLocalTransaction(LocalTransaction localTransaction) {
       if (!enabled) {
          return;

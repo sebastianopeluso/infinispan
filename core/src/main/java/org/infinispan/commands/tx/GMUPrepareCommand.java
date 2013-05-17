@@ -27,6 +27,7 @@ import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.transaction.xa.GlobalTransaction;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 
@@ -42,6 +43,7 @@ public class GMUPrepareCommand extends PrepareCommand {
 
    private Object[] readSet;
    private EntryVersion version;
+   private BitSet alreadyReadFrom;
 
    public GMUPrepareCommand(String cacheName, GlobalTransaction gtx, boolean onePhaseCommit, WriteCommand... modifications) {
       super(cacheName, gtx, onePhaseCommit, modifications);
@@ -117,6 +119,7 @@ public class GMUPrepareCommand extends PrepareCommand {
       copy.onePhaseCommit = onePhaseCommit;
       copy.readSet = readSet == null ? null : readSet.clone();
       copy.version = version;
+      copy.alreadyReadFrom = (BitSet) alreadyReadFrom.clone();
       return copy;
    }
 
@@ -146,5 +149,13 @@ public class GMUPrepareCommand extends PrepareCommand {
 
    public EntryVersion getPrepareVersion() {
       return version;
+   }
+
+   public BitSet getAlreadyReadFrom() {
+      return alreadyReadFrom;
+   }
+
+   public void setAlreadyReadFrom(BitSet alreadyReadFrom) {
+      this.alreadyReadFrom = alreadyReadFrom;
    }
 }
