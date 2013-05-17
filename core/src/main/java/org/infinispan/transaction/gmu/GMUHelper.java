@@ -222,7 +222,7 @@ public class GMUHelper {
 
       //this is considered the most recent version.
       InternalGMUCacheEntry entry = wrap(key, loaded, true, maxVersionToRead,
-                                         loaded == null ? null : loaded.getVersion(), null);
+                                         loaded == null ? null : loaded.getVersion(), null, false);
 
       if (log.isTraceEnabled()) {
          log.tracef("Loaded %s from cache store. Created wrapped cache entry %s", loaded, entry);

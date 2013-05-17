@@ -92,6 +92,10 @@ public class CommitLog {
 
    }
 
+   public final boolean isEnabled() {
+      return enabled;
+   }
+
    public final void initLocalTransaction(LocalTransaction localTransaction) {
       if (!enabled) {
          return;
@@ -390,7 +394,10 @@ public class CommitLog {
    }
 
    private boolean isLessOrEquals(EntryVersion version1, EntryVersion version2) {
-      InequalVersionComparisonResult comparisonResult = version1.compareTo(version2);
+      InequalVersionComparisonResult comparisonResult = version1.compareToWithCheckUnsafeBeforeOrEqual(version2);
+      if(comparisonResult == InequalVersionComparisonResult.UNSAFE_BEFORE_OR_EQUAL){
+         throw new IllegalArgumentException("GMU entry version cannot compare BeforeOrEqual" + version1 + " "+version2);
+      }
       return comparisonResult == BEFORE_OR_EQUAL || comparisonResult == BEFORE || comparisonResult == EQUAL;
    }
 

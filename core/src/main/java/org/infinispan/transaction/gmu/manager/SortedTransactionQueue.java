@@ -22,6 +22,7 @@
  */
 package org.infinispan.transaction.gmu.manager;
 
+import org.infinispan.container.versioning.gmu.GMUCacheEntryVersion;
 import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.stats.TransactionsStatisticsRegistry;
 import org.infinispan.transaction.xa.CacheTransaction;
@@ -63,6 +64,9 @@ public class SortedTransactionQueue {
          @Override
          public final void setNext(Node next) {
             this.first = next;
+            synchronized (SortedTransactionQueue.this) {
+               SortedTransactionQueue.this.notifyAll();
+            }
          }
 
          @Override
@@ -477,6 +481,10 @@ public class SortedTransactionQueue {
       boolean hasWaited();
 
       boolean committing();
+
+      GMUCacheEntryVersion getNewVersionInDataContainer();
+
+      void setNewVersionInDataContainer(GMUCacheEntryVersion version);
    }
 
    private class TransactionEntryImpl implements Node {
@@ -489,6 +497,7 @@ public class SortedTransactionQueue {
       private volatile long commitReceivedTimestamp = -1;
       private volatile long firstInQueueTimestamp = -1;
       private volatile long readyToCommitTimestamp = -1;
+      private GMUCacheEntryVersion newVersionInDataContainer;
       private Node previous;
       private Node next;
 
@@ -602,6 +611,14 @@ public class SortedTransactionQueue {
       public final CacheTransaction getCacheTransactionForCommit() {
          cacheTransaction.setTransactionVersion(entryVersion);
          return cacheTransaction;
+      }
+
+      public synchronized GMUCacheEntryVersion getNewVersionInDataContainer() {
+         return this.newVersionInDataContainer;
+      }
+
+      public synchronized void setNewVersionInDataContainer(GMUCacheEntryVersion version) {
+         this.newVersionInDataContainer = version;
       }
 
       @Override
@@ -796,6 +813,15 @@ public class SortedTransactionQueue {
       @Override
       public final boolean hasWaited() {
          return false;
+      }
+
+      @Override
+      public GMUCacheEntryVersion getNewVersionInDataContainer() {
+         throw new UnsupportedOperationException();
+      }
+
+      public void setNewVersionInDataContainer(GMUCacheEntryVersion version) {
+          /*no-op*/
       }
    }
 }

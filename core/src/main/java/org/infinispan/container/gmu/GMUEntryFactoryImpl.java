@@ -38,6 +38,7 @@ import org.infinispan.context.InvocationContext;
 import org.infinispan.context.SingleKeyNonTxInvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
+import org.infinispan.interceptors.locking.ClusteringDependentLogic;
 import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -55,21 +56,24 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
    private static final Log log = LogFactory.getLog(GMUEntryFactoryImpl.class);
    private CommitLog commitLog;
    private GMUVersionGenerator gmuVersionGenerator;
+   private ClusteringDependentLogic clusteringDependentLogic;
 
    public static InternalGMUCacheEntry wrap(Object key, InternalCacheEntry entry, boolean mostRecent,
                                             EntryVersion maxTxVersion, EntryVersion creationVersion,
-                                            EntryVersion maxValidVersion) {
+                                            EntryVersion maxValidVersion, boolean unsafeToRead) {
       if (entry == null || entry.isNull()) {
          return new InternalGMUNullCacheEntry(key, (entry == null ? null : entry.getVersion()), maxTxVersion, mostRecent,
-                                              creationVersion, maxValidVersion);
+                                              creationVersion, maxValidVersion, unsafeToRead);
       }
-      return new InternalGMUValueCacheEntry(entry, maxTxVersion, mostRecent, creationVersion, maxValidVersion);
+      return new InternalGMUValueCacheEntry(entry, maxTxVersion, mostRecent, creationVersion, maxValidVersion, unsafeToRead);
    }
 
    @Inject
-   public void injectDependencies(CommitLog commitLog, VersionGenerator versionGenerator) {
+   public void injectDependencies(CommitLog commitLog, VersionGenerator versionGenerator,
+                                  ClusteringDependentLogic clusteringDependentLogic) {
       this.commitLog = commitLog;
       this.gmuVersionGenerator = toGMUVersionGenerator(versionGenerator);
+      this.clusteringDependentLogic = clusteringDependentLogic;
    }
 
    public void start() {
@@ -87,6 +91,11 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
 
    @Override
    protected InternalCacheEntry getFromContainer(Object key, InvocationContext context) {
+      if (context.isOriginLocal() && !clusteringDependentLogic.localNodeIsOwner(key)) {
+         //force a remote get...
+         return null;
+      }
+
       boolean singleRead = context instanceof SingleKeyNonTxInvocationContext;
       boolean remotePrepare = !context.isOriginLocal() && context.isInTxScope();
       boolean remoteRead = !context.isOriginLocal() && !context.isInTxScope();
@@ -103,7 +112,7 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
 
       boolean hasAlreadyReadFromThisNode = context.hasAlreadyReadOnThisNode();
 
-      if (context.isInTxScope() && context.isOriginLocal() && !context.hasAlreadyReadOnThisNode()) {
+      if (context.isInTxScope() && !context.hasAlreadyReadOnThisNode()) {
          //firs read on the local node for a transaction. ensure the min version
          EntryVersion transactionVersion = ((TxInvocationContext) context).getTransactionVersion();
          try {
