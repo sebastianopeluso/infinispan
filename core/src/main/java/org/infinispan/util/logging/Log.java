@@ -859,5 +859,10 @@ public interface Log extends BasicLogger {
    @LogMessage(level = WARN)
    @Message(value = "Unknown response value [%s]. Expected [%s]", id = 221)
    void unexpectedResponse(String actual, String expected);
+
+   @LogMessage(level = ERROR)
+   @Message(value = "Failed to recover cache %s state after the current node became the coordinator", id = 222)
+   void failedToRecoverCacheState(String cacheName, @Cause Throwable cause);
+
 }
 
