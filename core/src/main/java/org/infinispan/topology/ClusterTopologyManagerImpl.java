@@ -352,7 +352,7 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
       ReplicableCommand command = new CacheTopologyControlCommand(cacheName,
             CacheTopologyControlCommand.Type.CH_UPDATE, transport.getAddress(), cacheTopology,
             transport.getViewId());
-      executeOnClusterSync(command, getGlobalTimeout(), cacheStatus.isTotalOrder(), cacheStatus.isDistributed());
+      executeOnClusterAsync(command, getGlobalTimeout(), cacheStatus.isTotalOrder(), cacheStatus.isDistributed());
    }
 
    private void startRebalance(String cacheName, Object customData) throws Exception {
@@ -412,7 +412,7 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
       ReplicableCommand command = new CacheTopologyControlCommand(cacheName,
             CacheTopologyControlCommand.Type.REBALANCE_START, transport.getAddress(), cacheTopology,
             transport.getViewId());
-      executeOnClusterSync(command, getGlobalTimeout(), cacheStatus.isTotalOrder(), cacheStatus.isDistributed());
+      executeOnClusterAsync(command, getGlobalTimeout(), cacheStatus.isTotalOrder(), cacheStatus.isDistributed());
    }
 
    private void endRebalance(String cacheName, ClusterCacheStatus cacheStatus) {
@@ -605,6 +605,29 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
       responseValues.put(transport.getAddress(), ((SuccessfulResponse) localResponse).getResponseValue());
 
       return responseValues;
+   }
+
+   private void executeOnClusterAsync(final ReplicableCommand command, final long timeout,
+                                      boolean totalOrder, boolean distributed)
+         throws Exception {
+      if (!totalOrder) {
+         // invoke the command on the local node
+         asyncTransportExecutor.submit(new Runnable() {
+            @Override
+            public void run() {
+               gcr.wireDependencies(command);
+               try {
+                  command.perform(null);
+               } catch (Throwable throwable) {
+                  // The command already logs any exception in perform()
+               }
+            }
+         });
+      }
+
+      // invoke remotely
+      transport.invokeRemotely(null, command,
+            ResponseMode.ASYNCHRONOUS_WITH_SYNC_MARSHALLING, timeout, true, null, totalOrder, distributed);
    }
 
    private int getGlobalTimeout() {
