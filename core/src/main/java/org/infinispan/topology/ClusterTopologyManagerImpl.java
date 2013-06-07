@@ -130,7 +130,7 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
                startRebalance(cacheName, customData);
                return null;
             } catch (Throwable t) {
-               log.errorf(t, "Failed to start rebalance: %s", t.getMessage());
+               log.rebalanceStartError(cacheName, t);
                throw new Exception(t);
             }
          }
