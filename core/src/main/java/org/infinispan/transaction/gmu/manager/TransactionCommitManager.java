@@ -125,4 +125,8 @@ public class TransactionCommitManager {
    public final TransactionEntry getTransactionEntry(GlobalTransaction globalTransaction) {
       return sortedTransactionQueue.getTransactionEntry(globalTransaction);
    }
+
+   public final int size() {
+      return sortedTransactionQueue.size();
+   }
 }

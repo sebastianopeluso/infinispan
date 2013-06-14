@@ -61,11 +61,14 @@ public class BlockingTaskAwareExecutorServiceImpl extends AbstractExecutorServic
       }
       if (runnable.isReady()) {
          doExecute(runnable);
+         if (log.isTraceEnabled()) {
+            log.tracef("Added directy to the thread pool a new task: %s task(s) are waiting", blockedTasks.size());
+         }
       } else {
          blockedTasks.offer(runnable);
-      }
-      if (log.isTraceEnabled()) {
-         log.tracef("Added a new task: %s task(s) are waiting", blockedTasks.size());
+         if (log.isTraceEnabled()) {
+            log.tracef("Enqueued a new task: %s task(s) are waiting", blockedTasks.size());
+         }
       }
    }
 
@@ -119,7 +122,8 @@ public class BlockingTaskAwareExecutorServiceImpl extends AbstractExecutorServic
       }
 
       if (log.isTraceEnabled()) {
-         log.tracef("Tasks executed=%s, still pending=%s", runnableReadyList.size(), blockedTasks.size());
+         log.tracef("Check for ready tasks: going to be executed=%s, still pending=%s", runnableReadyList.size(),
+                    blockedTasks.size());
       }
 
       for (BlockingRunnable runnable : runnableReadyList) {
