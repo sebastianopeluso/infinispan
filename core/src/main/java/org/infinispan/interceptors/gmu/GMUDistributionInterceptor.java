@@ -27,6 +27,7 @@ import org.infinispan.commands.remote.ClusteredGetCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.container.entries.InternalCacheEntry;
+import org.infinispan.container.entries.InternalCacheValue;
 import org.infinispan.container.entries.gmu.InternalGMUCacheEntry;
 import org.infinispan.container.entries.gmu.InternalGMUCacheValue;
 import org.infinispan.container.gmu.L1GMUContainer;
@@ -46,6 +47,7 @@ import org.infinispan.remoting.rpc.ResponseFilter;
 import org.infinispan.remoting.rpc.ResponseMode;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.transaction.gmu.CommitLog;
+import org.infinispan.transaction.gmu.VersionNotAvailableException;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -53,12 +55,13 @@ import org.infinispan.util.logging.LogFactory;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.infinispan.transaction.gmu.GMUHelper.*;
-import static org.infinispan.transaction.gmu.GMUHelper.convert;
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersion;
 
 /**
  * @author Pedro Ruivo
@@ -178,45 +181,18 @@ public class GMUDistributionInterceptor extends TxDistributionInterceptor {
       ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, command.getFlags(), acquireRemoteLock,
                                                                gtx, transactionVersion, alreadyReadFromMask);
 
-      if(log.isDebugEnabled()) {
-         log.debugf("Perform a remote get for transaction %s. %s",
-                    txInvocationContext.getGlobalTransaction().globalId(), get);
+      ClusterGetResponse response = doRemote(targets, get);
+      InternalGMUCacheValue gmuCacheValue = convert(response.value, InternalGMUCacheValue.class);
+
+      InternalGMUCacheEntry gmuCacheEntry = (InternalGMUCacheEntry) gmuCacheValue.toInternalCacheEntry(key);
+      txInvocationContext.addKeyReadInCommand(key, gmuCacheEntry);
+      txInvocationContext.addReadFrom(response.sender);
+
+      if (log.isDebugEnabled()) {
+         log.debugf("Remote Get successful for transaction %s and key %s. Return value is %s",
+                    txInvocationContext.getGlobalTransaction().globalId(), key, gmuCacheValue);
       }
-
-      ResponseFilter filter = new ClusteredGetResponseValidityFilter(targets, rpcManager.getAddress());
-      Map<Address, Response> responses = rpcManager.invokeRemotely(targets, get, ResponseMode.WAIT_FOR_VALID_RESPONSE,
-                                                                   cacheConfiguration.clustering().sync().replTimeout(), true, filter, false);
-
-      if(log.isDebugEnabled()) {
-         log.debugf("Remote get done for transaction %s [key:%s]. response are: %s",
-                    txInvocationContext.getGlobalTransaction().globalId(),
-                    key, responses);
-      }
-
-      if (!responses.isEmpty()) {
-         for (Map.Entry<Address,Response> entry : responses.entrySet()) {
-            Response r = entry.getValue();
-            if (r instanceof SuccessfulResponse) {
-               InternalGMUCacheValue gmuCacheValue = convert(((SuccessfulResponse) r).getResponseValue(),
-                                                             InternalGMUCacheValue.class);
-
-               InternalGMUCacheEntry gmuCacheEntry = (InternalGMUCacheEntry) gmuCacheValue.toInternalCacheEntry(key);
-               txInvocationContext.addKeyReadInCommand(key, gmuCacheEntry);
-               txInvocationContext.addReadFrom(entry.getKey());
-
-               if(log.isDebugEnabled()) {
-                  log.debugf("Remote Get successful for transaction %s and key %s. Return value is %s",
-                             txInvocationContext.getGlobalTransaction().globalId(), key, gmuCacheValue);
-               }
-               return gmuCacheEntry;
-            }
-         }
-      }
-
-      // TODO If everyone returned null, and the read CH has changed, retry the remote get.
-      // Otherwise our get command might be processed by the old owners after they have invalidated their data
-      // and we'd return a null even though the key exists on
-      return null;
+      return gmuCacheEntry;
    }
 
    private InternalCacheEntry retrieveSingleKeyFromRemoteSource(Object key, SingleKeyNonTxInvocationContext ctx, FlagAffectedCommand command) {
@@ -226,43 +202,81 @@ public class GMUDistributionInterceptor extends TxDistributionInterceptor {
       ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, command.getFlags(), false, null,
                                                                toGMUVersion(commitLog.getCurrentVersion()), null);
 
-      if(log.isDebugEnabled()) {
-         log.debugf("Perform a single remote get. %s", get);
+      ClusterGetResponse response = doRemote(targets, get);
+      InternalGMUCacheValue gmuCacheValue = convert(response.value, InternalGMUCacheValue.class);
+      InternalGMUCacheEntry gmuCacheEntry = (InternalGMUCacheEntry) gmuCacheValue.toInternalCacheEntry(key);
+      ctx.addKeyReadInCommand(key, gmuCacheEntry);
+
+      if (log.isDebugEnabled()) {
+         log.debugf("Remote Get successful for single key %s. Return value is %s", key, gmuCacheValue);
       }
+      return gmuCacheEntry;
+   }
 
-      ResponseFilter filter = new ClusteredGetResponseValidityFilter(targets, rpcManager.getAddress());
-      Map<Address, Response> responses = rpcManager.invokeRemotely(targets, get, ResponseMode.WAIT_FOR_VALID_RESPONSE,
-                                                                   cacheConfiguration.clustering().sync().replTimeout(), true, filter, false);
-
-      if(log.isDebugEnabled()) {
-         log.debugf("Remote get done for single key [key:%s]. response are: %s", key, responses);
-      }
-
-
-      if (!responses.isEmpty()) {
-         for (Map.Entry<Address,Response> entry : responses.entrySet()) {
-            Response r = entry.getValue();
-            if (r == null) {
-               continue;
+   private ClusterGetResponse doRemote(List<Address> targets, ClusteredGetCommand command) {
+      final Address localAddress = rpcManager.getAddress();
+      final long spinTimeout = 1000;
+      final Set<Address> alreadyTargeted = new HashSet<Address>();
+      final Object key = command.getKey();
+      while (!targets.isEmpty()) {
+         Address target = targets.remove(0);
+         alreadyTargeted.add(target);
+         try {
+            Object result = null;
+            boolean local = target.equals(localAddress);
+            if (log.isDebugEnabled()) {
+               log.debugf("Perform remote get for key [%s]. Command=%s, target=%s, local?=%s",
+                          key, command, target, local);
             }
-            if (r instanceof SuccessfulResponse) {
-               InternalGMUCacheValue gmuCacheValue = convert(((SuccessfulResponse) r).getResponseValue(),
-                                                             InternalGMUCacheValue.class);
-
-               InternalGMUCacheEntry gmuCacheEntry = (InternalGMUCacheEntry) gmuCacheValue.toInternalCacheEntry(key);
-               ctx.addKeyReadInCommand(key, gmuCacheEntry);
-
-               if(log.isDebugEnabled()) {
-                  log.debugf("Remote Get successful for single key %s. Return value is %s",key, gmuCacheValue);
+            if (local) {
+               cf.initializeReplicableCommand(command, true);
+               result = command.perform(null);
+            } else {
+               Collection<Address> reallyTargets = Collections.singleton(target);
+               ResponseFilter filter = new ClusteredGetResponseValidityFilter(reallyTargets, localAddress);
+               Map<Address, Response> responses = rpcManager.invokeRemotely(reallyTargets, command, ResponseMode.WAIT_FOR_VALID_RESPONSE,
+                                                                            spinTimeout, true, filter, false);
+               Response r = responses.get(target);
+               if (r == null) {
+                  continue;
                }
-               return gmuCacheEntry;
+               if (r instanceof SuccessfulResponse) {
+                  result = ((SuccessfulResponse) r).getResponseValue();
+               }
             }
+            if (log.isDebugEnabled()) {
+               log.debugf("Remote get done for key [%s]. Target=%s, local?=%s, response=%s",
+                          key, target, local, result);
+            }
+            if (result instanceof InternalCacheValue) {
+               return new ClusterGetResponse(target, (InternalCacheValue) result);
+            } else if (result instanceof Collection) {
+               Collection<Address> oldOwners = (Collection<Address>) result;
+               for (Address oldOwner : oldOwners) {
+                  if (!rpcManager.getMembers().contains(oldOwner)) {
+                     alreadyTargeted.add(oldOwner); //owner already left the cluster
+                  } else if (!alreadyTargeted.contains(oldOwner)) {
+                     targets.add(oldOwner);
+                  }
+               }
+            }
+            if (log.isDebugEnabled()) {
+               log.debugf("Value not found for key [%s]. Owners remaining: %s", key, targets);
+            }
+         } catch (Throwable throwable) {
+            //no-op
          }
       }
+      throw new VersionNotAvailableException(command.getKey());
+   }
 
-      // TODO If everyone returned null, and the read CH has changed, retry the remote get.
-      // Otherwise our get command might be processed by the old owners after they have invalidated their data
-      // and we'd return a null even though the key exists on
-      return null;
+   private class ClusterGetResponse {
+      private final Address sender;
+      private final InternalCacheValue value;
+
+      private ClusterGetResponse(Address sender, InternalCacheValue value) {
+         this.sender = sender;
+         this.value = value;
+      }
    }
 }

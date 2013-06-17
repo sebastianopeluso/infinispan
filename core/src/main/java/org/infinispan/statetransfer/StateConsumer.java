@@ -30,6 +30,7 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.topology.CacheTopology;
 
 import java.util.Collection;
+import java.util.List;
 
 /**
  * Handles inbound state transfers.
@@ -88,4 +89,6 @@ public interface StateConsumer {
     * @return  true if this node has already received the first rebalance command
     */
    boolean ownsData();
+
+   List<Address> oldOwners(Object key);
 }

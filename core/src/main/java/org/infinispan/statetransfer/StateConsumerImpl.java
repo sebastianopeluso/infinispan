@@ -30,7 +30,6 @@ import org.infinispan.commands.write.InvalidateCommand;
 import org.infinispan.commands.write.PutKeyValueCommand;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.cache.Configurations;
-import org.infinispan.configuration.cache.VersioningScheme;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.versioning.EntryVersion;
@@ -157,6 +156,8 @@ public class StateConsumerImpl implements StateConsumer {
 
    private volatile boolean ownsData = false;
 
+   private Map<Object, OwnersList> oldKeyOwners;
+
    public StateConsumerImpl() {
    }
 
@@ -247,6 +248,9 @@ public class StateConsumerImpl implements StateConsumer {
             configuration.clustering().cacheMode().isClustered();
 
       timeout = configuration.clustering().stateTransfer().timeout();
+      if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+         oldKeyOwners = new HashMap<Object, OwnersList>();
+      }
    }
 
    public boolean hasActiveTransfers() {
@@ -283,6 +287,13 @@ public class StateConsumerImpl implements StateConsumer {
    @Override
    public boolean ownsData() {
       return ownsData;
+   }
+
+   @Override
+   public List<Address> oldOwners(Object key) {
+      synchronized (oldKeyOwners) {
+         return oldKeyOwners.get(key).toList();
+      }
    }
 
    @Override
@@ -524,6 +535,15 @@ public class StateConsumerImpl implements StateConsumer {
       // CACHE_MODE_LOCAL avoids handling by StateTransferInterceptor and any potential locks in StateTransferLock
       EnumSet<Flag> flags = EnumSet.of(PUT_FOR_STATE_TRANSFER, CACHE_MODE_LOCAL, IGNORE_RETURN_VALUES, SKIP_REMOTE_LOOKUP, SKIP_SHARED_CACHE_STORE, SKIP_OWNERSHIP_CHECK, SKIP_XSITE_BACKUP);
       for (InternalCacheEntry e : cacheEntries) {
+         OwnersList ownersList;
+         synchronized (oldKeyOwners) {
+            ownersList = oldKeyOwners.get(e.getKey());
+            if (ownersList == null) {
+               ownersList = new OwnersList();
+               oldKeyOwners.put(sender, ownersList);
+            }
+         }
+         ownersList.add(sender);
          try {
             InvocationContext ctx;
             if (transactionManager != null) {
@@ -1031,5 +1051,25 @@ public class StateConsumerImpl implements StateConsumer {
       removeTransfer(inboundTransfer);
 
       notifyEndOfRebalanceIfNeeded(cacheTopology.getTopologyId());
+   }
+
+   private class OwnersList {
+      private final List<Address> owners;
+
+      public OwnersList() {
+         owners = new LinkedList<Address>();
+      }
+
+      public synchronized final void add(Address owner) {
+         owners.add(owner);
+      }
+
+      public synchronized final boolean contains(Address owner) {
+         return owners.contains(owner);
+      }
+
+      public synchronized final List<Address> toList() {
+         return Collections.unmodifiableList(owners);
+      }
    }
 }
