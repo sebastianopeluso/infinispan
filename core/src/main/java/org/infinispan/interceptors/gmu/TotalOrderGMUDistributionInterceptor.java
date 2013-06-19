@@ -28,14 +28,11 @@ import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.write.ClearCommand;
-import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.configuration.cache.Configurations;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
-import org.infinispan.remoting.responses.KeysValidateFilter;
 import org.infinispan.remoting.responses.Response;
-import org.infinispan.remoting.rpc.ResponseFilter;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -104,12 +101,7 @@ public class TotalOrderGMUDistributionInterceptor extends GMUDistributionInterce
       }
 
       try {
-         Set<Object> affectedKeys = ctx.getAffectedKeys();
-
-         ResponseFilter responseFilter = affectedKeys.isEmpty() || isSyncCommitPhase() ? null :
-               new KeysValidateFilter(rpcManager.getAddress(), affectedKeys);
-
-         Map<Address, Response> responseMap = totalOrderAnycastPrepare(recipients, command, responseFilter);
+         Map<Address, Response> responseMap = totalOrderAnycastPrepare(recipients, command, null);
          joinAndSetTransactionVersion(responseMap.values(), ctx, versionGenerator);
       } finally {
          totalOrderTxPrepare(ctx);
