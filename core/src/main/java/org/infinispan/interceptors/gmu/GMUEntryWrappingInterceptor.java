@@ -50,17 +50,24 @@ import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.KnownComponentNames;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
+import org.infinispan.factories.annotations.Start;
 import org.infinispan.interceptors.EntryWrappingInterceptor;
+import org.infinispan.loaders.CacheLoaderException;
+import org.infinispan.loaders.CacheLoaderManager;
+import org.infinispan.loaders.CacheStore;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.gmu.manager.CommittedTransaction;
 import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.xa.CacheTransaction;
+import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.concurrent.BlockingTaskAwareExecutorService;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import javax.transaction.Transaction;
+import javax.transaction.TransactionManager;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -80,15 +87,29 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
    private TransactionCommitManager transactionCommitManager;
    private InvocationContextContainer invocationContextContainer;
    private BlockingTaskAwareExecutorService gmuExecutor;
+   private TransactionManager transactionManager;
+   private CacheLoaderManager cacheLoaderManager;
+   private CacheStore store;
 
    @Inject
    public void inject(TransactionCommitManager transactionCommitManager, DataContainer dataContainer,
                       CommitLog commitLog, VersionGenerator versionGenerator, InvocationContextContainer invocationContextContainer,
-                      @ComponentName(value = KnownComponentNames.GMU_EXECUTOR) BlockingTaskAwareExecutorService gmuExecutor) {
+                      @ComponentName(value = KnownComponentNames.GMU_EXECUTOR) BlockingTaskAwareExecutorService gmuExecutor,
+                      TransactionManager transactionManager, CacheLoaderManager cacheLoaderManager) {
       this.transactionCommitManager = transactionCommitManager;
       this.versionGenerator = toGMUVersionGenerator(versionGenerator);
       this.invocationContextContainer = invocationContextContainer;
       this.gmuExecutor = gmuExecutor;
+      this.transactionManager = transactionManager;
+      this.cacheLoaderManager = cacheLoaderManager;
+   }
+
+   @Start(priority = 16) //after cache store interceptor
+   public void enableCacheStore() {
+      if (cacheLoaderManager.isShared()) {
+         throw new IllegalStateException("Shared cache store is not supported.");
+      }
+      store = cacheLoaderManager.isUsingPassivation() ? null : cacheLoaderManager.getCacheStore();
    }
 
    @Override
@@ -150,6 +171,14 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          }
 
          if (transactionEntry == null || transactionEntry.isCommitted()) {
+            if (ctx.getCacheTransaction().getAllModifications().isEmpty()) {
+               //this is a read-only tx... we need to store the loaded data
+               for (CacheEntry entry : ctx.getLookedUpEntries().values()) {
+                  if (entry.isLoaded()) {
+                     commitContextEntry(entry, ctx, false);
+                  }
+               }
+            }
             return retVal;
          }
 
@@ -185,6 +214,9 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
             commitContextEntries(context, false, isFromStateTransfer(ctx));
             committedTransactions.add(committedTransaction);
             committedTransactionEntries.add(transactionEntry);
+         }
+         for (TransactionEntry txEntry : committedTransactionEntries) {
+            store(txEntry.getGlobalTransaction());
          }
          transactionCommitManager.transactionCommitted(committedTransactions, committedTransactionEntries);
       } catch (Throwable throwable) {
@@ -251,7 +283,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
 
    @Override
    protected void commitContextEntry(CacheEntry entry, InvocationContext ctx, boolean skipOwnershipCheck) {
-      if (ctx.isInTxScope()) {
+      if (ctx.isInTxScope() && !entry.isLoaded()) {
          cdl.commitEntry(entry, ((TxInvocationContext) ctx).getTransactionVersion(), skipOwnershipCheck, ctx);
       } else {
          cdl.commitEntry(entry, entry.getVersion(), skipOwnershipCheck, ctx);
@@ -297,6 +329,41 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       if (log.isDebugEnabled()) {
          log.debugf("Transaction %s can commit on this node. Prepare Version is %s",
                     command.getGlobalTransaction().globalId(), ctx.getTransactionVersion());
+      }
+   }
+
+   private void store(GlobalTransaction globalTransaction) {
+      if (store == null) {
+         return;
+      }
+      Transaction tx = safeSuspend();
+      try {
+         store.commit(globalTransaction);
+      } catch (CacheLoaderException e) {
+         //ignored
+      } finally {
+         safeResume(tx);
+      }
+   }
+
+   private Transaction safeSuspend() {
+      if (transactionManager != null) {
+         try {
+            return transactionManager.suspend();
+         } catch (Exception e) {
+            //ignored
+         }
+      }
+      return null;
+   }
+
+   private void safeResume(Transaction tx) {
+      if (transactionManager != null && tx != null) {
+         try {
+            transactionManager.resume(tx);
+         } catch (Exception e) {
+            //ignored
+         }
       }
    }
 
