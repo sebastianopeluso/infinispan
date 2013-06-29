@@ -93,6 +93,10 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
 
    @Override
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
+      if (command.isOnePhaseCommit()) {
+         throw new IllegalStateException("GMU does not support one phase commits.");
+      }
+
       GMUPrepareCommand spc = convert(command, GMUPrepareCommand.class);
 
       if (ctx.isOriginLocal()) {
@@ -113,10 +117,6 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          ctx.setTransactionVersion(commitVersion);
       } else {
          retVal = ctx.getTransactionVersion();
-      }
-
-      if (command.isOnePhaseCommit()) {
-         commitContextEntries(ctx, false, false);
       }
 
       return retVal;
