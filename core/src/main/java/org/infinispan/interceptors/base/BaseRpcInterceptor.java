@@ -32,12 +32,14 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.remoting.responses.IgnoreExtraResponsesValidityFilter;
 import org.infinispan.remoting.responses.Response;
 import org.infinispan.remoting.responses.SelfDeliverFilter;
+import org.infinispan.remoting.responses.TotalOrderResponseFilter;
 import org.infinispan.remoting.rpc.ResponseFilter;
 import org.infinispan.remoting.rpc.ResponseMode;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.statetransfer.StateConsumer;
 import org.infinispan.transaction.LocalTransaction;
+import org.infinispan.util.concurrent.TimeoutException;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -130,24 +132,28 @@ public abstract class BaseRpcInterceptor extends CommandInterceptor {
 
    protected final Map<Address, Response> totalOrderAnycastPrepare(Collection<Address> recipients,
                                                                    PrepareCommand prepareCommand,
-                                                                   ResponseFilter responseFilter) {
+                                                                   TotalOrderResponseFilter responseFilter) {
       Set<Address> realRecipients = new HashSet<Address>(recipients);
       realRecipients.add(rpcManager.getAddress());
       return internalTotalOrderPrepare(realRecipients, prepareCommand, responseFilter);
    }
 
-   protected final Map<Address, Response> totalOrderBroadcastPrepare(PrepareCommand prepareCommand, ResponseFilter responseFilter) {
+   protected final Map<Address, Response> totalOrderBroadcastPrepare(PrepareCommand prepareCommand,
+                                                                     TotalOrderResponseFilter responseFilter) {
       return internalTotalOrderPrepare(null, prepareCommand, responseFilter);
    }
 
    private Map<Address, Response> internalTotalOrderPrepare(Collection<Address> recipients, PrepareCommand prepareCommand,
-                                                            ResponseFilter responseFilter) {
+                                                            TotalOrderResponseFilter responseFilter) {
       if (defaultSynchronous && responseFilter == null) {
          return rpcManager.invokeRemotely(recipients, prepareCommand, ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS,
-                                          getReplicationTimeout(), true, getIgnoreExtraResponseFilter(recipients), true);
+                                          getReplicationTimeout(), true, null, true);
       } else if (defaultSynchronous) {
-         return rpcManager.invokeRemotely(recipients, prepareCommand, ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS,
-                                          getReplicationTimeout(), true, responseFilter, true);
+         Map<Address, Response> responseMap = rpcManager.invokeRemotely(recipients, prepareCommand,
+                                                                        ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS,
+                                                                        getReplicationTimeout(), true, responseFilter, true);
+         responseFilter.validate();
+         return responseMap;
       } else {
          return rpcManager.invokeRemotely(recipients, prepareCommand, false, true);
       }
@@ -161,15 +167,7 @@ public abstract class BaseRpcInterceptor extends CommandInterceptor {
       return cacheConfiguration.transaction().syncCommitPhase();
    }
 
-   protected final ResponseFilter getSelfDeliverFilter() {
+   protected final TotalOrderResponseFilter getSelfDeliverFilter() {
       return new SelfDeliverFilter(rpcManager.getAddress());
-   }
-
-   protected final ResponseFilter getIgnoreExtraResponseFilter(Collection<Address> recipients) {
-      Set<Address> liveMembers = new HashSet<Address>(stateConsumer.getCacheTopology().getMembers());
-      if (recipients != null) {
-         liveMembers.retainAll(recipients);
-      }
-      return new IgnoreExtraResponsesValidityFilter(liveMembers, rpcManager.getAddress(), false);
    }
 }
