@@ -109,7 +109,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
          }
       } catch (Throwable exception) {
          if (log.isDebugEnabled()) {
-            log.debugf(exception, "Exception while preparing for transaction %s. Local=%s",
+            log.debugf(exception, "Exception while preparing for transaction %s",
                        command.getGlobalTransaction().globalId());
          }
          if (command.isOnePhaseCommit()) {
