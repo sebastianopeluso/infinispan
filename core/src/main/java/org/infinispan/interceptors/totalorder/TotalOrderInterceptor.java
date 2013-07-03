@@ -144,7 +144,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
       TotalOrderRemoteTransactionState state = getTransactionState(context);
 
       try {
-         if (!processSecondCommand(state, commit)) {
+         if (!processSecondCommand(state, commit) && !context.isOriginLocal()) {
             //we can return here, because we set onePhaseCommit to prepare and it will release all the resources
             return null;
          }
