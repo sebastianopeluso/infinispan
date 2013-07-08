@@ -25,9 +25,11 @@ import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.totalorder.TotalOrderPrepareCommand;
+import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TotalOrderRemoteTransactionState;
 import org.infinispan.transaction.TransactionTable;
@@ -72,7 +74,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
          if (ctx.isOriginLocal()) {
             return invokeNextInterceptor(ctx, command);
          } else {
-            TotalOrderRemoteTransactionState state = getTransactionState(ctx);
+            TotalOrderRemoteTransactionState state = getTransactionState(ctx, false);
 
             try {
                state.preparing();
@@ -141,7 +143,7 @@ public class TotalOrderInterceptor extends CommandInterceptor {
                     context.isOriginLocal());
       }
 
-      TotalOrderRemoteTransactionState state = getTransactionState(context);
+      TotalOrderRemoteTransactionState state = getTransactionState(context, !commit);
 
       try {
          if (!processSecondCommand(state, commit) && !context.isOriginLocal()) {
@@ -167,11 +169,18 @@ public class TotalOrderInterceptor extends CommandInterceptor {
       }
    }
 
-   private TotalOrderRemoteTransactionState getTransactionState(TxInvocationContext context) {
+   private TotalOrderRemoteTransactionState getTransactionState(TxInvocationContext context, boolean forRollback) {
       if (!context.isOriginLocal()) {
          return ((RemoteTransaction) context.getCacheTransaction()).getTransactionState();
       }
       RemoteTransaction remoteTransaction = transactionTable.getRemoteTransaction(context.getGlobalTransaction());
+      if (forRollback) {
+         LocalTransaction localTransaction = (LocalTransaction) context.getCacheTransaction();
+         if (localTransaction.isPrepareSent() && !localTransaction.isCommitOrRollbackSent()) {
+            remoteTransaction = transactionTable.getOrCreateRemoteTransaction(context.getGlobalTransaction(),
+                                                                              context.getModifications().toArray(new WriteCommand[1]));
+         }
+      }
       return remoteTransaction == null ? null : remoteTransaction.getTransactionState();
    }
 
