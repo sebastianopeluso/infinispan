@@ -134,4 +134,8 @@ public class GroupingConsistentHash implements ConsistentHash {
    public String toString() {
       return "GroupingConsistentHash:" + ch;
    }
+
+   public final ConsistentHash getConsistentHash() {
+      return ch;
+   }
 }
