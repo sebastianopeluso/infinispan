@@ -22,20 +22,17 @@
  */
 package org.infinispan.stats.topK;
 
-import com.clearspring.analytics.stream.Counter;
-import com.clearspring.analytics.stream.StreamSummary;
 import org.infinispan.Cache;
 import org.infinispan.factories.ComponentRegistry;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import java.util.Collections;
-import java.util.EnumMap;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * This contains all the stream lib top keys. Stream lib is a space efficient technique to obtains the top-most
@@ -50,22 +47,14 @@ public class StreamLibContainer {
    private static final Log log = LogFactory.getLog(StreamLibContainer.class);
    private final String cacheName;
    private final String address;
-   private final Map<Stat, StreamSummary<Object>> streamSummaryEnumMap;
-   private final Map<Stat, Lock> lockMap;
    private volatile int capacity = 1000;
    private volatile boolean active = false;
+   private volatile FlushThread flushThread;
 
    public StreamLibContainer(String cacheName, String address) {
       this.cacheName = cacheName;
       this.address = address;
-      streamSummaryEnumMap = Collections.synchronizedMap(new EnumMap<Stat, StreamSummary<Object>>(Stat.class));
-      lockMap = new EnumMap<Stat, Lock>(Stat.class);
-
-      for (Stat stat : Stat.values()) {
-         lockMap.put(stat, new ReentrantLock());
-      }
-
-      resetAll(1);
+      resetAll();
    }
 
    public static StreamLibContainer getOrCreateStreamLibContainer(Cache cache) {
@@ -73,7 +62,7 @@ public class StreamLibContainer {
       StreamLibContainer streamLibContainer = componentRegistry.getComponent(StreamLibContainer.class);
       if (streamLibContainer == null) {
          String cacheName = cache.getName();
-         String address = String.valueOf(cache.getCacheManager().getAddress()); 
+         String address = String.valueOf(cache.getCacheManager().getAddress());
          componentRegistry.registerComponent(new StreamLibContainer(cacheName, address), StreamLibContainer.class);
       }
       return componentRegistry.getComponent(StreamLibContainer.class);
@@ -85,8 +74,14 @@ public class StreamLibContainer {
 
    public void setActive(boolean active) {
       if (!this.active && active) {
+         this.flushThread = new FlushThread(cacheName);
+         this.flushThread.start();
          resetAll(capacity);
       } else if (!active) {
+         if (flushThread != null) {
+            flushThread.terminate();
+            flushThread = null;
+         }
          resetAll(1);
       }
       this.active = active;
@@ -143,24 +138,17 @@ public class StreamLibContainer {
    }
 
    public Map<Object, Long> getTopKFrom(Stat stat, int topK) {
-      try {
-         lockMap.get(stat).lock();
-         return getStatsFrom(streamSummaryEnumMap.get(stat), topK);
-      } finally {
-         lockMap.get(stat).unlock();
-      }
-
+      stat.flush();
+      return stat.streamSummary.topKey(topK);
    }
 
-   private Map<Object, Long> getStatsFrom(StreamSummary<Object> ss, int topK) {
-      List<Counter<Object>> counters = ss.topK(topK <= 0 ? 1 : topK);
-      Map<Object, Long> results = new HashMap<Object, Long>(topK);
+   public Map<String, Long> getTopKFromAsKeyString(Stat stat) {
+      return getTopKFromAsKeyString(stat, capacity);
+   }
 
-      for (Counter<Object> c : counters) {
-         results.put(c.getItem(), c.getCount());
-      }
-
-      return results;
+   public Map<String, Long> getTopKFromAsKeyString(Stat stat, int topK) {
+      stat.flush();
+      return stat.streamSummary.topKeyAsKeyString(topK);
    }
 
    public void resetAll() {
@@ -169,37 +157,6 @@ public class StreamLibContainer {
 
    public void resetStat(Stat stat) {
       resetStat(stat, capacity);
-   }
-
-   private void resetStat(Stat stat, int customCapacity) {
-      try {
-         lockMap.get(stat).lock();
-         streamSummaryEnumMap.put(stat, createNewStreamSummary(customCapacity));
-      } finally {
-         lockMap.get(stat).unlock();
-      }
-   }
-
-   private StreamSummary<Object> createNewStreamSummary(int customCapacity) {
-      return new StreamSummary<Object>(Math.min(MAX_CAPACITY, customCapacity));
-   }
-
-   private void resetAll(int customCapacity) {
-      for (Stat stat : Stat.values()) {
-         resetStat(stat, customCapacity);
-      }
-   }
-
-   private void syncOffer(final Stat stat, Object key) {
-      try {
-         lockMap.get(stat).lock();
-         if (log.isTraceEnabled()) {
-            log.tracef("Offer key=%s to stat=%s in %s", key, stat, this);
-         }
-         streamSummaryEnumMap.get(stat).offer(key);
-      } finally {
-         lockMap.get(stat).unlock();
-      }
    }
 
    @Override
@@ -228,6 +185,31 @@ public class StreamLibContainer {
             '}';
    }
 
+   protected ConcurrentStreamSummary<Object> createNewStreamSummary() {
+      return createNewStreamSummary(capacity);
+   }
+
+   private void resetStat(Stat stat, int customCapacity) {
+      stat.streamSummary = createNewStreamSummary(customCapacity);
+   }
+
+   private ConcurrentStreamSummary<Object> createNewStreamSummary(int customCapacity) {
+      return new ConcurrentStreamSummary<Object>(Math.min(MAX_CAPACITY, customCapacity));
+   }
+
+   private void resetAll(int customCapacity) {
+      for (Stat stat : Stat.values()) {
+         resetStat(stat, customCapacity);
+      }
+   }
+
+   private void syncOffer(final Stat stat, Object key) {
+      if (log.isTraceEnabled()) {
+         log.tracef("Offer key=%s to stat=%s in %s", key, stat, this);
+      }
+      stat.offer(key, flushThread);
+   }
+
    public static enum Stat {
       REMOTE_GET,
       LOCAL_GET,
@@ -237,6 +219,86 @@ public class StreamLibContainer {
       MOST_LOCKED_KEYS,
       MOST_CONTENDED_KEYS,
       MOST_FAILED_KEYS,
-      MOST_WRITE_SKEW_FAILED_KEYS
+      MOST_WRITE_SKEW_FAILED_KEYS;
+      private final BlockingQueue<Object> pendingOffers = new LinkedBlockingQueue<Object>();
+      private volatile ConcurrentStreamSummary<Object> streamSummary;
+
+      public final void offer(final Object element, final FlushThread flushThread) {
+         pendingOffers.add(element);
+         if (pendingOffers.size() > 1000000 && flushThread != null) {
+            flushThread.flush();
+         }
+      }
+
+      public final void reset(StreamLibContainer container) {
+         pendingOffers.clear();
+         streamSummary = container.createNewStreamSummary();
+      }
+
+      public final void flush() {
+         ConcurrentStreamSummary<Object> summary = streamSummary;
+         List<Object> keys = new ArrayList<Object>();
+         pendingOffers.drainTo(keys);
+         Map<Object, Counter> counterMap = new HashMap<Object, Counter>();
+         for (Object k : keys) {
+            Counter counter = counterMap.get(k);
+            if (counter == null) {
+               counter = new Counter();
+               counterMap.put(k, counter);
+            }
+            counter.value++;
+         }
+         for (Map.Entry<Object, Counter> entry : counterMap.entrySet()) {
+            summary.offer(entry.getKey(), entry.getValue().value);
+         }
+      }
+   }
+
+   private static class Counter {
+      private int value = 0;
+   }
+
+   private class FlushThread extends Thread {
+
+      private volatile boolean running;
+
+      public FlushThread(String cacheName) {
+         super(cacheName + "-topk-flusher");
+      }
+
+      @Override
+      public void run() {
+         running = true;
+         while (running) {
+            try {
+               sleep();
+            } catch (InterruptedException e) {
+               Thread.currentThread().interrupt();
+               continue;
+            }
+            for (Stat stat : Stat.values()) {
+               stat.flush();
+            }
+         }
+      }
+
+      @Override
+      public final void interrupt() {
+         running = false;
+         super.interrupt();
+      }
+
+      public synchronized final void terminate() {
+         notify();
+         running = false;
+      }
+
+      public synchronized final void flush() {
+         notify();
+      }
+
+      private synchronized void sleep() throws InterruptedException {
+         wait(60000);
+      }
    }
 }
