@@ -56,7 +56,7 @@ import org.infinispan.loaders.CacheLoaderException;
 import org.infinispan.loaders.CacheLoaderManager;
 import org.infinispan.loaders.CacheStore;
 import org.infinispan.stats.TransactionsStatisticsRegistry;
-import org.infinispan.stats.translations.ExposedStatistics;
+import org.infinispan.stats.container.TransactionStatistics;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.gmu.CommitLog;
@@ -75,6 +75,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import static org.infinispan.stats.ExposedStatistic.NUM_WAITS_IN_COMMIT_QUEUE;
+import static org.infinispan.stats.ExposedStatistic.WAIT_TIME_IN_COMMIT_QUEUE;
 import static org.infinispan.transaction.gmu.GMUHelper.*;
 import static org.infinispan.transaction.gmu.manager.SortedTransactionQueue.TransactionEntry;
 
@@ -167,15 +169,16 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          retVal = invokeNextInterceptor(ctx, command);
          //in remote context, the commit command will be enqueue, so it does not need to wait
          if (transactionEntry != null) {     //Only local
-            boolean waited = TransactionsStatisticsRegistry.hasStatisticCollector() && !transactionEntry.isReadyToCommit();
+            final TransactionStatistics transactionStatistics = TransactionsStatisticsRegistry.getTransactionStatistics();
+            boolean waited = transactionStatistics != null && !transactionEntry.isReadyToCommit();
             long waitTime = 0L;
             if (waited) {
                waitTime = System.nanoTime();
             }
             transactionEntry.awaitUntilIsReadyToCommit();
             if (waited) {
-               TransactionsStatisticsRegistry.incrementValue(ExposedStatistics.IspnStats.NUM_WAITS_IN_COMMIT_QUEUE);
-               TransactionsStatisticsRegistry.addValue(ExposedStatistics.IspnStats.WAIT_TIME_IN_COMMIT_QUEUE, System.nanoTime() - waitTime);
+               transactionStatistics.incrementValue(NUM_WAITS_IN_COMMIT_QUEUE);
+               transactionStatistics.addValue(WAIT_TIME_IN_COMMIT_QUEUE, System.nanoTime() - waitTime);
             }
          } else if (!ctx.isOriginLocal()) {
             transactionEntry = gmuCommitCommand.getTransactionEntry();
