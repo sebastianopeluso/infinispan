@@ -162,8 +162,8 @@ public class LockManagerWrapper implements LockManager {
          if (txScope && ctx.isOriginLocal() && transactionStatistics != null) {
             if (log.isTraceEnabled())
                log.trace("Tacking lock for Xact " + ((LocalTxInvocationContext) ctx).getGlobalTransaction().getId());
+            transactionStatistics.addTakenLock(key); //Idempotent
          }
-         transactionStatistics.addTakenLock(key); //Idempotent
       }
 
 
