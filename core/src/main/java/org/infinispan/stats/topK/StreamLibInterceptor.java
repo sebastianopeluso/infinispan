@@ -53,7 +53,7 @@ public class StreamLibInterceptor extends BaseCustomInterceptor {
    public Object visitGetKeyValueCommand(InvocationContext ctx, GetKeyValueCommand command) throws Throwable {
 
       if (statisticEnabled && ctx.isOriginLocal()) {
-         streamLibContainer.addGet(command.getKey(), isRemote(command.getKey()), statisticEnabled);
+         streamLibContainer.addGet(command.getKey(), isRemote(command.getKey()));
       }
       return invokeNextInterceptor(ctx, command);
    }

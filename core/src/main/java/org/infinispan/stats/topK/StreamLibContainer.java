@@ -30,6 +30,7 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,7 @@ public class StreamLibContainer {
    private final String cacheName;
    private final String address;
    private final AtomicBoolean flushing;
+   private final EnumMap<Stat, TopKeyWrapper> topKeyWrapper;
    private volatile int capacity = 1000;
    private volatile boolean active = false;
    private volatile boolean reset = false;
@@ -58,8 +60,11 @@ public class StreamLibContainer {
    public StreamLibContainer(String cacheName, String address) {
       this.cacheName = cacheName;
       this.address = address;
+      topKeyWrapper = new EnumMap<Stat, TopKeyWrapper>(Stat.class);
+      for (Stat stat : Stat.values()) {
+         topKeyWrapper.put(stat, new TopKeyWrapper());
+      }
       flushing = new AtomicBoolean(false);
-      resetAll();
    }
 
    public static StreamLibContainer getOrCreateStreamLibContainer(Cache cache) {
@@ -98,11 +103,12 @@ public class StreamLibContainer {
       }
    }
 
-   public void addGet(Object key, boolean remote, boolean transactional) {
+   public void addGet(Object key, boolean remote) {
       if (!isActive()) {
          return;
       }
       syncOffer(remote ? Stat.REMOTE_GET : Stat.LOCAL_GET, key);
+      tryFlushAll();
    }
 
    public void addPut(Object key, boolean remote) {
@@ -111,6 +117,7 @@ public class StreamLibContainer {
       }
 
       syncOffer(remote ? Stat.REMOTE_PUT : Stat.LOCAL_PUT, key);
+      tryFlushAll();
    }
 
    public void addLockInformation(Object key, boolean contention, boolean abort) {
@@ -126,10 +133,12 @@ public class StreamLibContainer {
       if (abort) {
          syncOffer(Stat.MOST_FAILED_KEYS, key);
       }
+      tryFlushAll();
    }
 
    public void addWriteSkewFailed(Object key) {
       syncOffer(Stat.MOST_WRITE_SKEW_FAILED_KEYS, key);
+      tryFlushAll();
    }
 
    public Map<Object, Long> getTopKFrom(Stat stat) {
@@ -138,7 +147,7 @@ public class StreamLibContainer {
 
    public Map<Object, Long> getTopKFrom(Stat stat, int topK) {
       tryFlushAll();
-      return stat.topK(topK);
+      return topKeyWrapper.get(stat).topK(topK);
    }
 
    public Map<String, Long> getTopKFromAsKeyString(Stat stat) {
@@ -147,7 +156,7 @@ public class StreamLibContainer {
 
    public Map<String, Long> getTopKFromAsKeyString(Stat stat, int topK) {
       tryFlushAll();
-      return stat.topKAsString(topK);
+      return topKeyWrapper.get(stat).topKAsString(topK);
    }
 
    @Override
@@ -180,12 +189,12 @@ public class StreamLibContainer {
       if (flushing.compareAndSet(false, true)) {
          if (reset) {
             for (Stat stat : Stat.values()) {
-               stat.reset(this, capacity);
+               topKeyWrapper.get(stat).reset(createNewStreamSummary(capacity));
             }
             reset = false;
          } else {
             for (Stat stat : Stat.values()) {
-               stat.flush();
+               topKeyWrapper.get(stat).flush();
             }
          }
          flushing.set(false);
@@ -205,7 +214,7 @@ public class StreamLibContainer {
       if (log.isTraceEnabled()) {
          log.tracef("Offer key=%s to stat=%s in %s", key, stat, this);
       }
-      stat.offer(key, this);
+      topKeyWrapper.get(stat).offer(key);
    }
 
    public static enum Stat {
@@ -217,22 +226,25 @@ public class StreamLibContainer {
       MOST_LOCKED_KEYS,
       MOST_CONTENDED_KEYS,
       MOST_FAILED_KEYS,
-      MOST_WRITE_SKEW_FAILED_KEYS;
-      private final BlockingQueue<Object> pendingOffers = new LinkedBlockingQueue<Object>();
+      MOST_WRITE_SKEW_FAILED_KEYS
+   }
+
+   private class TopKeyWrapper {
+      private final BlockingQueue<Object> pendingOffers;
       private volatile StreamSummary<Object> streamSummary;
 
-      private void offer(final Object element, final StreamLibContainer container) {
-         pendingOffers.add(element);
-         if (container != null) {
-            container.tryFlushAll();
-         }
+      public TopKeyWrapper() {
+         pendingOffers = new LinkedBlockingQueue<Object>();
+         streamSummary = createNewStreamSummary(capacity);
       }
 
-      private void reset(StreamLibContainer container, int capacity) {
+      private void offer(final Object element) {
+         pendingOffers.add(element);
+      }
+
+      private void reset(StreamSummary<Object> streamSummary) {
          pendingOffers.clear();
-         synchronized (this) {
-            streamSummary = container.createNewStreamSummary(capacity);
-         }
+         this.streamSummary = streamSummary;
       }
 
       private void flush() {

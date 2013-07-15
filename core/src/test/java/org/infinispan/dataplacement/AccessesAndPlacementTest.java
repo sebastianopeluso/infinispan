@@ -523,7 +523,7 @@ public class AccessesAndPlacementTest {
    private void addKey(Object key, boolean remote, int count, StreamLibContainer container) {
       log.debugf("Add %s accesses for key %s [is remote? %s]", count, key, remote);
       for (int i = 0; i < count; ++i) {
-         container.addGet(key, remote, false);
+         container.addGet(key, remote);
       }
    }
 
