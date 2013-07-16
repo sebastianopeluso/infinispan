@@ -218,7 +218,8 @@ public class RpcManagerWrapper implements RpcManager {
 
    private void updateStats(ReplicableCommand command, boolean sync, long init, Collection<Address> recipients) {
       final TransactionStatistics transactionStatistics = TransactionsStatisticsRegistry.getTransactionStatistics();
-      if (transactionStatistics == null && !(command instanceof TxCompletionNotificationCommand)) {
+      if (!TransactionsStatisticsRegistry.isActive() || transactionStatistics == null &&
+            !(command instanceof TxCompletionNotificationCommand)) {
          if (log.isTraceEnabled()) {
             log.tracef("Does not update stats for command %s. No statistic collector found", command);
          }
@@ -228,7 +229,6 @@ public class RpcManagerWrapper implements RpcManager {
       ExposedStatistic counterStat;
       ExposedStatistic recipientSizeStat;
       ExposedStatistic commandSizeStat = null;
-      long contactedNodes = recipientListSize(recipients);
       long contactedNodesMinusMe = recipientListSize(recipients) - (isCurrentNodeInvolved(recipients) ? 1 : 0);
       if (command instanceof PrepareCommand) {
          if (sync) {

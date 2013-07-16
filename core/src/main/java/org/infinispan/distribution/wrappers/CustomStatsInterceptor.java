@@ -43,6 +43,7 @@ import org.infinispan.interceptors.base.BaseCustomInterceptor;
 import org.infinispan.jmx.annotations.MBean;
 import org.infinispan.jmx.annotations.ManagedAttribute;
 import org.infinispan.jmx.annotations.ManagedOperation;
+import org.infinispan.jmx.annotations.Parameter;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Transport;
@@ -122,7 +123,7 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
                     ctx.isInTxScope(), ctx.isOriginLocal());
       }
       Object ret;
-      if (ctx.isInTxScope()) {
+      if (TransactionsStatisticsRegistry.isActive() && ctx.isInTxScope()) {
          final TransactionStatistics transactionStatistics = initStatsIfNecessary(ctx);
          transactionStatistics.setUpdateTransaction();
          long initTime = System.nanoTime();
@@ -163,7 +164,7 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
                     ctx.isInTxScope(), ctx.isOriginLocal());
       }
       Object ret;
-      if (ctx.isInTxScope()) {
+      if (TransactionsStatisticsRegistry.isActive() && ctx.isInTxScope()) {
 
          final TransactionStatistics transactionStatistics = initStatsIfNecessary(ctx);
          //transactionStatistics.addNTBCValue(currTimeForAllGetCommand);         
@@ -197,6 +198,10 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
          log.tracef("Visit Commit command %s. Is it local?. Transaction is %s", command,
                     ctx.isOriginLocal(), command.getGlobalTransaction().globalId());
       }
+      if (!TransactionsStatisticsRegistry.isActive()) {
+         return invokeNextInterceptor(ctx, command);
+      }
+
       TransactionStatistics transactionStatistics = initStatsIfNecessary(ctx);
       long currCpuTime = TransactionsStatisticsRegistry.getThreadCPUTime();
       long currTime = System.nanoTime();
@@ -229,6 +234,11 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
          log.tracef("Visit Prepare command %s. Is it local?. Transaction is %s", command,
                     ctx.isOriginLocal(), command.getGlobalTransaction().globalId());
       }
+
+      if (!TransactionsStatisticsRegistry.isActive()) {
+         return invokeNextInterceptor(ctx, command);
+      }
+
       TransactionStatistics transactionStatistics = initStatsIfNecessary(ctx);
       transactionStatistics.onPrepareCommand();
       if (command.hasModifications()) {
@@ -247,7 +257,7 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
       } catch (TimeoutException e) {
          if (ctx.isOriginLocal()) {
             transactionStatistics.incrementValue(NUM_LOCK_FAILED_TIMEOUT);
-      }
+         }
          throw e;
       } catch (DeadlockDetectedException e) {
          if (ctx.isOriginLocal()) {
@@ -298,6 +308,11 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
          log.tracef("Visit Rollback command %s. Is it local?. Transaction is %s", command,
                     ctx.isOriginLocal(), command.getGlobalTransaction().globalId());
       }
+
+      if (!TransactionsStatisticsRegistry.isActive()) {
+         return invokeNextInterceptor(ctx, command);
+      }
+
       TransactionStatistics transactionStatistics = initStatsIfNecessary(ctx);
       long currentCpuTime = TransactionsStatisticsRegistry.getThreadCPUTime();
       long initRollbackTime = System.nanoTime();
@@ -1486,8 +1501,101 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
       return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((REMOTE_LOCK_CONTENTION_TO_REMOTE))));
    }
 
+   @ManagedAttribute(description = "Average local Tx Waiting time due to pending Tx",
+                     displayName = "Average local Tx Waiting time due to pending Tx")
+   public final long getAvgLocalTxWaitingTimeInGMUQueueDuePendingTx() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL));
+   }
 
+   @ManagedAttribute(description = "Average remote Tx Waiting time due to pending Tx",
+                     displayName = "Average remote Tx Waiting time due to pending Tx")
+   public final long getAvgRemoteTxWaitingTimeInGMUQueueDuePendingTx() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE));
+   }
 
+   @ManagedAttribute(description = "Average local Tx Waiting time due to slow commits",
+                     displayName = "Average local Tx Waiting time due to slow commits")
+   public final long getAvgLocalTxWaitingTimeInGMUQueueDueToSlowCommits() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL));
+   }
+
+   @ManagedAttribute(description = "Average remote Tx Waiting time due to slow commits",
+                     displayName = "Average remote Tx Waiting time due to slow commits")
+   public final long getAvgRemoteTxWaitingTimeInGMUQueueDueToSlowCommits() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE));
+   }
+
+   @ManagedAttribute(description = "Average local Tx Waiting time due to commit conflicts",
+                     displayName = "Average local Tx Waiting time due to commit conflicts")
+   public final long getAvgLocalTxWaitingTimeInGMUQueueDueToCommitsConflicts() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL));
+   }
+
+   @ManagedAttribute(description = "Average remote Tx Waiting time due to commit conflicts",
+                     displayName = "Average remote Tx Waiting time due to commit conflicts")
+   public final long getAvgRemoteTxWaitingTimeInGMUQueueDueToCommitsConflicts() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE));
+   }
+
+   @ManagedAttribute(description = "Number of local Tx that waited due to pending Tx",
+                     displayName = "Number of local Tx that waited due to pending Tx")
+   public final long getNumLocalTxWaitingTimeInGMUQueueDuePendingTx() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL));
+   }
+
+   @ManagedAttribute(description = "Number of remote Tx that waited due to pending Tx",
+                     displayName = "Number of remote Tx that waited due to pending Tx")
+   public final long getNumRemoteTxWaitingTimeInGMUQueueDuePendingTx() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE));
+   }
+
+   @ManagedAttribute(description = "Number of local Tx that waited due to slow commits",
+                     displayName = "Number of local Tx that waited due to slow commits")
+   public final long getNumLocalTxWaitingTimeInGMUQueueDueToSlowCommits() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL));
+   }
+
+   @ManagedAttribute(description = "Number of remote Tx that waited due to slow commits",
+                     displayName = "Number of remote Tx that waited due to slow commits")
+   public final long getNumRemoteTxWaitingTimeInGMUQueueDueToSlowCommits() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE));
+   }
+
+   @ManagedAttribute(description = "Number of local Tx that waited due to commit conflicts",
+                     displayName = "Number of local Tx that waited due to commit conflicts")
+   public final long getNumLocalTxWaitingTimeInGMUQueueDueToCommitsConflicts() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL));
+   }
+
+   @ManagedAttribute(description = "Number of remote Tx that waited due to commit conflicts",
+                     displayName = "Number of remote Tx that waited due to commit conflicts")
+   public final long getNumRemoteTxWaitingTimeInGMUQueueDueToCommitsConflicts() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE));
+   }
+
+   @ManagedAttribute(description = "Returns true if the statistics are enabled, false otherwise",
+                     displayName = "Enabled")
+   public final boolean isEnabled() {
+      return TransactionsStatisticsRegistry.isActive();
+   }
+
+   @ManagedOperation(description = "Enabled/Disables the statistic collection.",
+                     displayName = "Enable/Disable Statistic")
+   public final void setEnabled(@Parameter boolean enabled) {
+      TransactionsStatisticsRegistry.setActive(enabled);
+   }
+
+   @ManagedAttribute(description = "Returns true if the waiting time in GMU queue statistics are collected",
+                     displayName = "Waiting time in GMU enabled")
+   public final boolean isGMUWaitingTimeEnabled() {
+      return TransactionsStatisticsRegistry.isGmuWaitingActive();
+   }
+
+   @ManagedOperation(description = "Enables/Disables the waiting in time GMU queue collection",
+                     displayName = "Enable/Disable GMU Waiting statistics")
+   public final void setGMUWaitingTimeEnabled(@Parameter boolean enabled) {
+      TransactionsStatisticsRegistry.setGmuWaitingActive(enabled);
+   }
 
     /*
      "handleCommand" methods could have been more compact (since they do very similar stuff)

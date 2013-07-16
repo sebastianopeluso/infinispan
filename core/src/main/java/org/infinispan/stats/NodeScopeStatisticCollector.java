@@ -578,6 +578,30 @@ public class NodeScopeStatisticCollector {
             } else {
                return new Long(0);
             }
+         case GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL:
+            return microAvgLocal(snapshot, NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING, GMU_WAITING_IN_QUEUE_DUE_PENDING);
+         case GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE:
+            return microAvgRemote(snapshot, NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING, GMU_WAITING_IN_QUEUE_DUE_PENDING);
+         case GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL:
+            return microAvgLocal(snapshot, NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS, GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS);
+         case GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE:
+            return microAvgRemote(snapshot, NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS, GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS);
+         case GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL:
+            return microAvgLocal(snapshot, NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION, GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION);
+         case GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE:
+            return microAvgRemote(snapshot, NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION, GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION);
+         case NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL:
+            return snapshot.getLocal(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING);
+         case NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE:
+            return snapshot.getRemote(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING);
+         case NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL:
+            return snapshot.getLocal(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS);
+         case NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE:
+            return snapshot.getRemote(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS);
+         case NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL:
+            return snapshot.getLocal(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION);
+         case NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE:
+            return snapshot.getRemote(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION);
          default:
             throw new NoIspnStatException("Invalid statistic " + param);
       }

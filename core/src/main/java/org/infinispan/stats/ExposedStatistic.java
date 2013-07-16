@@ -250,7 +250,30 @@ public enum ExposedStatistic {
    READ_ONLY_TX_TOTAL_R(true, false),
    READ_ONLY_TX_TOTAL_S(true, false),
    TERMINATION_COST(true, true),
-   FIRST_WRITE_INDEX(true, false);
+   FIRST_WRITE_INDEX(true, false),
+
+   //gmu waiting times:
+   GMU_WAITING_IN_QUEUE_DUE_PENDING(true, true),
+   NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING(true, true),
+   GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS(true, true),
+   NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS(true, true),
+   GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION(true, true),
+   NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION(true, true),
+
+   //gmu waiting times for query
+   GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL(false, false),
+   GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE(false, false),
+   GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL(false, false),
+   GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE(false, false),
+   GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL(false, false),
+   GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE(false, false),
+   NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL(false, false),
+   NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE(false, false),
+   NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL(false, false),
+   NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE(false, false),
+   NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL(false, false),
+   NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE(false, false),
+   ;
    public static final int NO_INDEX = -1;
    private static short localStatsSize = 0;
    private static short remoteStatsSize = 0;

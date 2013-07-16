@@ -59,7 +59,8 @@ public final class TransactionsStatisticsRegistry {
    //retrieve the transactionStatistics
    private static final ThreadLocal<TransactionStatistics> thread = new ThreadLocal<TransactionStatistics>();
    private static final ThreadMXBean THREAD_MX_BEAN = ManagementFactory.getThreadMXBean();
-   public static boolean active = false;
+   private static volatile boolean active = false;
+   private static volatile boolean gmuWaitingActive = false;
    private static ConcurrentHashMap<String, Map<Object, Long>> pendingLocks = new ConcurrentHashMap<String, Map<Object, Long>>();
    private static Configuration configuration;
    private static ThreadLocal<TransactionTS> lastTransactionTS = new ThreadLocal<TransactionTS>();
@@ -67,6 +68,10 @@ public final class TransactionsStatisticsRegistry {
 
    public static boolean isActive() {
       return active;
+   }
+
+   public static void setActive(boolean enabled) {
+      active = enabled;
    }
 
    public static boolean isSampleServiceTime() {
@@ -166,9 +171,6 @@ public final class TransactionsStatisticsRegistry {
    }
 
    public static Object getAttribute(ExposedStatistic param, String className) {
-      if (!active || configuration == null) {
-         return null;
-      }
       if (className == null) {
          return transactionalClassesStatsMap.get(DEFAULT_ISPN_CLASS).getAttribute(param);
       } else {
@@ -177,17 +179,6 @@ public final class TransactionsStatisticsRegistry {
          else
             return null;
       }
-   }
-
-   public static Object getAttribute(ExposedStatistic param) {
-      if (!active || configuration == null) {
-         return null;
-      }
-      Object ret = transactionalClassesStatsMap.get(DEFAULT_ISPN_CLASS).getAttribute(param);
-      if (log.isTraceEnabled()) {
-         log.tracef("Attribute %s == %s", param, ret);
-      }
-      return ret;
    }
 
    /*public static Object getPercentile(ExposedStatistic param, int percentile, String className) {
@@ -203,6 +194,14 @@ public final class TransactionsStatisticsRegistry {
             return null;
       }
    }*/
+
+   public static Object getAttribute(ExposedStatistic param) {
+      Object ret = transactionalClassesStatsMap.get(DEFAULT_ISPN_CLASS).getAttribute(param);
+      if (log.isTraceEnabled()) {
+         log.tracef("Attribute %s == %s", param, ret);
+      }
+      return ret;
+   }
 
    public static void flushPendingRemoteLocksIfNeeded(GlobalTransaction id) {
       if (!active) {
@@ -274,9 +273,6 @@ public final class TransactionsStatisticsRegistry {
    }
 
    public static void reset() {
-      if (!active) {
-         return;
-      }
       for (NodeScopeStatisticCollector nsc : transactionalClassesStatsMap.values()) {
          nsc.reset();
       }
@@ -293,6 +289,14 @@ public final class TransactionsStatisticsRegistry {
       }
       txs.setTransactionalClass(className);
       registerTransactionalClass(className);
+   }
+
+   public static boolean isGmuWaitingActive() {
+      return gmuWaitingActive && active;
+   }
+
+   public static void setGmuWaitingActive(boolean enabled) {
+      gmuWaitingActive = enabled;
    }
 
    private static void appendLocks(Map<Object, Long> locks, String id) {

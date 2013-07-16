@@ -75,8 +75,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import static org.infinispan.stats.ExposedStatistic.NUM_WAITS_IN_COMMIT_QUEUE;
-import static org.infinispan.stats.ExposedStatistic.WAIT_TIME_IN_COMMIT_QUEUE;
+import static org.infinispan.stats.ExposedStatistic.*;
 import static org.infinispan.transaction.gmu.GMUHelper.*;
 import static org.infinispan.transaction.gmu.manager.SortedTransactionQueue.TransactionEntry;
 
@@ -193,6 +192,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
                   }
                }
             }
+            updateWaitingTime(transactionEntry);
             return retVal;
          }
 
@@ -216,6 +216,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
 
          committedTransactions.add(committedTransaction);
          committedTransactionEntries.add(transactionEntry);
+
+         updateWaitingTime(transactionEntry);
 
          //in case of transaction has the same version... should be rare...
          while (toCommit.hasNext()) {
@@ -460,6 +462,39 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          return invocationContextContainer.createRemoteTxInvocationContext((RemoteTransaction) cacheTransaction, null);
       }
       throw new IllegalStateException("Expected a remote or local transaction and not " + cacheTransaction);
+   }
+
+   private void updateWaitingTime(TransactionEntry transactionEntry) {
+      if (!TransactionsStatisticsRegistry.isGmuWaitingActive() || transactionEntry == null || !transactionEntry.hasWaited()) {
+         return;
+      }
+      long commitTimestamp = transactionEntry.getCommitReceivedTimestamp();
+      long firstInQueueTimeStamp = transactionEntry.getFirstInQueueTimestamp();
+      long readyToCommitTimestamp = transactionEntry.getReadyToCommitTimestamp();
+      boolean pendingTx = transactionEntry.isWaitBecauseOfPendingTx();
+      if (log.isTraceEnabled()) {
+         log.tracef("Updating statistics for tx %s. Commit=%s, Queue head=%s, Ready to commit=%s, Pending Tx=%s",
+                    transactionEntry.getGlobalTransaction().globalId(),
+                    commitTimestamp, firstInQueueTimeStamp, readyToCommitTimestamp, pendingTx);
+      }
+      if (commitTimestamp == -1 || firstInQueueTimeStamp == -1) {
+         log.errorf("Commit Timestamp or Queue Head Timestamp cannot be -1");
+         return;
+      }
+      TransactionStatistics transactionStatistics = TransactionsStatisticsRegistry.getTransactionStatistics();
+      if (transactionStatistics != null) {
+         if (pendingTx) {
+            transactionStatistics.addValue(GMU_WAITING_IN_QUEUE_DUE_PENDING, firstInQueueTimeStamp - commitTimestamp);
+            transactionStatistics.incrementValue(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING);
+         } else {
+            transactionStatistics.addValue(GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS, firstInQueueTimeStamp - commitTimestamp);
+            transactionStatistics.incrementValue(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS);
+         }
+         if (readyToCommitTimestamp > firstInQueueTimeStamp) {
+            transactionStatistics.addValue(GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION, readyToCommitTimestamp - firstInQueueTimeStamp);
+            transactionStatistics.incrementValue(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION);
+         }
+      }
    }
 
 }
