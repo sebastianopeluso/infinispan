@@ -1622,9 +1622,9 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
             counter = NUM_UPDATE_TX_LOCAL_LOCAL_ROLLBACK;
          }
       } else {
-         cpuStat = UPDATE_TX_LOCAL_LOCAL_ROLLBACK_S;
-         stat = UPDATE_TX_LOCAL_LOCAL_ROLLBACK_R;
-         counter = NUM_UPDATE_TX_LOCAL_LOCAL_ROLLBACK;
+         cpuStat = UPDATE_TX_REMOTE_ROLLBACK_S;
+         stat = UPDATE_TX_REMOTE_ROLLBACK_R;
+         counter = NUM_UPDATE_TX_REMOTE_ROLLBACK;
       }
       updateWallClockTime(transactionStatistics, stat, counter, initTime);
       if (TransactionsStatisticsRegistry.isSampleServiceTime())
