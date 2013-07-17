@@ -84,7 +84,6 @@ public final class TransactionsStatisticsRegistry {
       sampleServiceTime = configuration.customStatsConfiguration().isSampleServiceTimes();
       transactionalClassesStatsMap.put(DEFAULT_ISPN_CLASS, new NodeScopeStatisticCollector());
       active = true;
-      sampleServiceTime = configuration.customStatsConfiguration().isSampleServiceTimes();
    }
 
    public static long getThreadCPUTime() {
