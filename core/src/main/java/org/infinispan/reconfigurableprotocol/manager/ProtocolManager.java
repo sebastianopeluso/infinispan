@@ -209,14 +209,14 @@ public class ProtocolManager {
    /**
     * the possible states
     */
-   private static enum State {
+   static enum State {
       SAFE,
       UNSAFE,
       IN_PROGRESS
    }
 
-    public String getState(){
-        return state.toString();
+    public final synchronized State getState(){
+        return state;
     }
 
    /**

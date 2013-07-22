@@ -505,9 +505,9 @@ public class ReconfigurableReplicationManager {
    }
 
     @ManagedAttribute(description = "Returns the current replication protocol state", writable = false,
-            displayName = "Current protocol state")
-    public final String getCurrentProtocolState() {
-        return protocolManager.getState();
+            displayName = "Current state")
+    public final String getCurrentState() {
+        return protocolManager.getState().toString();
     }
 
    @ManagedAttribute(description = "Returns the current replication protocol information, namely the protocol ID and " +
