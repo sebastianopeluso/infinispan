@@ -215,6 +215,10 @@ public class ProtocolManager {
       IN_PROGRESS
    }
 
+    public String getState(){
+        return state.toString();
+    }
+
    /**
     * class used to atomically retrieve the current replication protocol and epoch
     */

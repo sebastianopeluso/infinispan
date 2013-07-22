@@ -504,6 +504,12 @@ public class ReconfigurableReplicationManager {
       return protocolManager.getCurrent().getUniqueProtocolName();
    }
 
+    @ManagedAttribute(description = "Returns the current replication protocol state", writable = false,
+            displayName = "Current protocol state")
+    public final String getCurrentProtocolState() {
+        return protocolManager.getState();
+    }
+
    @ManagedAttribute(description = "Returns the current replication protocol information, namely the protocol ID and " +
          "the class name", writable = false, displayName = "Current protocol information")
    public final Map<String, String> getCurrentProtocolInfo() {
