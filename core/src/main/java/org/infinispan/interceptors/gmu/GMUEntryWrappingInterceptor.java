@@ -202,7 +202,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
             log.tracef("Transactions to commit: %s", transactionsToCommit);
          }
          if (transactionsToCommit.isEmpty()) {
-            throw new IllegalStateException();
+            //nothing to commit
+            return retVal;
          }
 
          List<CommittedTransaction> committedTransactions = new ArrayList<CommittedTransaction>(transactionsToCommit.size());
