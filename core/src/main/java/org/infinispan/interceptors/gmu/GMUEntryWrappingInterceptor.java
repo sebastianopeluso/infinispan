@@ -245,7 +245,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       } catch (Throwable throwable) {
          //let ignore the exception. we cannot have some nodes applying the write set and another not another one
          //receives the rollback and don't applies the write set
-         log.error("Error while committing transaction", throwable);
+         log.fatal("Error while committing transaction", throwable);
          transactionCommitManager.rollbackTransaction(ctx.getCacheTransaction());
       } finally {
          if (ctx.isOriginLocal()) {
