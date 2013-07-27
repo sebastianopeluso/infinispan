@@ -54,6 +54,8 @@ public abstract class AbstractInvocationContext implements InvocationContext {
 
    private Map<Object, InternalGMUCacheEntry> keysRead = null;
 
+   private Map<Object, Boolean> unsafeReads = null;
+
    private EntryVersion versionToRead;
    
    private boolean alreadyReadOnThisNode;
@@ -220,4 +222,6 @@ public abstract class AbstractInvocationContext implements InvocationContext {
    public String getProtocolId() {
       return protocolId;
    }
+
+
 }

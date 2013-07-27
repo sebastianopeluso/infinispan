@@ -54,6 +54,7 @@ import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.EntryWrappingInterceptor;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.statetransfer.ShadowTransactionInfo;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.gmu.CommitLog;
@@ -167,7 +168,19 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       try {
          retVal = invokeNextInterceptor(ctx, command);
          //in remote context, the commit command will be enqueue, so it does not need to wait
-         if (transactionEntry != null) {
+
+         //If this is a local shadow transaction creted to exchange state transfer info, then we can unblock this thread
+         boolean fromStateTransfer = false;
+         ShadowTransactionInfo shadowTransactionInfo = null;
+         if(ctx.isOriginLocal()){
+             fromStateTransfer = ((LocalTransaction)((TxInvocationContext)ctx).getCacheTransaction()).isFromStateTransfer();
+             shadowTransactionInfo = ((LocalTransaction)((TxInvocationContext)ctx).getCacheTransaction()).getShadowTransactionInfo();
+             if(transactionEntry != null && fromStateTransfer && shadowTransactionInfo != null){
+                 shadowTransactionInfo.setTransactionEntry(transactionEntry);
+             }
+         }
+
+         if (transactionEntry != null  && !fromStateTransfer) {
             transactionEntry.awaitUntilIsReadyToCommit();
          } else if (!ctx.isOriginLocal()) {
             transactionEntry = gmuCommitCommand.getTransactionEntry();
@@ -193,10 +206,14 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          CommittedTransaction committedTransaction = new CommittedTransaction(cacheTransaction, subVersion,
                                                                               transactionEntry.getConcurrentClockNumber());
          updateCommitVersion(ctx, cacheTransaction, subVersion);
+         transactionEntry.setNewVersionInDataContainer((GMUCacheEntryVersion) ctx.getCacheTransaction().getTransactionVersion());
+
          commitContextEntries(ctx, false, isFromStateTransfer(ctx));
 
          committedTransactions.add(committedTransaction);
          committedTransactionEntries.add(transactionEntry);
+
+
 
          //in case of transaction has the same version... should be rare...
          while (toCommit.hasNext()) {
@@ -206,6 +223,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
             committedTransaction = new CommittedTransaction(cacheTransaction, subVersion,
                                                             transactionEntry.getConcurrentClockNumber());
             InvocationContext context = createInvocationContext(cacheTransaction, subVersion);
+            transactionEntry.setNewVersionInDataContainer((GMUCacheEntryVersion) ctx.getCacheTransaction().getTransactionVersion());
+
             commitContextEntries(context, false, isFromStateTransfer(ctx));
             committedTransactions.add(committedTransaction);
             committedTransactionEntries.add(transactionEntry);
@@ -368,8 +387,12 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       }
 
       for (InternalGMUCacheEntry internalGMUCacheEntry : txInvocationContext.getKeysReadInCommand().values()) {
-         if (txInvocationContext.hasModifications() && !internalGMUCacheEntry.isMostRecent()) {
+         if (txInvocationContext.hasModifications() && !internalGMUCacheEntry.isMostRecent() && !internalGMUCacheEntry.isUnsafeToRead()) {
             throw new CacheException("Read-Write transaction read an old value and should rollback");
+         }
+
+         if (internalGMUCacheEntry.isUnsafeToRead()) {
+            throw new CacheException("Transaction read an unsafe value and should rollback");
          }
 
          if (internalGMUCacheEntry.getMaximumTransactionVersion() != null) {
@@ -411,6 +434,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       GMUCacheEntryVersion newVersion = versionGenerator.convertVersionToWrite(cacheTransaction.getTransactionVersion(),
                                                                                subVersion);
       context.getCacheTransaction().setTransactionVersion(newVersion);
+
    }
 
    private TxInvocationContext createInvocationContext(CacheTransaction cacheTransaction, int subVersion) {

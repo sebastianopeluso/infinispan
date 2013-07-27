@@ -70,6 +70,10 @@
       <priority value="DEBUG"/>
    </category>
 
+   <category name="org.infinispan.statetransfer.StateConsumerImpl">
+      <priority value="TRACE"/>
+   </category>
+
    <category name="org.infinispan.marshall">
       <priority value="WARN"/>
    </category>

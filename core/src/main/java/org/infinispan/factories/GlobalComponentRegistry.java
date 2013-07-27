@@ -196,10 +196,13 @@ public class GlobalComponentRegistry extends AbstractComponentRegistry {
    }
 
    public synchronized final void registerNamedComponentRegistry(ComponentRegistry componentRegistry, String name) {
+      System.out.println("registerNamedComponentRegistry("+componentRegistry+", "+name+")");
       namedComponents.put(name, componentRegistry);
    }
 
    public synchronized final void unregisterNamedComponentRegistry(String name) {
+      System.out.println("unregisterNamedComponentRegistry("+name+")");
+      System.out.println(globalConfiguration.transport().nodeName());
       namedComponents.remove(name);
    }
 

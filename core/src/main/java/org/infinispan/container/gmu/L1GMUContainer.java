@@ -101,7 +101,7 @@ public class L1GMUContainer {
             if (isValid(l1Entry, txVersion, owner)) {
                updateStats(Stat.CACHE_HIT);
                EntryVersion updatedTxVersion = gmuVersionGenerator.mergeAndMax(txVersion, l1Entry.getCreationVersion());
-               return wrap(key, l1Entry.getValue(), versionEntry.isMostRecent(), updatedTxVersion, null, null);
+               return wrap(key, l1Entry.getValue(), versionEntry.isMostRecent(), updatedTxVersion, null, null, false);
             } else {
                updateStats(Stat.CACHE_MISS_OLD_VERSION);
             }

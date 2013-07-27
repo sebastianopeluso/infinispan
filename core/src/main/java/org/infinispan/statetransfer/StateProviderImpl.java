@@ -28,6 +28,7 @@ import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.container.DataContainer;
+import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
@@ -199,6 +200,16 @@ public class StateProviderImpl implements StateProvider {
       }
 
       List<TransactionInfo> transactions = new ArrayList<TransactionInfo>();
+
+
+      //If we are adopting serializability and there is a valid commit log we have to send the current version
+      //of the most recent snapshot on this node so that we can commit a state-transfer shadow transaction on the acceptor of the state-transfer
+      EntryVersion version = commitLog != null && commitLog.isEnabled() ? commitLog.getCurrentVersion() : null;
+      //System.out.println("Sending the ShadowTransactionInfo with version: "+version);
+      if(version != null){
+         transactions.add(new ShadowTransactionInfo(requestTopologyId, version));
+      }
+
       //we migrate locks only if the cache is transactional and distributed
       if (configuration.transaction().transactionMode().isTransactional()) {
          collectTransactionsToTransfer(transactions, transactionTable.getRemoteTransactions(), segments, cacheTopology);

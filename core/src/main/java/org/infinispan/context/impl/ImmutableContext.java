@@ -198,4 +198,5 @@ public final class ImmutableContext implements InvocationContext {
    public String getProtocolId() {
       throw newUnsupportedMethod();
    }
+
 }

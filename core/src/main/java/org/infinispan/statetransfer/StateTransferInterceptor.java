@@ -32,22 +32,28 @@ import org.infinispan.commands.tx.*;
 import org.infinispan.commands.write.*;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.cache.VersioningScheme;
+import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
 import org.infinispan.context.impl.TxInvocationContext;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.topology.CacheTopology;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.LockingMode;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.WriteSkewHelper;
+import org.infinispan.transaction.gmu.GMUHelper;
 import org.infinispan.util.InfinispanCollections;
 import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
+import java.util.Collections;
 import java.util.Set;
 
 //todo [anistor] command forwarding breaks the rule that we have only one originator for a command. this opens now the possibility to have two threads processing incoming remote commands for the same TX
@@ -71,6 +77,10 @@ public class StateTransferInterceptor extends CommandInterceptor {   //todo [ani
 
    private boolean useGMU;
 
+   private VersionGenerator versionGenerator;
+
+   private RpcManager rpcManager;
+
    private final AffectedKeysVisitor affectedKeysVisitor = new AffectedKeysVisitor();
 
    @Override
@@ -80,7 +90,7 @@ public class StateTransferInterceptor extends CommandInterceptor {   //todo [ani
 
    @Inject
    public void init(StateTransferLock stateTransferLock, Configuration configuration,
-                    CommandsFactory commandFactory, StateTransferManager stateTransferManager) {
+                    CommandsFactory commandFactory, StateTransferManager stateTransferManager, VersionGenerator versionGenerator, RpcManager rpcManager) {
       this.stateTransferLock = stateTransferLock;
       this.commandFactory = commandFactory;
       this.stateTransferManager = stateTransferManager;
@@ -88,6 +98,9 @@ public class StateTransferInterceptor extends CommandInterceptor {   //todo [ani
       useGMU = configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE && configuration.versioning().scheme() == VersioningScheme.GMU;
       useVersioning = configuration.transaction().transactionMode().isTransactional() && configuration.locking().writeSkewCheck() &&
             configuration.transaction().lockingMode() == LockingMode.OPTIMISTIC && configuration.versioning().enabled();
+
+      this.versionGenerator = versionGenerator;
+      this.rpcManager = rpcManager;
    }
 
    @Override
@@ -124,8 +137,20 @@ public class StateTransferInterceptor extends CommandInterceptor {   //todo [ani
             commandFactory.initializeReplicableCommand(prepareCommand, true);
             prepareCommand.setOrigin(ctx.getOrigin());
             log.tracef("Replaying the transactions received as a result of state transfer %s", prepareCommand);
-            prepareCommand.perform(null);
+            Object ret = prepareCommand.perform(null);
+
+            if(useGMU && ret!=null && ret instanceof EntryVersion){
+               EntryVersion preparedVersion = (EntryVersion) ret;
+               EntryVersion currentCommitVersion = ((GMUCommitCommand)command).getCommitVersion();
+               if(versionGenerator != null && versionGenerator instanceof GMUVersionGenerator && rpcManager != null){
+                  EntryVersion newCommitVersion = ((GMUVersionGenerator)versionGenerator).mergeAndMax(preparedVersion, currentCommitVersion);
+                  newCommitVersion = GMUHelper.calculateCommitVersion(newCommitVersion, ((GMUVersionGenerator)versionGenerator), Collections.singleton(rpcManager.getAddress()));
+                  ((GMUCommitCommand)command).setCommitVersion(newCommitVersion);
+               }
+
+            }
          }
+
       }
 
       return handleTxCommand(ctx, command);

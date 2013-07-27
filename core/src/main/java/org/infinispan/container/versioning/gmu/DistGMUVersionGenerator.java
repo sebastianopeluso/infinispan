@@ -109,14 +109,19 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
       if (entryVersions == null || entryVersions.length == 0) {
          throw new IllegalStateException("Cannot merge an empy list");
       }
-
+      int maxViewId = -1;
+      GMUVersion currentVersion = null;
       List<GMUVersion> gmuVersions = new ArrayList<GMUVersion>(entryVersions.length);
       //validate the entry versions
       for (EntryVersion entryVersion : entryVersions) {
          if (entryVersion == null) {
             log.errorf("Null version in list %s. It will be ignored", entryVersion);
          } else if (entryVersion instanceof GMUVersion) {
-            gmuVersions.add(toGMUVersion(entryVersion));
+            currentVersion = toGMUVersion(entryVersion);
+            gmuVersions.add(currentVersion);
+            if(currentVersion.getViewId() > maxViewId) {
+               maxViewId = currentVersion.getViewId();
+            }
          } else {
             throw new IllegalArgumentException("Expected an array of GMU entry version but it has " +
                                                      entryVersion.getClass().getSimpleName());
@@ -124,6 +129,9 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
       }
 
       int viewId = currentViewId;
+      if(maxViewId > -1) {
+         viewId = maxViewId;
+      }
       GMUDistributedVersion mergedVersion = new GMUDistributedVersion(cacheName, viewId, this,
                                                                       mergeClustered(viewId, gmuVersions));
       if (log.isTraceEnabled()) {

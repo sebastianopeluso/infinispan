@@ -184,4 +184,5 @@ public interface InvocationContext extends EntryLookup, Cloneable {
     * @return  the protocol ID to be used by the command
     */
    String getProtocolId();
+
 }

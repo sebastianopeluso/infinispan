@@ -171,7 +171,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
    protected Object invoke(GetKeyValueCommand command, InvocationContext context) {
       super.invoke(command, context);
       InternalGMUCacheEntry gmuCacheEntry = context.getKeysReadInCommand().get(getKey());
-      if (gmuCacheEntry == null || gmuCacheEntry.getCreationVersion() == null) {
+      if (gmuCacheEntry == null || gmuCacheEntry.getCreationVersion() == null || gmuCacheEntry.isUnsafeToRead()) {
          return stateConsumer.oldOwners(getKey());
       }
       return gmuCacheEntry.toInternalCacheValue();

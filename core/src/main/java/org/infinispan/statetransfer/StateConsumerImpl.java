@@ -26,14 +26,17 @@ package org.infinispan.statetransfer;
 import org.infinispan.Cache;
 import org.infinispan.CacheException;
 import org.infinispan.commands.CommandsFactory;
+import org.infinispan.commands.control.ShadowTransactionCommand;
 import org.infinispan.commands.write.InvalidateCommand;
 import org.infinispan.commands.write.PutKeyValueCommand;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.cache.Configurations;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.entries.InternalCacheEntry;
+import org.infinispan.container.gmu.GMUDataContainer;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.container.versioning.gmu.GMUCacheEntryVersion;
 import org.infinispan.container.versioning.gmu.GMUVersionGenerator;
 import org.infinispan.context.Flag;
 import org.infinispan.context.InvocationContext;
@@ -157,6 +160,8 @@ public class StateConsumerImpl implements StateConsumer {
    private volatile boolean ownsData = false;
 
    private Map<Object, OwnersList> oldKeyOwners;
+
+   private final Map<Address, ShadowTransactionInfo> shadowTransactionInfoMap = new HashMap<Address, ShadowTransactionInfo>();
 
    public StateConsumerImpl() {
    }
@@ -524,96 +529,151 @@ public class StateConsumerImpl implements StateConsumer {
 
    private void doApplyState(Address sender, int segmentId, Collection<InternalCacheEntry> cacheEntries, EntryVersion txVersion) {
       log.debugf("Applying new state for segment %d of cache %s from node %s: received %d cache entries", segmentId, cacheName, sender, cacheEntries.size());
-      if (trace) {
-         List<Object> keys = new ArrayList<Object>(cacheEntries.size());
-         for (InternalCacheEntry e : cacheEntries) {
-            keys.add(e.getKey());
-         }
-         log.tracef("Received keys %s for segment %d of cache %s from node %s", keys, segmentId, cacheName, sender);
-      }
+       if (trace) {
+           List<Object> keys = new ArrayList<Object>(cacheEntries.size());
+           for (InternalCacheEntry e : cacheEntries) {
+               keys.add(e.getKey());
+           }
+           log.tracef("Received keys %s for segment %d of cache %s from node %s", keys, segmentId, cacheName, sender);
+       }
 
-      // CACHE_MODE_LOCAL avoids handling by StateTransferInterceptor and any potential locks in StateTransferLock
-      EnumSet<Flag> flags = EnumSet.of(PUT_FOR_STATE_TRANSFER, CACHE_MODE_LOCAL, IGNORE_RETURN_VALUES, SKIP_REMOTE_LOOKUP, SKIP_SHARED_CACHE_STORE, SKIP_OWNERSHIP_CHECK, SKIP_XSITE_BACKUP);
-      for (InternalCacheEntry e : cacheEntries) {
-         OwnersList ownersList;
-         synchronized (oldKeyOwners) {
-            ownersList = oldKeyOwners.get(e.getKey());
-            if (ownersList == null) {
-               ownersList = new OwnersList();
-               oldKeyOwners.put(sender, ownersList);
-            }
-         }
-         ownersList.add(sender);
-         try {
-            InvocationContext ctx;
-            if (transactionManager != null) {
-               // cache is transactional
-               transactionManager.begin();
-               Transaction transaction = transactionManager.getTransaction();
-               ctx = icc.createInvocationContext(transaction);
-               ((TxInvocationContext) ctx).setImplicitTransaction(true);
-            } else {
-               // non-tx cache
-               ctx = icc.createSingleKeyNonTxInvocationContext();
-            }
-
-            PutKeyValueCommand put = useVersionedPut ?
-                  commandsFactory.buildVersionedPutKeyValueCommand(e.getKey(), e.getValue(), e.getLifespan(), e.getMaxIdle(), e.getVersion(), flags)
-                  : commandsFactory.buildPutKeyValueCommand(e.getKey(), e.getValue(), e.getLifespan(), e.getMaxIdle(), flags);
-
-            boolean success = false;
-            try {
-               interceptorChain.invoke(ctx, put);
-               success = true;
-            } finally {
-               if (ctx.isInTxScope()) {
-                  if (success) {
-                     ((LocalTransaction)((TxInvocationContext)ctx).getCacheTransaction()).setFromStateTransfer(true);
-                     if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE &&
-                           versionGenerator != null && versionGenerator instanceof GMUVersionGenerator &&
-                           txVersion != null) {
-                        TxInvocationContext tctx = (TxInvocationContext) ctx;
-                        EntryVersion currentVersion = tctx.getTransactionVersion();
-                        tctx.setTransactionVersion(((GMUVersionGenerator) versionGenerator).mergeAndMax(currentVersion, txVersion));
-                     }
-                     try {
-                        transactionManager.commit();
-                     } catch (Throwable ex) {
-                        log.errorf(ex, "Could not commit transaction created by state transfer of key %s", e.getKey());
-                        if (transactionManager.getTransaction() != null) {
-                           transactionManager.rollback();
-                        }
-                     }
-                  } else {
-                     transactionManager.rollback();
-                  }
+       // CACHE_MODE_LOCAL avoids handling by StateTransferInterceptor and any potential locks in StateTransferLock
+       EnumSet<Flag> flags = EnumSet.of(PUT_FOR_STATE_TRANSFER, CACHE_MODE_LOCAL, IGNORE_RETURN_VALUES, SKIP_REMOTE_LOOKUP, SKIP_SHARED_CACHE_STORE, SKIP_OWNERSHIP_CHECK, SKIP_XSITE_BACKUP);
+       for (InternalCacheEntry e : cacheEntries) {
+           OwnersList ownersList;
+           synchronized (oldKeyOwners) {
+               ownersList = oldKeyOwners.get(e.getKey());
+               if (ownersList == null) {
+                   ownersList = new OwnersList();
+                   oldKeyOwners.put(sender, ownersList);
                }
-            }
-         } catch (Exception ex) {
-            log.problemApplyingStateForKey(ex.getMessage(), e.getKey(), ex);
-         }
-      }
+           }
+           ownersList.add(sender);
+
+
+           if(configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE){
+
+               //Wait for the commit of the state-transfer transaction
+               ShadowTransactionInfo transactionInfo = null;
+               synchronized (this){
+                   transactionInfo = this.shadowTransactionInfoMap.get(sender);
+               }
+
+               GMUCacheEntryVersion version = null;
+               if(transactionInfo == null){
+                   log.error("Unable to determine a commit version on state transfer");
+               }
+               else{
+                   boolean canAdvance = false;
+                   while(!canAdvance){
+                       try {
+                           transactionInfo.getTransactionEntry().awaitUntilCommitted();
+                           canAdvance = true;
+                       } catch (InterruptedException e1) {
+                           e1.printStackTrace();
+                       }
+                   }
+
+                   version = transactionInfo.getTransactionEntry().getNewVersionInDataContainer();
+               }
+
+               //Then put in the GMUDataContainer the new data by using the version numbers of the state transfer transaction
+               System.out.println("StateConsumerImpl["+sender+" -> "+rpcManager.getAddress()+"]\n put "+e.getKey()+", "+e.getValue()+", "+version);
+               dataContainer.put(e.getKey(), e.getValue(), version, e.getLifespan(), e.getMaxIdle(), true);
+
+
+           }
+           else{
+
+               try {
+                   InvocationContext ctx;
+                   if (transactionManager != null) {
+                       // cache is transactional
+                       transactionManager.begin();
+                       Transaction transaction = transactionManager.getTransaction();
+                       ctx = icc.createInvocationContext(transaction);
+                       ((TxInvocationContext) ctx).setImplicitTransaction(true);
+                   } else {
+                       // non-tx cache
+                       ctx = icc.createSingleKeyNonTxInvocationContext();
+                   }
+
+                   PutKeyValueCommand put = useVersionedPut ?
+                           commandsFactory.buildVersionedPutKeyValueCommand(e.getKey(), e.getValue(), e.getLifespan(), e.getMaxIdle(), e.getVersion(), flags)
+                           : commandsFactory.buildPutKeyValueCommand(e.getKey(), e.getValue(), e.getLifespan(), e.getMaxIdle(), flags);
+
+                   boolean success = false;
+                   try {
+                       interceptorChain.invoke(ctx, put);
+                       success = true;
+                   } finally {
+                       if (ctx.isInTxScope()) {
+                           if (success) {
+                               ((LocalTransaction)((TxInvocationContext)ctx).getCacheTransaction()).setFromStateTransfer(true);
+                               if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE &&
+                                       versionGenerator != null && versionGenerator instanceof GMUVersionGenerator &&
+                                       txVersion != null) {
+                                   TxInvocationContext tctx = (TxInvocationContext) ctx;
+                                   EntryVersion currentVersion = tctx.getTransactionVersion();
+                                   tctx.setTransactionVersion(((GMUVersionGenerator) versionGenerator).mergeAndMax(currentVersion, txVersion));
+                               }
+                               try {
+                                   transactionManager.commit();
+                               } catch (Throwable ex) {
+                                   log.errorf(ex, "Could not commit transaction created by state transfer of key %s", e.getKey());
+                                   if (transactionManager.getTransaction() != null) {
+                                       transactionManager.rollback();
+                                   }
+                               }
+                           } else {
+                               transactionManager.rollback();
+                           }
+                       }
+                   }
+               } catch (Exception ex) {
+                   log.problemApplyingStateForKey(ex.getMessage(), e.getKey(), ex);
+               }
+
+
+
+           }
+
+
+
+
+       }
       log.debugf("Finished applying state for segment %d of cache %s", segmentId, cacheName);
    }
 
-   protected void applyTransactions(Address sender, Collection<TransactionInfo> transactions) {
-      log.debugf("Applying %d transactions for cache %s transferred from node %s", transactions.size(), cacheName, sender);
-      if (isTransactional) {
-         for (TransactionInfo transactionInfo : transactions) {
-            CacheTransaction tx = transactionTable.getLocalTransaction(transactionInfo.getGlobalTransaction());
-            if (tx == null) {
-               tx = transactionTable.getRemoteTransaction(transactionInfo.getGlobalTransaction());
-               if (tx == null) {
-                  tx = transactionTable.getOrCreateRemoteTransaction(transactionInfo.getGlobalTransaction(), transactionInfo.getModifications());
-                  ((RemoteTransaction) tx).setMissingLookedUpEntries(true);
-               }
+    protected void applyTransactions(Address sender, Collection<TransactionInfo> transactions) {
+        log.debugf("Applying %d transactions for cache %s transferred from node %s", transactions.size(), cacheName, sender);
+        if (isTransactional) {
+            for (TransactionInfo transactionInfo : transactions) {
+
+                if(transactionInfo instanceof ShadowTransactionInfo){
+
+                   //Try to commit the Shadow Transaction. IF succesful it insert a new entry in the shadowTransactionInfoMap
+                   applyShadowTransaction(sender, (ShadowTransactionInfo) transactionInfo);
+
+
+                }
+                else{
+
+                    CacheTransaction tx = transactionTable.getLocalTransaction(transactionInfo.getGlobalTransaction());
+                    if (tx == null) {
+                        tx = transactionTable.getRemoteTransaction(transactionInfo.getGlobalTransaction());
+                        if (tx == null) {
+                            tx = transactionTable.getOrCreateRemoteTransaction(transactionInfo.getGlobalTransaction(), transactionInfo.getModifications());
+                            ((RemoteTransaction) tx).setMissingLookedUpEntries(true);
+                        }
+                    }
+                    for (Object key : transactionInfo.getLockedKeys()) {
+                        tx.addBackupLockForKey(key);
+                    }
+                }
             }
-            for (Object key : transactionInfo.getLockedKeys()) {
-               tx.addBackupLockForKey(key);
-            }
-         }
-      }
-   }
+        }
+    }
 
    // Must run after the CacheLoaderManager
    @Start(priority = 20)
@@ -651,6 +711,64 @@ public class StateConsumerImpl implements StateConsumer {
    public CacheTopology getCacheTopology() {
       return cacheTopology;
    }
+
+    private void applyShadowTransaction(Address sender, ShadowTransactionInfo transactionInfo){
+
+        try {
+            InvocationContext ctx = null;
+            if (transactionManager != null) {
+                // cache is transactional
+                transactionManager.begin();
+                Transaction transaction = transactionManager.getTransaction();
+                ctx = icc.createInvocationContext(transaction);
+                ((TxInvocationContext) ctx).setImplicitTransaction(true);
+            }
+
+            boolean success = false;
+
+            ShadowTransactionCommand shadowCommand = commandsFactory.buildShadowTransactionCommand();
+
+            try {
+                //This is a Shadow transaction for a state-transfer
+                interceptorChain.invoke(ctx, shadowCommand);
+                success = true;
+            } finally {
+                if (ctx!= null && ctx.isInTxScope()) {
+                    if (success) {
+                        ((LocalTransaction)((TxInvocationContext)ctx).getCacheTransaction()).setFromStateTransfer(true);
+                        ((LocalTransaction)((TxInvocationContext)ctx).getCacheTransaction()).setShadowTransactionInfo(transactionInfo);
+                        if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE &&
+                                versionGenerator != null && versionGenerator instanceof GMUVersionGenerator &&
+                                transactionInfo.getVersion() != null) {
+                            TxInvocationContext tctx = (TxInvocationContext) ctx;
+                            EntryVersion currentVersion = tctx.getTransactionVersion();
+                            tctx.setTransactionVersion(((GMUVersionGenerator) versionGenerator).mergeAndMax(currentVersion, transactionInfo.getVersion()));
+                        }
+                        try {
+                            transactionManager.commit();
+
+                            //Here we have committed the shadow transaction for the state transfer from that sender
+                            synchronized (this){
+                                shadowTransactionInfoMap.put(sender, transactionInfo);
+                            }
+
+                        } catch (Throwable ex) {
+                            log.errorf(ex, "Could not commit transaction created by state transfer %s", transactionInfo);
+                            if (transactionManager.getTransaction() != null) {
+                                transactionManager.rollback();
+                            }
+                        }
+                    } else {
+                        transactionManager.rollback();
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.problemApplyingShadowTransaction(ex.getMessage(), transactionInfo, ex);
+        }
+
+
+    }
 
    private void addTransfers(Set<Integer> segments) {
       log.debugf("Adding inbound state transfer for segments %s of cache %s", segments, cacheName);
@@ -742,6 +860,7 @@ public class StateConsumerImpl implements StateConsumer {
       if (trace) {
          log.tracef("Requesting transactions for segments %s of cache %s from node %s", segments, cacheName, source);
       }
+      System.out.printf("[%s] Requesting transactions for segments %s of cache %s from node %s\n", rpcManager.getAddress(), segments, cacheName, source);
       // get transactions and locks
       try {
          StateRequestCommand cmd = commandsFactory.buildStateRequestCommand(StateRequestCommand.Type.GET_TRANSACTIONS, rpcManager.getAddress(), topologyId, segments);
@@ -1037,6 +1156,7 @@ public class StateConsumerImpl implements StateConsumer {
             if (transfers.remove(inboundTransfer)) {
                if (transfers.isEmpty()) {
                   transfersBySource.remove(inboundTransfer.getSource());
+                  shadowTransactionInfoMap.remove(inboundTransfer.getSource());
                }
                transfersBySegment.keySet().removeAll(inboundTransfer.getSegments());
                return true;

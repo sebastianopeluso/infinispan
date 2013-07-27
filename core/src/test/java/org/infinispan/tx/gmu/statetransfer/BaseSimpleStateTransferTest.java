@@ -102,7 +102,7 @@ public abstract class BaseSimpleStateTransferTest extends MultipleCacheManagersT
       ConfigurationBuilder builder = getDefaultClusteredCacheConfig(cacheMode, true);
       builder.locking().lockAcquisitionTimeout(100).isolationLevel(IsolationLevel.SERIALIZABLE)
             .clustering().stateTransfer().fetchInMemoryState(true).awaitInitialTransfer(true)
-            .hash().numOwners(2).numSegments(50)
+            .hash().numOwners(3).numSegments(50)
             .versioning().enable().scheme(VersioningScheme.GMU);
       decorate(builder);
       return builder;

@@ -22,6 +22,7 @@
  */
 package org.infinispan.transaction.gmu.manager;
 
+import org.infinispan.container.versioning.gmu.GMUCacheEntryVersion;
 import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
@@ -418,6 +419,12 @@ public class SortedTransactionQueue {
       void awaitUntilCommitted() throws InterruptedException;
 
       long getConcurrentClockNumber();
+
+      void setNewVersionInDataContainer(GMUCacheEntryVersion version);
+
+      GMUCacheEntryVersion getNewVersionInDataContainer();
+
+
    }
 
    private class TransactionEntryImpl implements Node {
@@ -428,6 +435,8 @@ public class SortedTransactionQueue {
       private volatile boolean receivedCommitCommand;
       private volatile boolean committed;
       private long concurrentClockNumber; //This is the value of the last committed vector clock's n-th entry on this node n at the time this object was created.
+
+      private GMUCacheEntryVersion newVersionInDataContainer;
 
       private Node previous;
       private Node next;
@@ -506,6 +515,14 @@ public class SortedTransactionQueue {
       public CacheTransaction getCacheTransactionForCommit() {
          cacheTransaction.setTransactionVersion(entryVersion);
          return cacheTransaction;
+      }
+
+      public synchronized void setNewVersionInDataContainer(GMUCacheEntryVersion version){
+          this.newVersionInDataContainer = version;
+      }
+
+      public synchronized GMUCacheEntryVersion getNewVersionInDataContainer(){
+          return this.newVersionInDataContainer;
       }
 
       @Override
@@ -632,6 +649,16 @@ public class SortedTransactionQueue {
       @Override
       public long getConcurrentClockNumber() {
          throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public void setNewVersionInDataContainer(GMUCacheEntryVersion version){
+          /*no-op*/
+      }
+
+      @Override
+      public GMUCacheEntryVersion getNewVersionInDataContainer(){
+          throw new UnsupportedOperationException();
       }
    }
 }
