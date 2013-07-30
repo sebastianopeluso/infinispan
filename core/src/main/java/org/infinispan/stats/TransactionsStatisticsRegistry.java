@@ -181,7 +181,7 @@ public final class TransactionsStatisticsRegistry {
       }
    }
 
-   /*public static Object getPercentile(ExposedStatistic param, int percentile, String className) {
+   public static Object getPercentile(ExposedStatistic param, int percentile, String className) {
       if (configuration == null) {
          return null;
       }
@@ -193,7 +193,7 @@ public final class TransactionsStatisticsRegistry {
          else
             return null;
       }
-   }*/
+   }
 
    public static Object getAttribute(ExposedStatistic param) {
       Object ret = transactionalClassesStatsMap.get(DEFAULT_ISPN_CLASS).getAttribute(param);
