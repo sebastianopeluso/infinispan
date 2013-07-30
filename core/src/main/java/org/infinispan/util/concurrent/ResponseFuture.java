@@ -70,6 +70,19 @@ public class ResponseFuture implements Future<Map<Address, Response>> {
       return innerGet(timeout, unit);
    }
 
+   public final void setUpdateStats(TransactionStatistics transactionStatistics, long initTime, ExposedStatistic durationStat,
+                                    ExposedStatistic counterStat, ExposedStatistic recipientSizeStat, ExposedStatistic commandSizeStat, int size,
+                                    int numberOfNodes) {
+      this.initTime = initTime;
+      this.transactionStatistics = transactionStatistics;
+      this.durationStat = durationStat;
+      this.counterStat = counterStat;
+      this.recipientSizeStat = recipientSizeStat;
+      this.commandSizeStat = commandSizeStat;
+      this.size = size;
+      this.numberOfNodes = numberOfNodes;
+   }
+
    private Map<Address, Response> innerGet(long timeout, TimeUnit unit) throws org.infinispan.util.concurrent.TimeoutException, InterruptedException, ExecutionException {
       try {
          RspList<Object> rspList = realFuture.get(timeout, unit);
@@ -79,6 +92,9 @@ public class ResponseFuture implements Future<Map<Address, Response>> {
          if (rspList == null) {
             return InfinispanCollections.emptyMap();
          } else {
+            if (rspList.isEmpty() || containsOnlyNulls(rspList)) {
+               return null;
+            }
             Map<Address, Response> retval = new HashMap<Address, Response>(rspList.size());
 
             boolean noValidResponses = true;
@@ -98,19 +114,6 @@ public class ResponseFuture implements Future<Map<Address, Response>> {
       } catch (Exception e) {
          throw new RpcException(e);
       }
-   }
-
-   public final void setUpdateStats(TransactionStatistics transactionStatistics, long initTime, ExposedStatistic durationStat,
-                               ExposedStatistic counterStat, ExposedStatistic recipientSizeStat, ExposedStatistic commandSizeStat, int size,
-                               int numberOfNodes) {
-      this.initTime = initTime;
-      this.transactionStatistics = transactionStatistics;
-      this.durationStat = durationStat;
-      this.counterStat = counterStat;
-      this.recipientSizeStat = recipientSizeStat;
-      this.commandSizeStat = commandSizeStat;
-      this.size = size;
-      this.numberOfNodes = numberOfNodes;
    }
 
    private void updateStats() {
@@ -133,6 +136,13 @@ public class ResponseFuture implements Future<Map<Address, Response>> {
          }
       }
 
+   }
+
+   private boolean containsOnlyNulls(RspList<Object> l) {
+      for (Rsp<Object> r : l.values()) {
+         if (r.getValue() != null || !r.wasReceived() || r.wasSuspected()) return false;
+      }
+      return true;
    }
 
    public static interface ResponseParser {
