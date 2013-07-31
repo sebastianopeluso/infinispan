@@ -46,6 +46,7 @@ import org.infinispan.jmx.annotations.ManagedOperation;
 import org.infinispan.jmx.annotations.Parameter;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.rpc.RpcManager;
+import org.infinispan.remoting.transport.Address;
 import org.infinispan.remoting.transport.Transport;
 import org.infinispan.remoting.transport.jgroups.CommandAwareRpcDispatcher;
 import org.infinispan.remoting.transport.jgroups.JGroupsTransport;
@@ -65,6 +66,7 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.lang.reflect.Field;
+import java.util.Collection;
 
 import static org.infinispan.stats.ExposedStatistic.*;
 
@@ -749,10 +751,16 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
                      displayName = "Number of nodes")
    public long getNumNodes() {
       try {
-         return configuration.clustering().cacheMode().isClustered() ? rpcManager.getMembers().size() : 1;
+         if (rpcManager != null) {
+            Collection<Address> members = rpcManager.getMembers();
+            //member can be null if we haven't received the initial topology
+            return members == null ? 1 : members.size();
+         }
+         //if rpc manager is null, we are in local mode.
+         return 1;
       } catch (Throwable throwable) {
-         log.error("Error obtaining Number of Nodes. returning 0", throwable);
-         return 0;
+         log.error("Error obtaining Number of Nodes. returning 1", throwable);
+         return 1;
       }
    }
 
