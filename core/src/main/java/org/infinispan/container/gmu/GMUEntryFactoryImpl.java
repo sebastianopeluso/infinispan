@@ -112,7 +112,7 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
 
       boolean hasAlreadyReadFromThisNode = context.hasAlreadyReadOnThisNode();
 
-      if (context.isInTxScope() && !context.hasAlreadyReadOnThisNode()) {
+      if (context.isInTxScope() && context.isOriginLocal() && !context.hasAlreadyReadOnThisNode()) {
          //firs read on the local node for a transaction. ensure the min version
          EntryVersion transactionVersion = ((TxInvocationContext) context).getTransactionVersion();
          try {
