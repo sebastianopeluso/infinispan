@@ -210,4 +210,8 @@ public class AbstractDelegatingAdvancedCache<K, V> extends AbstractDelegatingCac
        return cache.getTxTable();
    }
 
+   @Override
+   public boolean setTransactionClass(String transactionClass) {
+      return cache.setTransactionClass(transactionClass);
+   }
 }

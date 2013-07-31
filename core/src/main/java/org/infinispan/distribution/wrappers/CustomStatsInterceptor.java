@@ -22,7 +22,7 @@
  */
 package org.infinispan.distribution.wrappers;
 
-import org.infinispan.commands.SetClassCommand;
+import org.infinispan.commands.SetTransactionClassCommand;
 import org.infinispan.commands.read.GetKeyValueCommand;
 import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.GMUPrepareCommand;
@@ -57,6 +57,7 @@ import org.infinispan.stats.topK.StreamLibContainer;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.WriteSkewException;
 import org.infinispan.transaction.gmu.ValidationException;
+import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.concurrent.TimeoutException;
 import org.infinispan.util.concurrent.locks.DeadlockDetectedException;
 import org.infinispan.util.concurrent.locks.LockManager;
@@ -106,14 +107,24 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
    }
 
    @Override
-   public Object visitSetClassCommand(InvocationContext ctx, SetClassCommand command) throws Throwable {
-      log.tracef("visitSetClassCommand invoked");
-      if (ctx.isInTxScope()) {
-         initStatsIfNecessary(ctx);
+   public Object visitSetTransactionClassCommand(InvocationContext ctx, SetTransactionClassCommand command) throws Throwable {
+      final String transactionClass = command.getTransactionalClass();
+
+      invokeNextInterceptor(ctx, command);
+      if (ctx.isInTxScope() && transactionClass != null && !transactionClass.isEmpty()) {
+         final GlobalTransaction globalTransaction = ((TxInvocationContext) ctx).getGlobalTransaction();
+         if (log.isTraceEnabled()) {
+            log.tracef("Setting the transaction class %s for %s", transactionClass, globalTransaction);
+         }
+         final TransactionStatistics txs = initStatsIfNecessary(ctx);
+         TransactionsStatisticsRegistry.setTransactionalClass(transactionClass, txs);
+         globalTransaction.setTransactionClass(command.getTransactionalClass());
+         return Boolean.TRUE;
+      } else if (log.isTraceEnabled()) {
+         log.tracef("Did not set transaction class %s. It is not inside a transaction or the transaction class is null",
+                    transactionClass);
       }
-      TransactionsStatisticsRegistry.setTransactionalClass(command.getTransactionalClass());
-      //TransactionsStatisticsRegistry.putThreadClasses(Thread.currentThread().getId(), command.getTransactionalClass());
-      return invokeNextInterceptor(ctx, command);
+      return Boolean.FALSE;
    }
 
    @Override
