@@ -228,6 +228,11 @@ public class RpcManagerWrapper implements RpcManager {
             log.tracef("Does not update stats for command %s. No statistic collector found", command);
          }
          return;
+      } else if (transactionStatistics != null && !transactionStatistics.isLocal()) {
+         if (log.isTraceEnabled()) {
+            log.tracef("Does not update stats for command %s. The command is remote!", command);
+         }
+         return;
       }
       ExposedStatistic durationStat;
       ExposedStatistic counterStat;
