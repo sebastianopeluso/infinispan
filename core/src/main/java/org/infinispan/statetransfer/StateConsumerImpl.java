@@ -66,6 +66,7 @@ import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.util.InfinispanCollections;
 import org.infinispan.util.ReadOnlyDataContainerBackedKeySet;
 import org.infinispan.util.concurrent.ConcurrentHashSet;
+import org.infinispan.util.concurrent.ConcurrentMapFactory;
 import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
@@ -156,7 +157,7 @@ public class StateConsumerImpl implements StateConsumer {
    private boolean isTransferThreadRunning;
 
    private volatile boolean ownsData = false;
-   private Map<Object, OwnersList> oldKeyOwners;
+   private ConcurrentMap<Object, OwnersList> oldKeyOwners;
    private VersionGenerator versionGenerator;
    private final Map<Address, ShadowTransactionInfo> shadowTransactionInfoMap = new HashMap<Address, ShadowTransactionInfo>();
 
@@ -255,7 +256,7 @@ public class StateConsumerImpl implements StateConsumer {
 
       timeout = configuration.clustering().stateTransfer().timeout();
       if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
-         oldKeyOwners = new HashMap<Object, OwnersList>();
+         oldKeyOwners = ConcurrentMapFactory.makeConcurrentMap();
       }
    }
 
@@ -297,9 +298,11 @@ public class StateConsumerImpl implements StateConsumer {
 
    @Override
    public List<Address> oldOwners(Object key) {
-      synchronized (oldKeyOwners) {
-         return oldKeyOwners.get(key).toList();
+      if (oldKeyOwners == null) {
+         return InfinispanCollections.emptyList();
       }
+      OwnersList list = oldKeyOwners.get(key);
+      return list == null ? InfinispanCollections.<Address>emptyList() : list.toList();
    }
 
    @Override
@@ -542,18 +545,13 @@ public class StateConsumerImpl implements StateConsumer {
       // CACHE_MODE_LOCAL avoids handling by StateTransferInterceptor and any potential locks in StateTransferLock
       EnumSet<Flag> flags = EnumSet.of(PUT_FOR_STATE_TRANSFER, CACHE_MODE_LOCAL, IGNORE_RETURN_VALUES, SKIP_REMOTE_LOOKUP, SKIP_SHARED_CACHE_STORE, SKIP_OWNERSHIP_CHECK, SKIP_XSITE_BACKUP);
       for (InternalCacheEntry e : cacheEntries) {
-         OwnersList ownersList;
-         synchronized (oldKeyOwners) {
-            ownersList = oldKeyOwners.get(e.getKey());
-            if (ownersList == null) {
-               ownersList = new OwnersList();
-               oldKeyOwners.put(sender, ownersList);
-            }
-         }
-         ownersList.add(sender);
-
-
          if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+            OwnersList ownersList = new OwnersList();
+            OwnersList existing = oldKeyOwners.putIfAbsent(e.getKey(), ownersList);
+            if (existing != null) {
+               ownersList = existing;
+            }
+            ownersList.add(sender);
             //Wait for the commit of the state-transfer transaction
             ShadowTransactionInfo transactionInfo;
             synchronized (this) {
