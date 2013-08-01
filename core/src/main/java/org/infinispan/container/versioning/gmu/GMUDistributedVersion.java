@@ -238,6 +238,7 @@ public class GMUDistributedVersion extends GMUVersion {
       public void writeObject(ObjectOutput output, GMUDistributedVersion object) throws IOException {
          output.writeUTF(object.cacheName);
          output.writeInt(object.viewId);
+         output.writeInt(object.versions.length);
          for (long v : object.versions) {
             output.writeLong(v);
          }
@@ -246,17 +247,14 @@ public class GMUDistributedVersion extends GMUVersion {
       @Override
       public GMUDistributedVersion readObject(ObjectInput input) throws IOException, ClassNotFoundException {
          String cacheName = input.readUTF();
-         GMUVersionGenerator gmuVersionGenerator = getGMUVersionGenerator(globalComponentRegistry, cacheName);
          int viewId = input.readInt();
-         ClusterSnapshot clusterSnapshot = gmuVersionGenerator.getClusterSnapshot(viewId);
-         if (clusterSnapshot == null) {
-            throw new IllegalArgumentException("View Id " + viewId + " not found in this node");
-         }
-         long[] versions = new long[clusterSnapshot.size()];
+         long[] versions = new long[input.readInt()];
          for (int i = 0; i < versions.length; ++i) {
             versions[i] = input.readLong();
          }
-         return new GMUDistributedVersion(cacheName, viewId, clusterSnapshot, gmuVersionGenerator.getAddress(), versions);
+         ClusterSnapshot clusterSnapshot = getClusterSnapshot(globalComponentRegistry, cacheName, viewId);
+         return new GMUDistributedVersion(cacheName, viewId, clusterSnapshot, getLocalAddress(globalComponentRegistry),
+                                          versions);
       }
 
       @Override

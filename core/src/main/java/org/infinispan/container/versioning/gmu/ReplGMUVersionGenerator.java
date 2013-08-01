@@ -85,7 +85,7 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
    public final GMUVersion mergeAndMax(EntryVersion... entryVersions) {
       //validate the entry versions
       for (EntryVersion entryVersion : entryVersions) {
-         if (entryVersion instanceof GMUReplicatedVersion) {
+         if (entryVersion == null || entryVersion instanceof GMUReplicatedVersion) {
             continue;
          }
          throw new IllegalArgumentException("Expected an array of GMU entry version but it has " +

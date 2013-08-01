@@ -252,14 +252,15 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
             CacheTransaction cacheTransaction = toCommit.getCacheTransactionForCommit();
             CommittedTransaction committedTransaction = new CommittedTransaction(cacheTransaction, subVersion,
                                                                                  toCommit.getConcurrentClockNumber());
-            InvocationContext context;
+            TxInvocationContext context;
             if (transactionEntry.getGlobalTransaction().equals(toCommit.getGlobalTransaction())) {
                updateCommitVersion(ctx, cacheTransaction, subVersion);
                context = ctx;
             } else {
                context = createInvocationContext(cacheTransaction, subVersion);
             }
-            transactionEntry.setNewVersionInDataContainer((GMUCacheEntryVersion) ctx.getCacheTransaction().getTransactionVersion());
+            transactionEntry.setNewVersionInDataContainer((GMUCacheEntryVersion) context.getCacheTransaction()
+                  .getTransactionVersion());
             if (log.isTraceEnabled()) {
                log.tracef("Committing %s", toCommit);
             }
