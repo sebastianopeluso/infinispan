@@ -90,6 +90,7 @@ public class ResponseFuture implements Future<Map<Address, Response>> {
             log.tracef("Response list is " + rspList);
          }
          if (rspList == null) {
+            updateStats();
             return InfinispanCollections.emptyMap();
          } else {
             if (rspList.isEmpty() || containsOnlyNulls(rspList)) {
@@ -117,7 +118,7 @@ public class ResponseFuture implements Future<Map<Address, Response>> {
    }
 
    private void updateStats() {
-      if (initTime != -1) {
+      if (initTime == -1) {
          return;
       }
       if (transactionStatistics != null) {
