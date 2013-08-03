@@ -4,8 +4,12 @@ import org.infinispan.Cache;
 import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.ConfigurationBuilder;
 import org.infinispan.configuration.cache.VersioningScheme;
+import org.infinispan.factories.GlobalComponentRegistry;
+import org.infinispan.factories.KnownComponentNames;
 import org.infinispan.test.MultipleCacheManagersTest;
 import org.infinispan.test.TestingUtil;
+import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
+import org.infinispan.util.concurrent.BlockingTaskAwareExecutorService;
 import org.infinispan.util.concurrent.IsolationLevel;
 import org.testng.annotations.Test;
 
@@ -14,6 +18,7 @@ import java.util.Random;
 import java.util.concurrent.Future;
 
 import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.AssertJUnit.assertNotNull;
 import static org.testng.AssertJUnit.assertTrue;
 
 /**
@@ -23,6 +28,7 @@ import static org.testng.AssertJUnit.assertTrue;
 @Test(groups = "functional")
 public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
 
+   private static final Random GLOBAL_RANDOM = new Random();
    private static final int NUM_OF_ACCOUNTS = 100;
    private static final int INITIAL_AMOUNT = 10000;
    protected final int clusterSize;
@@ -55,8 +61,12 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
       writeFuture.get();
       readerFuture.get();
 
-      assertEquals("No errors expected!", 0, reader.errors());
+      assertEquals("No consistency errors expected in Reader!", 0, reader.errors());
+      assertTrue("Transaction should not rollback", transfer(GLOBAL_RANDOM, tm(0), this.<String, Integer>cache(0),
+                                                             getAccount(0), getAccount(1)));
       sanityCheck();
+      assertNoTransactions();
+      assertQueuesEmpty();
    }
 
    public final void testLeave() throws Exception {
@@ -80,8 +90,12 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
       writeFuture.get();
       readerFuture.get();
 
-      assertEquals("No errors expected!", 0, reader.errors());
+      assertEquals("No consistency errors expected in Reader!", 0, reader.errors());
+      assertTrue("Transaction should not rollback", transfer(GLOBAL_RANDOM, tm(0), this.<String, Integer>cache(0),
+                                                             getAccount(0), getAccount(1)));
       sanityCheck();
+      assertNoTransactions();
+      assertQueuesEmpty();
    }
 
    @Override
@@ -146,6 +160,27 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
       }
    }
 
+   private void assertQueuesEmpty() {
+      for (Cache cache  : caches()) {
+         assertCommitQueueEmpty(cache);
+         assertExecutorQueueEmpty(cache);
+      }
+   }
+
+   private void assertCommitQueueEmpty(Cache cache) {
+      TransactionCommitManager manager = TestingUtil.extractComponent(cache, TransactionCommitManager.class);
+      assertNotNull("Transaction Commit Manager cannot be null!", manager);
+      assertEquals("Transaction Queue is not empty!", 0, manager.size());
+   }
+
+   private void assertExecutorQueueEmpty(Cache cache) {
+      GlobalComponentRegistry gcr = TestingUtil.extractGlobalComponentRegistry(cache.getCacheManager());
+      BlockingTaskAwareExecutorService executorService = gcr.getComponent(BlockingTaskAwareExecutorService.class,
+                                                                          KnownComponentNames.GMU_EXECUTOR);
+      assertNotNull("GMU Executor Service cannot be null!", executorService);
+      assertEquals("GMU Executor Service Queue is not empty!", 0, executorService.size());
+   }
+
    private void sanityCheck() {
       final int totalAmount = INITIAL_AMOUNT * NUM_OF_ACCOUNTS;
       for (final Cache<String, Integer> cache : this.<String, Integer>caches()) {
@@ -160,7 +195,7 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
          } catch (Exception e) {
             safeRollback(transactionManager);
          }
-         assertEquals("Consistency check failed!", totalAmount, sum);
+         assertEquals("Consistency check failed for cache" + address(cache) + ".", totalAmount, sum);
       }
    }
 
@@ -181,28 +216,39 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
       public final void run() {
          running = true;
          while (running) {
-            String srcAccount = generateRandomAccount(random);
-            String dstAccount = generateRandomAccount(random);
-            try {
-               transactionManager.begin();
-               Integer src = cache.get(srcAccount);
-               Integer transfer = generateRandomAmount(random, src);
-               Integer dst = cache.get(dstAccount);
-
-               src -= transfer;
-               dst += transfer;
-
-               cache.put(srcAccount, src);
-               cache.put(dstAccount, dst);
-               transactionManager.commit();
-            } catch (Exception e) {
-               safeRollback(transactionManager);
-            }
+            randomTransfer(random, transactionManager, cache);
          }
       }
 
       public final void stopTransfers() {
          running = false;
+      }
+   }
+
+   private boolean randomTransfer(Random random, TransactionManager transactionManager, Cache<String, Integer> cache) {
+      String srcAccount = generateRandomAccount(random);
+      String dstAccount = generateRandomAccount(random);
+      return transfer(random, transactionManager, cache, srcAccount, dstAccount);
+   }
+
+   private boolean transfer(Random random, TransactionManager transactionManager, Cache<String, Integer> cache,
+                            String srcAccount, String dstAccount) {
+      try {
+         transactionManager.begin();
+         Integer src = cache.get(srcAccount);
+         Integer transfer = generateRandomAmount(random, src);
+         Integer dst = cache.get(dstAccount);
+
+         src -= transfer;
+         dst += transfer;
+
+         cache.put(srcAccount, src);
+         cache.put(dstAccount, dst);
+         transactionManager.commit();
+         return true;
+      } catch (Exception e) {
+         safeRollback(transactionManager);
+         return false;
       }
    }
 
