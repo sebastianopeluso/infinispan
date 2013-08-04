@@ -70,6 +70,7 @@ import org.infinispan.stats.container.TransactionStatistics;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.gmu.CommitLog;
+import org.infinispan.transaction.gmu.GMURemoteTransactionState;
 import org.infinispan.transaction.gmu.manager.CommittedTransaction;
 import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.xa.CacheTransaction;
@@ -116,7 +117,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
                       @ComponentName(value = KnownComponentNames.GMU_EXECUTOR) BlockingTaskAwareExecutorService gmuExecutor,
                       TransactionManager transactionManager, CacheLoaderManager cacheLoaderManager) {
       this.transactionCommitManager = transactionCommitManager;
-      this.versionGenerator = toGMUVersionGenerator(versionGenerator);
+      this.versionGenerator = (GMUVersionGenerator) versionGenerator;
       this.invocationContextContainer = invocationContextContainer;
       this.gmuExecutor = gmuExecutor;
       this.transactionManager = transactionManager;
@@ -136,39 +137,51 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
    public Object visitPrepareCommand(TxInvocationContext ctx, PrepareCommand command) throws Throwable {
       if (command.isOnePhaseCommit()) {
          throw new IllegalStateException("GMU does not support one phase commits.");
+      } else if (!ctx.isOriginLocal()) {
+         RemoteTransaction remoteTransaction = (RemoteTransaction) ctx.getCacheTransaction();
+         GMURemoteTransactionState state = remoteTransaction.getGMUTransactionState();
+         if (!state.preparing()) {
+            return remoteTransaction.getTransactionVersion();
+         }
       }
 
-      GMUPrepareCommand spc = convert(command, GMUPrepareCommand.class);
+      final GMUPrepareCommand spc = (GMUPrepareCommand) command;
 
-      if (ctx.isOriginLocal()) {
-         GMUVersion transactionVersion = toGMUVersion(ctx.getTransactionVersion());
-         spc.setVersion(transactionVersion);
-         spc.setReadSet(ctx.getReadSet());
-         spc.setAlreadyReadFrom(toAlreadyReadFromMask(ctx.getAlreadyReadFrom(), versionGenerator,
-                                                      transactionVersion.getViewId()));
-      } else {
-         ctx.setTransactionVersion(spc.getPrepareVersion());
+      try {
+         if (ctx.isOriginLocal()) {
+            final GMUVersion transactionVersion = (GMUVersion) ctx.getTransactionVersion();
+            spc.setVersion(transactionVersion);
+            spc.setReadSet(ctx.getReadSet());
+            spc.setAlreadyReadFrom(toAlreadyReadFromMask(ctx.getAlreadyReadFrom(), versionGenerator,
+                                                         transactionVersion.getViewId()));
+         } else {
+            ctx.setTransactionVersion(spc.getPrepareVersion());
+         }
+
+         wrapEntriesForPrepare(ctx, command);
+         performValidation(ctx, spc);
+
+         Object retVal = invokeNextInterceptor(ctx, command);
+
+         if (ctx.isOriginLocal() && command.getModifications().length > 0) {
+            EntryVersion commitVersion = calculateCommitVersion(ctx.getTransactionVersion(), versionGenerator,
+                                                                cdl.getWriteOwners(ctx.getCacheTransaction()));
+            ctx.setTransactionVersion(commitVersion);
+         } else {
+            retVal = ctx.getTransactionVersion();
+         }
+
+         return retVal;
+      } finally {
+         if (!ctx.isOriginLocal()) {
+            ((RemoteTransaction) ctx.getCacheTransaction()).getGMUTransactionState().prepared();
+         }
       }
-
-      wrapEntriesForPrepare(ctx, command);
-      performValidation(ctx, spc);
-
-      Object retVal = invokeNextInterceptor(ctx, command);
-
-      if (ctx.isOriginLocal() && command.getModifications().length > 0) {
-         EntryVersion commitVersion = calculateCommitVersion(ctx.getTransactionVersion(), versionGenerator,
-                                                             cdl.getWriteOwners(ctx.getCacheTransaction()));
-         ctx.setTransactionVersion(commitVersion);
-      } else {
-         retVal = ctx.getTransactionVersion();
-      }
-
-      return retVal;
    }
 
    @Override
    public Object visitCommitCommand(TxInvocationContext ctx, CommitCommand command) throws Throwable {
-      GMUCommitCommand gmuCommitCommand = convert(command, GMUCommitCommand.class);
+      final GMUCommitCommand gmuCommitCommand = (GMUCommitCommand) command;
       TransactionEntry transactionEntry = null;
 
       if (ctx.isOriginLocal()) {
@@ -401,7 +414,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
 
       if (!isReadOnly || fromStateTransfer) {
          updatePrepareVersion(command);
-         GMUVersion transactionVersion = toGMUVersion(command.getPrepareVersion());
+         final GMUVersion transactionVersion = (GMUVersion) command.getPrepareVersion();
          List<Address> addressList = fromAlreadyReadFromMask(command.getAlreadyReadFrom(), versionGenerator,
                                                              transactionVersion.getViewId());
          GMUVersion maxGMUVersion = versionGenerator.calculateMaxVersionToRead(transactionVersion, addressList);
@@ -490,8 +503,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
    }
 
    private void updatePrepareVersion(GMUPrepareCommand prepareCommand) {
-      BitSet alreadyReadFrom = prepareCommand.getAlreadyReadFrom();
-      GMUVersion transactionVersion = toGMUVersion(prepareCommand.getPrepareVersion());
+      final BitSet alreadyReadFrom = prepareCommand.getAlreadyReadFrom();
+      final GMUVersion transactionVersion = (GMUVersion) prepareCommand.getPrepareVersion();
       boolean alreadyReadOnThisNode = false;
       EntryVersion maxGMUVersion = null;
       if (alreadyReadFrom != null) {

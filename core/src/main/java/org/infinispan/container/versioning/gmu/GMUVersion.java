@@ -32,8 +32,6 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.remoting.transport.Transport;
 import org.infinispan.util.InfinispanCollections;
 
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
-
 /**
  * // TODO: Document this
  *
@@ -42,9 +40,9 @@ import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
  */
 public abstract class GMUVersion implements IncrementableEntryVersion {
 
+   public static final long NON_EXISTING = -1;
    protected static final ClusterSnapshot EMPTY_SNAPSHOT = new ClusterSnapshot(InfinispanCollections.<Address>emptyList(),
                                                                                null);
-   public static final long NON_EXISTING = -1;
    protected final int viewId;
    protected final String cacheName;
    protected transient ClusterSnapshot clusterSnapshot;
@@ -146,7 +144,7 @@ public abstract class GMUVersion implements IncrementableEntryVersion {
          //create a empty cluster snapshot.
          return EMPTY_SNAPSHOT;
       }
-      GMUVersionGenerator gmuVersionGenerator = toGMUVersionGenerator(componentRegistry.getComponent(VersionGenerator.class));
+      GMUVersionGenerator gmuVersionGenerator = (GMUVersionGenerator) componentRegistry.getComponent(VersionGenerator.class);
       ClusterSnapshot clusterSnapshot = gmuVersionGenerator.getClusterSnapshot(viewId);
       return clusterSnapshot == null ? EMPTY_SNAPSHOT : clusterSnapshot;
    }

@@ -37,8 +37,6 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersion;
-
 /**
  * @author Pedro Ruivo
  * @since 5.2
@@ -46,12 +44,12 @@ import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersion;
 public class SortedTransactionQueue {
 
    private static final Log log = LogFactory.getLog(SortedTransactionQueue.class);
-   private final ConcurrentHashMap<GlobalTransaction, Node> concurrentHashMap;
+   private final ConcurrentHashMap<GlobalTransaction, TransactionEntryImpl> concurrentHashMap;
    private final Node firstEntry;
    private final Node lastEntry;
 
    public SortedTransactionQueue() {
-      this.concurrentHashMap = new ConcurrentHashMap<GlobalTransaction, Node>();
+      this.concurrentHashMap = new ConcurrentHashMap<GlobalTransaction, TransactionEntryImpl>();
 
       this.firstEntry = new AbstractBoundaryNode() {
          private Node first;
@@ -112,10 +110,10 @@ public class SortedTransactionQueue {
 
    public final void prepare(CacheTransaction cacheTransaction, long concurrentClockNumber) {
       GlobalTransaction globalTransaction = cacheTransaction.getGlobalTransaction();
-      if (concurrentHashMap.contains(globalTransaction)) {
+      if (concurrentHashMap.containsKey(globalTransaction)) {
          log.warnf("Duplicated prepare for %s", globalTransaction);
       }
-      Node entry = new TransactionEntryImpl(cacheTransaction, concurrentClockNumber);
+      TransactionEntryImpl entry = new TransactionEntryImpl(cacheTransaction, concurrentClockNumber);
       concurrentHashMap.put(globalTransaction, entry);
       insertNew(entry);
    }
@@ -504,7 +502,7 @@ public class SortedTransactionQueue {
       private TransactionEntryImpl(CacheTransaction cacheTransaction, long concurrentClockNumber) {
          this.state = 0;
          this.cacheTransaction = cacheTransaction;
-         this.entryVersion = toGMUVersion(cacheTransaction.getTransactionVersion());
+         this.entryVersion = (GMUVersion) cacheTransaction.getTransactionVersion();
          this.readyToCommit = new CountDownLatch(1);
          this.concurrentClockNumber = concurrentClockNumber;
       }

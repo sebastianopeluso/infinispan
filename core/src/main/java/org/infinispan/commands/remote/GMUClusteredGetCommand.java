@@ -39,7 +39,6 @@ import java.util.List;
 import java.util.Set;
 
 import static org.infinispan.transaction.gmu.GMUHelper.fromAlreadyReadFromMask;
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
 
 /**
  * Issues a remote get call.  This is not a {@link org.infinispan.commands.VisitableCommand} and hence not passed up the
@@ -80,7 +79,7 @@ public class GMUClusteredGetCommand extends ClusteredGetCommand {
 
    public void initializeGMUComponents(CommitLog commitLog, VersionGenerator versionGenerator, StateConsumer stateConsumer) {
       this.commitLog = commitLog;
-      this.versionGenerator = toGMUVersionGenerator(versionGenerator);
+      this.versionGenerator = (GMUVersionGenerator) versionGenerator;
       this.stateConsumer = stateConsumer;
    }
 

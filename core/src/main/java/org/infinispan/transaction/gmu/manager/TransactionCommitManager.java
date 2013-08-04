@@ -38,8 +38,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersion;
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
 import static org.infinispan.transaction.gmu.manager.SortedTransactionQueue.TransactionEntry;
 
 /**
@@ -64,7 +62,7 @@ public class TransactionCommitManager {
    public void inject(InvocationContextContainer icc, VersionGenerator versionGenerator, CommitLog commitLog,
                       Transport transport, Cache cache, GarbageCollectorManager garbageCollectorManager) {
       if (versionGenerator instanceof GMUVersionGenerator) {
-         this.versionGenerator = toGMUVersionGenerator(versionGenerator);
+         this.versionGenerator = (GMUVersionGenerator) versionGenerator;
       }
       this.commitLog = commitLog;
       this.garbageCollectorManager = garbageCollectorManager;
@@ -93,7 +91,7 @@ public class TransactionCommitManager {
    }
 
    public synchronized TransactionEntry commitTransaction(GlobalTransaction globalTransaction, EntryVersion version) {
-      GMUVersion commitVersion = toGMUVersion(version);
+      final GMUVersion commitVersion = (GMUVersion) version;
       lastPreparedVersion = Math.max(commitVersion.getThisNodeVersionValue(), lastPreparedVersion);
       TransactionEntry entry = sortedTransactionQueue.commit(globalTransaction, commitVersion);
       if (entry == null) {

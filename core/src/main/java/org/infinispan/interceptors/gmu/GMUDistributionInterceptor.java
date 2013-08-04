@@ -68,7 +68,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
 
-import static org.infinispan.transaction.gmu.GMUHelper.*;
+import static org.infinispan.transaction.gmu.GMUHelper.joinAndSetTransactionVersion;
+import static org.infinispan.transaction.gmu.GMUHelper.toAlreadyReadFromMask;
 
 /**
  * @author Pedro Ruivo
@@ -87,7 +88,7 @@ public class GMUDistributionInterceptor extends TxDistributionInterceptor {
 
    @Inject
    public void setVersionGenerator(VersionGenerator versionGenerator, L1GMUContainer l1GMUContainer, CommitLog commitLog, StateConsumer stateConsumer) {
-      this.versionGenerator = toGMUVersionGenerator(versionGenerator);
+      this.versionGenerator = (GMUVersionGenerator) versionGenerator;
       this.l1GMUContainer = l1GMUContainer;
       this.commitLog = commitLog;
       this.stateConsumer = stateConsumer;
@@ -277,7 +278,7 @@ public class GMUDistributionInterceptor extends TxDistributionInterceptor {
          oldTargets.retainAll(rpcManager.getTransport().getMembers());
       }
 
-      InternalGMUCacheEntry entry = txInvocationContext.getKeysReadInCommand().get(key);
+      final InternalGMUCacheEntry entry = txInvocationContext.getKeysReadInCommand().get(key);
       boolean unsafeToRead = entry != null && entry.isUnsafeToRead();
       if (unsafeToRead) {
          if (oldTargets == null) {
@@ -286,19 +287,19 @@ public class GMUDistributionInterceptor extends TxDistributionInterceptor {
          oldTargets.addAll(stateConsumer.oldOwners(key));
       }
 
-      Collection<Address> alreadyReadFrom = txInvocationContext.getAlreadyReadFrom();
-      GMUVersion transactionVersion = toGMUVersion(txInvocationContext.getTransactionVersion());
+      final Collection<Address> alreadyReadFrom = txInvocationContext.getAlreadyReadFrom();
+      final GMUVersion transactionVersion = (GMUVersion) txInvocationContext.getTransactionVersion();
 
       final BitSet alreadyReadFromMask = toAlreadyReadFromMask(alreadyReadFrom, versionGenerator,
                                                                transactionVersion.getViewId());
 
-      ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, command.getFlags(), acquireRemoteLock,
-                                                               gtx, transactionVersion, alreadyReadFromMask);
+      final ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, command.getFlags(), acquireRemoteLock,
+                                                                     gtx, transactionVersion, alreadyReadFromMask);
 
-      ClusterGetResponse response = doRemote(allTargets, oldTargets, get);
-      InternalGMUCacheValue gmuCacheValue = convert(response.value, InternalGMUCacheValue.class);
+      final ClusterGetResponse response = doRemote(allTargets, oldTargets, get);
+      final InternalGMUCacheValue gmuCacheValue = (InternalGMUCacheValue) response.value;
 
-      InternalGMUCacheEntry gmuCacheEntry = (InternalGMUCacheEntry) gmuCacheValue.toInternalCacheEntry(key);
+      final InternalGMUCacheEntry gmuCacheEntry = (InternalGMUCacheEntry) gmuCacheValue.toInternalCacheEntry(key);
       txInvocationContext.addKeyReadInCommand(key, gmuCacheEntry);
       txInvocationContext.addReadFrom(response.sender);
 
@@ -320,12 +321,12 @@ public class GMUDistributionInterceptor extends TxDistributionInterceptor {
          oldTargets.retainAll(rpcManager.getTransport().getMembers());
       }
 
-      ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, command.getFlags(), false, null,
-                                                               toGMUVersion(commitLog.getCurrentVersion()), null);
+      final ClusteredGetCommand get = cf.buildGMUClusteredGetCommand(key, command.getFlags(), false, null,
+                                                                     commitLog.getCurrentVersion(), null);
 
-      ClusterGetResponse response = doRemote(allTargets, oldTargets, get);
-      InternalGMUCacheValue gmuCacheValue = convert(response.value, InternalGMUCacheValue.class);
-      InternalGMUCacheEntry gmuCacheEntry = (InternalGMUCacheEntry) gmuCacheValue.toInternalCacheEntry(key);
+      final ClusterGetResponse response = doRemote(allTargets, oldTargets, get);
+      final InternalGMUCacheValue gmuCacheValue = (InternalGMUCacheValue) response.value;
+      final InternalGMUCacheEntry gmuCacheEntry = (InternalGMUCacheEntry) gmuCacheValue.toInternalCacheEntry(key);
       ctx.addKeyReadInCommand(key, gmuCacheEntry);
 
       if (log.isDebugEnabled()) {
@@ -334,6 +335,7 @@ public class GMUDistributionInterceptor extends TxDistributionInterceptor {
       return gmuCacheEntry;
    }
 
+   @SuppressWarnings("unchecked")
    private ClusterGetResponse doRemote(List<Address> allTargets, List<Address> oldTargets, ClusteredGetCommand command) {
       final Address localAddress = rpcManager.getAddress();
       final long spinTimeout = 1000;

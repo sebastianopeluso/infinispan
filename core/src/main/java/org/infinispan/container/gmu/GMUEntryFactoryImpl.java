@@ -43,9 +43,6 @@ import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-import static org.infinispan.transaction.gmu.GMUHelper.toGMUVersionGenerator;
-import static org.infinispan.transaction.gmu.GMUHelper.toInternalGMUCacheEntry;
-
 /**
  * @author Pedro Ruivo
  * @author Sebastiano Peluso
@@ -72,7 +69,7 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
    public void injectDependencies(CommitLog commitLog, VersionGenerator versionGenerator,
                                   ClusteringDependentLogic clusteringDependentLogic) {
       this.commitLog = commitLog;
-      this.gmuVersionGenerator = toGMUVersionGenerator(versionGenerator);
+      this.gmuVersionGenerator = (GMUVersionGenerator) versionGenerator;
       this.clusteringDependentLogic = clusteringDependentLogic;
    }
 
@@ -83,9 +80,6 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
 
    @Override
    protected MVCCEntry createWrappedEntry(Object key, Object value, EntryVersion version, boolean isForInsert, boolean forRemoval, long lifespan) {
-      if (value == null && !isForInsert) {
-         return forRemoval ? new NullMarkerEntryForRemoval(key, version) : NullMarkerEntry.getInstance();
-      }
       return new SerializableEntry(key, value, lifespan, version);
    }
 
@@ -122,11 +116,11 @@ public class GMUEntryFactoryImpl extends EntryFactoryImpl {
          }
       }
 
-      EntryVersion maxVersionToRead = hasAlreadyReadFromThisNode ? versionToRead :
+      final EntryVersion maxVersionToRead = hasAlreadyReadFromThisNode ? versionToRead :
             commitLog.getAvailableVersionLessThan(versionToRead);
 
-      EntryVersion mostRecentCommitLogVersion = commitLog.getCurrentVersion();
-      InternalGMUCacheEntry entry = toInternalGMUCacheEntry(container.get(key, maxVersionToRead));
+      final EntryVersion mostRecentCommitLogVersion = commitLog.getCurrentVersion();
+      final InternalGMUCacheEntry entry = (InternalGMUCacheEntry) container.get(key, maxVersionToRead);
 
       if (remoteRead) {
          if (entry.getMaximumValidVersion() == null) {

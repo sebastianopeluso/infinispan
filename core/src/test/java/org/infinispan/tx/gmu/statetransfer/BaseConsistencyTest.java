@@ -17,9 +17,7 @@ import javax.transaction.TransactionManager;
 import java.util.Random;
 import java.util.concurrent.Future;
 
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertNotNull;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.AssertJUnit.*;
 
 /**
  * @author Pedro Ruivo
@@ -52,14 +50,20 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
       Future<Object> writeFuture = fork(writer, null);
       Future<Object> readerFuture = fork(reader, null);
 
+      log.info("Started writer and reader threads.");
+
       addClusterEnabledCacheManager(createConfiguration());
       TestingUtil.waitForRehashToComplete(caches());
+
+      log.info("New node has joint. Stopping writer and reader threads.");
 
       writer.stopTransfers();
       reader.stopChecks();
 
       writeFuture.get();
       readerFuture.get();
+
+      log.info("Writer and reader threads was stopped.");
 
       assertEquals("No consistency errors expected in Reader!", 0, reader.errors());
       assertTrue("Transaction should not rollback", transfer(GLOBAL_RANDOM, tm(0), this.<String, Integer>cache(0),
@@ -81,14 +85,20 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
       Future<Object> writeFuture = fork(writer, null);
       Future<Object> readerFuture = fork(reader, null);
 
+      log.info("Started writer and reader threads.");
+
       TestingUtil.killCacheManagers(cacheManagers.remove(2));
       TestingUtil.waitForRehashToComplete(caches());
+
+      log.info("Node has left. Stopping writer and reader threads.");
 
       writer.stopTransfers();
       reader.stopChecks();
 
       writeFuture.get();
       readerFuture.get();
+
+      log.info("Writer and reader threads was stopped.");
 
       assertEquals("No consistency errors expected in Reader!", 0, reader.errors());
       assertTrue("Transaction should not rollback", transfer(GLOBAL_RANDOM, tm(0), this.<String, Integer>cache(0),
@@ -161,7 +171,7 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
    }
 
    private void assertQueuesEmpty() {
-      for (Cache cache  : caches()) {
+      for (Cache cache : caches()) {
          assertCommitQueueEmpty(cache);
          assertExecutorQueueEmpty(cache);
       }
@@ -182,6 +192,7 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
    }
 
    private void sanityCheck() {
+      log.info("Performing sanity check!");
       final int totalAmount = INITIAL_AMOUNT * NUM_OF_ACCOUNTS;
       for (final Cache<String, Integer> cache : this.<String, Integer>caches()) {
          final TransactionManager transactionManager = tm(cache);
@@ -196,6 +207,38 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
             safeRollback(transactionManager);
          }
          assertEquals("Consistency check failed for cache" + address(cache) + ".", totalAmount, sum);
+      }
+      log.info("Sanity check OK!");
+   }
+
+   private boolean randomTransfer(Random random, TransactionManager transactionManager, Cache<String, Integer> cache) {
+      String srcAccount = generateRandomAccount(random);
+      String dstAccount = generateRandomAccount(random);
+      return transfer(random, transactionManager, cache, srcAccount, dstAccount);
+   }
+
+   private boolean transfer(Random random, TransactionManager transactionManager, Cache<String, Integer> cache,
+                            String srcAccount, String dstAccount) {
+      try {
+         transactionManager.begin();
+         //read from source...
+         Integer src = cache.get(srcAccount);
+         Integer transfer = generateRandomAmount(random, src);
+         src -= transfer;
+         //decrement it
+         cache.put(srcAccount, src);
+
+         //read from destination
+         Integer dst = cache.get(dstAccount);
+         dst += transfer;
+         //and increment it
+         cache.put(dstAccount, dst);
+
+         transactionManager.commit();
+         return true;
+      } catch (Exception e) {
+         safeRollback(transactionManager);
+         return false;
       }
    }
 
@@ -222,33 +265,6 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
 
       public final void stopTransfers() {
          running = false;
-      }
-   }
-
-   private boolean randomTransfer(Random random, TransactionManager transactionManager, Cache<String, Integer> cache) {
-      String srcAccount = generateRandomAccount(random);
-      String dstAccount = generateRandomAccount(random);
-      return transfer(random, transactionManager, cache, srcAccount, dstAccount);
-   }
-
-   private boolean transfer(Random random, TransactionManager transactionManager, Cache<String, Integer> cache,
-                            String srcAccount, String dstAccount) {
-      try {
-         transactionManager.begin();
-         Integer src = cache.get(srcAccount);
-         Integer transfer = generateRandomAmount(random, src);
-         Integer dst = cache.get(dstAccount);
-
-         src -= transfer;
-         dst += transfer;
-
-         cache.put(srcAccount, src);
-         cache.put(dstAccount, dst);
-         transactionManager.commit();
-         return true;
-      } catch (Exception e) {
-         safeRollback(transactionManager);
-         return false;
       }
    }
 
@@ -279,11 +295,12 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
                }
 
                transactionManager.commit();
+               if (sum != totalAmount) {
+                  log.errorf("Consistency error: read=%s, expected=%s", sum, totalAmount);
+                  errors++;
+               }
             } catch (Exception e) {
                safeRollback(transactionManager);
-            }
-            if (sum != totalAmount) {
-               errors++;
             }
          }
       }
