@@ -104,10 +104,10 @@ public class PreloadWithAsyncStoreTest extends SingleCacheManagerTest {
 
       DataContainer dataContainer = cache.getAdvancedCache().getDataContainer();
 
-      assertEquals("Wrong number of keys in data container after puts.", KEYS.length, dataContainer.size());
+      assertEquals("Wrong number of keys in data container after puts.", KEYS.length, dataContainer.size(null));
       assertEquals("Some exceptions has been caught during the puts.", 0, interceptor.exceptionsCaught);
       cache.stop();
-      assertEquals("Expected empty data container after stop.", 0, dataContainer.size());
+      assertEquals("Expected empty data container after stop.", 0, dataContainer.size(null));
       assertEquals("Some exceptions has been caught during the stop.", 0, interceptor.exceptionsCaught);
 
       cache.start();
@@ -115,7 +115,7 @@ public class PreloadWithAsyncStoreTest extends SingleCacheManagerTest {
       assertTrue("Async Store should be enabled after restart.", cache.getCacheConfiguration().loaders().usingAsyncStore());
 
       dataContainer = cache.getAdvancedCache().getDataContainer();
-      assertEquals("Wrong number of keys in data container after preload.", KEYS.length, dataContainer.size());
+      assertEquals("Wrong number of keys in data container after preload.", KEYS.length, dataContainer.size(null));
       assertEquals("Some exceptions has been caught during the preload.", 0, interceptor.exceptionsCaught);
 
       // Re-retrieve since the old reference might not be usable
@@ -126,7 +126,7 @@ public class PreloadWithAsyncStoreTest extends SingleCacheManagerTest {
    }
 
    private void assertInCacheAndStore(Cache cache, CacheStore store, Object key, Object value) throws CacheLoaderException {
-      InternalCacheEntry se = cache.getAdvancedCache().getDataContainer().get(key);
+      InternalCacheEntry se = cache.getAdvancedCache().getDataContainer().get(key, null);
       assertStoredEntry(se, value, "Cache", key);
       se = store.load(key);
       assertStoredEntry(se, value, "Store", key);
@@ -140,7 +140,7 @@ public class PreloadWithAsyncStoreTest extends SingleCacheManagerTest {
 
    private <T> void assertNotInCacheAndStore(Cache cache, CacheStore store, T... keys) throws CacheLoaderException {
       for (Object key : keys) {
-         assertFalse("Cache should not contain key " + key, cache.getAdvancedCache().getDataContainer().containsKey(key));
+         assertFalse("Cache should not contain key " + key, cache.getAdvancedCache().getDataContainer().containsKey(key, null));
          assertFalse("Store should not contain key " + key, store.containsKey(key));
       }
    }
