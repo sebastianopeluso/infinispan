@@ -86,11 +86,11 @@ public class RebalancePolicyJmxTest extends MultipleCacheManagersTest {
       assertNull(stm0.getCacheTopology().getPendingCH());
 
       assertTrue(mBeanServer.isRegistered(ltmName0));
-      assertTrue((Boolean) mBeanServer.getAttribute(ltmName0, "RebalancingEnabled"));
+      assertTrue((Boolean) mBeanServer.invoke(ltmName0, "isRebalancingEnabled", new Object[0], new String[0]));
 
       // Suspend rebalancing
-      mBeanServer.setAttribute(ltmName0, new Attribute("RebalancingEnabled", false));
-      assertFalse((Boolean) mBeanServer.getAttribute(ltmName0, "RebalancingEnabled"));
+      mBeanServer.invoke(ltmName0, "setRebalancingEnabled", new Object[]{Boolean.FALSE}, new String[] {"boolean"});
+      assertFalse((Boolean) mBeanServer.invoke(ltmName0, "isRebalancingEnabled", new Object[0], new String[0]));
 
       // Add 2 nodes
       log.debugf("Starting 2 new nodes");
@@ -101,16 +101,16 @@ public class RebalancePolicyJmxTest extends MultipleCacheManagersTest {
 
       // Check that no rebalance happened after 1 second
       Thread.sleep(1000);
-      assertFalse((Boolean) mBeanServer.getAttribute(ltmName1, "RebalancingEnabled"));
+      assertFalse((Boolean) mBeanServer.invoke(ltmName1, "isRebalancingEnabled", new Object[0], new String[0]));
       assertNull(stm0.getCacheTopology().getPendingCH());
       assertEquals(Arrays.asList(address(0), address(1)), stm0.getCacheTopology().getCurrentCH().getMembers());
 
       // Re-enable rebalancing
       log.debugf("Rebalancing with nodes %s %s %s %s", address(0), address(1), address(2), address(3));
-      mBeanServer.setAttribute(ltmName0, new Attribute("RebalancingEnabled", true));
-      assertTrue((Boolean) mBeanServer.getAttribute(ltmName0, "RebalancingEnabled"));
+      mBeanServer.invoke(ltmName0, "setRebalancingEnabled", new Object[]{Boolean.TRUE}, new String[] {"boolean"});
+      assertTrue((Boolean) mBeanServer.invoke(ltmName0, "isRebalancingEnabled", new Object[0], new String[0]));
       // Duplicate request to enable rebalancing - should be ignored
-      mBeanServer.setAttribute(ltmName0, new Attribute("RebalancingEnabled", true));
+      mBeanServer.invoke(ltmName0, "setRebalancingEnabled", new Object[]{Boolean.TRUE}, new String[] {"boolean"});
 
       // Check that the cache now has 4 nodes, and the CH is balanced
       TestingUtil.waitForRehashToComplete(cache(0), cache(1), cache(2), cache(3));
@@ -122,11 +122,11 @@ public class RebalancePolicyJmxTest extends MultipleCacheManagersTest {
       }
 
       // Suspend rebalancing again
-      mBeanServer.setAttribute(ltmName1, new Attribute("RebalancingEnabled", false));
-      assertFalse((Boolean) mBeanServer.getAttribute(ltmName0, "RebalancingEnabled"));
-      assertFalse((Boolean) mBeanServer.getAttribute(ltmName1, "RebalancingEnabled"));
+      mBeanServer.invoke(ltmName1, "setRebalancingEnabled", new Object[]{Boolean.FALSE}, new String[] {"boolean"});
+      assertFalse((Boolean) mBeanServer.invoke(ltmName0, "isRebalancingEnabled", new Object[0], new String[0]));
+      assertFalse((Boolean) mBeanServer.invoke(ltmName1, "isRebalancingEnabled", new Object[0], new String[0]));
       // Duplicate request to enable rebalancing - should be ignored
-      mBeanServer.setAttribute(ltmName1, new Attribute("RebalancingEnabled", false));
+      mBeanServer.invoke(ltmName1, "setRebalancingEnabled", new Object[]{Boolean.FALSE}, new String[] {"boolean"});
 
       // Kill the first 2 nodes
       log.debugf("Stopping nodes %s %s", address(0), address(1));
@@ -150,9 +150,9 @@ public class RebalancePolicyJmxTest extends MultipleCacheManagersTest {
       ObjectName ltmName2 = TestingUtil.getCacheManagerObjectName(domain2, "DefaultCacheManager", "LocalTopologyManager");
       String domain3 = manager(2).getCacheManagerConfiguration().globalJmxStatistics().domain();
       ObjectName ltmName3 = TestingUtil.getCacheManagerObjectName(domain3, "DefaultCacheManager", "LocalTopologyManager");
-      mBeanServer.setAttribute(ltmName2, new Attribute("RebalancingEnabled", true));
-      assertTrue((Boolean) mBeanServer.getAttribute(ltmName2, "RebalancingEnabled"));
-      assertTrue((Boolean) mBeanServer.getAttribute(ltmName3, "RebalancingEnabled"));
+      mBeanServer.invoke(ltmName2, "setRebalancingEnabled", new Object[]{Boolean.TRUE}, new String[] {"boolean"});
+      assertTrue((Boolean) mBeanServer.invoke(ltmName2, "isRebalancingEnabled", new Object[0], new String[0]));
+      assertTrue((Boolean) mBeanServer.invoke(ltmName3, "isRebalancingEnabled", new Object[0], new String[0]));
 
       // Check that the CH is now balanced (and every segment has 2 copies)
       TestingUtil.waitForRehashToComplete(cache(2), cache(3));
