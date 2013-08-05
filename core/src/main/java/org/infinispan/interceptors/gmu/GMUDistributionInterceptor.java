@@ -255,6 +255,12 @@ public class GMUDistributionInterceptor extends TxDistributionInterceptor {
       return null;
    }
 
+   @Override
+   protected Object localGet(InvocationContext ctx, Object key, boolean isWrite, FlagAffectedCommand command) throws Throwable {
+      //this code is performed after the remote get (if any) return nulls.
+      return null;
+   }
+
    private InternalCacheEntry performRemoteGet(Object key, InvocationContext ctx, boolean acquireRemoteLock, FlagAffectedCommand command) throws Exception {
       if (ctx instanceof SingleKeyNonTxInvocationContext) {
          return retrieveSingleKeyFromRemoteSource(key, (SingleKeyNonTxInvocationContext) ctx, command);
