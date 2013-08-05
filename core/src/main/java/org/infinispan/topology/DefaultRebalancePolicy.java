@@ -109,19 +109,25 @@ public class DefaultRebalancePolicy implements RebalancePolicy {
          caches = cachesPendingRebalance;
          if (enabled) {
             if (cachesPendingRebalance != null) {
-               log.debugf("Rebalancing enabled");
+               if (log.isDebugEnabled()) {
+                  log.debugf("Rebalancing enabled");
+               }
                cachesPendingRebalance = null;
             }
          } else {
             if (cachesPendingRebalance == null) {
-               log.debugf("Rebalancing suspended");
+               if (log.isDebugEnabled()) {
+                  log.debugf("Rebalancing suspended");
+               }
                cachesPendingRebalance = new HashSet<String>();
             }
          }
       }
 
       if (enabled && caches != null) {
-         log.tracef("Rebalancing enabled, triggering rebalancing for caches %s", caches);
+         if (log.isTraceEnabled()) {
+            log.tracef("Rebalancing enabled, triggering rebalancing for caches %s", caches);
+         }
          for (String cacheName : caches) {
             try {
                clusterTopologyManager.triggerRebalance(cacheName, null);

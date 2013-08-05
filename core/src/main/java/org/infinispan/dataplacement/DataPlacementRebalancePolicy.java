@@ -26,7 +26,6 @@ import org.infinispan.dataplacement.ch.ConsistentHashChanges;
 import org.infinispan.dataplacement.ch.DataPlacementConsistentHash;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.factories.annotations.Inject;
-import org.infinispan.jmx.annotations.ManagedOperation;
 import org.infinispan.jmx.annotations.Parameter;
 import org.infinispan.topology.ClusterCacheStatus;
 import org.infinispan.topology.ClusterTopologyManager;
@@ -99,7 +98,6 @@ public class DataPlacementRebalancePolicy implements RebalancePolicy {
       clusterTopologyManager.triggerRebalance(cacheName, changes);
    }
 
-   @ManagedOperation(description = "Rebalancing enabled", displayName = "Rebalancing enabled")
    @Override
    public boolean isRebalancingEnabled() {
       synchronized (lock) {
@@ -107,21 +105,28 @@ public class DataPlacementRebalancePolicy implements RebalancePolicy {
       }
    }
 
-   @ManagedOperation(description = "Enable/Disable rebalancing", displayName = "Enable/Disable rebalancing")
    @Override
    public void setRebalancingEnabled(@Parameter(description = "enable?") boolean enabled) {
       Map<String, ConsistentHash> caches;
       synchronized (lock) {
          caches = cachesPendingRebalance;
          if (enabled) {
+            if (log.isDebugEnabled()) {
+               log.debugf("Rebalancing enabled");
+            }
             cachesPendingRebalance = null;
          } else {
+            if (log.isDebugEnabled()) {
+               log.debugf("Rebalancing suspended");
+            }
             cachesPendingRebalance = new HashMap<String, ConsistentHash>();
          }
       }
 
       if (enabled && caches != null) {
-         log.debugf("Rebalancing re-enabled, triggering rebalancing for caches %s", caches);
+         if (log.isTraceEnabled()) {
+            log.tracef("Rebalancing enabled, triggering rebalancing for caches %s", caches);
+         }
          for (Map.Entry<String, ConsistentHash> pendingRebalance : caches.entrySet()) {
             String cacheName = pendingRebalance.getKey();
             try {
