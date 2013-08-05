@@ -26,6 +26,8 @@ import org.infinispan.dataplacement.ch.ConsistentHashChanges;
 import org.infinispan.dataplacement.ch.DataPlacementConsistentHash;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.factories.annotations.Inject;
+import org.infinispan.jmx.annotations.ManagedOperation;
+import org.infinispan.jmx.annotations.Parameter;
 import org.infinispan.topology.ClusterCacheStatus;
 import org.infinispan.topology.ClusterTopologyManager;
 import org.infinispan.topology.RebalancePolicy;
@@ -46,7 +48,9 @@ public class DataPlacementRebalancePolicy implements RebalancePolicy {
 
    private static final Log log = LogFactory.getLog(DataPlacementRebalancePolicy.class);
    private final Map<String, ConsistentHashChanges> consistentHashChangesMap;
+   private final Object lock = new Object();
    private ClusterTopologyManager clusterTopologyManager;
+   private Map<String, ConsistentHash> cachesPendingRebalance = null;
 
    public DataPlacementRebalancePolicy() {
       consistentHashChangesMap = new HashMap<String, ConsistentHashChanges>();
@@ -82,35 +86,79 @@ public class DataPlacementRebalancePolicy implements RebalancePolicy {
          return;
       }
 
+      synchronized (lock) {
+         if (!isRebalancingEnabled()) {
+            log.tracef("Rebalancing is disabled, queueing rebalance for cache %s", cacheName);
+            cachesPendingRebalance.put(cacheName, cacheStatus.getCacheTopology().getCurrentCH());
+            return;
+         }
+      }
+
       ConsistentHashChanges changes = getConsistentHashChanges(cacheName, cacheStatus.getCacheTopology().getCurrentCH());
       log.tracef("Triggering rebalance for cache %s", cacheName);
       clusterTopologyManager.triggerRebalance(cacheName, changes);
    }
 
+   @ManagedOperation(description = "Rebalancing enabled", displayName = "Rebalancing enabled")
+   @Override
+   public boolean isRebalancingEnabled() {
+      synchronized (lock) {
+         return cachesPendingRebalance == null;
+      }
+   }
+
+   @ManagedOperation(description = "Enable/Disable rebalancing", displayName = "Enable/Disable rebalancing")
+   @Override
+   public void setRebalancingEnabled(@Parameter(description = "enable?") boolean enabled) {
+      Map<String, ConsistentHash> caches;
+      synchronized (lock) {
+         caches = cachesPendingRebalance;
+         if (enabled) {
+            cachesPendingRebalance = null;
+         } else {
+            cachesPendingRebalance = new HashMap<String, ConsistentHash>();
+         }
+      }
+
+      if (enabled && caches != null) {
+         log.debugf("Rebalancing re-enabled, triggering rebalancing for caches %s", caches);
+         for (Map.Entry<String, ConsistentHash> pendingRebalance : caches.entrySet()) {
+            String cacheName = pendingRebalance.getKey();
+            try {
+
+               clusterTopologyManager.triggerRebalance(cacheName,
+                                                       getConsistentHashChanges(cacheName, pendingRebalance.getValue()));
+            } catch (Exception e) {
+               log.rebalanceStartError(cacheName, e);
+            }
+         }
+      } else {
+         log.debugf("Rebalancing suspended");
+      }
+   }
+
    public final void setNewSegmentMappings(String cacheName, ClusterObjectLookup segmentMappings) throws Exception {
-      ConsistentHashChanges consistentHashChanges;
       synchronized (consistentHashChangesMap) {
-         consistentHashChanges = consistentHashChangesMap.get(cacheName);
+         ConsistentHashChanges consistentHashChanges = consistentHashChangesMap.get(cacheName);
          if (consistentHashChanges == null) {
             consistentHashChanges = new ConsistentHashChanges();
             consistentHashChangesMap.put(cacheName, consistentHashChanges);
          }
          consistentHashChanges.setNewMappings(segmentMappings);
       }
-      clusterTopologyManager.triggerRebalance(cacheName, consistentHashChanges);
+      clusterTopologyManager.updateCacheStatus(cacheName);
    }
 
    public final void setNewReplicationDegree(String cacheName, int replicationDegree) throws Exception {
-      ConsistentHashChanges consistentHashChanges;
       synchronized (consistentHashChangesMap) {
-         consistentHashChanges = consistentHashChangesMap.get(cacheName);
+         ConsistentHashChanges consistentHashChanges = consistentHashChangesMap.get(cacheName);
          if (consistentHashChanges == null) {
             consistentHashChanges = new ConsistentHashChanges();
             consistentHashChangesMap.put(cacheName, consistentHashChanges);
          }
          consistentHashChanges.setNewReplicationDegree(replicationDegree);
       }
-      clusterTopologyManager.triggerRebalance(cacheName, consistentHashChanges);
+      clusterTopologyManager.updateCacheStatus(cacheName);
    }
 
    public boolean isBalanced(String cacheName, ConsistentHash ch) {

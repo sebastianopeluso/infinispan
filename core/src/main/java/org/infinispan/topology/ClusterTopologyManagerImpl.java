@@ -231,6 +231,12 @@ public class ClusterTopologyManagerImpl implements ClusterTopologyManager {
       return cacheStatus == null ? 0 : cacheStatus.getCacheTopologyHistory().size();
    }
 
+   @Override
+   public void updateCacheStatus(String cacheName) throws Exception {
+      ClusterCacheStatus cacheStatus = cacheStatusMap.get(cacheName);
+      rebalancePolicy.updateCacheStatus(cacheName, cacheStatus);
+   }
+
    protected void handleNewView(List<Address> ignored, boolean mergeView, int newViewId) {
       synchronized (viewHandlingLock) {
          // check to ensure this is not an older view

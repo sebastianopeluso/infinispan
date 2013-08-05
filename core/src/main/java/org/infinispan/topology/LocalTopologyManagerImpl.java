@@ -19,15 +19,6 @@
 
 package org.infinispan.topology;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import org.infinispan.CacheException;
 import org.infinispan.commands.ReplicableCommand;
 import org.infinispan.commands.remote.ConfigurationStateCommand;
@@ -37,9 +28,9 @@ import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
-import org.infinispan.jmx.annotations.DataType;
 import org.infinispan.jmx.annotations.MBean;
-import org.infinispan.jmx.annotations.ManagedAttribute;
+import org.infinispan.jmx.annotations.ManagedOperation;
+import org.infinispan.jmx.annotations.Parameter;
 import org.infinispan.reconfigurableprotocol.manager.ReconfigurableReplicationManager;
 import org.infinispan.remoting.responses.ConfigurationFilter;
 import org.infinispan.remoting.responses.ExceptionResponse;
@@ -52,6 +43,15 @@ import org.infinispan.statetransfer.ConfigurationState;
 import org.infinispan.util.concurrent.ConcurrentMapFactory;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static org.infinispan.factories.KnownComponentNames.ASYNC_TRANSPORT_EXECUTOR;
 
@@ -292,15 +292,15 @@ public class LocalTopologyManagerImpl implements LocalTopologyManager {
       return null;
    }
 
-   @ManagedAttribute(description = "Rebalancing enabled", displayName = "Rebalancing enabled",
-         dataType = DataType.TRAIT, writable = true)
+   @ManagedOperation(description = "Rebalancing enabled", displayName = "Rebalancing enabled")
    public boolean isRebalancingEnabled() throws Exception {
       ReplicableCommand command = new CacheTopologyControlCommand(null,
             CacheTopologyControlCommand.Type.POLICY_GET_STATUS, transport.getAddress(), transport.getViewId());
       return (Boolean) executeOnCoordinator(command, getGlobalTimeout());
    }
 
-   public void setRebalancingEnabled(boolean enabled) throws Exception {
+   @ManagedOperation(description = "Enables/Disables rebalancing", displayName = "Enables/Disables rebalancing")
+   public void setRebalancingEnabled(@Parameter(description = "enable?") boolean enabled) throws Exception {
       CacheTopologyControlCommand.Type type = enabled ? CacheTopologyControlCommand.Type.POLICY_ENABLE
             : CacheTopologyControlCommand.Type.POLICY_DISABLE;
       ReplicableCommand command = new CacheTopologyControlCommand(null, type, transport.getAddress(),

@@ -60,4 +60,6 @@ public interface ClusterTopologyManager {
    void gcUnreachableCacheTopology(String cacheName, int minTopologyId);
    
    int getCacheHistorySize(String cacheName);
+
+   void updateCacheStatus(String cacheName) throws Exception;
 }

@@ -21,8 +21,7 @@ package org.infinispan.topology;
 
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.factories.annotations.Inject;
-import org.infinispan.jmx.annotations.DataType;
-import org.infinispan.jmx.annotations.ManagedAttribute;
+import org.infinispan.jmx.annotations.ManagedOperation;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -95,8 +94,7 @@ public class DefaultRebalancePolicy implements RebalancePolicy {
       return true;
    }
 
-   @ManagedAttribute(description = "Rebalancing enabled", displayName = "Rebalancing enabled",
-         dataType = DataType.TRAIT, writable = true)
+   @ManagedOperation(description = "Rebalancing enabled", displayName = "Rebalancing enabled")
    @Override
    public boolean isRebalancingEnabled() {
       synchronized (lock) {
@@ -104,6 +102,7 @@ public class DefaultRebalancePolicy implements RebalancePolicy {
       }
    }
 
+   @ManagedOperation(description = "Enable/Disable rebalancing", displayName = "Enable/Disable rebalancing")
    @Override
    public void setRebalancingEnabled(boolean enabled) {
       Set<String> caches;
@@ -120,7 +119,7 @@ public class DefaultRebalancePolicy implements RebalancePolicy {
          log.debugf("Rebalancing re-enabled, triggering rebalancing for caches %s", caches);
          for (String cacheName : caches) {
             try {
-               clusterTopologyManager.triggerRebalance(cacheName);
+               clusterTopologyManager.triggerRebalance(cacheName, null);
             } catch (Exception e) {
                log.rebalanceStartError(cacheName, e);
             }
