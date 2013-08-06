@@ -733,6 +733,60 @@ public class DistConsistencyTest3 extends AbstractGMUTest {
       assertCachesValue(1, key11, VALUE_2);
    }
 
+   public void testRollbackInAllNodes() throws Exception {
+      assertAtLeastCaches(2);
+      final Object key00 = newKey(0, 1);
+      final Object key01 = newKey(0, 1);
+      final Object key10 = newKey(1, 0);
+      final Object key11 = newKey(1, 0);
+
+      tm(0).begin();
+      cache(0).put(key00, VALUE_1);
+      cache(0).put(key01, VALUE_1);
+      cache(0).put(key10, VALUE_1);
+      cache(0).put(key11, VALUE_1);
+      tm(0).commit();
+
+      final ControlledRpcManager rpcManager0 = replaceRpcManager(cache(0));
+      rpcManager0.failAfterFor(GMUPrepareCommand.class);
+
+      tm(0).begin();
+      Assert.assertEquals(cache(0).get(key10), VALUE_1, "Wrong value for key " + key10);
+      Assert.assertEquals(cache(0).get(key11), VALUE_1, "Wrong value for key " + key11);
+      cache(0).put(key00, VALUE_2);
+      cache(0).put(key01, VALUE_2);
+      try {
+         tm(0).commit();
+         Assert.fail("Rollback expected");
+      } catch (RollbackException e) {
+         //expected
+      }
+      rpcManager0.stopFailing();
+
+      assertNoTransactions();
+      assertNotLocked(0, key00);
+      assertNotLocked(0, key01);
+      assertNotLocked(1, key10);
+      assertNotLocked(1, key11);
+
+      assertCachesValue(0, key00, VALUE_1);
+      assertCachesValue(0, key10, VALUE_1);
+      assertCachesValue(0, key01, VALUE_1);
+      assertCachesValue(0, key11, VALUE_1);
+
+      tm(0).begin();
+      cache(0).put(key00, VALUE_2);
+      cache(0).put(key01, VALUE_2);
+      cache(0).put(key10, VALUE_2);
+      cache(0).put(key11, VALUE_2);
+      tm(0).commit();
+
+      assertCachesValue(0, key00, VALUE_2);
+      assertCachesValue(0, key10, VALUE_2);
+      assertCachesValue(0, key01, VALUE_2);
+      assertCachesValue(0, key11, VALUE_2);
+   }
+
    @Override
    protected void decorate(ConfigurationBuilder builder) {
       builder.clustering().clustering().hash().numOwners(1);

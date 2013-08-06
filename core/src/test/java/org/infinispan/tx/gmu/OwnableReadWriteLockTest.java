@@ -23,8 +23,11 @@
 package org.infinispan.tx.gmu;
 
 import org.infinispan.util.concurrent.locks.OwnableReentrantReadWriteLock;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
 import org.testng.annotations.Test;
 
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import static junit.framework.Assert.assertEquals;
@@ -38,6 +41,8 @@ import static junit.framework.Assert.assertEquals;
 @Test(groups = "functional", testName = "tx.gmu.OwnableReadWriteLockTest")
 public class OwnableReadWriteLockTest {
 
+   private static final Log log = LogFactory.getLog(OwnableReadWriteLockTest.class);
+   private static final int NUMBER_OF_THREADS = 64;
    private static final long TIMEOUT = 10000;
 
    public void testMultipleRead() throws InterruptedException {
@@ -89,6 +94,39 @@ public class OwnableReadWriteLockTest {
       assert lock.getLockState() == 0;
    }
 
+   public void testMultipleThreads() {
+      final WorkerThread[] workerThreads = new WorkerThread[NUMBER_OF_THREADS];
+      final OwnableReentrantReadWriteLock lock1 = new OwnableReentrantReadWriteLock();
+      final OwnableReentrantReadWriteLock lock2 = new OwnableReentrantReadWriteLock();
+      final SharedObject sharedObject = new SharedObject(lock1, lock2);
+      for (int i = 0; i < NUMBER_OF_THREADS; ++i) {
+         workerThreads[i] = new WorkerThread(sharedObject, i);
+      }
+      for (int i = 0; i < NUMBER_OF_THREADS; ++i) {
+         workerThreads[i].start();
+      }
+      try {
+         Thread.sleep(60000);
+      } catch (InterruptedException e) {
+         Thread.currentThread().interrupt();
+      }
+      for (int i = 0; i < NUMBER_OF_THREADS; ++i) {
+         workerThreads[i].interrupt();
+      }
+      for (int i = 0; i < NUMBER_OF_THREADS; ++i) {
+         try {
+            workerThreads[i].join();
+         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+         }
+      }
+      assert lock1.getLockState() == 0;
+      assert lock2.getLockState() == 0;
+      for (int i = 0; i < NUMBER_OF_THREADS; ++i) {
+         assert workerThreads[i].errors == 0;
+      }
+   }
+
    private Owner owner(int id) {
       return new Owner(id);
    }
@@ -123,6 +161,128 @@ public class OwnableReadWriteLockTest {
       @Override
       public int hashCode() {
          return id;
+      }
+   }
+
+   private class WorkerThread extends Thread {
+
+      private final SharedObject sharedObject;
+      private final int id;
+      private final Random random;
+      private final boolean transferFrom1To2;
+      private volatile int errors;
+      private volatile boolean running;
+
+      private WorkerThread(SharedObject sharedObject, int id) {
+         this.sharedObject = sharedObject;
+         this.id = id;
+         this.random = new Random(System.nanoTime() << id);
+         this.errors = 0;
+         this.transferFrom1To2 = id % 2 == 0;
+      }
+
+      @Override
+      public void run() {
+         running = true;
+         while (running) {
+            executeWrite();
+            executeRead();
+         }
+      }
+
+      @Override
+      public void interrupt() {
+         running = false;
+         super.interrupt();
+      }
+
+      private void executeWrite() {
+         boolean locked1 = false;
+         boolean locked2 = false;
+         try {
+            locked1 = sharedObject.lock1.tryLock(id, 100, TimeUnit.MILLISECONDS);
+            if (!locked1) {
+               return;
+            }
+            locked2 = sharedObject.lock2.tryLock(id, 100, TimeUnit.MILLISECONDS);
+            if (!locked2) {
+               return;
+            }
+            if (!sharedObject.lock1.tryShareLock(id, 100, TimeUnit.MILLISECONDS)) {
+               log.fatalf("Could not acquire shared lock1 after acquired exclusive lock for thread %s", id);
+               errors++;
+               return;
+            }
+            if (!sharedObject.lock2.tryShareLock(id, 100, TimeUnit.MILLISECONDS)) {
+               log.fatalf("Could not acquire shared lock2 after acquired exclusive lock for thread %s", id);
+               errors++;
+               return;
+            }
+
+            if (transferFrom1To2) {
+               int transfer = random.nextInt(sharedObject.counter1);
+               sharedObject.counter1 -= transfer;
+               sharedObject.counter2 += transfer;
+            } else {
+               int transfer = random.nextInt(sharedObject.counter2);
+               sharedObject.counter2 -= transfer;
+               sharedObject.counter1 += transfer;
+            }
+         } catch (InterruptedException e) {
+            super.interrupt();
+         } finally {
+            if (locked1) {
+               sharedObject.lock1.unlock(id);
+            }
+            if (locked2) {
+               sharedObject.lock2.unlock(id);
+            }
+         }
+      }
+
+      private void executeRead() {
+         boolean locked1 = false;
+         boolean locked2 = false;
+         try {
+            locked1 = sharedObject.lock1.tryShareLock(id, 100, TimeUnit.MILLISECONDS);
+            if (!locked1) {
+               return;
+            }
+            locked2 = sharedObject.lock2.tryShareLock(id, 100, TimeUnit.MILLISECONDS);
+            if (!locked2) {
+               return;
+            }
+
+            if (!sharedObject.check()) {
+               log.fatalf("Inconsistency detected for thread %s", id);
+               errors++;
+            }
+         } catch (InterruptedException e) {
+            this.interrupt();
+         } finally {
+            if (locked1) {
+               sharedObject.lock1.unlock(id);
+            }
+            if (locked2) {
+               sharedObject.lock2.unlock(id);
+            }
+         }
+      }
+   }
+
+   private class SharedObject {
+      private final OwnableReentrantReadWriteLock lock1;
+      private final OwnableReentrantReadWriteLock lock2;
+      private volatile int counter1 = 10000;
+      private volatile int counter2 = 10000;
+
+      private SharedObject(OwnableReentrantReadWriteLock lock1, OwnableReentrantReadWriteLock lock2) {
+         this.lock1 = lock1;
+         this.lock2 = lock2;
+      }
+
+      public final boolean check() {
+         return counter2 + counter1 == 20000;
       }
    }
 

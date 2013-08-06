@@ -56,7 +56,7 @@ public class ReplicationTxExceptionTest extends MultipleCacheManagersTest {
    }
 
    public void testReplicationFailure() throws Exception {
-      controlledRpcManager.failFor(PrepareCommand.class);
+      controlledRpcManager.failBeforeFor(PrepareCommand.class);
       try {
          TransactionManager tm = cache(0).getAdvancedCache().getTransactionManager();
          tm.begin();

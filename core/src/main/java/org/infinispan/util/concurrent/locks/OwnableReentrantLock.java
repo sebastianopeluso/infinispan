@@ -52,7 +52,7 @@ public class OwnableReentrantLock extends AbstractQueuedSynchronizer implements 
    private static final Log log = LogFactory.getLog(OwnableReentrantLock.class);
 
    private static final long serialVersionUID = 4932974734462848792L;
-   private transient Object owner;
+   protected transient Object owner;
    private final ThreadLocal<Object> requestorOnStack = new ThreadLocal<Object>();
 
    /**
@@ -157,10 +157,6 @@ public class OwnableReentrantLock extends AbstractQueuedSynchronizer implements 
       final Object current = currentRequestor();
       int c = getState();
 
-      if (log.isTraceEnabled()) {
-         log.tracef("%s tryAcquire(%s)", current, System.identityHashCode(this));
-      }
-
       if (c == 0) {
          if (compareAndSetState(0, acquires)) {
             owner = current;
@@ -212,7 +208,7 @@ public class OwnableReentrantLock extends AbstractQueuedSynchronizer implements 
    /**
     * @return the owner of the lock, or null if it is currently unlocked.
     */
-   public final Object getOwner() {
+   public Object getOwner() {
       int c = getState();
       Object o = owner;
       return (c == 0) ? null : o;

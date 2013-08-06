@@ -40,7 +40,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class OwnableReentrantReadWriteLock extends OwnableReentrantLock {
 
    private static final Log log = LogFactory.getLog(OwnableReentrantReadWriteLock.class);
-
    private transient final Map<Object, AtomicInteger> readCounters = new HashMap<Object, AtomicInteger>();
 
    public final int getLockState() {
@@ -71,6 +70,81 @@ public class OwnableReentrantReadWriteLock extends OwnableReentrantLock {
       }
    }
 
+   public final void lockShare(Object requestor) {
+      setCurrentRequestor(requestor);
+      try {
+         acquireShared(1);
+      } finally {
+         unsetCurrentRequestor();
+      }
+   }
+
+   public final boolean ownsShareLock(Object owner) {
+      synchronized (readCounters) {
+         return readCounters.containsKey(owner);
+      }
+   }
+
+   public final boolean isShareLocked() {
+      return getState() < 0;
+   }
+
+   @Override
+   public Object getOwner() {
+      int c = getState();
+      Object writeOwner = owner;
+      Object readOwner = anyReadOwner();
+      return c < 0 ? readOwner : (c == 0) ? null : writeOwner;
+   }
+
+   @Override
+   protected int tryAcquireShared(int i) {
+      Object requestor = currentRequestor();
+      int state = getState();
+      if (state <= 0 && compareAndSetState(state, state - i)) {
+         incrementRead(requestor);
+         if (log.isTraceEnabled()) {
+            log.tracef("%s tryAcquireShared(%s) => SUCCESS", requestor, System.identityHashCode(this));
+         }
+         return 1;
+      } else if (state > 0) {
+         if (log.isTraceEnabled()) {
+            log.tracef("%s tryAcquireShared(%s) => WRITE_LOCKED (%s)", requestor, System.identityHashCode(this),
+                       requestor.equals(getOwner()));
+         }
+         return requestor.equals(getOwner()) ? 0 : -1;
+      }
+      if (log.isTraceEnabled()) {
+         log.tracef("%s tryAcquireShared(%s) => FAILED", requestor, System.identityHashCode(this));
+      }
+      return -1;
+   }
+
+   @Override
+   protected boolean tryReleaseShared(int i) {
+      if (!decrementRead(currentRequestor())) {
+         if (log.isTraceEnabled()) {
+            log.tracef("%s tryReleaseShared(%s) => FAILED (Not Onwer)", currentRequestor(), System.identityHashCode(this));
+         }
+         throw new IllegalMonitorStateException(this.toString() + "[Requestor is " + currentRequestor() + "]");
+      }
+      while (true) {
+         int state = getState();
+         if (compareAndSetState(state, state + i)) {
+            if (log.isTraceEnabled()) {
+               log.tracef("%s tryReleaseShared(%s) => SUCCESS", currentRequestor(), System.identityHashCode(this));
+            }
+            return true;
+         }
+      }
+   }
+
+   @Override
+   protected void resetState() {
+      super.resetState();
+      readCounters.clear();
+   }
+
    private void unlockShare(Object requestor) {
       if (log.isTraceEnabled()) {
          log.tracef("%s unlockShare(%s)", requestor, System.identityHashCode(this));
@@ -86,73 +160,6 @@ public class OwnableReentrantReadWriteLock extends OwnableReentrantLock {
       }
    }
 
-   public final void lockShare(Object requestor) {
-      setCurrentRequestor(requestor);
-      try {
-         acquireShared(1);
-      } finally {
-         unsetCurrentRequestor();
-      }
-   }
-   
-   public final boolean ownsShareLock(Object owner) {
-      synchronized (readCounters) {
-         return readCounters.containsKey(owner);
-      }
-   }
-   
-   public final boolean isShareLocked() {
-      return getState() < 0;
-   }
-
-   @Override
-   protected int tryAcquireShared(int i) {
-      Object requestor = currentRequestor();
-      int state = getState();
-      if (state <= 0 && compareAndSetState(state, state - 1)) {
-         incrementRead(requestor);
-         if (log.isTraceEnabled()) {
-            log.tracef("%s tryAcquireShared(%s) => SUCCESS", requestor, System.identityHashCode(this));
-         }
-         return 1;
-      } else if (state > 0) {
-         if (log.isTraceEnabled()) {
-            log.tracef("%s tryAcquireShared(%s) => WRITE_LOCKED (%s)", requestor, System.identityHashCode(this),
-                       requestor.equals(getOwner()));
-         }
-         return requestor.equals(getOwner()) ? 0 : -1 ;
-      }
-      if (log.isTraceEnabled()) {
-         log.tracef("%s tryAcquireShared(%s) => FAILED", requestor, System.identityHashCode(this));
-      }
-      return -1;
-   }
-
-   @Override
-   protected boolean tryReleaseShared(int i) {
-      if (!decrementRead(currentRequestor())) {
-         if (log.isTraceEnabled()) {
-            log.tracef("%s tryReleaseShared(%s) => FAILED (Not Onwer)", currentRequestor(), System.identityHashCode(this));
-         }
-         throw new IllegalMonitorStateException(this.toString() + "[Requestor is "+currentRequestor()+"]");
-      }
-      while (true) {
-         int state = getState();
-         if (compareAndSetState(state, state + 1)) {
-            if (log.isTraceEnabled()) {
-               log.tracef("%s tryReleaseShared(%s) => SUCCESS", currentRequestor(), System.identityHashCode(this));
-            }
-            return true;
-         }
-      }
-   }        
-
-   @Override
-   protected void resetState() {
-      super.resetState();
-      readCounters.clear();
-   }
-
    private void incrementRead(Object owner) {
       synchronized (readCounters) {
          AtomicInteger counter = readCounters.get(owner);
@@ -163,7 +170,7 @@ public class OwnableReentrantReadWriteLock extends OwnableReentrantLock {
          }
       }
    }
-   
+
    private boolean decrementRead(Object owner) {
       synchronized (readCounters) {
          AtomicInteger counter = readCounters.get(owner);
@@ -174,6 +181,15 @@ public class OwnableReentrantReadWriteLock extends OwnableReentrantLock {
             readCounters.remove(owner);
          }
          return true;
+      }
+   }
+
+   private Object anyReadOwner() {
+      synchronized (readCounters) {
+         if (readCounters.isEmpty()) {
+            return null;
+         }
+         return readCounters.keySet().iterator().next();
       }
    }
 }
