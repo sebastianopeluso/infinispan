@@ -170,15 +170,21 @@ public final class TransactionsStatisticsRegistry {
       TransactionsStatisticsRegistry.addValueAndFlushIfNeeded(ExposedStatistic.TERMINATION_COST, System.nanoTime() - init, txs instanceof LocalTransactionStatistics);
    }
 
-   public static Object getAttribute(ExposedStatistic param, String className) {
-      if (className == null) {
-         return transactionalClassesStatsMap.get(DEFAULT_ISPN_CLASS).getAttribute(param);
+   public static Object getAttribute(ExposedStatistic param, String transactionClass) {
+      Object ret = null;
+      if (transactionClass == null) {
+         ret = transactionalClassesStatsMap.get(DEFAULT_ISPN_CLASS).getAttribute(param);
       } else {
-         if (transactionalClassesStatsMap.get(className) != null)
-            return transactionalClassesStatsMap.get(className).getAttribute(param);
-         else
-            return null;
+         final NodeScopeStatisticCollector collector = transactionalClassesStatsMap.get(transactionClass);
+         if (collector != null) {
+            ret = collector.getAttribute(param);
+         }
       }
+      if (log.isTraceEnabled()) {
+         log.tracef("Attribute %s (%s) == %s", param, transactionClass == null ? DEFAULT_ISPN_CLASS : transactionClass,
+                    ret);
+      }
+      return ret;
    }
 
    public static Object getPercentile(ExposedStatistic param, int percentile, String className) {
@@ -193,14 +199,6 @@ public final class TransactionsStatisticsRegistry {
          else
             return null;
       }
-   }
-
-   public static Object getAttribute(ExposedStatistic param) {
-      Object ret = transactionalClassesStatsMap.get(DEFAULT_ISPN_CLASS).getAttribute(param);
-      if (log.isTraceEnabled()) {
-         log.tracef("Attribute %s == %s", param, ret);
-      }
-      return ret;
    }
 
    public static void flushPendingRemoteLocksIfNeeded(GlobalTransaction id) {

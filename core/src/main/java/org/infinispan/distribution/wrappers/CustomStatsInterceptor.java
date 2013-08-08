@@ -78,8 +78,9 @@ import static org.infinispan.stats.ExposedStatistic.*;
  * @author Pedro Ruivo
  * @since 5.2
  */
-@MBean(objectName = "ExtendedStatistics", description = "Component that manages and exposes extended statistics " +
-      "relevant to transactions.")
+@MBean(objectName = "ExtendedStatistics",
+       description = "Component that manages and exposes extended statistics " +
+             "relevant to transactions.")
 public final class CustomStatsInterceptor extends BaseCustomInterceptor {
    //TODO what about the transaction implicit vs transaction explicit? should we take in account this and ignore
    //the implicit stuff?
@@ -222,11 +223,13 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
       transactionStatistics.attachId(ctx.getGlobalTransaction());
       if (LockRelatedStatsHelper.shouldAppendLocks(configuration, true, !ctx.isOriginLocal())) {
          if (log.isTraceEnabled())
-            log.trace("Appending locks for " + ((!ctx.isOriginLocal()) ? "remote " : "local ") + "transaction " + ctx.getGlobalTransaction().getId());
+            log.trace("Appending locks for " + ((!ctx.isOriginLocal()) ? "remote " : "local ") + "transaction " +
+                            ctx.getGlobalTransaction().getId());
          TransactionsStatisticsRegistry.appendLocks();
       } else {
          if (log.isTraceEnabled())
-            log.trace("Not appending locks for " + ((!ctx.isOriginLocal()) ? "remote " : "local ") + "transaction " + ctx.getGlobalTransaction().getId());
+            log.trace("Not appending locks for " + ((!ctx.isOriginLocal()) ? "remote " : "local ") + "transaction " +
+                            ctx.getGlobalTransaction().getId());
       }
       Object ret = invokeNextInterceptor(ctx, command);
 
@@ -341,386 +344,391 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
    }
 
    @ManagedAttribute(description = "Average number of puts performed by a successful local transaction",
-                     displayName = "Number of puts per successful local transaction")
+                     displayName = "No. of puts per successful local transaction")
    public double getAvgNumPutsBySuccessfulLocalTx() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(PUTS_PER_LOCAL_TX));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(PUTS_PER_LOCAL_TX, null));
    }
 
    @ManagedAttribute(description = "Average Prepare Round-Trip Time duration (in microseconds)",
-                     displayName = "Average Prepare RTT")
+                     displayName = "Avg Prepare RTT")
    public long getAvgPrepareRtt() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_PREPARE))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_PREPARE), null)));
    }
 
    @ManagedAttribute(description = "Average Commit Round-Trip Time duration (in microseconds)",
-                     displayName = "Average Commit RTT")
+                     displayName = "Avg Commit RTT")
    public long getAvgCommitRtt() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(RTT_COMMIT)));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(RTT_COMMIT, null)));
    }
 
    @ManagedAttribute(description = "Average Remote Get Round-Trip Time duration (in microseconds)",
-                     displayName = "Average Remote Get RTT")
+                     displayName = "Avg Remote Get RTT")
    public long getAvgRemoteGetRtt() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_GET))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_GET), null)));
    }
 
    @ManagedAttribute(description = "Average Rollback Round-Trip Time duration (in microseconds)",
-                     displayName = "Average Rollback RTT")
+                     displayName = "Avg Rollback RTT")
    public long getAvgRollbackRtt() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_ROLLBACK))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_ROLLBACK), null)));
    }
 
    @ManagedAttribute(description = "Average asynchronous Prepare duration (in microseconds)",
-                     displayName = "Average Prepare Async")
+                     displayName = "Avg Prepare Async")
    public long getAvgPrepareAsync() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_PREPARE))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_PREPARE), null)));
    }
 
    @ManagedAttribute(description = "Average asynchronous Commit duration (in microseconds)",
-                     displayName = "Average Commit Async")
+                     displayName = "Avg Commit Async")
    public long getAvgCommitAsync() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_COMMIT))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(ASYNC_COMMIT, null)));
    }
 
    @ManagedAttribute(description = "Average asynchronous Complete Notification duration (in microseconds)",
-                     displayName = "Average Complete Notification Async")
+                     displayName = "Avg Complete Notification Async")
    public long getAvgCompleteNotificationAsync() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_COMPLETE_NOTIFY))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(ASYNC_COMPLETE_NOTIFY, null)));
    }
 
    @ManagedAttribute(description = "Average asynchronous Rollback duration (in microseconds)",
-                     displayName = "Average Rollback Async")
+                     displayName = "Avg Rollback Async")
    public long getAvgRollbackAsync() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_ROLLBACK))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(ASYNC_ROLLBACK, null)));
    }
 
    @ManagedAttribute(description = "Average number of nodes in Commit destination set",
-                     displayName = "Average Number of Nodes in Commit Destination Set")
+                     displayName = "Avg no. of Nodes in Commit Destination Set")
    public long getAvgNumNodesCommit() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_COMMIT))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(NUM_NODES_COMMIT, null)));
    }
 
-   @ManagedAttribute(description = "Average number of nodes of async commit messages sent per xact",
-                     displayName = "Average number of nodes of async commit messages sent per xact")
+   @ManagedAttribute(description = "Average number of nodes of async commit messages sent per tx",
+                     displayName = "Avg no. of nodes of async commit messages sent per tx")
    public long getAvgNumAsyncSentCommitMsgs() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((SENT_ASYNC_COMMIT))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(SENT_ASYNC_COMMIT, null)));
    }
 
-   @ManagedAttribute(description = "Average number of nodes of Sync commit messages sent per xact",
-                     displayName = "Average number of nodes of Sync commit messages sent per xact")
+   @ManagedAttribute(description = "Average number of nodes of Sync commit messages sent per tx",
+                     displayName = "Avg no. of nodes of Sync commit messages sent per tx")
    public long getAvgNumSyncSentCommitMsgs() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((SENT_SYNC_COMMIT))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(SENT_SYNC_COMMIT, null)));
    }
 
    @ManagedAttribute(description = "Average number of nodes in Complete Notification destination set",
-                     displayName = "Average Number of Nodes in Complete Notification Destination Set")
+                     displayName = "Avg no. of Nodes in Complete Notification Destination Set")
    public long getAvgNumNodesCompleteNotification() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_COMPLETE_NOTIFY))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(NUM_NODES_COMPLETE_NOTIFY, null)));
    }
 
-   @ManagedAttribute(description = "Average number of nodes in Remote Get destination set",
-                     displayName = "Average Number of Nodes in Remote Get Destination Set")
+   @ManagedAttribute(description = "Average no. of nodes in Remote Get destination set",
+                     displayName = "Avg no. of Nodes in Remote Get Destination Set")
    public long getAvgNumNodesRemoteGet() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_GET))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(NUM_NODES_GET, null)));
    }
 
    @ManagedAttribute(description = "Average number of nodes in Prepare destination set",
-                     displayName = "Average Number of Nodes in Prepare Destination Set")
+                     displayName = "Avg no. of Nodes in Prepare Destination Set")
    public long getAvgNumNodesPrepare() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_PREPARE))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(NUM_NODES_PREPARE, null)));
    }
 
    @ManagedAttribute(description = "Average number of nodes in Rollback destination set",
-                     displayName = "Average Number of Nodes in Rollback Destination Set")
+                     displayName = "Avg no. of Nodes in Rollback Destination Set")
    public long getAvgNumNodesRollback() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_ROLLBACK))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_ROLLBACK), null)));
    }
 
    @ManagedAttribute(description = "Application Contention Factor",
                      displayName = "Application Contention Factor")
    public double getApplicationContentionFactor() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((APPLICATION_CONTENTION_FACTOR)));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(APPLICATION_CONTENTION_FACTOR, null));
    }
 
    @Deprecated
    @ManagedAttribute(description = "Local Contention Probability",
                      displayName = "Local Conflict Probability")
    public double getLocalContentionProbability() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((LOCAL_CONTENTION_PROBABILITY)));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((LOCAL_CONTENTION_PROBABILITY), null));
    }
 
    @Deprecated
    @ManagedAttribute(description = "Remote Contention Probability",
                      displayName = "Remote Conflict Probability")
    public double getRemoteContentionProbability() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((REMOTE_CONTENTION_PROBABILITY)));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((REMOTE_CONTENTION_PROBABILITY), null));
    }
 
    @ManagedAttribute(description = "Lock Contention Probability",
                      displayName = "Lock Contention Probability")
    public double getLockContentionProbability() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((LOCK_CONTENTION_PROBABILITY)));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((LOCK_CONTENTION_PROBABILITY), null));
    }
 
-   @ManagedAttribute(description = "Avg lock holding time (in microseconds)", displayName = "Avg lock holding time (in microseconds)")
+   @ManagedAttribute(description = "Avg lock holding time (in microseconds)",
+                     displayName = "Avg lock holding time")
    public long getAvgLockHoldTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME, null));
    }
 
    @ManagedAttribute(description = "Average lock local holding time (in microseconds)",
-                     displayName = "Average Lock Local Holding Time")
+                     displayName = "Avg Lock Local Holding Time")
    public long getAvgLocalLockHoldTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME_LOCAL));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME_LOCAL, null));
    }
 
-   @ManagedAttribute(description = "Average lock local holding time of committed xacts (in microseconds)",
-                     displayName = "Average lock local holding time of committed xacts")
+   @ManagedAttribute(description = "Average lock local holding time of committed tx (in microseconds)",
+                     displayName = "Avg lock local holding time of committed txs")
    public long getAvgLocalSuccessfulLockHoldTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(SUX_LOCK_HOLD_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(SUX_LOCK_HOLD_TIME, null));
    }
 
-   @ManagedAttribute(description = "Average lock local holding time of locally aborted xacts (in microseconds)",
-                     displayName = "Average lock local holding time of locally aborted xacts")
+   @ManagedAttribute(description = "Average lock local holding time of locally aborted tx (in microseconds)",
+                     displayName = "Avg lock local holding time of locally aborted txs")
    public long getAvgLocalLocalAbortLockHoldTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_ABORT_LOCK_HOLD_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_ABORT_LOCK_HOLD_TIME, null));
    }
 
-   @ManagedAttribute(description = "Average lock local holding time of remotely aborted xacts (in microseconds)",
-                     displayName = "Average lock local holding time of remotely aborted xacts (in microseconds)")
+   @ManagedAttribute(description = "Average lock local holding time of remotely aborted tx (in microseconds)",
+                     displayName = "Avg lock local holding time of remotely aborted tx")
    public long getAvgLocalRemoteAbortLockHoldTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_ABORT_LOCK_HOLD_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_ABORT_LOCK_HOLD_TIME, null));
    }
 
    @ManagedAttribute(description = "Average lock remote holding time (in microseconds)",
-                     displayName = "Average Lock Remote Holding Time")
+                     displayName = "Avg Lock Remote Holding Time")
    public long getAvgRemoteLockHoldTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME_REMOTE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME_REMOTE, null));
    }
 
-   @ManagedAttribute(description = "Avg prepare command size (in bytes)", displayName = "Avg prepare command size (in bytes)")
+   @ManagedAttribute(description = "Avg prepare command size (in bytes)",
+                     displayName = "Avg prepare command size (in bytes)")
    public long getAvgPrepareCommandSize() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(PREPARE_COMMAND_SIZE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(PREPARE_COMMAND_SIZE, null));
    }
 
-   @ManagedAttribute(description = "Avg rollback command size (in bytes)", displayName = "Avg rollback command size (in bytes)")
+   @ManagedAttribute(description = "Avg rollback command size (in bytes)",
+                     displayName = "Avg rollback command size (in bytes)")
    public long getAvgRollbackCommandSize() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(ROLLBACK_COMMAND_SIZE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(ROLLBACK_COMMAND_SIZE, null));
    }
 
-   @ManagedAttribute(description = "Avg size of a remote get reply (in bytes)", displayName = "Avg size of a remote get reply (in bytes)")
+   @ManagedAttribute(description = "Avg size of a remote get reply (in bytes)",
+                     displayName = "Avg size of a remote get reply (in bytes)")
    public long getAvgClusteredGetCommandReplySize() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_REPLY_SIZE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_REPLY_SIZE, null));
    }
 
    @ManagedAttribute(description = "Average commit command size (in bytes)",
-                     displayName = "Average Commit Command Size")
+                     displayName = "Avg Commit Command Size")
    public long getAvgCommitCommandSize() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(COMMIT_COMMAND_SIZE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(COMMIT_COMMAND_SIZE, null));
    }
 
    @ManagedAttribute(description = "Average clustered get command size (in bytes)",
-                     displayName = "Average Clustered Get Command Size")
+                     displayName = "Avg Clustered Get Command Size")
    public long getAvgClusteredGetCommandSize() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(CLUSTERED_GET_COMMAND_SIZE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(CLUSTERED_GET_COMMAND_SIZE, null));
    }
 
    @ManagedAttribute(description = "Average time waiting for the lock acquisition (in microseconds)",
-                     displayName = "Average Lock Waiting Time")
+                     displayName = "Avg Lock Waiting Time")
    public long getAvgLockWaitingTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_WAITING_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_WAITING_TIME, null));
    }
 
    @ManagedAttribute(description = "Average transaction arrival rate, originated locally and remotely (in transaction " +
          "per second)",
-                     displayName = "Average Transaction Arrival Rate")
+                     displayName = "Avg Transaction Arrival Rate")
    public double getAvgTxArrivalRate() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(ARRIVAL_RATE));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(ARRIVAL_RATE, null));
    }
 
    @ManagedAttribute(description = "Percentage of Write transaction executed locally (committed and aborted)",
                      displayName = "Percentage of Write Transactions")
    public double getPercentageWriteTransactions() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(TX_WRITE_PERCENTAGE));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(TX_WRITE_PERCENTAGE, null));
    }
 
    @ManagedAttribute(description = "Percentage of Write transaction executed in all successfully executed " +
          "transactions (local transaction only)",
                      displayName = "Percentage of Successfully Write Transactions")
    public double getPercentageSuccessWriteTransactions() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(SUCCESSFUL_WRITE_PERCENTAGE));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(SUCCESSFUL_WRITE_PERCENTAGE, null));
    }
 
-   @ManagedAttribute(description = "The numberh of ndlePreborted transactions due to deadlock",
-                     displayName = "Number of Aborted Transaction due to Deadlock")
+   @ManagedAttribute(description = "The number of aborted transactions due to deadlock",
+                     displayName = "No. of Aborted Transaction due to Deadlock")
    public long getNumAbortedTxDueDeadlock() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_FAILED_DEADLOCK));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_FAILED_DEADLOCK, null));
    }
 
    @ManagedAttribute(description = "Average successful read-only transaction duration (in microseconds)",
-                     displayName = "Average Read-Only Transaction Duration")
+                     displayName = "Avg Read-Only Transaction Duration")
    public long getAvgReadOnlyTxDuration() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(RO_TX_SUCCESSFUL_EXECUTION_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(RO_TX_SUCCESSFUL_EXECUTION_TIME, null));
    }
 
    @ManagedAttribute(description = "Average successful write transaction duration (in microseconds)",
-                     displayName = "Average Write Transaction Duration")
+                     displayName = "Avg Write Transaction Duration")
    public long getAvgWriteTxDuration() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WR_TX_SUCCESSFUL_EXECUTION_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WR_TX_SUCCESSFUL_EXECUTION_TIME, null));
    }
 
    @ManagedAttribute(description = "Average aborted write transaction duration (in microseconds)",
-                     displayName = "Average Aborted Write Transaction Duration")
+                     displayName = "Avg Aborted Write Transaction Duration")
    public long getAvgAbortedWriteTxDuration() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WR_TX_ABORTED_EXECUTION_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WR_TX_ABORTED_EXECUTION_TIME, null));
    }
 
    @ManagedAttribute(description = "Average number of locks per write local transaction",
-                     displayName = "Average Number of Lock per Local Transaction")
+                     displayName = "Avg no. of Lock per Local Transaction")
    public long getAvgNumOfLockLocalTx() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_LOCAL_TX));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_LOCAL_TX, null));
    }
 
    @ManagedAttribute(description = "Average number of locks per write remote transaction",
-                     displayName = "Average Number of Lock per Remote Transaction")
+                     displayName = "Avg no. of Lock per Remote Transaction")
    public long getAvgNumOfLockRemoteTx() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_REMOTE_TX));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_REMOTE_TX, null));
    }
 
    @ManagedAttribute(description = "Average number of locks per successfully write local transaction",
-                     displayName = "Average Number of Lock per Successfully Local Transaction")
+                     displayName = "Avg no. of Lock per Successfully Local Transaction")
    public long getAvgNumOfLockSuccessLocalTx() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_SUCCESS_LOCAL_TX));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_SUCCESS_LOCAL_TX, null));
    }
 
-   @ManagedAttribute(description = "Avg time it takes to execute the rollback command remotely (in microseconds)", displayName = "Avg time it takes to execute the rollback command remotely (in microseconds)")
+   @ManagedAttribute(description = "Average time it takes to execute the rollback command remotely (in microseconds)",
+                     displayName = "Avg remote CompletionCommand execution time")
    public long getAvgRemoteTxCompleteNotifyTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TX_COMPLETE_NOTIFY_EXECUTION_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TX_COMPLETE_NOTIFY_EXECUTION_TIME, null));
    }
 
    @ManagedAttribute(description = "Abort Rate",
                      displayName = "Abort Rate")
    public double getAbortRate() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(ABORT_RATE));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(ABORT_RATE, null));
    }
 
    @ManagedAttribute(description = "Throughput (in transactions per second)",
                      displayName = "Throughput")
    public double getThroughput() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(THROUGHPUT));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(THROUGHPUT, null));
    }
 
-   @ManagedAttribute(description = "Number of xact dead in remote prepare",
-                     displayName = "Number of xact dead in remote prepare")
-   public double getRemotelyDeadXact() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_REMOTELY_ABORTED));
+   @ManagedAttribute(description = "Number of tx dead in remote prepare",
+                     displayName = "No. of tx dead in remote prepare")
+   public long getRemotelyDeadXact() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_REMOTELY_ABORTED, null));
    }
 
    @ManagedAttribute(description = "Number of early aborts",
-                     displayName = "Number of early aborts")
-   public double getNumEarlyAborts() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_EARLY_ABORTS));
+                     displayName = "No. of early aborts")
+   public long getNumEarlyAborts() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_EARLY_ABORTS, null));
    }
 
-   @ManagedAttribute(description = "Number of xact dead while preparing locally",
-                     displayName = "Number of xact dead while preparing locally")
-   public double getNumLocalPrepareAborts() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCALPREPARE_ABORTS));
+   @ManagedAttribute(description = "Number of tx dead while preparing locally",
+                     displayName = "No. of tx dead while preparing locally")
+   public long getNumLocalPrepareAborts() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCALPREPARE_ABORTS, null));
    }
 
-   @ManagedAttribute(description = "Number of update xacts gone up to prepare phase",
-                     displayName = "Number of update xacts gone up to prepare phase")
-   public double getUpdateXactToPrepare() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_UPDATE_TX_GOT_TO_PREPARE));
+   @ManagedAttribute(description = "Number of update tx gone up to prepare phase",
+                     displayName = "No. of update tx gone up to prepare phase")
+   public long getUpdateXactToPrepare() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_UPDATE_TX_GOT_TO_PREPARE, null));
    }
 
    @ManagedAttribute(description = "Average number of get operations per local read transaction",
-                     displayName = "Average number of get operations per local read transaction")
+                     displayName = "Avg no. of get operations per local read transaction")
    public long getAvgGetsPerROTransaction() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_GETS_RO_TX));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_GETS_RO_TX, null));
    }
 
    @ManagedAttribute(description = "Average number of get operations per local write transaction",
-                     displayName = "Average number of get operations per local write transaction")
+                     displayName = "Avg no. of get operations per local write transaction")
    public long getAvgGetsPerWrTransaction() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_GETS_WR_TX));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_GETS_WR_TX, null));
    }
 
    @ManagedAttribute(description = "Average number of remote get operations per local write transaction",
-                     displayName = "Average number of remote get operations per local write transaction")
+                     displayName = "Avg no. of remote get operations per local write transaction")
    public double getAvgRemoteGetsPerWrTransaction() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_GETS_WR_TX));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_GETS_WR_TX, null));
    }
 
    @ManagedAttribute(description = "Average number of remote get operations per local read transaction",
-                     displayName = "Average number of remote get operations per local read transaction")
+                     displayName = "Avg no. of remote get operations per local read transaction")
    public double getAvgRemoteGetsPerROTransaction() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_GETS_RO_TX));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_GETS_RO_TX, null));
    }
 
    @ManagedAttribute(description = "Average cost of a remote get",
                      displayName = "Remote get cost")
    public long getRemoteGetResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_REMOTE_GET_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_REMOTE_GET_R, null));
    }
 
    @ManagedAttribute(description = "Average number of put operations per local write transaction",
-                     displayName = "Average number of put operations per local write transaction")
+                     displayName = "Avg no. of put operations per local write transaction")
    public double getAvgPutsPerWrTransaction() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_PUTS_WR_TX));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_PUTS_WR_TX, null));
    }
 
    @ManagedAttribute(description = "Average number of remote put operations per local write transaction",
-                     displayName = "Average number of remote put operations per local write transaction")
+                     displayName = "Avg no. of remote put operations per local write transaction")
    public double getAvgRemotePutsPerWrTransaction() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_PUTS_WR_TX));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_PUTS_WR_TX, null));
    }
 
    @ManagedAttribute(description = "Average cost of a remote put",
                      displayName = "Remote put cost")
    public long getRemotePutExecutionTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_PUT_EXECUTION));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_PUT_EXECUTION, null));
    }
 
    @ManagedAttribute(description = "Number of gets performed since last reset",
-                     displayName = "Number of Gets")
+                     displayName = "No. of Gets")
    public long getNumberOfGets() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GET));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GET, null));
    }
 
    @ManagedAttribute(description = "Number of remote gets performed since last reset",
-                     displayName = "Number of Remote Gets")
+                     displayName = "No. of Remote Gets")
    public long getNumberOfRemoteGets() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCAL_REMOTE_GET));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCAL_REMOTE_GET, null));
    }
 
    @ManagedAttribute(description = "Number of puts performed since last reset",
-                     displayName = "Number of Puts")
+                     displayName = "No. of Puts")
    public long getNumberOfPuts() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_PUT));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_PUT, null));
    }
 
    @ManagedAttribute(description = "Number of remote puts performed since last reset",
-                     displayName = "Number of Remote Puts")
+                     displayName = "No. of Remote Puts")
    public long getNumberOfRemotePuts() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_REMOTE_PUT));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_REMOTE_PUT, null));
    }
 
    @ManagedAttribute(description = "Number of committed transactions since last reset",
-                     displayName = "Number Of Commits")
+                     displayName = "No. Of Commits")
    public long getNumberOfCommits() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_COMMITS));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_COMMITS, null));
    }
 
    @ManagedAttribute(description = "Number of local committed transactions since last reset",
-                     displayName = "Number Of Local Commits")
+                     displayName = "No. Of Local Commits")
    public long getNumberOfLocalCommits() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCAL_COMMITS));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCAL_COMMITS, null));
    }
 
    @ManagedAttribute(description = "Write skew probability",
                      displayName = "Write Skew Probability")
    public double getWriteSkewProbability() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(WRITE_SKEW_PROBABILITY));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(WRITE_SKEW_PROBABILITY, null));
    }
 
    @ManagedOperation(description = "Reset all the statistics collected",
@@ -730,25 +738,25 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
    }
 
    @ManagedAttribute(description = "Average Local processing Get time (in microseconds)",
-                     displayName = "Average Local Get time")
+                     displayName = "Avg Local Get time")
    public long getAvgLocalGetTime() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((LOCAL_GET_EXECUTION))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(LOCAL_GET_EXECUTION, null)));
    }
 
    @ManagedAttribute(description = "Average TCB time (in microseconds)",
-                     displayName = "Average TCB time")
+                     displayName = "Avg TCB time")
    public long getAvgTCBTime() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((TBC))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(TBC, null)));
    }
 
    @ManagedAttribute(description = "Average NTCB time (in microseconds)",
-                     displayName = "Average NTCB time")
+                     displayName = "Avg NTCB time")
    public long getAvgNTCBTime() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NTBC))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(NTBC, null)));
    }
 
    @ManagedAttribute(description = "Number of nodes in the cluster",
-                     displayName = "Number of nodes")
+                     displayName = "No. of nodes")
    public long getNumNodes() {
       try {
          if (rpcManager != null) {
@@ -775,10 +783,10 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
       }
    }
 
-   @ManagedAttribute(description = "Cost of terminating a xact (debug only)",
-                     displayName = "Cost of terminating a xact (debug only)")
+   @ManagedAttribute(description = "Cost of terminating a tx (debug only)",
+                     displayName = "Cost of terminating a tx (debug only)")
    public long getTerminationCost() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TERMINATION_COST));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TERMINATION_COST, null));
    }
 
    @ManagedAttribute(description = "Number of concurrent transactions executing on the current node",
@@ -797,625 +805,608 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
 
     /*Local Update*/
 
-   @ManagedAttribute(description = "Avg CPU demand to execute a local xact up to the prepare phase", displayName = "Avg CPU demand to execute a local xact up to the prepare phase")
+   @ManagedAttribute(description = "Avg CPU demand to execute a local tx up to the prepare phase",
+                     displayName = "Avg CPU to execute a local tx up to the prepare phase")
    public long getLocalUpdateTxLocalServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_S, null));
    }
 
-   @ManagedAttribute(description = "Avg response time of the local part of a xact up to the prepare phase", displayName = "Avg response time of the local part of a xact up to the prepare phase")
+   @ManagedAttribute(description = "Avg response time of the local part of a tx up to the prepare phase",
+                     displayName = "Avg response time of a tx up to the prepare phase")
    public long getLocalUpdateTxLocalResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_R, null));
    }
 
-   @ManagedAttribute(description = "Avg response time of a local PrepareCommand", displayName = "Avg response time of a local PrepareCommand")
+   @ManagedAttribute(description = "Avg response time of a local PrepareCommand",
+                     displayName = "Avg response time of a local PrepareCommand")
    public long getLocalUpdateTxPrepareResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_PREPARE_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_PREPARE_R, null));
    }
 
-   @ManagedAttribute(description = "Avg CPU demand to execute a local PrepareCommand", displayName = "Avg CPU demand to execute a local PrepareCommand")
+   @ManagedAttribute(description = "Avg CPU demand to execute a local PrepareCommand",
+                     displayName = "Avg CPU to execute a local PrepareCommand")
    public long getLocalUpdateTxPrepareServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_PREPARE_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_PREPARE_S, null));
    }
 
-   @ManagedAttribute(description = "Avg CPU demand to execute a local PrepareCommand", displayName = "Avg CPU demand to execute a local PrepareCommand")
+   @ManagedAttribute(description = "Avg CPU demand to execute a local PrepareCommand",
+                     displayName = "Avg CPU to execute a local PrepareCommand")
    public long getLocalUpdateTxCommitServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_COMMIT_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_COMMIT_S, null));
    }
 
-   @ManagedAttribute(description = "Avg response time of a local CommitCommand", displayName = "Avg response time of a local CommitCommand")
+   @ManagedAttribute(description = "Avg response time of a local CommitCommand",
+                     displayName = "Avg response time of a local CommitCommand")
    public long getLocalUpdateTxCommitResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_COMMIT_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_COMMIT_R, null));
    }
 
-   @ManagedAttribute(description = "Avg CPU demand to execute a local RollbackCommand without remote nodes", displayName = "Avg CPU demand to execute a local RollbackCommand without remote nodes")
+   @ManagedAttribute(description = "Avg CPU demand to execute a local RollbackCommand without remote nodes",
+                     displayName = "Avg CPU to execute a local RollbackCommand without remote nodes")
    public long getLocalUpdateTxLocalRollbackServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_LOCAL_ROLLBACK_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_LOCAL_ROLLBACK_S, null));
    }
 
-   @ManagedAttribute(description = "Avg response time to execute a remote RollbackCommand", displayName = "Avg response time to execute a remote RollbackCommand")
+   @ManagedAttribute(description = "Avg response time to execute a remote RollbackCommand",
+                     displayName = "Avg response time to execute a remote RollbackCommand")
    public long getLocalUpdateTxLocalRollbackResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_LOCAL_ROLLBACK_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_LOCAL_ROLLBACK_R, null));
    }
 
-   @ManagedAttribute(description = "Avg CPU demand to execute a local RollbackCommand with remote nodes", displayName = "Avg CPU demand to execute a local RollbackCommand with remote nodes")
+   @ManagedAttribute(description = "Avg CPU demand to execute a local RollbackCommand with remote nodes",
+                     displayName = "Avg CPU to execute a local RollbackCommand with remote nodes")
    public long getLocalUpdateTxRemoteRollbackServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_REMOTE_ROLLBACK_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_REMOTE_ROLLBACK_S, null));
    }
 
-   @ManagedAttribute(description = "Avg response time to execute a local RollbackCommand with remote nodes", displayName = "Avg response time to execute a local RollbackCommand with remote nodes")
+   @ManagedAttribute(description = "Avg response time to execute a local RollbackCommand with remote nodes",
+                     displayName = "Avg response time of a local RollbackCommand with remote nodes")
    public long getLocalUpdateTxRemoteRollbackResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_REMOTE_ROLLBACK_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_REMOTE_ROLLBACK_R, null));
    }
 
 
    /*Remote*/
 
-   @ManagedAttribute(description = "Avg response time of the prepare of a remote xact", displayName = "Avg response time of the prepare of a remote xact")
+   @ManagedAttribute(description = "Avg response time of the prepare of a remote tx",
+                     displayName = "Avg response time of the prepare of a remote tx")
    public long getRemoteUpdateTxPrepareResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_PREPARE_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_PREPARE_R, null));
    }
 
-   @ManagedAttribute(description = "Avg CPU demand to execute the prepare of a remote xact", displayName = "Avg CPU demand to execute the prepare of a remote xact")
+   @ManagedAttribute(description = "Avg CPU demand to execute the prepare of a remote tx",
+                     displayName = "Avg CPU to execute the prepare of a remote tx")
    public long getRemoteUpdateTxPrepareServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_PREPARE_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_PREPARE_S, null));
    }
 
-   @ManagedAttribute(description = "Avg CPU demand to execute the commitCommand of a remote xact", displayName = "Avg CPU demand to execute the commitCommand of a remote xact")
+   @ManagedAttribute(description = "Avg CPU demand to execute the commitCommand of a remote tx",
+                     displayName = "Avg CPU to execute the commitCommand of a remote tx")
    public long getRemoteUpdateTxCommitServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_COMMIT_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_COMMIT_S, null));
    }
 
-   @ManagedAttribute(description = "Avg response time of the execution of the commitCommand of a remote xact", displayName = "Avg response time of the execution of the commitCommand of a remote xact")
+   @ManagedAttribute(description = "Avg response time of the execution of the commitCommand of a remote tx",
+                     displayName = "Avg response time of the CommitCommand execution for remote tx")
    public long getRemoteUpdateTxCommitResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_COMMIT_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_COMMIT_R, null));
    }
 
-   @ManagedAttribute(description = "Avg CPU demand to perform the rollback of a remote xact", displayName = "Avg CPU demand to perform the rollback of a remote xact")
+   @ManagedAttribute(description = "Avg CPU demand to perform the rollback of a remote tx",
+                     displayName = "Avg CPU to perform the rollback of a remote tx")
    public long getRemoteUpdateTxRollbackServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_ROLLBACK_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_ROLLBACK_S, null));
    }
 
-   @ManagedAttribute(description = "Avg response time of the rollback of a remote xact", displayName = "Avg response time of the rollback of a remote xact")
+   @ManagedAttribute(description = "Avg response time of the rollback of a remote tx",
+                     displayName = "Avg response time of the rollback of a remote tx")
    public long getRemoteUpdateTxRollbackResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_ROLLBACK_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_ROLLBACK_R, null));
    }
 
    /* Read Only*/
 
-   @ManagedAttribute(description = "Avg CPU demand to perform the local execution of a read only xact", displayName = "Avg CPU demand to perform the local execution of a read only xact")
+   @ManagedAttribute(description = "Avg CPU demand to perform the local execution of a read only tx",
+                     displayName = "Avg CPU to perform the local execution of a read only tx")
    public long getLocalReadOnlyTxLocalServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_LOCAL_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_LOCAL_S, null));
    }
 
-   @ManagedAttribute(description = "Avg response time of the local execution of a read only xact", displayName = "Avg response time of the local execution of a read only xact")
+   @ManagedAttribute(description = "Avg response time of the local execution of a read only tx",
+                     displayName = "Avg response time of local execution of a read only tx")
    public long getLocalReadOnlyTxLocalResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_LOCAL_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_LOCAL_R, null));
    }
 
-   @ManagedAttribute(description = "Avg response time of the prepare of a read only xact", displayName = "Avg response time of the prepare of a read only xact")
+   @ManagedAttribute(description = "Avg response time of the prepare of a read only tx",
+                     displayName = "Avg response time of the prepare of a read only tx")
    public long getLocalReadOnlyTxPrepareResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_PREPARE_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_PREPARE_R, null));
    }
 
-   @ManagedAttribute(description = "Avg CPU demand to perform the prepare of a read only xact", displayName = "Avg CPU demand to perform the prepare of a read only xact")
+   @ManagedAttribute(description = "Avg CPU demand to perform the prepare of a read only tx",
+                     displayName = "Avg CPU to perform the prepare of a read only tx")
    public long getLocalReadOnlyTxPrepareServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_PREPARE_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_PREPARE_S, null));
    }
 
-   @ManagedAttribute(description = "Avg CPU demand to perform the commit of a read only xact", displayName = "Avg CPU demand to perform the commit of a read only xact")
+   @ManagedAttribute(description = "Avg CPU demand to perform the commit of a read only tx",
+                     displayName = "Avg CPU to perform the commit of a read only tx")
    public long getLocalReadOnlyTxCommitServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_COMMIT_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_COMMIT_S, null));
    }
 
-   @ManagedAttribute(description = "Avg response time of the commit of a read only xact", displayName = "Avg response time of the commit of a read only xact")
+   @ManagedAttribute(description = "Avg response time of the commit of a read only tx",
+                     displayName = "Avg response time of the commit of a read only tx")
    public long getLocalReadOnlyTxCommitResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_COMMIT_R));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_COMMIT_R, null));
    }
 
-   @ManagedAttribute(description = "Avg CPU demand to serve a remote get", displayName = "Avg CPU demand to serve a remote get")
+   @ManagedAttribute(description = "Avg CPU demand to serve a remote get",
+                     displayName = "Avg CPU to serve a remote get")
    public long getRemoteGetServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_REMOTE_GET_S));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_REMOTE_GET_S, null));
    }
 
-   @ManagedAttribute(description = "Avg number of local items in a local prepareCommand", displayName = "Avg number or data items in a local prepareCommand to write")
+   @ManagedAttribute(description = "Avg number of local items in a local prepareCommand",
+                     displayName = "Avg no. or items in a local prepareCommand to write")
    public double getNumOwnedRdItemsInLocalPrepare() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_RD_ITEMS_IN_LOCAL_PREPARE));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_RD_ITEMS_IN_LOCAL_PREPARE, null));
    }
 
-   @ManagedAttribute(description = "Avg number of local data items in a local prepareCommand to read-validate", displayName = "Avg number or data items in a local prepareCommand to read-validate")
+   @ManagedAttribute(description = "Avg number of local data items in a local prepareCommand to read-validate",
+                     displayName = "Avg no. or items in a local prepareCommand to read")
    public double getNumOwnedWrItemsInLocalPrepare() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_WR_ITEMS_IN_LOCAL_PREPARE));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_WR_ITEMS_IN_LOCAL_PREPARE, null));
    }
 
-   @ManagedAttribute(description = "Avg number of local data items in a remote prepareCommand to read-validate", displayName = "Avg number or data items in a remote prepareCommand to read-validate")
+   @ManagedAttribute(description = "Avg number of local data items in a remote prepareCommand to read-validate",
+                     displayName = "Avg no. or items in a remote prepareCommand to read")
    public double getNumOwnedRdItemsInRemotePrepare() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_RD_ITEMS_IN_REMOTE_PREPARE));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_RD_ITEMS_IN_REMOTE_PREPARE, null));
    }
 
-   @ManagedAttribute(description = "Avg number of local data items in a remote prepareCommand to write", displayName = "Avg number or data items in a remote prepareCommand to write")
+   @ManagedAttribute(description = "Avg number of local data items in a remote prepareCommand to write",
+                     displayName = "Avg no. or items in a remote prepareCommand to write")
    public double getNumOwnedWrItemsInRemotePrepare() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_WR_ITEMS_IN_REMOTE_PREPARE));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_WR_ITEMS_IN_REMOTE_PREPARE, null));
    }
 
-   @ManagedAttribute(description = "Avg waiting time before serving a ClusteredGetCommand", displayName = "Avg waiting time before serving a ClusteredGetCommand")
+   @ManagedAttribute(description = "Avg waiting time before serving a ClusteredGetCommand",
+                     displayName = "Avg waiting time before serving a ClusteredGetCommand")
    public long getWaitedTimeInRemoteCommitQueue() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WAIT_TIME_IN_REMOTE_COMMIT_QUEUE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WAIT_TIME_IN_REMOTE_COMMIT_QUEUE, null));
    }
 
-   @ManagedAttribute(displayName = "Avg time spent in the commit queue by a xact", description = "Avg time spent in the commit queue by a xact")
+   @ManagedAttribute(displayName = "Avg time spent in the commit queue by a tx",
+                     description = "Avg time spent in the commit queue by a tx")
    public long getWaitedTimeInLocalCommitQueue() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WAIT_TIME_IN_COMMIT_QUEUE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WAIT_TIME_IN_COMMIT_QUEUE, null));
    }
 
-   @ManagedAttribute(displayName = "The number of xacts killed on the node due to unsuccessful validation", description = "The number of xacts killed on the node due to unsuccessful validation")
+   @ManagedAttribute(displayName = "No. of tx killed on the node due to unsuccessful validation",
+                     description = "The number of tx killed on the node due to unsuccessful validation")
    public long getNumKilledTxDueToValidation() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_KILLED_TX_DUE_TO_VALIDATION));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_KILLED_TX_DUE_TO_VALIDATION, null));
    }
 
-   @ManagedAttribute(description = "The number of aborted xacts due to unsuccessful validation", displayName = "The number of aborted xacts due to unsuccessful validation")
+   @ManagedAttribute(description = "The number of aborted tx due to unsuccessful validation",
+                     displayName = "No. of aborted tx due to unsuccessful validation")
    public long getNumAbortedTxDueToValidation() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_ABORTED_TX_DUE_TO_VALIDATION));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_ABORTED_TX_DUE_TO_VALIDATION, null));
    }
 
-   @ManagedAttribute(description = "The number of aborted xacts due to timeout in readlock acquisition", displayName = "The number of aborted xacts due to timeout in readlock acquisition")
+   @ManagedAttribute(description = "The number of aborted tx due to timeout in readlock acquisition",
+                     displayName = "No. of aborted tx due to timeout in readlock acquisition")
    public long getNumAbortedTxDueToReadLock() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_READLOCK_FAILED_TIMEOUT));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_READLOCK_FAILED_TIMEOUT, null));
    }
 
-   @ManagedAttribute(displayName = "The number of aborted xacts due to timeout in lock acquisition", description = "The number of aborted xacts due to timeout in lock acquisition")
+   @ManagedAttribute(displayName = "No. of aborted tx due to timeout in lock acquisition",
+                     description = "The number of aborted tx due to timeout in lock acquisition")
    public long getNumAbortedTxDueToWriteLock() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_FAILED_TIMEOUT));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_FAILED_TIMEOUT, null));
    }
 
-   @ManagedAttribute(displayName = "The number of aborted xacts due to stale read", description = "The number of aborted xacts due to stale read")
-   public long getNumAbortedTxDueToNotLastValueAccessed() {
-      return (long) getNumEarlyAborts();
-   }
-
-   @ManagedAttribute(displayName = "Number of reads before first write", description = "Number of reads before first writed")
+   @ManagedAttribute(displayName = "No. of reads before first write",
+                     description = "Number of reads before first writed")
    public double getNumReadsBeforeWrite() {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(FIRST_WRITE_INDEX));
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(FIRST_WRITE_INDEX, null));
    }
 
-   @ManagedAttribute(displayName = "Avg waiting time for a GMUClusteredGetCommand", description = "Avg waiting time for a GMUClusteredGetCommand")
-   public double getGMUClusteredGetCommandWaitingTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_WAITING_TIME));
+   @ManagedAttribute(displayName = "Avg waiting time for a GMUClusteredGetCommand",
+                     description = "Avg waiting time for a GMUClusteredGetCommand")
+   public long getGMUClusteredGetCommandWaitingTime() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_WAITING_TIME, null));
    }
 
-   @ManagedAttribute(displayName = "Avg response time for a GMUClusteredGetCommand (no queue)", description = "Avg response time for a GMUClusteredGetCommand (no queue)")
-   public double getGMUClusteredGetCommandResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_R));
+   @ManagedAttribute(displayName = "Avg response time for a GMUClusteredGetCommand (no queue)",
+                     description = "Avg response time for a GMUClusteredGetCommand (no queue)")
+   public long getGMUClusteredGetCommandResponseTime() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_R, null));
    }
 
-   @ManagedAttribute(displayName = "Avg cpu time for a GMUClusteredGetCommand", description = "Avg cpu time for a GMUClusteredGetCommand")
-   public double getGMUClusteredGetCommandServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_S));
+   @ManagedAttribute(displayName = "Avg cpu time for a GMUClusteredGetCommand",
+                     description = "Avg cpu time for a GMUClusteredGetCommand")
+   public long getGMUClusteredGetCommandServiceTime() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_S, null));
    }
 
-   @ManagedAttribute(displayName = "Avg CPU demand of a local update xact", description = "Avg CPU demand of a local update xact")
-   public double getLocalUpdateTxTotalCpuTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_TOTAL_S));
+   @ManagedAttribute(displayName = "Avg CPU of a local update tx",
+                     description = "Avg CPU demand of a local update tx")
+   public long getLocalUpdateTxTotalCpuTime() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_TOTAL_S, null));
    }
 
-   @ManagedAttribute(displayName = "Avg response time of a local update xact", description = "Avg response time of a local update xact")
-   public double getLocalUpdateTxTotalResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_TOTAL_R));
+   @ManagedAttribute(displayName = "Avg response time of a local update tx",
+                     description = "Avg response time of a local update tx")
+   public long getLocalUpdateTxTotalResponseTime() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_TOTAL_R, null));
    }
 
-   @ManagedAttribute(displayName = "Avg CPU demand of a read only xact", description = "Avg CPU demand of a read only xact")
-   public double getReadOnlyTxTotalResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_TOTAL_R));
+   @ManagedAttribute(displayName = "Avg CPU of a read only tx",
+                     description = "Avg CPU demand of a read only tx")
+   public long getReadOnlyTxTotalResponseTime() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_TOTAL_R, null));
    }
 
-   @ManagedAttribute(displayName = "Avg response time of a read only xact", description = "Avg response time of a read only xact")
-   public double getReadOnlyTxTotalCpuTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_TOTAL_S));
+   @ManagedAttribute(displayName = "Avg response time of a read only tx",
+                     description = "Avg response time of a read only tx")
+   public long getReadOnlyTxTotalCpuTime() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_TOTAL_S, null));
    }
 
-   @ManagedAttribute(description = "Avg Response Time", displayName = "Avg Response Time")
+   @ManagedAttribute(description = "Avg Response Time",
+                     displayName = "Avg Response Time")
    public long getAvgResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(RESPONSE_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(RESPONSE_TIME, null));
    }
 
    @ManagedOperation(description = "Average number of puts performed by a successful local transaction per class",
-                     displayName = "Number of puts per successful local transaction per class")
-   public double getAvgNumPutsBySuccessfulLocalTxParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(PUTS_PER_LOCAL_TX, transactionalClass));
+                     displayName = "No. of puts per successful local transaction per class")
+   public double getAvgNumPutsBySuccessfulLocalTxForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(PUTS_PER_LOCAL_TX, txClass));
    }
 
    @ManagedOperation(description = "Average Prepare Round-Trip Time duration (in microseconds) per class",
-                     displayName = "Average Prepare RTT per class")
-   public long getAvgPrepareRttParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_PREPARE), transactionalClass)));
+                     displayName = "Avg Prepare RTT per class")
+   public long getAvgPrepareRttForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(RTT_PREPARE, txClass)));
    }
 
    @ManagedOperation(description = "Average Commit Round-Trip Time duration (in microseconds) per class",
-                     displayName = "Average Commit RTT per class")
-   public long getAvgCommitRttParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_COMMIT), transactionalClass)));
+                     displayName = "Avg Commit RTT per class")
+   public long getAvgCommitRttForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(RTT_COMMIT, txClass)));
    }
 
    @ManagedOperation(description = "Average Remote Get Round-Trip Time duration (in microseconds) per class",
-                     displayName = "Average Remote Get RTT per class")
-   public long getAvgRemoteGetRttParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_GET), transactionalClass)));
+                     displayName = "Avg Remote Get RTT per class")
+   public long getAvgRemoteGetRttForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_GET), txClass)));
    }
 
    @ManagedOperation(description = "Average Rollback Round-Trip Time duration (in microseconds) per class",
-                     displayName = "Average Rollback RTT per class")
-   public long getAvgRollbackRttParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_ROLLBACK), transactionalClass)));
+                     displayName = "Avg Rollback RTT per class")
+   public long getAvgRollbackRttForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((RTT_ROLLBACK), txClass)));
    }
 
    @ManagedOperation(description = "Average asynchronous Prepare duration (in microseconds) per class",
-                     displayName = "Average Prepare Async per class")
-   public long getAvgPrepareAsyncParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_PREPARE), transactionalClass)));
+                     displayName = "Avg Prepare Async per class")
+   public long getAvgPrepareAsyncForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_PREPARE), txClass)));
    }
 
    @ManagedOperation(description = "Average asynchronous Commit duration (in microseconds) per class",
-                     displayName = "Average Commit Async per class")
-   public long getAvgCommitAsyncParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_COMMIT), transactionalClass)));
+                     displayName = "Avg Commit Async per class")
+   public long getAvgCommitAsyncForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(ASYNC_COMMIT, txClass)));
    }
 
    @ManagedOperation(description = "Average asynchronous Complete Notification duration (in microseconds) per class",
-                     displayName = "Average Complete Notification Async per class")
-   public long getAvgCompleteNotificationAsyncParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_COMPLETE_NOTIFY), transactionalClass)));
+                     displayName = "Avg Complete Notification Async per class")
+   public long getAvgCompleteNotificationAsyncForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(ASYNC_COMPLETE_NOTIFY, txClass)));
    }
 
    @ManagedOperation(description = "Average asynchronous Rollback duration (in microseconds) per class",
-                     displayName = "Average Rollback Async per class")
-   public long getAvgRollbackAsyncParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_ROLLBACK), transactionalClass)));
+                     displayName = "Avg Rollback Async per class")
+   public long getAvgRollbackAsyncForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((ASYNC_ROLLBACK), txClass)));
    }
 
    @ManagedOperation(description = "Average number of nodes in Commit destination set per class",
-                     displayName = "Average Number of Nodes in Commit Destination Set per class")
-   public long getAvgNumNodesCommitParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_COMMIT), transactionalClass)));
+                     displayName = "Avg no. of Nodes in Commit Destination Set per class")
+   public long getAvgNumNodesCommitForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(NUM_NODES_COMMIT, txClass)));
    }
 
    @ManagedOperation(description = "Average number of nodes in Complete Notification destination set per class",
-                     displayName = "Average Number of Nodes in Complete Notification Destination Set per class")
-   public long getAvgNumNodesCompleteNotificationParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_COMPLETE_NOTIFY), transactionalClass)));
+                     displayName = "Avg no. of Nodes in Complete Notification Destination Set per class")
+   public long getAvgNumNodesCompleteNotificationForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(NUM_NODES_COMPLETE_NOTIFY, txClass)));
    }
 
    @ManagedOperation(description = "Average number of nodes in Remote Get destination set per class",
-                     displayName = "Average Number of Nodes in Remote Get Destination Set per class")
-   public long getAvgNumNodesRemoteGetParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_GET), transactionalClass)));
+                     displayName = "Avg no. of Nodes in Remote Get Destination Set per class")
+   public long getAvgNumNodesRemoteGetForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_GET), txClass)));
    }
 
    //JMX with Transactional class xxxxxxxxx
 
    @ManagedOperation(description = "Average number of nodes in Prepare destination set per class",
-                     displayName = "Average Number of Nodes in Prepare Destination Set per class")
-   public long getAvgNumNodesPrepareParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_PREPARE), transactionalClass)));
+                     displayName = "Avg no. of Nodes in Prepare Destination Set per class")
+   public long getAvgNumNodesPrepareForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(NUM_NODES_PREPARE, txClass)));
    }
 
    @ManagedOperation(description = "Average number of nodes in Rollback destination set per class",
-                     displayName = "Average Number of Nodes in Rollback Destination Set per class")
-   public long getAvgNumNodesRollbackParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_ROLLBACK), transactionalClass)));
+                     displayName = "Avg no. of Nodes in Rollback Destination Set per class")
+   public long getAvgNumNodesRollbackForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_NODES_ROLLBACK), txClass)));
    }
 
    @ManagedOperation(description = "Application Contention Factor per class",
                      displayName = "Application Contention Factor per class")
-   public double getApplicationContentionFactorParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((APPLICATION_CONTENTION_FACTOR), transactionalClass));
+   public double getApplicationContentionFactorForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(APPLICATION_CONTENTION_FACTOR, txClass));
    }
 
    @Deprecated
    @ManagedOperation(description = "Local Contention Probability per class",
                      displayName = "Local Conflict Probability per class")
-   public double getLocalContentionProbabilityParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((LOCAL_CONTENTION_PROBABILITY), transactionalClass));
+   public double getLocalContentionProbabilityForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((LOCAL_CONTENTION_PROBABILITY), txClass));
    }
 
+   @Deprecated
    @ManagedOperation(description = "Remote Contention Probability per class",
                      displayName = "Remote Conflict Probability per class")
-   public double getRemoteContentionProbabilityParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((REMOTE_CONTENTION_PROBABILITY), transactionalClass));
+   public double getRemoteContentionProbabilityForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((REMOTE_CONTENTION_PROBABILITY), txClass));
    }
 
    @ManagedOperation(description = "Lock Contention Probability per class",
                      displayName = "Lock Contention Probability per class")
-   public double getLockContentionProbabilityParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((LOCK_CONTENTION_PROBABILITY), transactionalClass));
-   }
-
-   @ManagedOperation(description = "Local execution time of a transaction without the time waiting for lock acquisition per class",
-                     displayName = "Local Execution Time Without Locking Time per class")
-   public long getLocalExecutionTimeWithoutLockParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_EXEC_NO_CONT, transactionalClass));
+   public double getLockContentionProbabilityForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute((LOCK_CONTENTION_PROBABILITY), txClass));
    }
 
    @ManagedOperation(description = "Average lock holding time (in microseconds) per class",
-                     displayName = "Average Lock Holding Time per class")
-   public long getAvgLockHoldTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME, transactionalClass));
+                     displayName = "Avg Lock Holding Time per class")
+   public long getAvgLockHoldTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME, txClass));
    }
 
    @ManagedOperation(description = "Average lock local holding time (in microseconds) per class",
-                     displayName = "Average Lock Local Holding Time per class")
-   public long getAvgLocalLockHoldTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME_LOCAL, transactionalClass));
+                     displayName = "Avg Lock Local Holding Time per class")
+   public long getAvgLocalLockHoldTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME_LOCAL, txClass));
    }
 
    @ManagedOperation(description = "Average lock remote holding time (in microseconds) per class",
-                     displayName = "Average Lock Remote Holding Time per class")
-   public long getAvgRemoteLockHoldTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME_REMOTE, transactionalClass));
-   }
-
-   @ManagedOperation(description = "Average local rollback duration time (2nd phase only) (in microseconds) per class",
-                     displayName = "Average Rollback Time per class")
-   public long getAvgRollbackTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(ROLLBACK_EXECUTION_TIME, transactionalClass));
+                     displayName = "Avg Lock Remote Holding Time per class")
+   public long getAvgRemoteLockHoldTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_HOLD_TIME_REMOTE, txClass));
    }
 
    @ManagedOperation(description = "Average prepare command size (in bytes) per class",
-                     displayName = "Average Prepare Command Size per class")
-   public long getAvgPrepareCommandSizeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(PREPARE_COMMAND_SIZE, transactionalClass));
+                     displayName = "Avg Prepare Command Size per class")
+   public long getAvgPrepareCommandSizeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(PREPARE_COMMAND_SIZE, txClass));
    }
 
    @ManagedOperation(description = "Average commit command size (in bytes) per class",
-                     displayName = "Average Commit Command Size per class")
-   public long getAvgCommitCommandSizeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(COMMIT_COMMAND_SIZE, transactionalClass));
+                     displayName = "Avg Commit Command Size per class")
+   public long getAvgCommitCommandSizeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(COMMIT_COMMAND_SIZE, txClass));
    }
 
    @ManagedOperation(description = "Average clustered get command size (in bytes) per class",
-                     displayName = "Average Clustered Get Command Size per class")
-   public long getAvgClusteredGetCommandSizeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(CLUSTERED_GET_COMMAND_SIZE, transactionalClass));
+                     displayName = "Avg Clustered Get Command Size per class")
+   public long getAvgClusteredGetCommandSizeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(CLUSTERED_GET_COMMAND_SIZE, txClass));
    }
 
    @ManagedOperation(description = "Average time waiting for the lock acquisition (in microseconds) per class",
-                     displayName = "Average Lock Waiting Time per class")
-   public long getAvgLockWaitingTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_WAITING_TIME, transactionalClass));
+                     displayName = "Avg Lock Waiting Time per class")
+   public long getAvgLockWaitingTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_WAITING_TIME, txClass));
    }
 
    @ManagedOperation(description = "Average transaction arrival rate, originated locally and remotely (in transaction " +
          "per second) per class",
-                     displayName = "Average Transaction Arrival Rate per class")
-   public double getAvgTxArrivalRateParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(ARRIVAL_RATE, transactionalClass));
+                     displayName = "Avg Transaction Arrival Rate per class")
+   public double getAvgTxArrivalRateForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(ARRIVAL_RATE, txClass));
    }
 
-   @ManagedOperation(description = "Percentage of Write xact executed locally (committed and aborted) per class",
+   @ManagedOperation(description = "Percentage of Write tx executed locally (committed and aborted) per class",
                      displayName = "Percentage of Write Transactions per class")
-   public double getPercentageWriteTransactionsParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(TX_WRITE_PERCENTAGE, transactionalClass));
+   public double getPercentageWriteTransactionsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(TX_WRITE_PERCENTAGE, txClass));
    }
 
-   @ManagedOperation(description = "Percentage of Write xact executed in all successfully executed " +
-         "xacts (local xact only) per class",
+   @ManagedOperation(description = "Percentage of Write tx executed in all successfully executed " +
+         "xacts (local tx only) per class",
                      displayName = "Percentage of Successfully Write Transactions per class")
-   public double getPercentageSuccessWriteTransactionsParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(SUCCESSFUL_WRITE_PERCENTAGE, transactionalClass));
+   public double getPercentageSuccessWriteTransactionsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(SUCCESSFUL_WRITE_PERCENTAGE, txClass));
    }
 
-   @ManagedOperation(description = "The number of aborted xacts due to timeout in lock acquisition per class",
-                     displayName = "Number of Aborted Transaction due to Lock Acquisition Timeout per class")
-   public long getNumAbortedTxDueTimeoutParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(ExposedStatistic.NUM_LOCK_FAILED_TIMEOUT, transactionalClass));
+   @ManagedOperation(description = "The number of aborted tx due to deadlock per class",
+                     displayName = "No. of Aborted Transaction due to Deadlock per class")
+   public long getNumAbortedTxDueDeadlockForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_FAILED_DEADLOCK, txClass));
    }
 
-   @ManagedOperation(description = "The number of aborted xacts due to deadlock per class",
-                     displayName = "Number of Aborted Transaction due to Deadlock per class")
-   public long getNumAbortedTxDueDeadlockParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_FAILED_DEADLOCK, transactionalClass));
+   @ManagedOperation(description = "Average successful read-only tx duration (in microseconds) per class",
+                     displayName = "Avg Read-Only Transaction Duration per class")
+   public long getAvgReadOnlyTxDurationForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(RO_TX_SUCCESSFUL_EXECUTION_TIME, txClass));
    }
 
-   @ManagedOperation(description = "Average successful read-only xact duration (in microseconds) per class",
-                     displayName = "Average Read-Only Transaction Duration per class")
-   public long getAvgReadOnlyTxDurationParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(RO_TX_SUCCESSFUL_EXECUTION_TIME, transactionalClass));
+   @ManagedOperation(description = "Average successful write tx duration (in microseconds) per class",
+                     displayName = "Avg Write Transaction Duration per class")
+   public long getAvgWriteTxDurationForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WR_TX_SUCCESSFUL_EXECUTION_TIME, txClass));
    }
 
-   @ManagedOperation(description = "Average successful write xact duration (in microseconds) per class",
-                     displayName = "Average Write Transaction Duration per class")
-   public long getAvgWriteTxDurationParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WR_TX_SUCCESSFUL_EXECUTION_TIME, transactionalClass));
+   @ManagedOperation(description = "Average number of locks per write local tx per class",
+                     displayName = "Avg no. of Lock per Local Transaction per class")
+   public long getAvgNumOfLockLocalTxForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_LOCAL_TX, txClass));
    }
 
-   @ManagedOperation(description = "Average number of locks per write local xact per class",
-                     displayName = "Average Number of Lock per Local Transaction per class")
-   public long getAvgNumOfLockLocalTxParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_LOCAL_TX, transactionalClass));
-   }
-
-   @ManagedOperation(description = "Average number of locks per write remote xact per class",
-                     displayName = "Average Number of Lock per Remote Transaction per class")
-   public long getAvgNumOfLockRemoteTxParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_REMOTE_TX, transactionalClass));
+   @ManagedOperation(description = "Average number of locks per write remote tx per class",
+                     displayName = "Avg no. of Lock per Remote Transaction per class")
+   public long getAvgNumOfLockRemoteTxForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_REMOTE_TX, txClass));
    }
 
    @ManagedOperation(description = "Average number of locks per successfully write local transaction per class",
-                     displayName = "Average Number of Lock per Successfully Local Transaction per class")
-   public long getAvgNumOfLockSuccessLocalTxParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_SUCCESS_LOCAL_TX, transactionalClass));
+                     displayName = "Avg no. of Lock per Successfully Local Transaction per class")
+   public long getAvgNumOfLockSuccessLocalTxForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_PER_SUCCESS_LOCAL_TX, txClass));
    }
 
-   @ManagedOperation(description = "Average time it takes to execute the prepare command locally (in microseconds) per class",
-                     displayName = "Average Local Prepare Execution Time per class")
-   public long getAvgLocalPrepareTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_PREPARE_EXECUTION_TIME, transactionalClass));
-   }
-
-   @ManagedOperation(description = "Average time it takes to execute the prepare command remotely (in microseconds) per class",
-                     displayName = "Average Remote Prepare Execution Time per class")
-   public long getAvgRemotePrepareTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_PREPARE_EXECUTION_TIME, transactionalClass));
-   }
-
-   @ManagedOperation(description = "Average time it takes to execute the commit command locally (in microseconds) per class",
-                     displayName = "Average Local Commit Execution Time per class")
-   public long getAvgLocalCommitTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_COMMIT_EXECUTION_TIME, transactionalClass));
-   }
-
-   @ManagedOperation(description = "Average time it takes to execute the commit command remotely (in microseconds) per class",
-                     displayName = "Average Remote Commit Execution Time per class")
-   public long getAvgRemoteCommitTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_COMMIT_EXECUTION_TIME, transactionalClass));
-   }
-
-   @ManagedOperation(description = "Average time it takes to execute the rollback command locally (in microseconds) per class",
-                     displayName = "Average Local Rollback Execution Time per class")
-   public long getAvgLocalRollbackTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_ROLLBACK_EXECUTION_TIME, transactionalClass));
-   }
-
-   @ManagedOperation(description = "Average time it takes to execute the rollback command remotely (in microseconds) per class",
-                     displayName = "Average Remote Rollback Execution Time per class")
-   public long getAvgRemoteRollbackTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_ROLLBACK_EXECUTION_TIME, transactionalClass));
-   }
-
-   @ManagedOperation(description = "Average time it takes to execute the rollback command remotely (in microseconds) per class",
-                     displayName = "Average Remote Transaction Completion Notify Execution Time per class")
-   public long getAvgRemoteTxCompleteNotifyTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TX_COMPLETE_NOTIFY_EXECUTION_TIME, transactionalClass));
+   @ManagedOperation(description = "Average time it takes to execute the rollback command remotely (in microseconds) " +
+         "per class",
+                     displayName = "Avg remote CompletionCommand execution time per tx class")
+   public long getAvgRemoteTxCompleteNotifyTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TX_COMPLETE_NOTIFY_EXECUTION_TIME, txClass));
    }
 
    @ManagedOperation(description = "Abort Rate per class",
                      displayName = "Abort Rate per class")
-   public double getAbortRateParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(ABORT_RATE, transactionalClass));
+   public double getAbortRateForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(ABORT_RATE, txClass));
    }
 
-   @ManagedOperation(description = "Throughput (in xacts per second) per class",
+   @ManagedOperation(description = "Throughput (in tx per second) per class",
                      displayName = "Throughput per class")
-   public double getThroughputParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(THROUGHPUT, transactionalClass));
+   public double getThroughputForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(THROUGHPUT, txClass));
    }
 
-   @ManagedOperation(description = "Average number of get operations per local read xact per class",
-                     displayName = "Average number of get operations per local read xact per class")
-   public long getAvgGetsPerROTransactionParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_GETS_RO_TX, transactionalClass));
+   @ManagedOperation(description = "Average number of get operations per local read tx per class",
+                     displayName = "Avg no. of get operations per local read tx per class")
+   public long getAvgGetsPerROTransactionForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_GETS_RO_TX, txClass));
    }
 
-   @ManagedOperation(description = "Average number of get operations per local write xact per class",
-                     displayName = "Average number of get operations per local write xact per class")
-   public long getAvgGetsPerWrTransactionParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_GETS_WR_TX, transactionalClass));
+   @ManagedOperation(description = "Average number of get operations per local write tx per class",
+                     displayName = "Avg no. of get operations per local write tx per class")
+   public long getAvgGetsPerWrTransactionForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_GETS_WR_TX, txClass));
    }
 
-   @ManagedOperation(description = "Average number of remote get operations per local write xact per class",
-                     displayName = "Average number of remote get operations per local write xact per class")
-   public double getAvgRemoteGetsPerWrTransactionParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_GETS_WR_TX, transactionalClass));
+   @ManagedOperation(description = "Average number of remote get operations per local write tx per class",
+                     displayName = "Avg no. of remote get operations per local write tx per class")
+   public double getAvgRemoteGetsPerWrTransactionForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_GETS_WR_TX, txClass));
    }
 
-   @ManagedOperation(description = "Average number of remote get operations per local read xact per class",
-                     displayName = "Average number of remote get operations per local read xact per class")
-   public double getAvgRemoteGetsPerROTransactionParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_GETS_RO_TX, transactionalClass));
+   @ManagedOperation(description = "Average number of remote get operations per local read tx per class",
+                     displayName = "Avg no. of remote get operations per local read tx per class")
+   public double getAvgRemoteGetsPerROTransactionForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_GETS_RO_TX, txClass));
    }
 
-   @ManagedOperation(description = "Average cost of a remote get per class",
-                     displayName = "Remote get cost per class")
-   public long getRemoteGetExecutionTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_REMOTE_GET_R, transactionalClass));
+   @ManagedOperation(description = "Average number of put operations per local write tx per class",
+                     displayName = "Avg no. of put operations per local write tx per class")
+   public double getAvgPutsPerWrTransactionForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_PUTS_WR_TX, txClass));
    }
 
-   @ManagedOperation(description = "Average number of put operations per local write xact per class",
-                     displayName = "Average number of put operations per local write xact per class")
-   public double getAvgPutsPerWrTransactionParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_PUTS_WR_TX, transactionalClass));
-   }
-
-   @ManagedOperation(description = "Average number of remote put operations per local write xact per class",
-                     displayName = "Average number of remote put operations per local write xact per class")
-   public double getAvgRemotePutsPerWrTransactionParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_PUTS_WR_TX, transactionalClass));
+   @ManagedOperation(description = "Average number of remote put operations per local write tx per class",
+                     displayName = "Avg nr. of remote put operations per local write tx per tx class")
+   public double getAvgRemotePutsPerWrTransactionForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_SUCCESSFUL_REMOTE_PUTS_WR_TX, txClass));
    }
 
    @ManagedOperation(description = "Average cost of a remote put per class",
                      displayName = "Remote put cost per class")
-   public long getRemotePutExecutionTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_PUT_EXECUTION, transactionalClass));
+   public long getRemotePutExecutionTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_PUT_EXECUTION, txClass));
    }
 
    @ManagedOperation(description = "Number of gets performed since last reset per class",
-                     displayName = "Number of Gets per class")
-   public long getNumberOfGetsParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GET, transactionalClass));
+                     displayName = "No. of Gets per class")
+   public long getNumberOfGetsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GET, txClass));
    }
 
    @ManagedOperation(description = "Number of remote gets performed since last reset per class",
-                     displayName = "Number of Remote Gets per class")
-   public long getNumberOfRemoteGetsParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCAL_REMOTE_GET, transactionalClass));
+                     displayName = "No. of Remote Gets per class")
+   public long getNumberOfRemoteGetsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCAL_REMOTE_GET, txClass));
    }
 
    @ManagedOperation(description = "Number of puts performed since last reset per class",
-                     displayName = "Number of Puts per class")
-   public long getNumberOfPutsParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_PUT, transactionalClass));
+                     displayName = "No. of Puts per class")
+   public long getNumberOfPutsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_PUT, txClass));
    }
 
    @ManagedOperation(description = "Number of remote puts performed since last reset per class",
-                     displayName = "Number of Remote Puts per class")
-   public long getNumberOfRemotePutsParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_REMOTE_PUT, transactionalClass));
+                     displayName = "No. of Remote Puts per class")
+   public long getNumberOfRemotePutsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_REMOTE_PUT, txClass));
    }
 
-   @ManagedOperation(description = "Number of committed xacts since last reset per class",
-                     displayName = "Number Of Commits per class")
-   public long getNumberOfCommitsParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_COMMITS, transactionalClass));
+   @ManagedOperation(description = "Number of committed tx since last reset per class",
+                     displayName = "No. Of Commits per class")
+   public long getNumberOfCommitsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_COMMITS, txClass));
    }
 
-   @ManagedOperation(description = "Number of local committed xacts since last reset per class",
-                     displayName = "Number Of Local Commits per class")
-   public long getNumberOfLocalCommitsParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCAL_COMMITS, transactionalClass));
+   @ManagedOperation(description = "Number of local committed tx since last reset per class",
+                     displayName = "No. Of Local Commits per class")
+   public long getNumberOfLocalCommitsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCAL_COMMITS, txClass));
    }
 
    @ManagedOperation(description = "Write skew probability per class",
                      displayName = "Write Skew Probability per class")
-   public double getWriteSkewProbabilityParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(WRITE_SKEW_PROBABILITY, transactionalClass));
+   public double getWriteSkewProbabilityForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(WRITE_SKEW_PROBABILITY, txClass));
    }
 
-   @ManagedOperation(description = "K-th percentile of local read-only xacts execution time per class",
+   @ManagedOperation(description = "K-th percentile of local read-only tx execution time per class",
                      displayName = "K-th Percentile Local Read-Only Transactions per class")
-   public double getPercentileLocalReadOnlyTransactionParam(@Parameter(name = "Percentile") int percentile, @Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getPercentile(RO_LOCAL_PERCENTILE, percentile, transactionalClass));
+   public double getPercentileLocalReadOnlyTransactionForTxClass(@Parameter(name = "Percentile") int percentile,
+                                                                 @Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getPercentile(RO_LOCAL_PERCENTILE, percentile, txClass));
    }
 
-   @ManagedOperation(description = "K-th percentile of remote read-only xacts execution time per class",
-                     displayName = "K-th Percentile Remote Read-Only Transactions per class")
-   public double getPercentileRemoteReadOnlyTransactionParam(@Parameter(name = "Percentile") int percentile, @Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getPercentile(RO_REMOTE_PERCENTILE, percentile, transactionalClass));
+   @ManagedOperation(description = "K-th percentile of remote read-only tx execution time per tx class",
+                     displayName = "K-th Percentile Remote Read-Only Transactions per tx class")
+   public double getPercentileRemoteReadOnlyTransactionForTxClass(@Parameter(name = "Percentile") int percentile,
+                                                                  @Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getPercentile(RO_REMOTE_PERCENTILE, percentile, txClass));
    }
 
-   @ManagedOperation(description = "K-th percentile of local write xacts execution time per class",
+   @ManagedOperation(description = "K-th percentile of local write tx execution time per class",
                      displayName = "K-th Percentile Local Write Transactions per class")
-   public double getPercentileLocalRWriteTransactionParam(@Parameter(name = "Percentile") int percentile, @Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getPercentile(WR_LOCAL_PERCENTILE, percentile, transactionalClass));
+   public double getPercentileLocalRWriteTransactionForTxClass(@Parameter(name = "Percentile") int percentile,
+                                                               @Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getPercentile(WR_LOCAL_PERCENTILE, percentile, txClass));
    }
 
-   @ManagedOperation(description = "K-th percentile of remote write xacts execution time per class",
+   @ManagedOperation(description = "K-th percentile of remote write tx execution time per class",
                      displayName = "K-th Percentile Remote Write Transactions per class")
-   public double getPercentileRemoteWriteTransactionParam(@Parameter(name = "Percentile") int percentile, @Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleDouble((Double) TransactionsStatisticsRegistry.getPercentile(WR_REMOTE_PERCENTILE, percentile, transactionalClass));
+   public double getPercentileRemoteWriteTransactionForTxClass(@Parameter(name = "Percentile") int percentile,
+                                                               @Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getPercentile(WR_REMOTE_PERCENTILE, percentile, txClass));
    }
 
    @ManagedOperation(description = "Average Local processing Get time (in microseconds) per class",
-                     displayName = "Average Local Get time per class")
-   public long getAvgLocalGetTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((LOCAL_GET_EXECUTION), transactionalClass)));
+                     displayName = "Avg Local Get time per class")
+   public long getAvgLocalGetTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(LOCAL_GET_EXECUTION, txClass)));
    }
 
    @ManagedOperation(description = "K-th percentile of local read-only transactions execution time",
@@ -1443,135 +1434,135 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
    }
 
    @ManagedOperation(description = "Average TCB time (in microseconds) per class",
-                     displayName = "Average TCB time per class")
-   public long getAvgTCBTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((TBC), transactionalClass)));
+                     displayName = "Avg TCB time per class")
+   public long getAvgTCBTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(TBC, txClass)));
    }
 
    @ManagedOperation(description = "Average NTCB time (in microseconds) per class",
-                     displayName = "Average NTCB time per class")
-   public long getAvgNTCBTimeParam(@Parameter(name = "Transaction Class") String transactionalClass) {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NTBC), transactionalClass)));
+                     displayName = "Avg NTCB time per class")
+   public long getAvgNTCBTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(NTBC, txClass)));
    }
 
-   @ManagedAttribute(description = "Number of local aborted xacts",
-                     displayName = "Number of local aborted xacts")
+   @ManagedAttribute(description = "Number of local aborted txs",
+                     displayName = "No. of local aborted txs")
    public long getNumAbortedXacts() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_ABORTED_WR_TX))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_ABORTED_WR_TX), null)));
    }
 
    @ManagedAttribute(description = "Number of remote gets that have waited",
-                     displayName = "Number of remote gets that have waited")
+                     displayName = "No. of remote gets that have waited")
    public long getNumWaitedRemoteGets() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_WAITS_REMOTE_REMOTE_GETS))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_WAITS_REMOTE_REMOTE_GETS), null)));
    }
 
    @ManagedAttribute(description = "Number of local commits that have waited",
-                     displayName = "Number of local commits that have waited")
+                     displayName = "No. of local commits that have waited")
    public long getNumWaitedLocalCommits() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_WAITS_IN_COMMIT_QUEUE))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_WAITS_IN_COMMIT_QUEUE), null)));
    }
 
    @ManagedAttribute(description = "Number of remote commits that have waited",
-                     displayName = "Number of remote commits that have waited")
+                     displayName = "No. of remote commits that have waited")
    public long getNumWaitedRemoteCommits() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_WAITS_IN_REMOTE_COMMIT_QUEUE))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((NUM_WAITS_IN_REMOTE_COMMIT_QUEUE), null)));
    }
 
    @ManagedAttribute(description = "Local Local Contentions",
                      displayName = "Local Local Contentions")
    public long getNumLocalLocalLockContentions() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((LOCK_CONTENTION_TO_LOCAL))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((LOCK_CONTENTION_TO_LOCAL), null)));
    }
 
    @ManagedAttribute(description = "Local Remote Contentions",
                      displayName = "Local Remote Contentions")
    public long getNumLocalRemoteLockContentions() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((LOCK_CONTENTION_TO_REMOTE))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((LOCK_CONTENTION_TO_REMOTE), null)));
    }
 
    @ManagedAttribute(description = "Remote Local Contentions",
                      displayName = "Remote Local Contentions")
    public long getNumRemoteLocalLockContentions() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((REMOTE_LOCK_CONTENTION_TO_LOCAL))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((REMOTE_LOCK_CONTENTION_TO_LOCAL), null)));
    }
 
    @ManagedAttribute(description = "Remote Remote Contentions",
                      displayName = "Remote Remote Contentions")
    public long getNumRemoteRemoteLockContentions() {
-      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((REMOTE_LOCK_CONTENTION_TO_REMOTE))));
+      return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute((REMOTE_LOCK_CONTENTION_TO_REMOTE), null)));
    }
 
    @ManagedAttribute(description = "Average local Tx Waiting time due to pending Tx",
-                     displayName = "Average local Tx Waiting time due to pending Tx")
+                     displayName = "Avg local Tx Waiting time due to pending Tx")
    public final long getAvgLocalTxWaitingTimeInGMUQueueDuePendingTx() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL, null));
    }
 
    @ManagedAttribute(description = "Average remote Tx Waiting time due to pending Tx",
-                     displayName = "Average remote Tx Waiting time due to pending Tx")
+                     displayName = "Avg remote Tx Waiting time due to pending Tx")
    public final long getAvgRemoteTxWaitingTimeInGMUQueueDuePendingTx() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE, null));
    }
 
    @ManagedAttribute(description = "Average local Tx Waiting time due to slow commits",
-                     displayName = "Average local Tx Waiting time due to slow commits")
+                     displayName = "Avg local Tx Waiting time due to slow commits")
    public final long getAvgLocalTxWaitingTimeInGMUQueueDueToSlowCommits() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL, null));
    }
 
    @ManagedAttribute(description = "Average remote Tx Waiting time due to slow commits",
-                     displayName = "Average remote Tx Waiting time due to slow commits")
+                     displayName = "Avg remote Tx Waiting time due to slow commits")
    public final long getAvgRemoteTxWaitingTimeInGMUQueueDueToSlowCommits() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE, null));
    }
 
    @ManagedAttribute(description = "Average local Tx Waiting time due to commit conflicts",
-                     displayName = "Average local Tx Waiting time due to commit conflicts")
+                     displayName = "Avg local Tx Waiting time due to commit conflicts")
    public final long getAvgLocalTxWaitingTimeInGMUQueueDueToCommitsConflicts() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL, null));
    }
 
    @ManagedAttribute(description = "Average remote Tx Waiting time due to commit conflicts",
-                     displayName = "Average remote Tx Waiting time due to commit conflicts")
+                     displayName = "Avg remote Tx Waiting time due to commit conflicts")
    public final long getAvgRemoteTxWaitingTimeInGMUQueueDueToCommitsConflicts() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE, null));
    }
 
    @ManagedAttribute(description = "Number of local Tx that waited due to pending Tx",
-                     displayName = "Number of local Tx that waited due to pending Tx")
+                     displayName = "No. of local Tx that waited due to pending Tx")
    public final long getNumLocalTxWaitingTimeInGMUQueueDuePendingTx() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL, null));
    }
 
    @ManagedAttribute(description = "Number of remote Tx that waited due to pending Tx",
-                     displayName = "Number of remote Tx that waited due to pending Tx")
+                     displayName = "No. of remote Tx that waited due to pending Tx")
    public final long getNumRemoteTxWaitingTimeInGMUQueueDuePendingTx() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE, null));
    }
 
    @ManagedAttribute(description = "Number of local Tx that waited due to slow commits",
-                     displayName = "Number of local Tx that waited due to slow commits")
+                     displayName = "No. of local Tx that waited due to slow commits")
    public final long getNumLocalTxWaitingTimeInGMUQueueDueToSlowCommits() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL, null));
    }
 
    @ManagedAttribute(description = "Number of remote Tx that waited due to slow commits",
-                     displayName = "Number of remote Tx that waited due to slow commits")
+                     displayName = "No. of remote Tx that waited due to slow commits")
    public final long getNumRemoteTxWaitingTimeInGMUQueueDueToSlowCommits() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE, null));
    }
 
    @ManagedAttribute(description = "Number of local Tx that waited due to commit conflicts",
-                     displayName = "Number of local Tx that waited due to commit conflicts")
+                     displayName = "No. of local Tx that waited due to commit conflicts")
    public final long getNumLocalTxWaitingTimeInGMUQueueDueToCommitsConflicts() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL, null));
    }
 
    @ManagedAttribute(description = "Number of remote Tx that waited due to commit conflicts",
-                     displayName = "Number of remote Tx that waited due to commit conflicts")
+                     displayName = "No. of remote Tx that waited due to commit conflicts")
    public final long getNumRemoteTxWaitingTimeInGMUQueueDueToCommitsConflicts() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE, null));
    }
 
    @ManagedAttribute(description = "Returns true if the statistics are enabled, false otherwise",
@@ -1601,79 +1592,607 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
    @ManagedAttribute(description = "Avg Conditional Waiting time experience by TO-GMU prepare command",
                      displayName = "Avg Conditional Waiting time experience by TO-GMU prepare command")
    public final long getTOPrepareWaitTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_AVG_WAIT_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_AVG_WAIT_TIME, null));
    }
 
    @ManagedAttribute(description = "Average TO-GMU conditional max replay time at cohorts",
-                     displayName = "Average TO-GMU conditional max replay time at cohorts")
+                     displayName = "Avg TO-GMU conditional max replay time at cohorts")
    public final long getTOMaxSuccessfulValidationWaitingTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_MAX_WAIT_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_MAX_WAIT_TIME, null));
    }
 
    @ManagedAttribute(description = "Average TO-GMU validation conditional wait time on a single node",
-                     displayName = "Average TO-GMU validation conditional wait time on a single node")
+                     displayName = "Avg TO-GMU validation conditional wait time on a single node")
    public final long getTOAvgValidationConditionalWaitTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_REMOTE_WAIT));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_REMOTE_WAIT, null));
    }
 
    @ManagedAttribute(description = "Average TO-GMU validations that waited on a node",
-                     displayName = "Average TO-GMU validations that waited on a node")
+                     displayName = "Avg TO-GMU validations that waited on a node")
    public final long getTONumValidationWaited() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_TO_GMU_PREPARE_COMMAND_REMOTE_WAITED));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_TO_GMU_PREPARE_COMMAND_REMOTE_WAITED, null));
    }
 
    @ManagedAttribute(description = "Probability that a TO-GMU prepare experiences waiting time",
                      displayName = "Probability that a TO-GMU prepare experiences waiting time")
    public final long getTOGMUPrepareWaitProbability() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_TO_GMU_PREPARE_COMMAND_AT_LEAST_ONE_WAIT));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_TO_GMU_PREPARE_COMMAND_AT_LEAST_ONE_WAIT, null));
    }
 
-   @ManagedAttribute(description = "Average TO-GMU prepare Rtt minus avg replay time at cohorts for successful xact",
-                     displayName = "Average TO-GMU prepare Rtt minus avg replay time at cohorts for successful xact")
+   @ManagedAttribute(description = "Average TO-GMU prepare Rtt minus avg replay time at cohorts for successful tx",
+                     displayName = "Avg TO-GMU Prepare RTT (- avg replay) time")
    public final long getTOGMUPrepareRttMinusAvgValidationTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RTT_MINUS_AVG));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RTT_MINUS_AVG, null));
    }
 
-   @ManagedAttribute(description = "Average TO-GMU prepare Rtt minus max replay time at cohorts for successful xact",
-                     displayName = "Average TO-GMU prepare Rtt minus max replay time at cohorts for successful xact")
+   @ManagedAttribute(description = "Average TO-GMU prepare Rtt minus max replay time at cohorts for successful tx",
+                     displayName = "Avg TO-GMU Prepare RTT (- max replay) time")
    public final long getTOGMUPrepareRttMinusMaxValidationTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RTT_MINUS_MAX));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RTT_MINUS_MAX, null));
    }
 
-   @ManagedAttribute(description = "Average TO-GMU mean replay time at cohorts for successful xact",
-                     displayName = "Average TO-GMU mean replay time at cohorts for successful xact")
+   @ManagedAttribute(description = "Average TO-GMU mean replay time at cohorts for successful tx",
+                     displayName = "Avg TO-GMU mean replay time at cohorts for successful tx")
    public final long getTOGMUAvgSuccessfulValidationResponseTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RESPONSE_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RESPONSE_TIME, null));
    }
 
-   @ManagedAttribute(description = "Average TO-GMU mean replay time at cohorts for successful xact",
-                     displayName = "Average TO-GMU mean replay time at cohorts for successful xact")
+   @ManagedAttribute(description = "Average TO-GMU mean replay time at cohorts for successful tx",
+                     displayName = "Avg TO-GMU mean replay time at cohorts for successful tx")
    public final long getTOGMUAvgSuccessfulValidationServiceTime() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_SERVICE_TIME));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_SERVICE_TIME, null));
    }
 
    @ManagedAttribute(description = "Number of successful TO-GMU prepares that did not wait",
-                     displayName = "Number of successful TO-GMU prepares that did not wait")
+                     displayName = "No. of successful TO-GMU prepares that did not wait")
    public final long getNumTOGMUSuccessfulPrepareNoWait() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_TO_GMU_PREPARE_COMMAND_RTT_NO_WAITED));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_TO_GMU_PREPARE_COMMAND_RTT_NO_WAITED, null));
    }
 
    @ManagedAttribute(description = "Avg rtt for TO-GMU prepares that did not wait",
                      displayName = "Avg rtt for TO-GMU prepares that did not wait")
    public final long getAvgTOGMUPrepareNoWaitRtt() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RTT_NO_WAIT));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RTT_NO_WAIT, null));
    }
 
    @ManagedAttribute(description = "Avg rtt for GMU remote get that do not wait",
                      displayName = "Avg rtt for GMU remote get that do not wait")
    public final long getAvgGmuClusteredGetCommandRttNoWait() {
-      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(RTT_GET_NO_WAIT));
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(RTT_GET_NO_WAIT, null));
    }
 
     /*
      "handleCommand" methods could have been more compact (since they do very similar stuff)
      But I wanted smaller, clear sub-methods
     */
+
+   @ManagedOperation(description = "Avg CPU demand to perform the commit of a read only tx per tx class",
+                     displayName = "Avg CPU to perform the commit of a read only tx per tx class")
+   public final long getLocalReadOnlyTxCommitServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_COMMIT_S, txClass));
+   }
+
+   @ManagedOperation(description = "Avg waiting time for a GMUClusteredGetCommand per tx class",
+                     displayName = "Avg waiting time for a GMUClusteredGetCommand per tx class")
+   public final long getGMUClusteredGetCommandWaitingTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_WAITING_TIME, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of the prepare of a remote tx per tx class",
+                     displayName = "Avg response time of the prepare of a remote tx per tx class")
+   public final long getRemoteUpdateTxPrepareResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_PREPARE_R, txClass));
+   }
+
+   @ManagedOperation(description = "The number of tx killed on the node due to unsuccessful validation per tx class",
+                     displayName = "No. of tx killed due to unsuccessful validation per tx class")
+   public final long getNumKilledTxDueToValidationForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_KILLED_TX_DUE_TO_VALIDATION, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of the prepare of a read only tx per tx class",
+                     displayName = "Avg response time of the prepare of a read only tx per tx class")
+   public final long getLocalReadOnlyTxPrepareResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_PREPARE_R, txClass));
+   }
+
+   @ManagedOperation(description = "Number of local Tx that waited due to slow commits per tx class",
+                     displayName = "No. of local Tx that waited due to slow commits per tx class")
+   public final long getNumLocalTxWaitingTimeInGMUQueueDueToSlowCommitsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL, txClass));
+   }
+
+   @ManagedOperation(description = "Average local Tx Waiting time due to commit conflicts per tx class",
+                     displayName = "Avg local Tx Waiting time due to commit conflicts per tx class")
+   public final long getAvgLocalTxWaitingTimeInGMUQueueDueToCommitsConflictsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to execute the commitCommand of a remote tx per tx class",
+                     displayName = "Avg CPU to execute the CommitCommand of a remote tx per tx class")
+   public final long getRemoteUpdateTxCommitServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_COMMIT_S, txClass));
+   }
+
+   @ManagedOperation(description = "Average TO-GMU prepare Rtt minus max replay time at cohorts for successful tx per tx class",
+                     displayName = "Avg TO-GMU Prepare RTT (- max replay) time per tx class")
+   public final long getTOGMUPrepareRttMinusMaxValidationTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RTT_MINUS_MAX, txClass));
+   }
+
+   @ManagedOperation(description = "Remote Remote Contentions per tx class",
+                     displayName = "Remote Remote Contentions per tx class")
+   public final long getNumRemoteRemoteLockContentionsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_LOCK_CONTENTION_TO_REMOTE, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand of a local update tx per tx class",
+                     displayName = "Avg CPU of a local update tx per tx class")
+   public final long getLocalUpdateTxTotalCpuTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_TOTAL_S, txClass));
+   }
+
+   @ManagedOperation(description = "Number of local Tx that waited due to commit conflicts per tx class",
+                     displayName = "No. of local Tx that waited due to commit conflicts per tx class")
+   public final long getNumLocalTxWaitingTimeInGMUQueueDueToCommitsConflictsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_LOCAL, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to perform the prepare of a read only tx per tx class",
+                     displayName = "Avg CPU to perform the a read only tx Prepare per tx class")
+   public final long getLocalReadOnlyTxPrepareServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_PREPARE_S, txClass));
+   }
+
+   @ManagedOperation(description = "Avg time spent in the commit queue by a tx per tx class",
+                     displayName = "Avg time spent in the commit queue by a tx per tx class")
+   public final long getWaitedTimeInLocalCommitQueueForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WAIT_TIME_IN_COMMIT_QUEUE, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to execute a local tx up to the prepare phase per tx class",
+                     displayName = "Avg CPU to execute a local tx up to the prepare phase per tx class")
+   public final long getLocalUpdateTxLocalServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_S, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to execute the prepare of a remote tx per tx class",
+                     displayName = "Avg CPU to execute the prepare of a remote tx per tx class")
+   public final long getRemoteUpdateTxPrepareServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_PREPARE_S, txClass));
+   }
+
+   @ManagedOperation(description = "Number of local commits that have waited per tx class",
+                     displayName = "No. of local commits that have waited per tx class")
+   public final long getNumWaitedLocalCommitsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_WAITS_IN_COMMIT_QUEUE, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to execute a local PrepareCommand per tx class",
+                     displayName = "Avg CPU to execute a local PrepareCommand per tx class")
+   public final long getLocalUpdateTxCommitServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_COMMIT_S, txClass));
+   }
+
+   @ManagedOperation(description = "Avg rtt for TO-GMU prepares that did not wait per tx class",
+                     displayName = "Avg rtt for TO-GMU prepares that did not wait per tx class")
+   public final long getAvgTOGMUPrepareNoWaitRttForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RTT_NO_WAIT, txClass));
+   }
+
+   @ManagedOperation(description = "Number of remote Tx that waited due to pending Tx per tx class",
+                     displayName = "No. of remote Tx that waited due to pending Tx per tx class")
+   public final long getNumRemoteTxWaitingTimeInGMUQueueDuePendingTxForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE, txClass));
+   }
+
+   @ManagedOperation(description = "Number of successful TO-GMU prepares that did not wait per tx class",
+                     displayName = "No. of successful TO-GMU prepares that did not wait per tx class")
+   public final long getNumTOGMUSuccessfulPrepareNoWaitForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_TO_GMU_PREPARE_COMMAND_RTT_NO_WAITED, txClass));
+   }
+
+   @ManagedOperation(description = "The number of aborted tx due to timeout in lock acquisition per tx class",
+                     displayName = "No. of aborted tx due to timeout in lock acquisition per tx class")
+   public final long getNumAbortedTxDueToWriteLockForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCK_FAILED_TIMEOUT, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to execute a local RollbackCommand with remote nodes per tx class",
+                     displayName = "Avg CPU to execute a local RollbackCommand with remote nodes per tx class")
+   public final long getLocalUpdateTxRemoteRollbackServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_REMOTE_ROLLBACK_S, txClass));
+   }
+
+   @ManagedOperation(description = "Average remote Tx Waiting time due to pending Tx per tx class",
+                     displayName = "Avg remote Tx Waiting time due to pending Tx per tx class")
+   public final long getAvgRemoteTxWaitingTimeInGMUQueueDuePendingTxForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_PENDING_REMOTE, txClass));
+   }
+
+   @ManagedOperation(description = "Average local Tx Waiting time due to pending Tx per tx class",
+                     displayName = "Avg local Tx Waiting time due to pending Tx per tx class")
+   public final long getAvgLocalTxWaitingTimeInGMUQueueDuePendingTxForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL, txClass));
+   }
+
+   @ManagedOperation(description = "Probability that a TO-GMU prepare experiences waiting time per tx class",
+                     displayName = "Probability TO-GMU prepare experiences waiting time per tx class")
+   public final long getTOGMUPrepareWaitProbabilityForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_TO_GMU_PREPARE_COMMAND_AT_LEAST_ONE_WAIT, txClass));
+   }
+
+   @ManagedOperation(description = "Average number of nodes of async commit messages sent per tx per tx class",
+                     displayName = "Avg nr of nodes in async commit messages per tx class")
+   public final long getAvgNumAsyncSentCommitMsgsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(SENT_ASYNC_COMMIT, txClass));
+   }
+
+   @ManagedOperation(description = "Number of remote Tx that waited due to commit conflicts per tx class",
+                     displayName = "No. of remote Tx that waited due to commit conflicts per tx class")
+   public final long getNumRemoteTxWaitingTimeInGMUQueueDueToCommitsConflictsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE, txClass));
+   }
+
+   @ManagedOperation(description = "Avg TO-GMU mean replay time at cohorts for successful tx per tx class",
+                     displayName = "Avg TO-GMU mean replay time at cohorts for successful tx per tx class")
+   public final long getTOGMUAvgSuccessfulValidationResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RESPONSE_TIME, txClass));
+   }
+
+   @ManagedOperation(description = "Local Remote Contentions per tx class",
+                     displayName = "Local Remote Contentions per tx class")
+   public final long getNumLocalRemoteLockContentionsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_CONTENTION_TO_REMOTE, txClass));
+   }
+
+   @ManagedOperation(description = "Avg Response Time per tx class",
+                     displayName = "Avg Response Time per tx class")
+   public final long getAvgResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(RESPONSE_TIME, txClass));
+   }
+
+   @ManagedOperation(description = "Average TO-GMU validation conditional wait time on a single node per tx class",
+                     displayName = "Avg TO-GMU validation conditional wait time on a single node per tx class")
+   public final long getTOAvgValidationConditionalWaitTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_REMOTE_WAIT, txClass));
+   }
+
+   @ManagedOperation(description = "Avg number of local data items in a local prepareCommand to read-validate per tx class",
+                     displayName = "Avg no. of items in a local prepareCommand to read per tx class")
+   public final double getNumOwnedWrItemsInLocalPrepareForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_WR_ITEMS_IN_LOCAL_PREPARE, txClass));
+   }
+
+   @ManagedOperation(description = "Avg rollback command size (in bytes) per tx class",
+                     displayName = "Avg rollback command size (in bytes) per tx class")
+   public final long getAvgRollbackCommandSizeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(ROLLBACK_COMMAND_SIZE, txClass));
+   }
+
+   @ManagedOperation(description = "Number of reads before first writed per tx class",
+                     displayName = "No. of reads before first write per tx class")
+   public final double getNumReadsBeforeWriteForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(FIRST_WRITE_INDEX, txClass));
+   }
+
+   @ManagedOperation(description = "The number of aborted tx due to unsuccessful validation per tx class",
+                     displayName = "No. of aborted tx due to unsuccessful validation per tx class")
+   public final long getNumAbortedTxDueToValidationForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_ABORTED_TX_DUE_TO_VALIDATION, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time to execute a remote RollbackCommand per tx class",
+                     displayName = "Avg response time to execute a remote RollbackCommand per tx class")
+   public final long getLocalUpdateTxLocalRollbackResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_LOCAL_ROLLBACK_R, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand of a read only tx per tx class",
+                     displayName = "Avg CPU of a read only tx per tx class")
+   public final long getReadOnlyTxTotalResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_TOTAL_R, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to perform the rollback of a remote tx per tx class",
+                     displayName = "Avg CPU to perform the rollback of a remote tx per tx class")
+   public final long getRemoteUpdateTxRollbackServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_ROLLBACK_S, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of the rollback of a remote tx per tx class",
+                     displayName = "Avg response time of the rollback of a remote tx per tx class")
+   public final long getRemoteUpdateTxRollbackResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_ROLLBACK_R, txClass));
+   }
+
+   @ManagedOperation(description = "Avg number of local data items in a remote prepareCommand to write per tx class",
+                     displayName = "Avg no. or items in a remote prepareCommand to write per tx class")
+   public final double getNumOwnedWrItemsInRemotePrepareForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_WR_ITEMS_IN_REMOTE_PREPARE, txClass));
+   }
+
+   @ManagedOperation(description = "Avg size of a remote get reply (in bytes) per tx class",
+                     displayName = "Avg size of a remote get reply (in bytes) per tx class")
+   public final long getAvgClusteredGetCommandReplySizeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_REPLY_SIZE, txClass));
+   }
+
+   @ManagedOperation(description = "Number of remote commits that have waited per tx class",
+                     displayName = "No. of remote commits that have waited per tx class")
+   public final long getNumWaitedRemoteCommitsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_WAITS_IN_REMOTE_COMMIT_QUEUE, txClass));
+   }
+
+   @ManagedOperation(description = "Average lock local holding time of locally aborted tx (in microseconds) per tx class",
+                     displayName = "Avg lock local holding time of locally aborted tx per tx class")
+   public final long getAvgLocalLocalAbortLockHoldTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_ABORT_LOCK_HOLD_TIME, txClass));
+   }
+
+   @ManagedOperation(description = "Average number of nodes of Sync commit messages sent per tx per tx class",
+                     displayName = "Avg no. of nodes of Sync commit messages sent per tx per tx class")
+   public final long getAvgNumSyncSentCommitMsgsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(SENT_SYNC_COMMIT, txClass));
+   }
+
+   @ManagedOperation(description = "Number of remote Tx that waited due to slow commits per tx class",
+                     displayName = "No. of remote Tx that waited due to slow commits per tx class")
+   public final long getNumRemoteTxWaitingTimeInGMUQueueDueToSlowCommitsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE, txClass));
+   }
+
+   @ManagedOperation(description = "Avg rtt for GMU remote get that do not wait per tx class",
+                     displayName = "Avg rtt for GMU remote get that do not wait per tx class")
+   public final long getAvgGmuClusteredGetCommandRttNoWaitForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(RTT_GET_NO_WAIT, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of a read only tx per tx class",
+                     displayName = "Avg response time of a read only tx per tx class")
+   public final long getReadOnlyTxTotalCpuTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_TOTAL_S, txClass));
+   }
+
+   @ManagedOperation(description = "Local Local Contentions per tx class",
+                     displayName = "Local Local Contentions per tx class")
+   public final long getNumLocalLocalLockContentionsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCK_CONTENTION_TO_LOCAL, txClass));
+   }
+
+   @ManagedOperation(description = "Number of remote gets that have waited per tx class",
+                     displayName = "No. of remote gets that have waited per tx class")
+   public final long getNumWaitedRemoteGetsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_WAITS_REMOTE_REMOTE_GETS, txClass));
+   }
+
+   @ManagedOperation(description = "Average TO-GMU conditional max replay time at cohorts per tx class",
+                     displayName = "Avg TO-GMU conditional max replay time at cohorts per tx class")
+   public final long getTOMaxSuccessfulValidationWaitingTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_MAX_WAIT_TIME, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time to execute a local RollbackCommand with remote nodes per tx class",
+                     displayName = "Avg response time of a local RollbackCommand with remote nodes per tx class")
+   public final long getLocalUpdateTxRemoteRollbackResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_REMOTE_ROLLBACK_R, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of a local update tx per tx class",
+                     displayName = "Avg response time of a local update tx per tx class")
+   public final long getLocalUpdateTxTotalResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_TOTAL_R, txClass));
+   }
+
+   @ManagedOperation(description = "Average remote Tx Waiting time due to commit conflicts per tx class",
+                     displayName = "Avg remote Tx Waiting time due to commit conflicts per tx class")
+   public final long getAvgRemoteTxWaitingTimeInGMUQueueDueToCommitsConflictsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_CONFLICT_VERSION_REMOTE, txClass));
+   }
+
+   @ManagedOperation(description = "Average remote Tx Waiting time due to slow commits per tx class",
+                     displayName = "Avg remote Tx Waiting time due to slow commits per tx class")
+   public final long getAvgRemoteTxWaitingTimeInGMUQueueDueToSlowCommitsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_REMOTE, txClass));
+   }
+
+   @ManagedOperation(description = "Number of early aborts per tx class",
+                     displayName = "No. of early aborts per tx class")
+   public final long getNumEarlyAbortsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_EARLY_ABORTS, txClass));
+   }
+
+   @ManagedOperation(description = "Cost of terminating a tx (debug only) per tx class",
+                     displayName = "Cost of terminating a tx (debug only) per tx class")
+   public final long getTerminationCostForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TERMINATION_COST, txClass));
+   }
+
+   @ManagedOperation(description = "Average TO-GMU prepare Rtt minus avg replay time at cohorts for successful tx per tx class",
+                     displayName = "Avg TO-GMU Prepare RTT (- avg replay) time per tx class")
+   public final long getTOGMUPrepareRttMinusAvgValidationTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_RTT_MINUS_AVG, txClass));
+   }
+
+   @ManagedOperation(description = "Average lock local holding time of committed tx (in microseconds) per tx class",
+                     displayName = "Avg lock local holding time of committed tx per tx class")
+   public final long getAvgLocalSuccessfulLockHoldTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(SUX_LOCK_HOLD_TIME, txClass));
+   }
+
+   @ManagedOperation(description = "Avg Conditional Waiting time experience by TO-GMU prepare command per tx class",
+                     displayName = "Avg Conditional Waiting time experience by TO-GMU prepare command per tx class")
+   public final long getTOPrepareWaitTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_AVG_WAIT_TIME, txClass));
+   }
+
+   @ManagedOperation(description = "Avg number of local data items in a remote prepareCommand to read-validate per tx class",
+                     displayName = "Avg no. of items in a remote PrepareCommand to read per tx class")
+   public final double getNumOwnedRdItemsInRemotePrepareForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_RD_ITEMS_IN_REMOTE_PREPARE, txClass));
+   }
+
+   @ManagedOperation(description = "Number of tx dead in remote prepare per tx class",
+                     displayName = "No. of tx dead in remote prepare per tx class")
+   public final long getRemotelyDeadXactForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_REMOTELY_ABORTED, txClass));
+   }
+
+   @ManagedOperation(description = "Number of local Tx that waited due to pending Tx per tx class",
+                     displayName = "No. of local Tx that waited due to pending Tx per tx class")
+   public final long getNumLocalTxWaitingTimeInGMUQueueDuePendingTxForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_GMU_WAITING_IN_QUEUE_DUE_PENDING_LOCAL, txClass));
+   }
+
+   @ManagedOperation(description = "Average TO-GMU mean replay time at cohorts for successful tx per tx class",
+                     displayName = "Avg TO-GMU mean replay time at cohorts for successful tx per tx class")
+   public final long getTOGMUAvgSuccessfulValidationServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(TO_GMU_PREPARE_COMMAND_SERVICE_TIME, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to execute a local RollbackCommand without remote nodes per tx class",
+                     displayName = "Avg CPU to execute a local RollbackCommand without remote nodes per tx class")
+   public final long getLocalUpdateTxLocalRollbackServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_LOCAL_ROLLBACK_S, txClass));
+   }
+
+   @ManagedOperation(description = "Number of tx dead while preparing locally per tx class",
+                     displayName = "No. of tx dead while preparing locally per tx class")
+   public final long getNumLocalPrepareAbortsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_LOCALPREPARE_ABORTS, txClass));
+   }
+
+   @ManagedOperation(description = "Avg number of local items in a local prepareCommand per tx class",
+                     displayName = "Avg no. or items in a local prepareCommand to write per tx class")
+   public final double getNumOwnedRdItemsInLocalPrepareForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleDouble((Double) TransactionsStatisticsRegistry.getAttribute(NUM_OWNED_RD_ITEMS_IN_LOCAL_PREPARE, txClass));
+   }
+
+   @ManagedOperation(description = "Average aborted write transaction duration (in microseconds) per tx class",
+                     displayName = "Avg Aborted Write Transaction Duration per tx class")
+   public final long getAvgAbortedWriteTxDurationForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WR_TX_ABORTED_EXECUTION_TIME, txClass));
+   }
+
+   @ManagedOperation(description = "Average lock local holding time of remotely aborted tx (in microseconds) per tx class",
+                     displayName = "Avg lock local holding time of remotely aborted tx per tx class")
+   public final long getAvgLocalRemoteAbortLockHoldTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_ABORT_LOCK_HOLD_TIME, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to execute a local PrepareCommand per tx class",
+                     displayName = "Avg CPU to execute a local PrepareCommand per tx class")
+   public final long getLocalUpdateTxPrepareServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_PREPARE_S, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of the execution of the commitCommand of a remote tx per tx class",
+                     displayName = "Avg response time of the CommitCommand execution for remote tx per tx class")
+   public final long getRemoteUpdateTxCommitResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_REMOTE_COMMIT_R, txClass));
+   }
+
+   @ManagedOperation(description = "Remote Local Contentions per tx class",
+                     displayName = "Remote Local Contentions per tx class")
+   public final long getNumRemoteLocalLockContentionsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_LOCK_CONTENTION_TO_LOCAL, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of the local part of a tx up to the prepare phase per tx class",
+                     displayName = "Avg response time of a tx up to the prepare phase per tx class")
+   public final long getLocalUpdateTxLocalResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_R, txClass));
+   }
+
+   @ManagedOperation(description = "Average cost of a remote get per tx class",
+                     displayName = "Remote get cost per tx class")
+   public final long getRemoteGetResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_REMOTE_GET_R, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to perform the local execution of a read only tx per tx class",
+                     displayName = "Avg CPU to perform the local execution of a read only tx per tx class")
+   public final long getLocalReadOnlyTxLocalServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_LOCAL_S, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of the local execution of a read only tx per tx class",
+                     displayName = "Avg response time of local execution of a read only tx per tx class")
+   public final long getLocalReadOnlyTxLocalResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_LOCAL_R, txClass));
+   }
+
+   @ManagedOperation(description = "The number of aborted tx due to timeout in readlock acquisition per tx class",
+                     displayName = "No. of aborted tx due to timeout in readlock acquisition per tx class")
+   public final long getNumAbortedTxDueToReadLockForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_READLOCK_FAILED_TIMEOUT, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of a local PrepareCommand per tx class",
+                     displayName = "Avg response time of a local PrepareCommand per tx class")
+   public final long getLocalUpdateTxPrepareResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_PREPARE_R, txClass));
+   }
+
+   @ManagedOperation(description = "Avg cpu time for a GMUClusteredGetCommand per tx class",
+                     displayName = "Avg cpu time for a GMUClusteredGetCommand per tx class")
+   public final long getGMUClusteredGetCommandServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_S, txClass));
+   }
+
+   @ManagedOperation(description = "Number of update tx gone up to prepare phase per tx class",
+                     displayName = "No. of update tx gone up to prepare phase per tx class")
+   public final long getUpdateXactToPrepareForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_UPDATE_TX_GOT_TO_PREPARE, txClass));
+   }
+
+   @ManagedOperation(description = "Average local Tx Waiting time due to slow commits per tx class",
+                     displayName = "Avg local Tx Waiting time due to slow commits per tx class")
+   public final long getAvgLocalTxWaitingTimeInGMUQueueDueToSlowCommitsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(GMU_WAITING_IN_QUEUE_DUE_SLOW_COMMITS_LOCAL, txClass));
+   }
+
+   @ManagedOperation(description = "Avg waiting time before serving a ClusteredGetCommand per tx class",
+                     displayName = "Avg waiting time before serving a ClusteredGetCommand per tx class")
+   public final long getWaitedTimeInRemoteCommitQueueForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(WAIT_TIME_IN_REMOTE_COMMIT_QUEUE, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of a local CommitCommand per tx class",
+                     displayName = "Avg response time of a local CommitCommand per tx class")
+   public final long getLocalUpdateTxCommitResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(UPDATE_TX_LOCAL_COMMIT_R, txClass));
+   }
+
+   @ManagedOperation(description = "Avg CPU demand to serve a remote get per tx class",
+                     displayName = "Avg CPU to serve a remote get per tx class")
+   public final long getRemoteGetServiceTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(LOCAL_REMOTE_GET_S, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time for a GMUClusteredGetCommand (no queue) per tx class",
+                     displayName = "Avg response time for a remote get (no queue) per tx class")
+   public final long getGMUClusteredGetCommandResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(REMOTE_REMOTE_GET_R, txClass));
+   }
+
+   @ManagedOperation(description = "Average TO-GMU validations that waited on a node per tx class",
+                     displayName = "Avg TO-GMU validations that waited on a node per tx class")
+   public final long getTONumValidationWaitedForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_TO_GMU_PREPARE_COMMAND_REMOTE_WAITED, txClass));
+   }
+
+   @ManagedOperation(description = "Number of local aborted tx per tx class",
+                     displayName = "No. of local aborted tx per tx class")
+   public final long getNumAbortedXactsForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_ABORTED_WR_TX, txClass));
+   }
+
+   @ManagedOperation(description = "Avg response time of the commit of a read only tx per tx class",
+                     displayName = "Avg response time of the commit of a read only tx per tx class")
+   public final long getLocalReadOnlyTxCommitResponseTimeForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(READ_ONLY_TX_COMMIT_R, txClass));
+   }
 
    //NB: readOnly transactions are never aborted (RC, RR, GMU)
    private void handleRollbackCommand(TransactionStatistics transactionStatistics, long initTime, long initCpuTime, TxInvocationContext ctx) {
@@ -1832,7 +2351,8 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
 
    private void replaceLockManager(ComponentRegistry componentRegistry) {
       LockManager lockManager = componentRegistry.getComponent(LockManager.class);
-      LockManagerWrapper lockManagerWrapper = new LockManagerWrapper(lockManager, StreamLibContainer.getOrCreateStreamLibContainer(cache), true);// this.configuration.customStatsConfiguration().sampleServiceTimes());
+      // this.configuration.customStatsConfiguration().sampleServiceTimes());
+      LockManagerWrapper lockManagerWrapper = new LockManagerWrapper(lockManager, StreamLibContainer.getOrCreateStreamLibContainer(cache), true);
       componentRegistry.registerComponent(lockManagerWrapper, LockManager.class);
    }
 
@@ -1855,10 +2375,6 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
       return null;
    }
 
-   private boolean isLockTimeout(TimeoutException e) {
-      return e.getMessage().startsWith("Unable to acquire lock after");
-   }
-
    private void updateWallClockTime(TransactionStatistics transactionStatistics, ExposedStatistic duration, ExposedStatistic counter, long initTime) {
       transactionStatistics.addValue(duration, System.nanoTime() - initTime);
       transactionStatistics.incrementValue(counter);
@@ -1871,11 +2387,6 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
    private void updateServiceTimeWithoutCounter(TransactionStatistics transactionStatistics, ExposedStatistic time, long initTime) {
       transactionStatistics.addValue(time, TransactionsStatisticsRegistry.getThreadCPUTime() - initTime);
    }
-
-   /*private void updateServiceTime(ExposedStatistic duration, ExposedStatistic counter, long initTime) {
-      transactionTable.addValue(duration, threadMXBean.getCurrentThreadCpuTime() - initTime);
-      transactionTable.incrementValue(counter);
-   }*/
 
    private long handleLong(Long value) {
       return value == null ? 0 : value;
