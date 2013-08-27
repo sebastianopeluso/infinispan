@@ -25,6 +25,7 @@ package org.infinispan.transaction.gmu.manager;
 import org.infinispan.container.versioning.gmu.GMUCacheEntryVersion;
 import org.infinispan.container.versioning.gmu.GMUVersion;
 import org.infinispan.stats.TransactionsStatisticsRegistry;
+import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.logging.Log;
@@ -466,6 +467,8 @@ public class SortedTransactionQueue {
 
       void awaitUntilCommitted() throws InterruptedException;
 
+      void awaitUntilCommitted(long time) throws InterruptedException;
+
       long getConcurrentClockNumber();
 
       long getCommitReceivedTimestamp();
@@ -575,6 +578,24 @@ public class SortedTransactionQueue {
       public final synchronized void awaitUntilCommitted() throws InterruptedException {
          while (!isCommitted()) {
             wait();
+         }
+      }
+
+      @Override
+      public final synchronized void awaitUntilCommitted(long time) throws InterruptedException {
+         String toPrint = " ";
+         while (!isCommitted()) {
+            wait(time);
+            toPrint="*** Delay in commit ***"+this+" This node value: "+this.entryVersion.getThisNodeVersionValue()+"\n";
+            toPrint+="*** Queue status ***\n";
+            Node insertAfter = lastEntry.getPrevious();
+
+            while (insertAfter != firstEntry) {
+               toPrint+=""+insertAfter;
+               insertAfter = insertAfter.getPrevious();
+            }
+
+            log.warn(toPrint+"\n");
          }
       }
 
@@ -769,6 +790,9 @@ public class SortedTransactionQueue {
       public final void awaitUntilCommitted() throws InterruptedException {/*no-op*/}
 
       @Override
+      public final void awaitUntilCommitted(long time) throws InterruptedException {/*no-op*/}
+
+      @Override
       public final long getConcurrentClockNumber() {
          throw new UnsupportedOperationException();
       }
@@ -819,7 +843,7 @@ public class SortedTransactionQueue {
       }
 
       public void setNewVersionInDataContainer(GMUCacheEntryVersion version) {
-          /*no-op*/
+         /*no-op*/
       }
    }
 }

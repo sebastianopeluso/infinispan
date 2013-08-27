@@ -156,7 +156,7 @@ public class TransactionTable {
          notifier.addListener(this);
          clustered = true;
       }
-      
+
       // Periodically run a task to cleanup the transaction table from completed transactions.
       ThreadFactory tf = new ThreadFactory() {
          @Override
@@ -185,10 +185,10 @@ public class TransactionTable {
    @Stop
    @SuppressWarnings("unused")
    private void stop() {
-      
+
       if (executorService != null)
          executorService.shutdownNow();
-      
+
       if (clustered) {
          notifier.removeListener(this);
          currentTopologyId = CACHE_STOPPED_TOPOLOGY_ID; // indicate that the cache has stopped
@@ -267,7 +267,7 @@ public class TransactionTable {
          return;
 
       log.tracef("Checking for transactions originated on leavers. Current members are %s, remote transactions: %d",
-            members, remoteTransactions.size());
+                 members, remoteTransactions.size());
       Set<GlobalTransaction> toKill = new HashSet<GlobalTransaction>();
       for (Map.Entry<GlobalTransaction, RemoteTransaction> e : remoteTransactions.entrySet()) {
          GlobalTransaction gt = e.getKey();
@@ -298,7 +298,7 @@ public class TransactionTable {
       }
 
       log.tracef("Completed cleaning transactions originating on leavers. Remote transactions remaining: %d",
-            remoteTransactions.size());
+                 remoteTransactions.size());
    }
 
    /**
@@ -542,6 +542,19 @@ public class TransactionTable {
       if (txsOnGoing) {
          log.unfinishedTransactionsRemain(localTransactions == null ? 0 : localTransactions.size(),
                                           remoteTransactions == null ? 0 : remoteTransactions.size());
+
+         String allLocal = "*** ";
+         Set<Map.Entry<Transaction,LocalTransaction>> set = localTransactions.entrySet();
+
+         for(Map.Entry<Transaction,LocalTransaction> e : set){
+            allLocal+=("["+e.getKey()+" | "+e.getValue()+"]\n");
+         }
+
+         allLocal+="***";
+
+         System.out.println("["+rpcManager.getAddress()+"] "+allLocal);
+
+
       } else {
          log.debug("All transactions terminated");
       }
@@ -584,8 +597,8 @@ public class TransactionTable {
             long duration = System.nanoTime() - beginning;
 
             log.tracef("Finished cleaning up completed transactions. %d transactions were removed, total duration was %d millis, " +
-                  "current number of completed transactions is %d", removedEntries, TimeUnit.NANOSECONDS.toMillis(duration),
-                  completedTransactions.size());
+                             "current number of completed transactions is %d", removedEntries, TimeUnit.NANOSECONDS.toMillis(duration),
+                       completedTransactions.size());
          } catch (Exception e) {
             log.errorf(e, "Failed to cleanup completed transactions: %s", e.getMessage());
          }
