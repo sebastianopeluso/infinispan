@@ -467,8 +467,6 @@ public class SortedTransactionQueue {
 
       void awaitUntilCommitted() throws InterruptedException;
 
-      void awaitUntilCommitted(long time) throws InterruptedException;
-
       long getConcurrentClockNumber();
 
       long getCommitReceivedTimestamp();
@@ -578,24 +576,6 @@ public class SortedTransactionQueue {
       public final synchronized void awaitUntilCommitted() throws InterruptedException {
          while (!isCommitted()) {
             wait();
-         }
-      }
-
-      @Override
-      public final synchronized void awaitUntilCommitted(long time) throws InterruptedException {
-         String toPrint = " ";
-         while (!isCommitted()) {
-            wait(time);
-            toPrint="*** Delay in commit ***"+this+" This node value: "+this.entryVersion.getThisNodeVersionValue()+"\n";
-            toPrint+="*** Queue status ***\n";
-            Node insertAfter = lastEntry.getPrevious();
-
-            while (insertAfter != firstEntry) {
-               toPrint+=""+insertAfter;
-               insertAfter = insertAfter.getPrevious();
-            }
-
-            log.warn(toPrint+"\n");
          }
       }
 
@@ -788,9 +768,6 @@ public class SortedTransactionQueue {
 
       @Override
       public final void awaitUntilCommitted() throws InterruptedException {/*no-op*/}
-
-      @Override
-      public final void awaitUntilCommitted(long time) throws InterruptedException {/*no-op*/}
 
       @Override
       public final long getConcurrentClockNumber() {

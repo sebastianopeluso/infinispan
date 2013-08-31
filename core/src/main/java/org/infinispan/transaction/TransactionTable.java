@@ -542,19 +542,6 @@ public class TransactionTable {
       if (txsOnGoing) {
          log.unfinishedTransactionsRemain(localTransactions == null ? 0 : localTransactions.size(),
                                           remoteTransactions == null ? 0 : remoteTransactions.size());
-
-         String allLocal = "*** ";
-         Set<Map.Entry<Transaction,LocalTransaction>> set = localTransactions.entrySet();
-
-         for(Map.Entry<Transaction,LocalTransaction> e : set){
-            allLocal+=("["+e.getKey()+" | "+e.getValue()+"]\n");
-         }
-
-         allLocal+="***";
-
-         System.out.println("["+rpcManager.getAddress()+"] "+allLocal);
-
-
       } else {
          log.debug("All transactions terminated");
       }

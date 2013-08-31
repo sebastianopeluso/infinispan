@@ -172,7 +172,7 @@ public class TestingUtil {
    }
 
    public static void waitForRehashToComplete(Cache... caches) {
-      int gracetime = 180000; // 90 seconds
+      int gracetime = 90000; // 90 seconds
       long giveup = System.currentTimeMillis() + gracetime;
       for (Cache c : caches) {
          StateTransferManager stateTransferManager = extractComponent(c, StateTransferManager.class);
