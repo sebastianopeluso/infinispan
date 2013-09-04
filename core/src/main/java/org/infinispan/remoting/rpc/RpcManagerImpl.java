@@ -432,6 +432,13 @@ public class RpcManagerImpl implements RpcManager {
       return totalReplicationTime.get() / replicationCount.get();
    }
 
+   @ManagedAttribute(description = "Number of nodes in the cluster",
+                     displayName = "No. of nodes")
+   public long getNumNodes() {
+      List<Address> members = getMembers();
+      return members.isEmpty() ? 1 : members.size();
+   }
+
    // mainly for unit testing
    public void setTransport(Transport t) {
       this.t = t;

@@ -755,23 +755,6 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
       return handleLong((Long) (TransactionsStatisticsRegistry.getAttribute(NTBC, null)));
    }
 
-   @ManagedAttribute(description = "Number of nodes in the cluster",
-                     displayName = "No. of nodes")
-   public long getNumNodes() {
-      try {
-         if (rpcManager != null) {
-            Collection<Address> members = rpcManager.getMembers();
-            //member can be null if we haven't received the initial topology
-            return members == null ? 1 : members.size();
-         }
-         //if rpc manager is null, we are in local mode.
-         return 1;
-      } catch (Throwable throwable) {
-         log.error("Error obtaining Number of Nodes. returning 1", throwable);
-         return 1;
-      }
-   }
-
    @ManagedAttribute(description = "Number of replicas for each key",
                      displayName = "Replication Degree")
    public long getReplicationDegree() {
