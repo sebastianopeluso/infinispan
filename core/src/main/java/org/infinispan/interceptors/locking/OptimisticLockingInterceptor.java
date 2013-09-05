@@ -62,6 +62,7 @@ public class OptimisticLockingInterceptor extends AbstractTxLockingInterceptor {
 
    private LockAcquisitionVisitor lockAcquisitionVisitor;
    private boolean needToMarkReads;
+   private boolean localMode;
 
    EntryFactory entryFactory;
 
@@ -80,7 +81,8 @@ public class OptimisticLockingInterceptor extends AbstractTxLockingInterceptor {
    
    @Start
    public void start() {
-      if (cacheConfiguration.clustering().cacheMode() == CacheMode.LOCAL &&
+      this.localMode = cacheConfiguration.clustering().cacheMode() == CacheMode.LOCAL;
+      if (localMode &&
             cacheConfiguration.locking().writeSkewCheck() &&
             cacheConfiguration.locking().isolationLevel() == IsolationLevel.REPEATABLE_READ &&
             !cacheConfiguration.unsafe().unreliableReturnValues()) {
@@ -284,7 +286,9 @@ public class OptimisticLockingInterceptor extends AbstractTxLockingInterceptor {
       long lockTimeout = cacheConfiguration.locking().lockAcquisitionTimeout();
       for (Object key: orderedKeys) {
          lockAndRegisterBackupLock(ctx, key, lockTimeout, false);
-         performLocalWriteSkewCheck(ctx, key);
+         if (localMode) {
+            performLocalWriteSkewCheck(ctx, key);
+         }
          ctx.addAffectedKey(key);
       }
    }
