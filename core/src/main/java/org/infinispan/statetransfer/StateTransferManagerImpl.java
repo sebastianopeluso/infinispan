@@ -36,6 +36,8 @@ import org.infinispan.configuration.cache.CacheMode;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.global.GlobalConfiguration;
 import org.infinispan.container.versioning.VersionGenerator;
+import org.infinispan.dataplacement.DataPlacementManager;
+import org.infinispan.dataplacement.ch.DataPlacementConsistentHash;
 import org.infinispan.dataplacement.ch.DataPlacementConsistentHashFactory;
 import org.infinispan.distribution.ch.*;
 import org.infinispan.distribution.group.GroupManager;
@@ -78,6 +80,7 @@ public class StateTransferManagerImpl implements StateTransferManager {
    private LocalTopologyManager localTopologyManager;
    private VersionGenerator versionGenerator;
    private ReconfigurableReplicationManager reconfigurableReplicationManager;
+   private DataPlacementManager dataPlacementManager;
 
    private final CountDownLatch initialStateTransferComplete = new CountDownLatch(1);
 
@@ -95,7 +98,8 @@ public class StateTransferManagerImpl implements StateTransferManager {
                     GroupManager groupManager,
                     LocalTopologyManager localTopologyManager,
                     VersionGenerator versionGenerator,
-                    ReconfigurableReplicationManager reconfigurableReplicationManager) {
+                    ReconfigurableReplicationManager reconfigurableReplicationManager,
+                    DataPlacementManager dataPlacementManager) {
       this.stateConsumer = stateConsumer;
       this.stateProvider = stateProvider;
       this.cacheName = cache.getName();
@@ -107,6 +111,7 @@ public class StateTransferManagerImpl implements StateTransferManager {
       this.localTopologyManager = localTopologyManager;
       this.versionGenerator = versionGenerator;
       this.reconfigurableReplicationManager = reconfigurableReplicationManager;
+      this.dataPlacementManager = dataPlacementManager;
    }
 
    // needs to be AFTER the DistributionManager and *after* the cache loader manager (if any) inits and preloads
@@ -199,12 +204,24 @@ public class StateTransferManagerImpl implements StateTransferManager {
       return new CacheTopology(cacheTopology.getTopologyId(), currentCH, pendingCH);
    }
 
+   private void initDataPlacement(CacheTopology cacheTopology) {
+      ConsistentHash currentCH = cacheTopology.getCurrentCH();
+      if (currentCH instanceof DataPlacementConsistentHash) {
+         dataPlacementManager.init((DataPlacementConsistentHash) currentCH);
+      }
+      ConsistentHash pendingCH = cacheTopology.getPendingCH();
+      if (pendingCH != null && pendingCH instanceof DataPlacementConsistentHash) {
+         dataPlacementManager.init((DataPlacementConsistentHash) pendingCH);
+      }
+   }
+
    private void doTopologyUpdate(CacheTopology newCacheTopology, boolean isRebalance) {
       if (trace) {
          log.tracef("Installing new cache topology %s on cache %s", newCacheTopology, cacheName);
       }
 
       // handle grouping
+      initDataPlacement(newCacheTopology);
       newCacheTopology = addGrouping(newCacheTopology);
 
       CacheTopology oldCacheTopology = stateConsumer.getCacheTopology();

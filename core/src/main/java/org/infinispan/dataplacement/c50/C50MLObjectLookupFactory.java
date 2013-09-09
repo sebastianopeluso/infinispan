@@ -133,7 +133,14 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
       objectLookup.setKeyFeatureManager(keyFeatureManager);
       deleteAll();
 
+      if (log.isTraceEnabled()) {
+         log.tracef("Start iterating...");
+      }
+
       for (int iteration = 0; iteration < numberOfOwners; ++iteration) {
+         if (log.isTraceEnabled()) {
+            log.tracef("Create rules for iteration %s (%s total)", iteration, numberOfOwners);
+         }
          Set<Integer> ownersIndexes = new TreeSet<Integer>();
          boolean success = writeObjectsToInputData(segmentMapping.iterator(), ownersIndexes, iteration);
 
@@ -197,8 +204,14 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
     * @throws InterruptedException if interrupted while waiting
     */
    private void runMachineLearner(int iteration) throws IOException, InterruptedException {
+      String cmd = String.format(EXEC_FORMAT, machineLearnerPath, iteration);
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Running C5.0 for iteration %s. cmd=%s", iteration, cmd);
+      }
+
       Process process = Runtime.getRuntime()
-            .exec(String.format(EXEC_FORMAT, machineLearnerPath, iteration));
+            .exec(cmd);
       if (process != null) {
          process.getOutputStream();
          //this is needed because the process can block if the input stream buffer gets full
@@ -220,6 +233,10 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
       if (writer == null) {
          log.errorf("Cannot create writer when tried to write the input.names");
          return false;
+      }
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Writing input names for iteration %s", iteration);
       }
 
       try {
@@ -303,14 +320,27 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
          return false;
       }
 
+      if (log.isTraceEnabled()) {
+         log.tracef("Writing object input data. Start iterating over the keys... (iteration=%s)", iteration);
+      }
+
       try {
          while (iterator.hasNext()) {
             SegmentMapping.KeyOwners keyOwners = iterator.next();
-            int owner = keyOwners.getOwnerIndexes().length < iteration ?
+
+            if (log.isTraceEnabled()) {
+               log.tracef("Analyzing %s", keyOwners);
+            }
+
+            int owner = keyOwners.getOwnerIndexes().length > iteration ?
                   keyOwners.getOwnerIndexes()[iteration] : -1;
             if (owner >= 0) {
                writeInputData(keyOwners.getKey(), owner, writer);
                ownersIndexes.add(owner);
+            } else {
+               if (log.isTraceEnabled()) {
+                  log.tracef("No owners for iteration %s", iteration);
+               }
             }
          }
       } catch (IOException e) {
@@ -333,6 +363,10 @@ public class C50MLObjectLookupFactory implements ObjectLookupFactory {
     */
    private void writeInputData(Object key, Integer nodeIndex, BufferedWriter writer) throws IOException {
       Map<Feature, FeatureValue> keyFeatures = keyFeatureManager.getFeatures(key);
+
+      if (log.isTraceEnabled()) {
+         log.tracef("Write input data. key=%s, node=%s, features=%s", key, nodeIndex, keyFeatures);
+      }
 
       for (Feature feature : keyFeatureManager.getAllKeyFeatures()) {
          FeatureValue keyFeatureValue = keyFeatures.get(feature);

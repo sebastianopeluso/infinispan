@@ -24,6 +24,7 @@ package org.infinispan.dataplacement;
 
 import org.infinispan.commons.hash.Hash;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
+import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.remoting.transport.Address;
 
@@ -119,4 +120,7 @@ public class ClusterObjectLookup {
       return result;
    }
 
+   public void initObjectLookup(ObjectLookupFactory objectLookupFactory) {
+      objectLookupFactory.init(Arrays.asList(objectLookups));
+   }
 }

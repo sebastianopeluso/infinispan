@@ -24,6 +24,7 @@ package org.infinispan.dataplacement.ch;
 
 import org.infinispan.commons.hash.Hash;
 import org.infinispan.dataplacement.ClusterObjectLookup;
+import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
 import org.infinispan.distribution.ch.ConsistentHash;
 import org.infinispan.marshall.AbstractExternalizer;
 import org.infinispan.marshall.Ids;
@@ -212,6 +213,12 @@ public class DataPlacementConsistentHash<CH extends ConsistentHash> implements C
             "consistentHash=" + consistentHash +
             ", clusterObjectLookupList=" + clusterObjectLookupList +
             '}';
+   }
+
+   public void initObjectLookup(ObjectLookupFactory objectLookupFactory) {
+      for (ClusterObjectLookup clusterObjectLookup : clusterObjectLookupList) {
+         clusterObjectLookup.initObjectLookup(objectLookupFactory);
+      }
    }
 
    private List<Address> merge(List<Address> defaultOwners, List<Address> newOwners, int numberOfOwners) {

@@ -351,7 +351,7 @@ public class ParseTreeNode {
          matcher = pattern.matcher(rule);
 
          if (log.isTraceEnabled()) {
-            log.tracef("Trying to match '%s' with pattern '%s%", rule, pattern.pattern());
+            log.tracef("Trying to match '%s' with pattern '%s", rule, pattern.pattern());
          }
 
          return matcher.matches();

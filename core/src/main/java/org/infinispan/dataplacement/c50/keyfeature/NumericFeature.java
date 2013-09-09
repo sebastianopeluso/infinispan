@@ -66,6 +66,13 @@ public class NumericFeature implements Feature {
    @Override
    public FeatureValue featureValueFromParser(String value) {
       try {
+         if (value == null || value.isEmpty()) {
+            throw new IllegalStateException("Error parsing value from decision tree");
+         } else if (value.charAt(0) == '+') {
+            //skip the plus sign since java cannot parse the number with it in older versions
+            value = value.substring(1);
+         }
+
          Number number = NumberFormat.getNumberInstance().parse(value);
          return new NumericValue(number);
       } catch (ParseException e) {

@@ -27,6 +27,7 @@ import org.infinispan.Cache;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.DataPlacementCommand;
 import org.infinispan.configuration.cache.Configuration;
+import org.infinispan.dataplacement.ch.DataPlacementConsistentHash;
 import org.infinispan.dataplacement.lookup.ObjectLookup;
 import org.infinispan.dataplacement.lookup.ObjectLookupFactory;
 import org.infinispan.dataplacement.stats.AccessesMessageSizeTask;
@@ -119,6 +120,7 @@ public class DataPlacementManager {
       } else if (this.rebalancePolicy == null) {
          log.info("Data placement not enabled because the Rebalance Policy is not the expected: " +
                         rebalancePolicy.getClass().getSimpleName());
+         return;
       }
 
       objectLookupFactory = configuration.dataPlacement().objectLookupFactory();
@@ -277,6 +279,12 @@ public class DataPlacementManager {
          } catch (Exception e) {
             log.error("Error triggering State Transfer with the new mappings", e);
          }
+      }
+   }
+
+   public final void init(DataPlacementConsistentHash consistentHash) {
+      if (objectLookupFactory != null) {
+         consistentHash.initObjectLookup(objectLookupFactory);
       }
    }
 
