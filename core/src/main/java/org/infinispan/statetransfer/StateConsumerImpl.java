@@ -47,7 +47,10 @@ import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
+import org.infinispan.interceptors.EntryWrappingInterceptor;
 import org.infinispan.interceptors.InterceptorChain;
+import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.interceptors.gmu.GMUEntryWrappingInterceptor;
 import org.infinispan.loaders.CacheLoaderException;
 import org.infinispan.loaders.CacheLoaderManager;
 import org.infinispan.loaders.CacheStore;
@@ -61,7 +64,9 @@ import org.infinispan.topology.CacheTopology;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
+import org.infinispan.transaction.gmu.manager.CommittedTransaction;
 import org.infinispan.transaction.gmu.manager.SortedTransactionQueue;
+import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.totalorder.TotalOrderLatch;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.transaction.xa.CacheTransaction;
@@ -161,7 +166,8 @@ public class StateConsumerImpl implements StateConsumer {
    private volatile boolean ownsData = false;
    private ConcurrentMap<Object, OwnersList> oldKeyOwners;
    private VersionGenerator versionGenerator;
-   private final Map<Address, ShadowTransactionInfo> shadowTransactionInfoMap = new HashMap<Address, ShadowTransactionInfo>();
+   private final Map<Address, ShadowTransactionInfo> shadowTransactionInfoReceiverMap = new HashMap<Address, ShadowTransactionInfo>();
+   private TransactionCommitManager transactionCommitManager;
 
    public StateConsumerImpl() {
    }
@@ -229,7 +235,8 @@ public class StateConsumerImpl implements StateConsumer {
                     CacheNotifier cacheNotifier,
                     TotalOrderManager totalOrderManager,
                     VersionGenerator versionGenerator,
-                    @ComponentName(KnownComponentNames.GMU_EXECUTOR) BlockingTaskAwareExecutorService gmuExecutorService) {
+                    @ComponentName(KnownComponentNames.GMU_EXECUTOR) BlockingTaskAwareExecutorService gmuExecutorService,
+                    TransactionCommitManager transactionCommitManager) {
       this.cacheName = cache.getName();
       this.executorService = executorService;
       this.stateTransferManager = stateTransferManager;
@@ -247,6 +254,7 @@ public class StateConsumerImpl implements StateConsumer {
       this.totalOrderManager = totalOrderManager;
       this.versionGenerator = versionGenerator;
       this.gmuExecutorService = gmuExecutorService;
+      this.transactionCommitManager = transactionCommitManager;
 
       isInvalidationMode = configuration.clustering().cacheMode().isInvalidation();
 
@@ -559,7 +567,7 @@ public class StateConsumerImpl implements StateConsumer {
             //Wait for the commit of the state-transfer transaction
             ShadowTransactionInfo transactionInfo;
             synchronized (this) {
-               transactionInfo = this.shadowTransactionInfoMap.get(sender);
+               transactionInfo = this.shadowTransactionInfoReceiverMap.get(sender);
             }
 
             GMUCacheEntryVersion version = null;
@@ -650,7 +658,7 @@ public class StateConsumerImpl implements StateConsumer {
       if (isTransactional) {
          for (TransactionInfo transactionInfo : transactions) {
             if (transactionInfo instanceof ShadowTransactionInfo) {
-               //Try to commit the Shadow Transaction. IF successful it insert a new entry in the shadowTransactionInfoMap
+               //Try to commit the Receiver Shadow Transaction. If successful it insert a new entry in the shadowTransactionInfoReceiverMap
                applyShadowTransaction(sender, (ShadowTransactionInfo) transactionInfo);
             } else {
                CacheTransaction tx = transactionTable.getLocalTransaction(transactionInfo.getGlobalTransaction());
@@ -709,11 +717,11 @@ public class StateConsumerImpl implements StateConsumer {
    private void applyShadowTransaction(final Address sender, final ShadowTransactionInfo transactionInfo) {
 
       synchronized (this) {
-         ShadowTransactionInfo info = shadowTransactionInfoMap.get(sender);
+         ShadowTransactionInfo info = shadowTransactionInfoReceiverMap.get(sender);
          if(info != null){
-            log.error("Shadow Transaction Info "+transactionInfo+" already in shadowTransactionInfoMap for sender "+sender+". Old entry is "+info);
+            log.warn("Shadow Transaction Info "+transactionInfo+" already in shadowTransactionInfoReceiverMap for sender "+sender+". Old entry is "+info);
          }
-         shadowTransactionInfoMap.put(sender, transactionInfo);
+         shadowTransactionInfoReceiverMap.put(sender, transactionInfo);
       }
 
       this.gmuExecutorService.execute(new BlockingRunnable() {
@@ -724,54 +732,51 @@ public class StateConsumerImpl implements StateConsumer {
          @Override
          public void run() {
 
-            try {
-               InvocationContext ctx = null;
-               if (transactionManager != null) {
-                  // cache is transactional
-                  transactionManager.begin();
-                  Transaction transaction = transactionManager.getTransaction();
-                  ctx = icc.createInvocationContext(transaction);
-                  ((TxInvocationContext) ctx).setImplicitTransaction(true);
+            try{
+
+               SortedTransactionQueue.TransactionEntry transactionEntry = transactionCommitManager.commitReceiverStateTransferTransaction(sender, transactionInfo.getVersion());
+               //see org.infinispan.tx.gmu.DistConsistencyTest3.testNoCommitDeadlock
+               //the commitTransaction() can re-order the queue. we need to check for pending commit commands.
+               //if not, the queue can be blocked forever.
+               gmuExecutorService.checkForReadyTasks();
+
+
+               if (transactionEntry != null && transactionInfo != null) {
+                  //Attach the entry in the commit queue to the transaction info
+                  transactionInfo.setTransactionEntry(transactionEntry);
                }
 
-               boolean success = false;
+               if(transactionEntry != null){
+                  //Wait for this transaction is ready to be committed.
+                  transactionEntry.awaitUntilIsReadyToCommit();
+               }
 
-               ShadowTransactionCommand shadowCommand = commandsFactory.buildShadowTransactionCommand();
+               if(transactionEntry != null && !transactionEntry.isCommitted()){
+                  //If this transaction is not committed try to commit transactions from the commit queue
+                  Collection<SortedTransactionQueue.TransactionEntry> transactionsToCommit = transactionCommitManager.getTransactionsToCommit();
 
-               try {
-                  //This is a Shadow transaction for a state-transfer
-                  interceptorChain.invoke(ctx, shadowCommand);
-                  success = true;
-               } finally {
-                  if (ctx != null && ctx.isInTxScope()) {
-                     if (success) {
-                        ((LocalTransaction) ((TxInvocationContext) ctx).getCacheTransaction()).setFromStateTransfer(true);
-                        ((LocalTransaction) ((TxInvocationContext) ctx).getCacheTransaction()).setShadowTransactionInfo(transactionInfo);
-                        if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE &&
-                              versionGenerator != null && versionGenerator instanceof GMUVersionGenerator &&
-                              transactionInfo.getVersion() != null) {
-                           TxInvocationContext tctx = (TxInvocationContext) ctx;
-                           EntryVersion currentVersion = tctx.getTransactionVersion();
-                           tctx.setTransactionVersion(((GMUVersionGenerator) versionGenerator).mergeAndMax(currentVersion, transactionInfo.getVersion()));
-                        }
-                        try {
-                           //This commit will attach the transaction entry in the commit queue to the transaction info. See GMUEntryWrappingInterceptor.visitCommitCommand()
-                           transactionManager.commit();
-
-
-                        } catch (Throwable ex) {
-                           log.errorf(ex, "Could not commit transaction created by state transfer %s", transactionInfo);
-                           if (transactionManager.getTransaction() != null) {
-                              transactionManager.rollback();
-                           }
-                        }
-                     } else {
-                        transactionManager.rollback();
-                     }
+                  List<CommandInterceptor> interceptors = interceptorChain.getInterceptorsWithClass(GMUEntryWrappingInterceptor.class);
+                  GMUEntryWrappingInterceptor GMUInterceptor = null;
+                  if(interceptors == null || interceptors.isEmpty()){
+                     log.fatal("No GMUEntryWrappingInterceptor found");
+                     return;
                   }
+                  else{
+                     GMUInterceptor = ((GMUEntryWrappingInterceptor)(interceptors.get(0)));
+                  }
+
+                  transactionCommitManager.executeCommit(transactionEntry, transactionsToCommit, null, GMUInterceptor);
+
                }
-            } catch (Exception ex) {
-               log.problemApplyingShadowTransaction(ex.getMessage(), transactionInfo, ex);
+
+            } catch (Throwable throwable) {
+               log.fatal("Error while committing transaction", throwable);
+               shadowTransactionInfoReceiverMap.remove(sender);
+               transactionCommitManager.rollbackReceiverStateTransferTransaction(sender);
+            } finally {
+
+               gmuExecutorService.checkForReadyTasks();
+
             }
 
          }
@@ -877,7 +882,13 @@ public class StateConsumerImpl implements StateConsumer {
       }
       // get transactions and locks
       try {
-         StateRequestCommand cmd = commandsFactory.buildStateRequestCommand(StateRequestCommand.Type.GET_TRANSACTIONS, rpcManager.getAddress(), topologyId, segments);
+         EntryVersion preparedVersion = null;
+         if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+            //Prepare a shadow transaction for this state transfer from sender.
+            preparedVersion = transactionCommitManager.prepareReceiverStateTransferTransaction(source);
+         }
+
+         StateRequestCommand cmd = commandsFactory.buildStateRequestCommand(StateRequestCommand.Type.GET_TRANSACTIONS, rpcManager.getAddress(), topologyId, segments, preparedVersion);
          Map<Address, Response> responses = rpcManager.invokeRemotely(Collections.singleton(source), cmd, ResponseMode.SYNCHRONOUS_IGNORE_LEAVERS, timeout, false);
          Response response = responses.get(source);
          if (response instanceof SuccessfulResponse) {
@@ -886,6 +897,9 @@ public class StateConsumerImpl implements StateConsumer {
          log.failedToRetrieveTransactionsForSegments(segments, cacheName, source, null);
       } catch (CacheException e) {
          log.failedToRetrieveTransactionsForSegments(segments, cacheName, source, e);
+      }
+      if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+         transactionCommitManager.rollbackReceiverStateTransferTransaction(source);
       }
       return null;
    }
@@ -1170,7 +1184,7 @@ public class StateConsumerImpl implements StateConsumer {
             if (transfers.remove(inboundTransfer)) {
                if (transfers.isEmpty()) {
                   transfersBySource.remove(inboundTransfer.getSource());
-                  shadowTransactionInfoMap.remove(inboundTransfer.getSource());
+                  shadowTransactionInfoReceiverMap.remove(inboundTransfer.getSource());
                }
                transfersBySegment.keySet().removeAll(inboundTransfer.getSegments());
                return true;

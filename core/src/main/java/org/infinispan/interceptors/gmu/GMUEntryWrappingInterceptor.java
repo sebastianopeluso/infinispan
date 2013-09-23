@@ -249,44 +249,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
             return retVal;
          }
 
-         List<CommittedTransaction> committedTransactions = new ArrayList<CommittedTransaction>(transactionsToCommit.size());
-         List<TransactionEntry> committedTransactionEntries = new ArrayList<TransactionEntry>(transactionsToCommit.size());
-         int subVersion = 0;
+         transactionCommitManager.executeCommit(transactionEntry, transactionsToCommit, ctx, this);
 
-         //in case of transaction has the same version... should be rare...
-         for (TransactionEntry toCommit : transactionsToCommit) {
-            if (!toCommit.committing()) {
-               if (log.isTraceEnabled()) {
-                  log.tracef("Other thread already started to commit %s. Waiting...", toCommit);
-               }
-               toCommit.awaitUntilCommitted();
-               continue;
-            }
-            CacheTransaction cacheTransaction = toCommit.getCacheTransactionForCommit();
-            CommittedTransaction committedTransaction = new CommittedTransaction(cacheTransaction, subVersion,
-                                                                                 toCommit.getConcurrentClockNumber());
-            TxInvocationContext context;
-            if (transactionEntry.getGlobalTransaction().equals(toCommit.getGlobalTransaction())) {
-               updateCommitVersion(ctx, cacheTransaction, subVersion);
-               context = ctx;
-            } else {
-               context = createInvocationContext(cacheTransaction, subVersion);
-            }
-            toCommit.setNewVersionInDataContainer((GMUCacheEntryVersion) context.getCacheTransaction()
-                  .getTransactionVersion());
-            if (log.isTraceEnabled()) {
-               log.tracef("Committing %s", toCommit);
-            }
-            commitContextEntries(context, false, isFromStateTransfer(context));
-            committedTransactions.add(committedTransaction);
-            committedTransactionEntries.add(toCommit);
-            updateWaitingTime(toCommit);
-            subVersion++;
-         }
-         for (TransactionEntry txEntry : committedTransactionEntries) {
-            store(txEntry.getGlobalTransaction());
-         }
-         transactionCommitManager.transactionCommitted(committedTransactions, committedTransactionEntries);
       } catch (Throwable throwable) {
          //let ignore the exception. we cannot have some nodes applying the write set and another not another one
          //receives the rollback and don't applies the write set
@@ -467,7 +431,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       }
    }
 
-   private void store(GlobalTransaction globalTransaction) {
+   public void store(GlobalTransaction globalTransaction) {
       if (store == null) {
          return;
       }
@@ -596,16 +560,21 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       return false;
    }
 
-   private void updateCommitVersion(TxInvocationContext context, CacheTransaction cacheTransaction, int subVersion) {
-      GMUCacheEntryVersion newVersion = versionGenerator.convertVersionToWrite(cacheTransaction.getTransactionVersion(),
-                                                                               subVersion);
+   public void updateCommitVersion(TxInvocationContext context, CacheTransaction cacheTransaction, int subVersion) {
+      GMUCacheEntryVersion newVersion = inferCommitVersion(cacheTransaction.getTransactionVersion(),subVersion);
       context.getCacheTransaction().setTransactionVersion(newVersion);
 
    }
 
-   private TxInvocationContext createInvocationContext(CacheTransaction cacheTransaction, int subVersion) {
-      GMUCacheEntryVersion cacheEntryVersion = versionGenerator.convertVersionToWrite(cacheTransaction.getTransactionVersion(),
-                                                                                      subVersion);
+   public GMUCacheEntryVersion inferCommitVersion(EntryVersion entryVersion, int subVersion) {
+      GMUCacheEntryVersion newVersion = versionGenerator.convertVersionToWrite(entryVersion, subVersion);
+      return newVersion;
+
+   }
+
+   public TxInvocationContext createInvocationContext(CacheTransaction cacheTransaction, int subVersion) {
+      GMUCacheEntryVersion cacheEntryVersion = inferCommitVersion(cacheTransaction.getTransactionVersion(),subVersion);
+
       cacheTransaction.setTransactionVersion(cacheEntryVersion);
       if (cacheTransaction instanceof LocalTransaction) {
          LocalTxInvocationContext localTxInvocationContext = invocationContextContainer.createTxInvocationContext();
@@ -617,7 +586,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       throw new IllegalStateException("Expected a remote or local transaction and not " + cacheTransaction);
    }
 
-   private void updateWaitingTime(TransactionEntry transactionEntry) {
+   public void updateWaitingTime(TransactionEntry transactionEntry) {
       if (!TransactionsStatisticsRegistry.isGmuWaitingActive() || transactionEntry == null || !transactionEntry.hasWaited()) {
          return;
       }

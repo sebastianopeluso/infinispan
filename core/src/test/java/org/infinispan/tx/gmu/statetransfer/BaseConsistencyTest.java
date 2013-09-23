@@ -27,7 +27,7 @@ import static org.testng.AssertJUnit.*;
 public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
 
    private static final Random GLOBAL_RANDOM = new Random();
-   private static final int NUM_OF_ACCOUNTS = 100;
+   private static final int NUM_OF_ACCOUNTS = 10;
    private static final int INITIAL_AMOUNT = 10000;
    protected final int clusterSize;
    protected final CacheMode cacheMode;
@@ -118,7 +118,7 @@ public abstract class BaseConsistencyTest extends MultipleCacheManagersTest {
       ConfigurationBuilder builder = getDefaultClusteredCacheConfig(cacheMode, true);
       builder.locking().lockAcquisitionTimeout(100).isolationLevel(IsolationLevel.SERIALIZABLE)
             .clustering().stateTransfer().fetchInMemoryState(true).awaitInitialTransfer(true)
-            .hash().numOwners(2).numSegments(50)
+            .hash().numOwners(2).numSegments(10)
             .versioning().enable().scheme(VersioningScheme.GMU);
       return builder;
    }

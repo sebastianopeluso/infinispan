@@ -11,6 +11,6 @@ import org.testng.annotations.Test;
 public class DistConsistencyTest extends BaseConsistencyTest {
 
    public DistConsistencyTest() {
-      super(4, CacheMode.DIST_SYNC);
+      super(3, CacheMode.DIST_SYNC);
    }
 }

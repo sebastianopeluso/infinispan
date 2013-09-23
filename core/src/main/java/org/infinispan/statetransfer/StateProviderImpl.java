@@ -23,6 +23,7 @@
 
 package org.infinispan.statetransfer;
 
+import com.apple.laf.AquaUtils;
 import org.infinispan.Cache;
 import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.write.WriteCommand;
@@ -30,10 +31,14 @@ import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.container.DataContainer;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.distribution.ch.ConsistentHash;
+import org.infinispan.factories.KnownComponentNames;
 import org.infinispan.factories.annotations.ComponentName;
 import org.infinispan.factories.annotations.Inject;
 import org.infinispan.factories.annotations.Start;
 import org.infinispan.factories.annotations.Stop;
+import org.infinispan.interceptors.InterceptorChain;
+import org.infinispan.interceptors.base.CommandInterceptor;
+import org.infinispan.interceptors.gmu.GMUEntryWrappingInterceptor;
 import org.infinispan.loaders.CacheLoaderManager;
 import org.infinispan.notifications.Listener;
 import org.infinispan.notifications.cachelistener.CacheNotifier;
@@ -44,7 +49,13 @@ import org.infinispan.remoting.transport.Address;
 import org.infinispan.topology.CacheTopology;
 import org.infinispan.transaction.TransactionTable;
 import org.infinispan.transaction.gmu.CommitLog;
+import org.infinispan.transaction.gmu.GMUHelper;
+import org.infinispan.transaction.gmu.manager.SortedTransactionQueue;
+import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.xa.CacheTransaction;
+import org.infinispan.util.concurrent.BlockingRunnable;
+import org.infinispan.util.concurrent.BlockingTaskAwareExecutorService;
+import org.infinispan.util.concurrent.IsolationLevel;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -80,6 +91,11 @@ public class StateProviderImpl implements StateProvider {
 
    private StateConsumer stateConsumer;
    protected CommitLog commitLog;
+   private TransactionCommitManager transactionCommitManager;
+   private BlockingTaskAwareExecutorService gmuExecutorService;
+   private InterceptorChain interceptorChain;
+
+   private final Map<Address, ShadowTransactionInfo> shadowTransactionInfoSenderMap = new HashMap<Address, ShadowTransactionInfo>();
 
    /**
     * A map that keeps track of current outbound state transfers by destination address. There could be multiple transfers
@@ -102,7 +118,10 @@ public class StateProviderImpl implements StateProvider {
                     TransactionTable transactionTable,
                     StateTransferLock stateTransferLock,
                     StateConsumer stateConsumer,
-                    CommitLog commitLog) {
+                    CommitLog commitLog,
+                    TransactionCommitManager transactionCommitManager,
+                    @ComponentName(KnownComponentNames.GMU_EXECUTOR) BlockingTaskAwareExecutorService gmuExecutorService,
+                    InterceptorChain interceptorChain) {
       this.cacheName = cache.getName();
       this.executorService = executorService;
       this.configuration = configuration;
@@ -115,6 +134,9 @@ public class StateProviderImpl implements StateProvider {
       this.stateTransferLock = stateTransferLock;
       this.stateConsumer = stateConsumer;
       this.commitLog = commitLog;
+      this.transactionCommitManager = transactionCommitManager;
+      this.gmuExecutorService = gmuExecutorService;
+      this.interceptorChain = interceptorChain;
 
       timeout = configuration.clustering().stateTransfer().timeout();
 
@@ -185,7 +207,7 @@ public class StateProviderImpl implements StateProvider {
       }
    }
 
-   public List<TransactionInfo> getTransactionsForSegments(Address destination, int requestTopologyId, Set<Integer> segments) throws InterruptedException {
+   public List<TransactionInfo> getTransactionsForSegments(Address destination, int requestTopologyId, Set<Integer> segments, EntryVersion proposal) throws InterruptedException {
       if (trace) {
          log.tracef("Received request for transactions from node %s for segments %s of cache %s with topology id %d", destination, segments, cacheName, requestTopologyId);
       }
@@ -202,11 +224,26 @@ public class StateProviderImpl implements StateProvider {
       List<TransactionInfo> transactions = new ArrayList<TransactionInfo>();
 
 
-      //If we are adopting serializability and there is a valid commit log we have to send the current version
-      //of the most recent snapshot on this node so that we can commit a state-transfer shadow transaction on the acceptor of the state-transfer
-      EntryVersion version = commitLog != null && commitLog.isEnabled() ? commitLog.getCurrentVersion() : null;
-      if(version != null){
-         transactions.add(new ShadowTransactionInfo(requestTopologyId, version));
+      EntryVersion preparedVersion = null;
+      if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE && proposal != null) {
+         //Prepare a shadow transaction for this state transfer to destination
+         preparedVersion = transactionCommitManager.prepareSenderStateTransferTransaction(destination);
+
+         EntryVersion finalCommitVersion = transactionCommitManager.computeFinalCommitVersionOnStateTransfer(preparedVersion, proposal, rpcManager.getAddress(), destination);
+
+
+         ShadowTransactionInfo transactionInfo =  new ShadowTransactionInfo(requestTopologyId, finalCommitVersion);
+         synchronized (this){
+            shadowTransactionInfoSenderMap.put(destination, transactionInfo);
+         }
+
+         transactions.add(transactionInfo);
+
+         SortedTransactionQueue.TransactionEntry transactionEntry = transactionCommitManager.commitSenderStateTransferTransaction(destination, finalCommitVersion);
+
+         handleSenderStateTransferTransaction(destination, transactionInfo, transactionEntry);
+
+
       }
 
       //we migrate locks only if the cache is transactional and distributed
@@ -219,6 +256,72 @@ public class StateProviderImpl implements StateProvider {
       }
       return transactions;
    }
+
+   private void handleSenderStateTransferTransaction(final Address destination, final ShadowTransactionInfo transactionInfo, final SortedTransactionQueue.TransactionEntry transactionEntry){
+
+       this.gmuExecutorService.execute(new BlockingRunnable() {
+         @Override
+         public boolean isReady() {
+            return true;
+         }
+         @Override
+         public void run() {
+
+            try{
+
+
+               gmuExecutorService.checkForReadyTasks();
+
+
+               if (transactionEntry != null && transactionInfo != null) {
+                  //Attach the entry in the commit queue to the transaction info
+                  transactionInfo.setTransactionEntry(transactionEntry);
+               }
+
+               if(transactionEntry != null){
+                  //Wait for this transaction is ready to be committed.
+                  transactionEntry.awaitUntilIsReadyToCommit();
+               }
+
+               if(transactionEntry != null && !transactionEntry.isCommitted()){
+                  //If this transaction is not committed try to commit transactions from the commit queue
+                  Collection<SortedTransactionQueue.TransactionEntry> transactionsToCommit = transactionCommitManager.getTransactionsToCommit();
+
+                  List<CommandInterceptor> interceptors = interceptorChain.getInterceptorsWithClass(GMUEntryWrappingInterceptor.class);
+                  GMUEntryWrappingInterceptor GMUInterceptor = null;
+                  if(interceptors == null || interceptors.isEmpty()){
+                     log.fatal("No GMUEntryWrappingInterceptor found");
+                     return;
+                  }
+                  else{
+                     GMUInterceptor = ((GMUEntryWrappingInterceptor)(interceptors.get(0)));
+                  }
+
+                  transactionCommitManager.executeCommit(transactionEntry, transactionsToCommit, null, GMUInterceptor);
+
+               }
+
+            } catch (Throwable throwable) {
+               log.fatal("Error while committing transaction", throwable);
+               shadowTransactionInfoSenderMap.remove(destination);
+               transactionCommitManager.rollbackSenderStateTransferTransaction(destination);
+            } finally {
+
+               gmuExecutorService.checkForReadyTasks();
+
+            }
+
+         }
+
+         @Override
+         public final String toString() {
+            return "Apply Shadow Transaction Thread. "+transactionInfo;
+         }
+      });
+
+
+   }
+
 
    private CacheTopology getCacheTopology(int requestTopologyId, Address destination, boolean isReqForTransactions) throws InterruptedException {
       CacheTopology cacheTopology = stateConsumer.getCacheTopology();
@@ -299,6 +402,34 @@ public class StateProviderImpl implements StateProvider {
       }
 
       final CacheTopology cacheTopology = getCacheTopology(requestTopologyId, destination, false);
+
+      if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+
+         ShadowTransactionInfo transactionInfo = null;
+         synchronized (this){
+            transactionInfo = shadowTransactionInfoSenderMap.get(destination);
+         }
+         if(transactionInfo == null){
+            log.warn("Unable to determine a shadow transaction info for this state transfer");
+         }
+         else{
+            SortedTransactionQueue.TransactionEntry transactionEntry = null;
+
+            try {
+               transactionEntry = transactionInfo.waitForTransactionEntry();
+               if(transactionEntry != null)
+                  transactionEntry.awaitUntilCommitted();
+
+            } catch (InterruptedException e1) {
+               e1.printStackTrace();
+            }
+
+         }
+
+         synchronized (this){
+            transactionInfo = shadowTransactionInfoSenderMap.remove(destination);
+         }
+      }
 
       // the destination node must already have an InboundTransferTask waiting for these segments
       OutboundTransferTask outboundTransfer = createTask(destination, segments, cacheTopology);

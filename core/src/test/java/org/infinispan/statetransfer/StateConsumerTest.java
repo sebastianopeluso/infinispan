@@ -54,6 +54,7 @@ import org.infinispan.topology.CacheTopology;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
+import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
 import org.infinispan.util.InfinispanCollections;
 import org.infinispan.util.concurrent.BlockingTaskAwareExecutorService;
@@ -162,11 +163,12 @@ public class StateConsumerTest extends AbstractInfinispanTest {
       InterceptorChain interceptorChain = mock(InterceptorChain.class);
       InvocationContextContainer icc = mock(InvocationContextContainer.class);
       TotalOrderManager totalOrderManager = mock(TotalOrderManager.class);
+      TransactionCommitManager trasanctionCommitManager = mock(TransactionCommitManager.class);
 
-      when(commandsFactory.buildStateRequestCommand(any(StateRequestCommand.Type.class), any(Address.class), anyInt(), any(Set.class))).thenAnswer(new Answer<StateRequestCommand>() {
+      when(commandsFactory.buildStateRequestCommand(any(StateRequestCommand.Type.class), any(Address.class), anyInt(), any(Set.class), null)).thenAnswer(new Answer<StateRequestCommand>() {
          @Override
          public StateRequestCommand answer(InvocationOnMock invocation) {
-            return new StateRequestCommand("cache1", (StateRequestCommand.Type) invocation.getArguments()[0], (Address) invocation.getArguments()[1], (Integer) invocation.getArguments()[2], (Set) invocation.getArguments()[3]);
+            return new StateRequestCommand("cache1", (StateRequestCommand.Type) invocation.getArguments()[0], (Address) invocation.getArguments()[1], (Integer) invocation.getArguments()[2], (Set) invocation.getArguments()[3], null);
          }
       });
 
@@ -201,7 +203,7 @@ public class StateConsumerTest extends AbstractInfinispanTest {
       final StateConsumerImpl stateConsumer = new StateConsumerImpl();
       stateConsumer.init(cache, pooledExecutorService, stateTransferManager, interceptorChain, icc, configuration, rpcManager, null,
             commandsFactory, cacheLoaderManager, dataContainer, transactionTable, stateTransferLock, cacheNotifier, totalOrderManager,
-            null, blockingservice);
+            null, blockingservice, trasanctionCommitManager);
       stateConsumer.start();
 
       final List<InternalCacheEntry> cacheEntries = new ArrayList<InternalCacheEntry>();

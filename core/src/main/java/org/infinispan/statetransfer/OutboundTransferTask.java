@@ -156,6 +156,10 @@ public class OutboundTransferTask implements Runnable {
    //todo [anistor] check thread interrupt status in loops to implement faster cancellation
    public void run() {
       try {
+
+
+
+
          // send data container entries
          for (InternalCacheEntry ice : dataContainer) {
             Object key = ice.getKey();  //todo [anistor] should we check for expired entries?
