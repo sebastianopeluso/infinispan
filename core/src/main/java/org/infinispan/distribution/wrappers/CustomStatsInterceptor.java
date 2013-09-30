@@ -46,7 +46,6 @@ import org.infinispan.jmx.annotations.ManagedOperation;
 import org.infinispan.jmx.annotations.Parameter;
 import org.infinispan.remoting.InboundInvocationHandler;
 import org.infinispan.remoting.rpc.RpcManager;
-import org.infinispan.remoting.transport.Address;
 import org.infinispan.remoting.transport.Transport;
 import org.infinispan.remoting.transport.jgroups.CommandAwareRpcDispatcher;
 import org.infinispan.remoting.transport.jgroups.JGroupsTransport;
@@ -66,7 +65,6 @@ import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
 import java.lang.reflect.Field;
-import java.util.Collection;
 
 import static org.infinispan.stats.ExposedStatistic.*;
 
@@ -2199,6 +2197,30 @@ public final class CustomStatsInterceptor extends BaseCustomInterceptor {
                      displayName = "Remote nodes read by update xacts")
    public final long getLocalUpdateTxRemoteNodesRead() {
       return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_REMOTE_NODES_READ_WR_TX, null));
+   }
+
+   @ManagedOperation(description = "Number of local Update xact committed",
+                     displayName = "Num of local committed update xact")
+   public final long getLocalUpdateCommittedXact() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_COMMITTED_WR_TX, null));
+   }
+
+   @ManagedOperation(description = "Number of local ReadOnly xact committed",
+                     displayName = "Num of local committed readonly xact")
+   public final long getLocalReadOnlyCommittedXact() {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_COMMITTED_RO_TX, null));
+   }
+
+   @ManagedOperation(description = "Number of local Update xact committed per class",
+                     displayName = "Num of local committed update xact per class")
+   public final long getLocalUpdateCommittedXactForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_COMMITTED_WR_TX, txClass));
+   }
+
+   @ManagedOperation(description = "Number of local ReadOnly xact committed per class",
+                     displayName = "Num of local committed readonly xact per class")
+   public final long getLocalReadOnlyCommittedXactForTxClass(@Parameter(name = "Transaction Class") String txClass) {
+      return handleLong((Long) TransactionsStatisticsRegistry.getAttribute(NUM_COMMITTED_RO_TX, txClass));
    }
 
    //NB: readOnly transactions are never aborted (RC, RR, GMU)
