@@ -44,6 +44,7 @@ import static org.infinispan.factories.KnownComponentNames.*;
  *
  * @author Manik Surtani
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @DefaultFactoryFor(classes = {ExecutorService.class, Executor.class, ScheduledExecutorService.class,
@@ -56,6 +57,7 @@ public class NamedExecutorsFactory extends NamedComponentFactory implements Auto
    private ScheduledExecutorService asyncReplicationExecutor;
    private BlockingTaskAwareExecutorService totalOrderExecutor;
    private BlockingTaskAwareExecutorService gmuExecutor;
+   private BlockingTaskAwareExecutorService topologyExecutor;
 
    @Override
    @SuppressWarnings("unchecked")
@@ -120,6 +122,15 @@ public class NamedExecutorsFactory extends NamedComponentFactory implements Auto
                }
             }
             return (T) gmuExecutor;
+         } else if (componentName.equals(TOPOLOGY_EXECUTOR)) {
+            synchronized (this) {
+               if (topologyExecutor == null) {
+                  topologyExecutor = buildAndConfigureBlockingTaskAwareExecutorService(
+                        globalConfiguration.gmuExecutor().factory(),
+                        globalConfiguration.gmuExecutor().properties(), componentName, nodeName);
+               }
+            }
+            return (T) topologyExecutor;
          } else {
             throw new ConfigurationException("Unknown named executor " + componentName);
          }
@@ -138,6 +149,7 @@ public class NamedExecutorsFactory extends NamedComponentFactory implements Auto
       if (evictionExecutor != null) evictionExecutor.shutdownNow();
       if (totalOrderExecutor != null) totalOrderExecutor.shutdownNow();
       if (gmuExecutor != null) gmuExecutor.shutdownNow();
+      if (topologyExecutor != null) topologyExecutor.shutdownNow();
    }
 
    private ExecutorService buildAndConfigureExecutorService(ExecutorFactory f, Properties p,

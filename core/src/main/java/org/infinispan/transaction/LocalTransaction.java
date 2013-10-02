@@ -29,7 +29,7 @@ import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.entries.CacheEntry;
 import org.infinispan.context.Flag;
 import org.infinispan.remoting.transport.Address;
-import org.infinispan.statetransfer.ShadowTransactionInfo;
+import org.infinispan.statetransfer.TransactionInfo;
 import org.infinispan.transaction.xa.GlobalTransaction;
 import org.infinispan.util.InfinispanCollections;
 import org.infinispan.util.logging.Log;
@@ -68,8 +68,6 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
 
    private volatile boolean isFromStateTransfer;
 
-   private volatile ShadowTransactionInfo shadowTransactionInfo;
-
    private boolean prepareSent;
    private boolean commitOrRollbackSent;
    private boolean alreadyReadOnThisNode;
@@ -79,7 +77,6 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
       super(tx, topologyId);
       this.transaction = transaction;
       this.implicitTransaction = implicitTransaction;
-      this.shadowTransactionInfo = null;
    }
 
    public final void addModification(WriteCommand mod) {
@@ -147,14 +144,6 @@ public abstract class LocalTransaction extends AbstractCacheTransaction {
 
    public boolean isReadOnly() {
       return (modifications == null || modifications.isEmpty()) && (lookedUpEntries == null || lookedUpEntries.isEmpty());
-   }
-
-   public void setShadowTransactionInfo(ShadowTransactionInfo shadowTransactionInfo){
-      this.shadowTransactionInfo = shadowTransactionInfo;
-   }
-
-   public ShadowTransactionInfo getShadowTransactionInfo(){
-      return this.shadowTransactionInfo;
    }
 
    public abstract boolean isEnlisted();

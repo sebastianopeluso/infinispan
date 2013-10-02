@@ -64,7 +64,7 @@ import org.infinispan.loaders.CacheLoaderManager;
 import org.infinispan.loaders.CacheStore;
 import org.infinispan.remoting.responses.Response;
 import org.infinispan.remoting.transport.Address;
-import org.infinispan.statetransfer.ShadowTransactionInfo;
+import org.infinispan.statetransfer.TransactionInfo;
 import org.infinispan.stats.TransactionsStatisticsRegistry;
 import org.infinispan.stats.container.TransactionStatistics;
 import org.infinispan.transaction.LocalTransaction;
@@ -96,6 +96,7 @@ import static org.infinispan.transaction.gmu.manager.SortedTransactionQueue.Tran
 
 /**
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 @MBean(objectName = "GMUTransactionManager", description = "Shows information about the transactions committed or prepared")
@@ -112,7 +113,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
    private CommitLog commitLog;
 
    @Inject
-   public void inject(TransactionCommitManager transactionCommitManager, DataContainer dataContainer,
+   public void inject(TransactionCommitManager transactionCommitManager,
                       CommitLog commitLog, VersionGenerator versionGenerator, InvocationContextContainer invocationContextContainer,
                       @ComponentName(value = KnownComponentNames.GMU_EXECUTOR) BlockingTaskAwareExecutorService gmuExecutor,
                       TransactionManager transactionManager, CacheLoaderManager cacheLoaderManager) {
@@ -199,15 +200,6 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          retVal = invokeNextIgnoringTimeout(ctx, command);
          //in remote context, the commit command will be enqueue, so it does not need to wait
          //If this is a local shadow transaction created to exchange state transfer info, then we can unblock this thread
-         boolean fromStateTransfer;
-         ShadowTransactionInfo shadowTransactionInfo;
-         if (ctx.isOriginLocal()) {
-            fromStateTransfer = ((LocalTransaction) ctx.getCacheTransaction()).isFromStateTransfer();
-            shadowTransactionInfo = ((LocalTransaction) ctx.getCacheTransaction()).getShadowTransactionInfo();
-            if (transactionEntry != null && fromStateTransfer && shadowTransactionInfo != null) {
-               shadowTransactionInfo.setTransactionEntry(transactionEntry);
-            }
-         }
 
          if (transactionEntry != null) {
             final TransactionStatistics transactionStatistics = TransactionsStatisticsRegistry.getTransactionStatistics();
@@ -224,7 +216,6 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
          } else if (!ctx.isOriginLocal()) {
             transactionEntry = gmuCommitCommand.getTransactionEntry();
          }
-
          if (transactionEntry == null || transactionEntry.isCommitted()) {
             if (ctx.getCacheTransaction().getAllModifications().isEmpty()) {
                //this is a read-only tx... we need to store the loaded data
@@ -248,9 +239,7 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
             awaitCommitCommandAcksIfNeeded(ctx, retVal);
             return retVal;
          }
-
          transactionCommitManager.executeCommit(transactionEntry, transactionsToCommit, ctx, this);
-
       } catch (Throwable throwable) {
          //let ignore the exception. we cannot have some nodes applying the write set and another not another one
          //receives the rollback and don't applies the write set
@@ -261,7 +250,6 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
             gmuExecutor.checkForReadyTasks();
          }
       }
-
       awaitCommitCommandAcksIfNeeded(ctx, retVal);
 
       return retVal;

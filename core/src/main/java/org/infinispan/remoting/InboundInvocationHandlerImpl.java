@@ -29,7 +29,10 @@ import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.CacheRpcCommand;
 import org.infinispan.commands.remote.ConfigurationStateCommand;
 import org.infinispan.commands.remote.GMUClusteredGetCommand;
+import org.infinispan.commands.tx.AbstractTransactionBoundaryCommand;
+import org.infinispan.commands.tx.CommitCommand;
 import org.infinispan.commands.tx.GMUCommitCommand;
+import org.infinispan.commands.tx.GMUPrepareCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
 import org.infinispan.commands.tx.totalorder.TotalOrderPrepareCommand;
@@ -51,10 +54,13 @@ import org.infinispan.remoting.responses.ResponseGenerator;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.remoting.transport.Transport;
 import org.infinispan.remoting.transport.jgroups.JGroupsTransport;
+import org.infinispan.statetransfer.StateRequestCommand;
+import org.infinispan.statetransfer.StateResponseCommand;
 import org.infinispan.statetransfer.StateTransferManager;
 import org.infinispan.stats.PiggyBackStat;
 import org.infinispan.stats.TransactionsStatisticsRegistry;
 import org.infinispan.stats.container.TransactionStatistics;
+import org.infinispan.topology.CacheTopologyControlCommand;
 import org.infinispan.transaction.TotalOrderRemoteTransactionState;
 import org.infinispan.transaction.totalorder.TotalOrderLatch;
 import org.infinispan.transaction.totalorder.TotalOrderManager;
@@ -71,6 +77,7 @@ import static org.infinispan.stats.ExposedStatistic.*;
  * Sets the cache interceptor chain on an RPCCommand before calling it to perform
  *
  * @author Manik Surtani
+ * @author Sebastiano Peluso
  * @since 4.0
  */
 @Scope(Scopes.GLOBAL)
@@ -84,18 +91,22 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
    private BlockingTaskAwareExecutorService totalOrderExecutorService;
    private BlockingTaskAwareExecutorService gmuExecutorService;
    private RpcDispatcher.Marshaller marshaller = null;
+   private BlockingTaskAwareExecutorService topologyExecutorService;
 
    @Inject
    public void inject(GlobalComponentRegistry gcr, Transport transport,
                       @ComponentName(KnownComponentNames.TOTAL_ORDER_EXECUTOR) BlockingTaskAwareExecutorService totalOrderExecutorService,
                       @ComponentName(KnownComponentNames.GMU_EXECUTOR) BlockingTaskAwareExecutorService gmuExecutorService,
-                      GlobalConfiguration globalConfiguration, CancellationService cancelService) {
+                      GlobalConfiguration globalConfiguration, CancellationService cancelService,
+                      @ComponentName(KnownComponentNames.TOPOLOGY_EXECUTOR) BlockingTaskAwareExecutorService topologyExecutorService) {
       this.gcr = gcr;
       this.transport = transport;
       this.globalConfiguration = globalConfiguration;
       this.cancelService = cancelService;
       this.totalOrderExecutorService = totalOrderExecutorService;
       this.gmuExecutorService = gmuExecutorService;
+      this.topologyExecutorService = topologyExecutorService;
+
    }
 
    @Override
@@ -131,7 +142,7 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
          }
          Object retval = cmd.perform(null);
          Response response = respGen.getResponse(cmd, retval);
-         log.tracef("About to send back response %s for command %s", response, cmd);
+         if(trace)log.tracef("About to send back response %s for command %s", response, cmd);
          return response;
       } catch (Exception e) {
          log.error("Exception executing command", e);
@@ -339,7 +350,65 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
          });
          gmuExecutorService.checkForReadyTasks();
          return;
+      } else if ((cmd instanceof StateResponseCommand) || ((cmd instanceof StateRequestCommand) && ( ((StateRequestCommand)cmd).getType() == StateRequestCommand.Type.GET_TRANSACTIONS || ((StateRequestCommand)cmd).getType() == StateRequestCommand.Type.START_STATE_TRANSFER)) ){
+
+         topologyExecutorService.execute(new BlockingRunnable() {
+            @Override
+            public boolean isReady() {
+               return true;
+            }
+
+            @Override
+            public void run() {
+               Response resp;
+               try {
+                  resp = handleInternal(cmd, cr);
+               } catch (Throwable throwable) {
+                  log.exceptionHandlingCommand(cmd, throwable);
+                  resp = new ExceptionResponse(new CacheException("Problems invoking command.", throwable));
+               }
+               reply(response, resp);
+
+            }
+
+            @Override
+            public final String toString() {
+               return "Topology Executor Thread - "+cmd.toString();
+            }
+         });
+
+         return;
+      } else if (cmd instanceof AbstractTransactionBoundaryCommand){
+
+         gmuExecutorService.execute(new BlockingRunnable() {
+            @Override
+            public boolean isReady() {
+               return true;
+            }
+
+            @Override
+            public void run() {
+               TransactionsStatisticsRegistry.attachRemoteTransactionStatistic(((AbstractTransactionBoundaryCommand) cmd).getGlobalTransaction(), true);
+               Response resp;
+               try {
+                  resp = handleInternal(cmd, cr);
+               } catch (Throwable throwable) {
+                  log.exceptionHandlingCommand(cmd, throwable);
+                  resp = new ExceptionResponse(new CacheException("Problems invoking command.", throwable));
+               }
+               reply(response, resp);
+
+            }
+
+            @Override
+            public final String toString() {
+               return "Topology Executor Thread - " + cmd.toString();
+            }
+         });
+
+         return;
       }
+
       Response resp = handleInternal(cmd, cr);
 
       // A null response is valid and OK ...
@@ -347,7 +416,12 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
          // invalid response
          log.tracef("Unable to execute command, got invalid response %s", resp);
       }
-      reply(response, resp);
+      if(cmd instanceof StateRequestCommand){
+         replyStateRequest(response, resp);
+      }
+      else
+         reply(response, resp);
+
       if (cr.getComponent(Configuration.class).locking().isolationLevel() == IsolationLevel.SERIALIZABLE &&
             cmd instanceof RollbackCommand) {
          gmuExecutorService.checkForReadyTasks();
@@ -357,6 +431,17 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
    private void reply(org.jgroups.blocks.Response response, Object retVal) {
       if (response != null) {
          response.send(retVal, false);
+      }
+   }
+
+   private void replyStateRequest(org.jgroups.blocks.Response response, Object retVal){
+      if(response != null){
+         try{
+            response.send(retVal, false);
+         }
+         catch(Throwable e){
+            e.printStackTrace();
+         }
       }
    }
 

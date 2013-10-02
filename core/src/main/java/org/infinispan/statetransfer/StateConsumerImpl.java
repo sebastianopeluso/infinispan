@@ -89,6 +89,7 @@ import static org.infinispan.factories.KnownComponentNames.ASYNC_TRANSPORT_EXECU
  * {@link StateConsumer} implementation.
  *
  * @author anistor@redhat.com
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 public class StateConsumerImpl implements StateConsumer {
@@ -166,7 +167,7 @@ public class StateConsumerImpl implements StateConsumer {
    private volatile boolean ownsData = false;
    private ConcurrentMap<Object, OwnersList> oldKeyOwners;
    private VersionGenerator versionGenerator;
-   private final Map<Address, ShadowTransactionInfo> shadowTransactionInfoReceiverMap = new HashMap<Address, ShadowTransactionInfo>();
+   private final Map<Address, TransactionInfo> shadowTransactionInfoReceiverMap = new HashMap<Address, TransactionInfo>();
    private TransactionCommitManager transactionCommitManager;
 
    public StateConsumerImpl() {
@@ -220,7 +221,7 @@ public class StateConsumerImpl implements StateConsumer {
 
    @Inject
    public void init(Cache cache,
-                    @ComponentName(ASYNC_TRANSPORT_EXECUTOR) ExecutorService executorService, //TODO Use a dedicated ExecutorService
+                    @ComponentName(KnownComponentNames.TOPOLOGY_EXECUTOR) BlockingTaskAwareExecutorService executorService, //TODO Use a dedicated ExecutorService
                     StateTransferManager stateTransferManager,
                     InterceptorChain interceptorChain,
                     InvocationContextContainer icc,
@@ -545,7 +546,6 @@ public class StateConsumerImpl implements StateConsumer {
    }
 
    private void doApplyState(Address sender, int segmentId, Collection<InternalCacheEntry> cacheEntries, EntryVersion txVersion) {
-      log.debugf("Applying new state for segment %d of cache %s from node %s: received %d cache entries", segmentId, cacheName, sender, cacheEntries.size());
       if (trace) {
          List<Object> keys = new ArrayList<Object>(cacheEntries.size());
          for (InternalCacheEntry e : cacheEntries) {
@@ -565,7 +565,7 @@ public class StateConsumerImpl implements StateConsumer {
             }
             ownersList.add(sender);
             //Wait for the commit of the state-transfer transaction
-            ShadowTransactionInfo transactionInfo;
+            TransactionInfo transactionInfo;
             synchronized (this) {
                transactionInfo = this.shadowTransactionInfoReceiverMap.get(sender);
             }
@@ -654,12 +654,13 @@ public class StateConsumerImpl implements StateConsumer {
    }
 
    protected void applyTransactions(Address sender, Collection<TransactionInfo> transactions) {
-      log.debugf("Applying %d transactions for cache %s transferred from node %s", transactions.size(), cacheName, sender);
       if (isTransactional) {
+          boolean shadowApplied = false;
          for (TransactionInfo transactionInfo : transactions) {
-            if (transactionInfo instanceof ShadowTransactionInfo) {
+            if (transactionInfo.isShadow()) {
                //Try to commit the Receiver Shadow Transaction. If successful it insert a new entry in the shadowTransactionInfoReceiverMap
-               applyShadowTransaction(sender, (ShadowTransactionInfo) transactionInfo);
+               applyShadowTransaction(sender, transactionInfo);
+               shadowApplied = true;
             } else {
                CacheTransaction tx = transactionTable.getLocalTransaction(transactionInfo.getGlobalTransaction());
                if (tx == null) {
@@ -673,6 +674,9 @@ public class StateConsumerImpl implements StateConsumer {
                   tx.addBackupLockForKey(key);
                }
             }
+         }
+         if(configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE && !shadowApplied){
+            transactionCommitManager.rollbackReceiverStateTransferTransaction(sender);
          }
       }
    }
@@ -714,10 +718,10 @@ public class StateConsumerImpl implements StateConsumer {
       return cacheTopology;
    }
 
-   private void applyShadowTransaction(final Address sender, final ShadowTransactionInfo transactionInfo) {
+   private void applyShadowTransaction(final Address sender, final TransactionInfo transactionInfo) {
 
       synchronized (this) {
-         ShadowTransactionInfo info = shadowTransactionInfoReceiverMap.get(sender);
+         TransactionInfo info = shadowTransactionInfoReceiverMap.get(sender);
          if(info != null){
             log.warn("Shadow Transaction Info "+transactionInfo+" already in shadowTransactionInfoReceiverMap for sender "+sender+". Old entry is "+info);
          }
@@ -733,7 +737,6 @@ public class StateConsumerImpl implements StateConsumer {
          public void run() {
 
             try{
-
                SortedTransactionQueue.TransactionEntry transactionEntry = transactionCommitManager.commitReceiverStateTransferTransaction(sender, transactionInfo.getVersion());
                //see org.infinispan.tx.gmu.DistConsistencyTest3.testNoCommitDeadlock
                //the commitTransaction() can re-order the queue. we need to check for pending commit commands.
@@ -764,7 +767,6 @@ public class StateConsumerImpl implements StateConsumer {
                   else{
                      GMUInterceptor = ((GMUEntryWrappingInterceptor)(interceptors.get(0)));
                   }
-
                   transactionCommitManager.executeCommit(transactionEntry, transactionsToCommit, null, GMUInterceptor);
 
                }
@@ -774,9 +776,7 @@ public class StateConsumerImpl implements StateConsumer {
                shadowTransactionInfoReceiverMap.remove(sender);
                transactionCommitManager.rollbackReceiverStateTransferTransaction(sender);
             } finally {
-
                gmuExecutorService.checkForReadyTasks();
-
             }
 
          }
@@ -791,7 +791,7 @@ public class StateConsumerImpl implements StateConsumer {
    }
 
    private void addTransfers(Set<Integer> segments) {
-      log.debugf("Adding inbound state transfer for segments %s of cache %s", segments, cacheName);
+      if(trace)log.tracef("Adding inbound state transfer for segments %s of cache %s", segments, cacheName);
 
       // the set of nodes that reported errors when fetching data from them - these will not be retried in this topology
       Set<Address> excludedSources = new HashSet<Address>();
@@ -807,7 +807,7 @@ public class StateConsumerImpl implements StateConsumer {
          requestSegments(segments, sources, excludedSources);
       }
 
-      log.debugf("Finished adding inbound state transfer for segments %s of cache %s", segments, cacheName);
+      if(trace)log.tracef("Finished adding inbound state transfer for segments %s of cache %s", segments, cacheName);
    }
 
    private void findSources(Set<Integer> segments, Map<Address, Set<Integer>> sources, Set<Address> excludedSources) {
@@ -857,6 +857,10 @@ public class StateConsumerImpl implements StateConsumer {
                // if requesting the transactions failed we need to retry from another source
                failedSegments.addAll(segmentsFromSource);
                excludedSources.add(source);
+
+               if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+                  transactionCommitManager.rollbackReceiverStateTransferTransaction(source);
+               }
             }
          }
 
@@ -880,6 +884,7 @@ public class StateConsumerImpl implements StateConsumer {
       if (trace) {
          log.tracef("Requesting transactions for segments %s of cache %s from node %s", segments, cacheName, source);
       }
+
       // get transactions and locks
       try {
          EntryVersion preparedVersion = null;
@@ -924,7 +929,13 @@ public class StateConsumerImpl implements StateConsumer {
          isTransferThreadRunning = true;
       }
 
-      executorService.submit(new Runnable() {
+      executorService.submit(new BlockingRunnable() {
+
+         @Override
+         public boolean isReady() {
+            return true;
+         }
+
          @Override
          public void run() {
             try {
@@ -961,7 +972,7 @@ public class StateConsumerImpl implements StateConsumer {
                      break;
                   }
 
-                  log.tracef("Retrying %d failed tasks", failedTasks.size());
+                  if(trace)log.tracef("Retrying %d failed tasks", failedTasks.size());
 
                   // look for other sources for the failed segments and replace all failed tasks with new tasks to be retried
                   // remove+add needs to be atomic
@@ -990,6 +1001,11 @@ public class StateConsumerImpl implements StateConsumer {
                   isTransferThreadRunning = false;
                }
             }
+         }
+
+         @Override
+         public final String toString() {
+            return "Topology Executor Thread";
          }
       });
    }
@@ -1152,7 +1168,7 @@ public class StateConsumerImpl implements StateConsumer {
 
    private InboundTransferTask addTransfer(Address source, Set<Integer> segmentsFromSource) {
       synchronized (this) {
-         log.tracef("Adding transfer from %s for segments %s", source, segmentsFromSource);
+         if(trace)log.tracef("Adding transfer from %s for segments %s", source, segmentsFromSource);
          segmentsFromSource.removeAll(transfersBySegment.keySet());  // already in progress segments are excluded
          if (!segmentsFromSource.isEmpty()) {
             InboundTransferTask inboundTransfer = new InboundTransferTask(segmentsFromSource, source,
@@ -1176,7 +1192,7 @@ public class StateConsumerImpl implements StateConsumer {
 
    private boolean removeTransfer(InboundTransferTask inboundTransfer) {
       synchronized (this) {
-         log.tracef("Removing inbound transfers for segments %s from source %s for cache %s",
+         if(trace)log.tracef("Removing inbound transfers for segments %s from source %s for cache %s",
                     inboundTransfer.getSegments(), inboundTransfer.getSource(), cacheName);
          taskQueue.remove(inboundTransfer);
          List<InboundTransferTask> transfers = transfersBySource.get(inboundTransfer.getSource());
@@ -1195,7 +1211,7 @@ public class StateConsumerImpl implements StateConsumer {
    }
 
    void onTaskCompletion(InboundTransferTask inboundTransfer) {
-      log.tracef("Completion of inbound transfer task: %s ", inboundTransfer);
+      if(trace)log.tracef("Completion of inbound transfer task: %s ", inboundTransfer);
       removeTransfer(inboundTransfer);
 
       notifyEndOfRebalanceIfNeeded(cacheTopology.getTopologyId());

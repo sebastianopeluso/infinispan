@@ -68,6 +68,7 @@ import static org.infinispan.factories.KnownComponentNames.ASYNC_TRANSPORT_EXECU
  * {@link StateProvider} implementation.
  *
  * @author anistor@redhat.com
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 @Listener
@@ -95,7 +96,7 @@ public class StateProviderImpl implements StateProvider {
    private BlockingTaskAwareExecutorService gmuExecutorService;
    private InterceptorChain interceptorChain;
 
-   private final Map<Address, ShadowTransactionInfo> shadowTransactionInfoSenderMap = new HashMap<Address, ShadowTransactionInfo>();
+   private final Map<Address, TransactionInfo> shadowTransactionInfoSenderMap = new HashMap<Address, TransactionInfo>();
 
    /**
     * A map that keeps track of current outbound state transfers by destination address. There could be multiple transfers
@@ -223,21 +224,23 @@ public class StateProviderImpl implements StateProvider {
 
       List<TransactionInfo> transactions = new ArrayList<TransactionInfo>();
 
-
       EntryVersion preparedVersion = null;
+
       if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE && proposal != null) {
          //Prepare a shadow transaction for this state transfer to destination
+         if(trace)log.tracef("Prepare a shadow transaction for this state transfer to destination");
          preparedVersion = transactionCommitManager.prepareSenderStateTransferTransaction(destination);
 
          EntryVersion finalCommitVersion = transactionCommitManager.computeFinalCommitVersionOnStateTransfer(preparedVersion, proposal, rpcManager.getAddress(), destination);
 
-
-         ShadowTransactionInfo transactionInfo =  new ShadowTransactionInfo(requestTopologyId, finalCommitVersion);
+         TransactionInfo transactionInfo =  new TransactionInfo(requestTopologyId, finalCommitVersion);
          synchronized (this){
             shadowTransactionInfoSenderMap.put(destination, transactionInfo);
          }
 
          transactions.add(transactionInfo);
+
+         if(trace)log.tracef("Commit a shadow transaction for this state transfer to destination");
 
          SortedTransactionQueue.TransactionEntry transactionEntry = transactionCommitManager.commitSenderStateTransferTransaction(destination, finalCommitVersion);
 
@@ -254,12 +257,14 @@ public class StateProviderImpl implements StateProvider {
             log.tracef("Found %d transaction(s) to transfer", transactions.size());
          }
       }
+
+      if(trace)log.tracef("Sending transactions back: "+transactions);
       return transactions;
    }
 
-   private void handleSenderStateTransferTransaction(final Address destination, final ShadowTransactionInfo transactionInfo, final SortedTransactionQueue.TransactionEntry transactionEntry){
+   private void handleSenderStateTransferTransaction(final Address destination, final TransactionInfo transactionInfo, final SortedTransactionQueue.TransactionEntry transactionEntry){
 
-       this.gmuExecutorService.execute(new BlockingRunnable() {
+      this.gmuExecutorService.execute(new BlockingRunnable() {
          @Override
          public boolean isReady() {
             return true;
@@ -321,7 +326,6 @@ public class StateProviderImpl implements StateProvider {
 
 
    }
-
 
    private CacheTopology getCacheTopology(int requestTopologyId, Address destination, boolean isReqForTransactions) throws InterruptedException {
       CacheTopology cacheTopology = stateConsumer.getCacheTopology();
@@ -405,7 +409,7 @@ public class StateProviderImpl implements StateProvider {
 
       if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
 
-         ShadowTransactionInfo transactionInfo = null;
+         TransactionInfo transactionInfo = null;
          synchronized (this){
             transactionInfo = shadowTransactionInfoSenderMap.get(destination);
          }
@@ -414,11 +418,11 @@ public class StateProviderImpl implements StateProvider {
          }
          else{
             SortedTransactionQueue.TransactionEntry transactionEntry = null;
-
             try {
                transactionEntry = transactionInfo.waitForTransactionEntry();
-               if(transactionEntry != null)
+               if(transactionEntry != null){
                   transactionEntry.awaitUntilCommitted();
+               }
 
             } catch (InterruptedException e1) {
                e1.printStackTrace();

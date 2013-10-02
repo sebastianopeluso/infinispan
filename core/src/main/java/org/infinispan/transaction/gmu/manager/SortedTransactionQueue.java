@@ -42,6 +42,7 @@ import java.util.concurrent.CountDownLatch;
 
 /**
  * @author Pedro Ruivo
+ * @author Sebastiano Peluso
  * @since 5.2
  */
 public class SortedTransactionQueue {
@@ -127,7 +128,6 @@ public class SortedTransactionQueue {
    }
 
    public final void prepareSenderOnStateTransfer(Address other, EntryVersion preparedVersion, long concurrentClockNumber) {
-
       //other is the receiver of this state transfer
       if (senderStateTransferMap.containsKey(other)) {
          log.warnf("Duplicated prepare for state transfer shadow transaction. Other node %s", other);
@@ -138,9 +138,7 @@ public class SortedTransactionQueue {
    }
 
    public final void prepareReceiverOnStateTransfer(Address other, EntryVersion preparedVersion, long concurrentClockNumber) {
-
       //other is the sender of this state transfer
-      //other is the receiver of this state transfer
       if (receiverStateTransferMap.containsKey(other)) {
          log.warnf("Duplicated prepare for state transfer shadow transaction. Other node %s", other);
       }
@@ -154,19 +152,16 @@ public class SortedTransactionQueue {
    }
 
    public final void rollbackSenderOnStateTransfer(Address other) {
-
       //other is the receiver of this state transfer
       internalRollbackOnStateTransfer(other, senderStateTransferMap);
    }
 
    public final void rollbackReceiverOnStateTransfer(Address other) {
-
       //other is the sender of this state transfer
       internalRollbackOnStateTransfer(other, receiverStateTransferMap);
    }
 
    private void internalRollbackOnStateTransfer(Address other, ConcurrentHashMap<Address, TransactionEntryImpl> map) {
-
       remove(map.remove(other));
    }
 
@@ -185,13 +180,11 @@ public class SortedTransactionQueue {
    }
 
    public final TransactionEntry commitSenderOnStateTransfer(Address other, GMUVersion commitVersion) {
-
       //other is the receiver of this state transfer
       return internalCommitOnStateTransfer(other, commitVersion, senderStateTransferMap);
    }
 
    public final TransactionEntry commitReceiverOnStateTransfer(Address other, GMUVersion commitVersion) {
-
       //other is the receiver of this state transfer
       return internalCommitOnStateTransfer(other, commitVersion, receiverStateTransferMap);
    }
@@ -208,8 +201,6 @@ public class SortedTransactionQueue {
       return entry;
    }
 
-
-
    public final synchronized void populateToCommit(List<TransactionEntry> transactionEntryList) {
       Node entry = firstEntry.getNext();
       if (entry == lastEntry || !entry.isReadyToCommit()) {
@@ -218,7 +209,6 @@ public class SortedTransactionQueue {
          }
          return;
       }
-
       do {
          transactionEntryList.add(entry);
          entry = entry.getNext();
@@ -747,7 +737,7 @@ public class SortedTransactionQueue {
          return "TransactionEntry{" +
                "version=" + getVersion() +
                ", state=" + TxState.stateToString(state) +
-               ", gtx=" + cacheTransaction.getGlobalTransaction().globalId() +
+               ", gtx=" + ((cacheTransaction==null)?null:cacheTransaction.getGlobalTransaction().globalId()) +
                '}';
       }
 
