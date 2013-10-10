@@ -34,6 +34,7 @@ import org.infinispan.commands.tx.AbstractTransactionBoundaryCommand;
 import org.infinispan.commands.tx.GMUCommitCommand;
 import org.infinispan.commands.tx.PrepareCommand;
 import org.infinispan.commands.tx.RollbackCommand;
+import org.infinispan.commands.tx.totalorder.TotalOrderGMUPrepareCommand;
 import org.infinispan.commands.tx.totalorder.TotalOrderPrepareCommand;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.configuration.global.GlobalConfiguration;
@@ -232,8 +233,10 @@ public class InboundInvocationHandlerImpl implements InboundInvocationHandler {
                if (stats) {
                   TransactionsStatisticsRegistry.detachRemoteTransactionStatistic(command.getGlobalTransaction(),
                                                                                   command.isOnePhaseCommit());
-                  PiggyBackStat pbs = new PiggyBackStat(waitTime);
-                  ((AbstractResponse) resp).setPiggyBackStat(pbs);
+                  if (cmd instanceof TotalOrderGMUPrepareCommand) {
+                     PiggyBackStat pbs = new PiggyBackStat(waitTime);
+                     ((AbstractResponse) resp).setPiggyBackStat(pbs);
+                  }
                }
                //the ResponseGenerated is null in this case because the return value is a Response
                reply(response, resp);
