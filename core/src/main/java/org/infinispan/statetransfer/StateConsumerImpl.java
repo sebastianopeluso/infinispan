@@ -65,6 +65,7 @@ import org.infinispan.topology.CacheTopology;
 import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.TransactionTable;
+import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.gmu.manager.SortedTransactionQueue;
 import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.totalorder.TotalOrderLatch;
@@ -561,21 +562,17 @@ public class StateConsumerImpl implements StateConsumer {
 
       // CACHE_MODE_LOCAL avoids handling by StateTransferInterceptor and any potential locks in StateTransferLock
       EnumSet<Flag> flags = EnumSet.of(PUT_FOR_STATE_TRANSFER, CACHE_MODE_LOCAL, IGNORE_RETURN_VALUES, SKIP_REMOTE_LOOKUP, SKIP_SHARED_CACHE_STORE, SKIP_OWNERSHIP_CHECK, SKIP_XSITE_BACKUP);
-      for (InternalCacheEntry e : cacheEntries) {
-         if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
-            OwnersList ownersList = new OwnersList();
-            OwnersList existing = oldKeyOwners.putIfAbsent(e.getKey(), ownersList);
-            if (existing != null) {
-               ownersList = existing;
-            }
-            ownersList.add(sender);
-            //Wait for the commit of the state-transfer transaction
+
+      GMUCacheEntryVersion version = null;
+      List<Object> markInCommitLog = new LinkedList<Object>();
+
+      if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+         //Wait for the commit of the state-transfer transaction
             TransactionInfo transactionInfo;
             synchronized (this) {
                transactionInfo = this.shadowTransactionInfoReceiverMap.get(sender);
             }
 
-            GMUCacheEntryVersion version = null;
             SortedTransactionQueue.TransactionEntry transactionEntry = null;
             if (transactionInfo == null) {
                log.error("Unable to determine a commit version on state transfer");
@@ -597,10 +594,22 @@ public class StateConsumerImpl implements StateConsumer {
                   log.error("Transaction Info for Transaction Entry "+transactionEntry+" is not null but Commit Version is null");
                }
             }
+      }
+
+      for (InternalCacheEntry e : cacheEntries) {
+         if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+            OwnersList ownersList = new OwnersList();
+            OwnersList existing = oldKeyOwners.putIfAbsent(e.getKey(), ownersList);
+            if (existing != null) {
+               ownersList = existing;
+            }
+            ownersList.add(sender);
+
 
             //Then put in the GMUDataContainer the new data by using the version numbers of the state transfer transaction
             dataContainer.put(e.getKey(), e.getValue(), version, e.getLifespan(), e.getMaxIdle(), true);
 
+            markInCommitLog.add(e);
 
          } else {
 
@@ -655,6 +664,17 @@ public class StateConsumerImpl implements StateConsumer {
             }
          }
          log.debugf("Finished applying state for segment %d of cache %s", segmentId, cacheName);
+      }
+
+      if (configuration.locking().isolationLevel() == IsolationLevel.SERIALIZABLE) {
+         //Update the commit log for Garbage Collection
+         if(version!=null && !markInCommitLog.isEmpty()){
+            //A version now points to an entry in the commit log.
+            CommitLog.VersionEntry versionEntry = version.getVersionEntryInCommitLog();
+            if(versionEntry != null){
+               versionEntry.updateModifications(markInCommitLog);
+            }
+         }
       }
    }
 

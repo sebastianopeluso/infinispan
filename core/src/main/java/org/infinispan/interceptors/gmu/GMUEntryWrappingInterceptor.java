@@ -69,6 +69,7 @@ import org.infinispan.transaction.LocalTransaction;
 import org.infinispan.transaction.RemoteTransaction;
 import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.gmu.GMURemoteTransactionState;
+import org.infinispan.transaction.gmu.manager.CommittedTransaction;
 import org.infinispan.transaction.gmu.manager.TransactionCommitManager;
 import org.infinispan.transaction.xa.CacheTransaction;
 import org.infinispan.transaction.xa.GlobalTransaction;
@@ -365,10 +366,11 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       if (!isReadOnly || fromStateTransfer) {
          updatePrepareVersion(command);
          final GMUVersion transactionVersion = (GMUVersion) command.getPrepareVersion();
-         List<Address> addressList = fromAlreadyReadFromMask(command.getAlreadyReadFrom(), versionGenerator,
-                                                             transactionVersion.getViewId());
-         GMUVersion maxGMUVersion = versionGenerator.calculateMaxVersionToRead(transactionVersion, addressList);
-         cdl.performReadSetValidation(ctx, command, commitLog.getAvailableVersionLessThan(maxGMUVersion));
+         //List<Address> addressList = fromAlreadyReadFromMask(command.getAlreadyReadFrom(), versionGenerator,
+                                                             //transactionVersion.getViewId());
+         //GMUVersion maxGMUVersion = versionGenerator.calculateMaxVersionToRead(transactionVersion, addressList);
+         //cdl.performReadSetValidation(ctx, command, commitLog.getAvailableVersionLessThan(maxGMUVersion));
+         cdl.performReadSetValidation(ctx, command, transactionVersion);
          if (hasToUpdateLocalKeys) {
             transactionCommitManager.prepareTransaction(ctx.getCacheTransaction(), fromStateTransfer);
          } else {
@@ -431,8 +433,8 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       }
    }
 
-   public GMUCacheEntryVersion inferCommitVersion(EntryVersion entryVersion, int subVersion) {
-      GMUCacheEntryVersion newVersion = versionGenerator.convertVersionToWrite(entryVersion, subVersion);
+   public GMUCacheEntryVersion inferCommitVersion(CommittedTransaction committedTransaction) {
+      GMUCacheEntryVersion newVersion = versionGenerator.convertVersionToWrite(committedTransaction);
       return newVersion;
 
    }
@@ -552,14 +554,14 @@ public class GMUEntryWrappingInterceptor extends EntryWrappingInterceptor {
       return false;
    }
 
-   public void updateCommitVersion(TxInvocationContext context, CacheTransaction cacheTransaction, int subVersion) {
-      GMUCacheEntryVersion newVersion = inferCommitVersion(cacheTransaction.getTransactionVersion(),subVersion);
+   public void updateCommitVersion(TxInvocationContext context, CacheTransaction cacheTransaction, CommittedTransaction committedTransaction) {
+      GMUCacheEntryVersion newVersion = inferCommitVersion(committedTransaction);
       context.getCacheTransaction().setTransactionVersion(newVersion);
 
    }
 
-   public TxInvocationContext createInvocationContext(CacheTransaction cacheTransaction, int subVersion) {
-      GMUCacheEntryVersion cacheEntryVersion = inferCommitVersion(cacheTransaction.getTransactionVersion(),subVersion);
+   public TxInvocationContext createInvocationContext(CacheTransaction cacheTransaction, CommittedTransaction committedTransaction) {
+      GMUCacheEntryVersion cacheEntryVersion = inferCommitVersion(committedTransaction);
 
       cacheTransaction.setTransactionVersion(cacheEntryVersion);
       if (cacheTransaction instanceof LocalTransaction) {

@@ -123,8 +123,9 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Dat
          }
          return wrap(k, null, true, version, null, null, false);
       }
-      VersionEntry<InternalCacheEntry> entry = chain.get(getReadVersion(version));
 
+      //VersionEntry<InternalCacheEntry> entry = chain.get(getReadVersion(version));
+      VersionEntry<InternalCacheEntry> entry = chain.get(version);
       if (log.isTraceEnabled()) {
          log.tracef("DataContainer.peek(%s,%s) => %s", k, version, entry);
       }
@@ -209,7 +210,7 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Dat
       }
 
       VersionChain chain = entries.get(k);
-      boolean contains = chain != null && chain.contains(getReadVersion(version));
+      boolean contains = chain != null && chain.contains(version);
 
       if (log.isTraceEnabled()) {
          log.tracef("DataContainer.containsKey(%s,%s) => %s", k, version, contains);
@@ -252,7 +253,7 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Dat
       }
       int size = 0;
       for (VersionChain chain : entries.values()) {
-         if (chain.contains(getReadVersion(version))) {
+         if (chain.contains(version)) {
             size++;
          }
       }
@@ -338,6 +339,12 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Dat
       }
    }
 
+   public final void gc(Object key, CommitLog.VersionEntry versionEntry){
+      DataContainerVersionChain chain = entries.get(key);
+      chain.gc(versionEntry);
+
+   }
+
    public final VersionChain<?> getVersionChain(Object key) {
       return entries.get(key);
    }
@@ -393,6 +400,50 @@ public class GMUDataContainer extends AbstractDataContainer<GMUDataContainer.Dat
          writer.write(String.valueOf(value.getValue()));
          writer.write("=");
          writer.write(String.valueOf(value.getVersion()));
+      }
+
+      protected void gc(CommitLog.VersionEntry commitEntry){
+
+         VersionBody iterator;
+         VersionBody next = null;
+         VersionBody firstInChain;
+         synchronized (this){
+            iterator = first;
+         }
+         EntryVersion version;
+         if(iterator != null){
+
+            version = iterator.getVersion();
+            if(version == null || (version instanceof GMUCacheEntryVersion &&
+                                         ((GMUCacheEntryVersion) version).getVersionEntryInCommitLog() == commitEntry)){
+
+               //Remove from iterator
+               //If iterator is the first in the chain, do not remove it. I set its version to null.
+               synchronized (this){
+                  firstInChain = first;
+               }
+
+               //GC the chain
+               iterator.setPrevious(null);
+
+               if(firstInChain == iterator){
+                  if(version != null){
+                     ((GMUCacheEntryVersion) version).detachVersionEntry();
+                  }
+               }
+               else{//GC iterator
+                  next.setPrevious(null);
+               }
+
+               return;
+
+            }
+
+            next = iterator;
+            iterator = iterator.getPrevious();
+         }
+
+
       }
    }
 

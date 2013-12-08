@@ -33,6 +33,7 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.topology.CacheTopology;
+import org.infinispan.transaction.gmu.manager.CommittedTransaction;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -120,9 +121,10 @@ public class ReplGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public final GMUCacheEntryVersion convertVersionToWrite(EntryVersion version, int subVersion) {
+   public final GMUCacheEntryVersion convertVersionToWrite(CommittedTransaction committedTransaction) {
+
       return new GMUCacheEntryVersion(cacheName, cacheTopologyId, this,
-                                      ((GMUVersion) version).getThisNodeVersionValue(), subVersion);
+                                    committedTransaction.getVersionEntryForCommitLog(), committedTransaction.getSubVersion());
    }
 
    @Override

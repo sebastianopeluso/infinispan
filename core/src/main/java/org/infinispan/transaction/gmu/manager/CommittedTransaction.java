@@ -24,6 +24,8 @@ package org.infinispan.transaction.gmu.manager;
 
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.container.versioning.EntryVersion;
+import org.infinispan.container.versioning.gmu.GMUVersion;
+import org.infinispan.transaction.gmu.CommitLog;
 import org.infinispan.transaction.xa.CacheTransaction;
 
 import java.util.Collection;
@@ -42,12 +44,17 @@ public class CommittedTransaction {
    private final Collection<WriteCommand> modifications;
    private final int subVersion;
    private final long concurrentClockNumber;
+   private final CommitLog.VersionEntry versionEntryForCommitLog;
 
    public CommittedTransaction(CacheTransaction cacheTransaction, int subVersion, long concurrentClockNumber) {
       this.subVersion = subVersion;
       this.concurrentClockNumber = concurrentClockNumber;
       commitVersion = cacheTransaction.getTransactionVersion();
       modifications = new LinkedList<WriteCommand>(cacheTransaction.getModifications());
+
+      versionEntryForCommitLog = CommitLog.generateVersionEntry((GMUVersion) getCommitVersion(),
+                                                 getModifications(),
+                                                 getSubVersion(), getConcurrentClockNumber());
    }
 
    public CommittedTransaction(EntryVersion version, int subVersion, long concurrentClockNumber) {
@@ -56,6 +63,10 @@ public class CommittedTransaction {
       this.concurrentClockNumber = concurrentClockNumber;
       commitVersion = version;
       modifications = new LinkedList<WriteCommand>();
+
+      versionEntryForCommitLog = CommitLog.generateVersionEntry((GMUVersion) getCommitVersion(),
+                                                 getModifications(),
+                                                 getSubVersion(), getConcurrentClockNumber());
    }
 
    public final EntryVersion getCommitVersion() {
@@ -72,5 +83,9 @@ public class CommittedTransaction {
 
    public final long getConcurrentClockNumber(){
       return this.concurrentClockNumber;
+   }
+
+   public final CommitLog.VersionEntry getVersionEntryForCommitLog(){
+      return this.versionEntryForCommitLog;
    }
 }

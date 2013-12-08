@@ -39,7 +39,7 @@ import java.io.IOException;
 public abstract class VersionChain<T> {
 
    private static final Log log = LogFactory.getLog(VersionChain.class);
-   private VersionBody<T> first;
+   protected VersionBody<T> first;
 
    public final VersionEntry<T> get(EntryVersion version) {
       VersionBody<T> iterator;

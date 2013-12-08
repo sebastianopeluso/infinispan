@@ -27,6 +27,7 @@ import org.infinispan.commands.CommandsFactory;
 import org.infinispan.commands.remote.GarbageCollectorControlCommand;
 import org.infinispan.configuration.cache.Configuration;
 import org.infinispan.container.DataContainer;
+import org.infinispan.container.gmu.GMUDataContainer;
 import org.infinispan.container.gmu.L1GMUContainer;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
@@ -333,14 +334,12 @@ public class GarbageCollectorManager {
             }
 
             //step 3
-            GMUVersion minimumLocalVersion = commitLog.gcOlderVersions(globalMinimumVersion);
+            GMUVersion minimumLocalVersion = commitLog.gcOlderVersions(globalMinimumVersion, (dataContainer instanceof GMUDataContainer)?((GMUDataContainer)dataContainer):null);
 
             if (log.isTraceEnabled()) {
                log.tracef("Minimum local visible version is %s", minimumLocalVersion);
             }
 
-            //step 4
-            dataContainer.gc(minimumLocalVersion, stateTransferManager, rpcManager);
          } catch (Throwable throwable) {
             log.warnf("Exception caught while garbage collecting oldest versions: " + throwable.getLocalizedMessage());
          }

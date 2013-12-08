@@ -26,6 +26,7 @@ package org.infinispan.transaction.gmu;
 import org.infinispan.commands.write.ClearCommand;
 import org.infinispan.commands.write.WriteCommand;
 import org.infinispan.configuration.cache.Configuration;
+import org.infinispan.container.gmu.GMUDataContainer;
 import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.InequalVersionComparisonResult;
 import org.infinispan.container.versioning.VersionGenerator;
@@ -48,7 +49,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 
 import static org.infinispan.container.versioning.InequalVersionComparisonResult.*;
@@ -236,13 +239,13 @@ public class CommitLog {
       assertEnabled();
       VersionEntry oldCurrentVersion = currentVersion;
       GMUVersion oldMostRecentVersion = mostRecentVersion;
+      VersionEntry current;
       for (CommittedTransaction transaction : transactions) {
          if (log.isTraceEnabled()) {
             log.tracef("insertNewCommittedVersions(...) ==> add %s", transaction.getCommitVersion());
          }
-         VersionEntry current = new VersionEntry((GMUVersion) transaction.getCommitVersion(),
-                                                 getAffectedKeys(transaction.getModifications()),
-                                                 transaction.getSubVersion(), transaction.getConcurrentClockNumber());
+         current = transaction.getVersionEntryForCommitLog();
+
          current.setPrevious(oldCurrentVersion);
          oldCurrentVersion = current;
          oldMostRecentVersion = versionGenerator.mergeAndMax(oldMostRecentVersion, oldCurrentVersion.getVersion());
@@ -327,11 +330,11 @@ public class CommitLog {
     * @param minVersion the minimum visible version
     * @return the minimum usable version (to remove entries in data container)
     */
-   public final GMUVersion gcOlderVersions(GMUVersion minVersion) {
+   public final GMUVersion gcOlderVersions(GMUVersion minVersion, GMUDataContainer gmuDataContainer) {
       VersionEntry iterator = currentVersion;
       VersionEntry removeFromHere = null;
       GMUVersion minimumVisibleVersion = null;
-
+      Object[] keysModified;
       while (iterator != null) {
          if (isLessOrEquals(iterator.getVersion(), minVersion)) {
             if (minimumVisibleVersion == null) {
@@ -349,6 +352,16 @@ public class CommitLog {
          VersionEntry previous = removeFromHere.getPrevious();
          removeFromHere.setPrevious(null);
          removeFromHere = previous;
+
+         if(removeFromHere != null){
+            keysModified = removeFromHere.getKeysModified();
+
+            if(keysModified != null && keysModified.length > 0){
+               for(int i = 0; i < keysModified.length; i++){
+                   gmuDataContainer.gc(keysModified[i], removeFromHere);
+               }
+            }
+         }
       }
 
       if (log.isTraceEnabled()) {
@@ -368,7 +381,7 @@ public class CommitLog {
       return minimumViewId;
    }
 
-   private Set<Object> getAffectedKeys(Collection<WriteCommand> modifications) {
+   private static Set<Object> getAffectedKeys(Collection<WriteCommand> modifications) {
       Set<Object> keys = new HashSet<Object>();
       for (WriteCommand writeCommand : modifications) {
          if (writeCommand instanceof ClearCommand) {
@@ -393,14 +406,20 @@ public class CommitLog {
       return comparisonResult == BEFORE_OR_EQUAL || comparisonResult == BEFORE || comparisonResult == EQUAL;
    }
 
-   private static class VersionEntry {
+   public static VersionEntry generateVersionEntry(GMUVersion commitVersion, Collection<WriteCommand> writeCommands, int subVersion, long concurrentClockNumber){
+
+      return new CommitLog.VersionEntry(commitVersion, getAffectedKeys(writeCommands), subVersion, concurrentClockNumber);
+   }
+
+   public static class VersionEntry {
       private final GMUVersion version;
-      private final Object[] keysModified;
+      private volatile Object[] keysModified;
       private final int subVersion;
       private final long concurrentClockNumber;
-      private VersionEntry previous;
+      private volatile VersionEntry previous;
+      private final Object lock;
 
-      private VersionEntry(GMUVersion version, Set<Object> keysModified, int subVersion, long concurrentClockNumber) {
+      public VersionEntry(GMUVersion version, Set<Object> keysModified, int subVersion, long concurrentClockNumber) {
          this.version = version;
          if (keysModified == null) {
             this.keysModified = null;
@@ -409,6 +428,8 @@ public class CommitLog {
          }
          this.subVersion = subVersion;
          this.concurrentClockNumber = concurrentClockNumber;
+
+         this.lock = new Object();
       }
 
       public GMUVersion getVersion() {
@@ -429,6 +450,44 @@ public class CommitLog {
 
       public long getConcurrentClockNumber() {
          return concurrentClockNumber;
+      }
+
+      public void updateModifications(List<Object> newModifications){
+
+         int oldSize = 0;
+         int toAdd = 0;
+         Object[] newModificationsArray;
+         synchronized (lock){
+            if(keysModified != null){
+               oldSize = keysModified.length;
+            }
+
+            if(newModifications != null && !newModifications.isEmpty()){
+               toAdd = newModifications.size();
+            }
+
+            if(toAdd > 0){
+               newModificationsArray = new Object[oldSize+toAdd];
+               int i;
+               if(oldSize > 0){
+                  for(i = 0; i < oldSize; i++){
+                     newModificationsArray[i] = keysModified[i];
+                  }
+               }
+               i = oldSize;
+               Iterator<Object> itr = newModifications.iterator();
+               while(itr.hasNext()){
+                  newModificationsArray[i] = itr.next();
+                  i++;
+               }
+            }
+         }
+      }
+
+      public Object[] getKeysModified(){
+         synchronized (lock){
+            return keysModified;
+         }
       }
 
       @Override

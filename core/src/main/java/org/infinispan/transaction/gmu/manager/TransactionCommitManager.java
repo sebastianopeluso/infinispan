@@ -223,10 +223,10 @@ public class TransactionCommitManager {
 
             if(cacheTransaction != null){
                if (ctx != null && currentEntry.getGlobalTransaction() != null && currentEntry.getGlobalTransaction().equals(toCommit.getGlobalTransaction())) {
-                  GMUInterceptor.updateCommitVersion(ctx, cacheTransaction, subVersion);
+                  GMUInterceptor.updateCommitVersion(ctx, cacheTransaction, committedTransaction);
                   context = ctx;
                } else {
-                  context = GMUInterceptor.createInvocationContext(cacheTransaction, subVersion);
+                  context = GMUInterceptor.createInvocationContext(cacheTransaction, committedTransaction);
                }
 
                toCommit.setNewVersionInDataContainer((GMUCacheEntryVersion) context.getCacheTransaction().getTransactionVersion());
@@ -234,7 +234,7 @@ public class TransactionCommitManager {
                GMUInterceptor.commitContextEntries(context, false, false);
             }
             else{
-               toCommit.setNewVersionInDataContainer(GMUInterceptor.inferCommitVersion(toCommit.getVersion(), subVersion));
+               toCommit.setNewVersionInDataContainer(GMUInterceptor.inferCommitVersion(committedTransaction));
             }
 
 

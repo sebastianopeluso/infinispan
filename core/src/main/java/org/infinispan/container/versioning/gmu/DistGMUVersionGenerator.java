@@ -33,6 +33,7 @@ import org.infinispan.factories.annotations.Start;
 import org.infinispan.remoting.rpc.RpcManager;
 import org.infinispan.remoting.transport.Address;
 import org.infinispan.topology.CacheTopology;
+import org.infinispan.transaction.gmu.manager.CommittedTransaction;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
@@ -175,12 +176,12 @@ public class DistGMUVersionGenerator implements GMUVersionGenerator {
    }
 
    @Override
-   public final GMUCacheEntryVersion convertVersionToWrite(EntryVersion version, int subVersion) {
+   public final GMUCacheEntryVersion convertVersionToWrite(CommittedTransaction committedTransaction) {
       GMUCacheEntryVersion cacheEntryVersion = new GMUCacheEntryVersion(cacheName, currentViewId, this,
-                                                                        ((GMUVersion) version).getThisNodeVersionValue(), subVersion);
+                                                                        committedTransaction.getVersionEntryForCommitLog(), committedTransaction.getSubVersion());
 
       if (log.isTraceEnabled()) {
-         log.tracef("convertVersionToWrite(%s) ==> %s", version, cacheEntryVersion);
+         log.tracef("convertVersionToWrite(%s) ==> %s", committedTransaction.getCommitVersion(), cacheEntryVersion);
       }
       return cacheEntryVersion;
    }

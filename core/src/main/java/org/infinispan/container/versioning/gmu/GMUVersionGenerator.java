@@ -26,6 +26,7 @@ import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.container.versioning.VersionGenerator;
 import org.infinispan.dataplacement.ClusterSnapshot;
 import org.infinispan.remoting.transport.Address;
+import org.infinispan.transaction.gmu.manager.CommittedTransaction;
 
 import java.util.Collection;
 
@@ -42,7 +43,7 @@ public interface GMUVersionGenerator extends VersionGenerator {
 
    GMUVersion calculateCommitVersion(EntryVersion prepareVersion, Collection<Address> affectedOwners);
 
-   GMUCacheEntryVersion convertVersionToWrite(EntryVersion version, int subVersion);
+   GMUCacheEntryVersion convertVersionToWrite(CommittedTransaction committedTransaction);
 
    GMUReadVersion convertVersionToRead(EntryVersion version);
 
