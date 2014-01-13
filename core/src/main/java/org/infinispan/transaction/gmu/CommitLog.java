@@ -45,14 +45,7 @@ import org.infinispan.util.logging.LogFactory;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static org.infinispan.container.versioning.InequalVersionComparisonResult.*;
 import static org.infinispan.container.versioning.gmu.GMUVersion.NON_EXISTING;
@@ -161,8 +154,8 @@ public class CommitLog {
       VersionEntry iterator = currentVersion;
 
       while (iterator != null &&
-            (firstFoundPossible == null ||
-                   concurrentClockNumber < iterator.getVersion().getThisNodeVersionValue())) {
+              (firstFoundPossible == null ||
+                      concurrentClockNumber < iterator.getVersion().getThisNodeVersionValue())) {
          if (isLessOrEquals(iterator.getVersion(), gmuVersion)) {
             possibleVersion.add(iterator.getVersion());
 
@@ -202,8 +195,8 @@ public class CommitLog {
       VersionEntry iterator = currentVersion;
 
       while (iterator != null &&
-            (firstFoundPossible == null ||
-                   concurrentClockNumber < iterator.getVersion().getThisNodeVersionValue())) {
+              (firstFoundPossible == null ||
+                      concurrentClockNumber < iterator.getVersion().getThisNodeVersionValue())) {
          if (iterator.getVersion().getThisNodeVersionValue() <= gmuReadVersion.getThisNodeVersionValue()) {
             if (!isLessOrEquals(iterator.getVersion(), gmuVersion)) {
                if (log.isTraceEnabled()) {
@@ -287,7 +280,7 @@ public class CommitLog {
       }
       if (log.isTraceEnabled()) {
          log.tracef("waitForVersion(%s) ==> %s TRUE ?", version,
-                    currentVersion.getVersion().getThisNodeVersionValue());
+                 currentVersion.getVersion().getThisNodeVersionValue());
       }
    }
 
@@ -353,12 +346,12 @@ public class CommitLog {
          removeFromHere.setPrevious(null);
          removeFromHere = previous;
 
-         if(removeFromHere != null){
+         if (removeFromHere != null) {
             keysModified = removeFromHere.getKeysModified();
 
-            if(keysModified != null && keysModified.length > 0){
-               for(int i = 0; i < keysModified.length; i++){
-                   gmuDataContainer.gc(keysModified[i], removeFromHere);
+            if (keysModified != null && keysModified.length > 0) {
+               for (int i = 0; i < keysModified.length; i++) {
+                  gmuDataContainer.gc(keysModified[i], removeFromHere);
                }
             }
          }
@@ -382,6 +375,8 @@ public class CommitLog {
    }
 
    private static Set<Object> getAffectedKeys(Collection<WriteCommand> modifications) {
+      if (modifications == null)
+         return null;
       Set<Object> keys = new HashSet<Object>();
       for (WriteCommand writeCommand : modifications) {
          if (writeCommand instanceof ClearCommand) {
@@ -406,7 +401,7 @@ public class CommitLog {
       return comparisonResult == BEFORE_OR_EQUAL || comparisonResult == BEFORE || comparisonResult == EQUAL;
    }
 
-   public static VersionEntry generateVersionEntry(GMUVersion commitVersion, Collection<WriteCommand> writeCommands, int subVersion, long concurrentClockNumber){
+   public static VersionEntry generateVersionEntry(GMUVersion commitVersion, Collection<WriteCommand> writeCommands, int subVersion, long concurrentClockNumber) {
 
       return new CommitLog.VersionEntry(commitVersion, getAffectedKeys(writeCommands), subVersion, concurrentClockNumber);
    }
@@ -452,31 +447,31 @@ public class CommitLog {
          return concurrentClockNumber;
       }
 
-      public void updateModifications(List<Object> newModifications){
+      public void updateModifications(List<Object> newModifications) {
 
          int oldSize = 0;
          int toAdd = 0;
          Object[] newModificationsArray;
-         synchronized (lock){
-            if(keysModified != null){
+         synchronized (lock) {
+            if (keysModified != null) {
                oldSize = keysModified.length;
             }
 
-            if(newModifications != null && !newModifications.isEmpty()){
+            if (newModifications != null && !newModifications.isEmpty()) {
                toAdd = newModifications.size();
             }
 
-            if(toAdd > 0){
-               newModificationsArray = new Object[oldSize+toAdd];
+            if (toAdd > 0) {
+               newModificationsArray = new Object[oldSize + toAdd];
                int i;
-               if(oldSize > 0){
-                  for(i = 0; i < oldSize; i++){
+               if (oldSize > 0) {
+                  for (i = 0; i < oldSize; i++) {
                      newModificationsArray[i] = keysModified[i];
                   }
                }
                i = oldSize;
                Iterator<Object> itr = newModifications.iterator();
-               while(itr.hasNext()){
+               while (itr.hasNext()) {
                   newModificationsArray[i] = itr.next();
                   i++;
                }
@@ -484,8 +479,8 @@ public class CommitLog {
          }
       }
 
-      public Object[] getKeysModified(){
-         synchronized (lock){
+      public Object[] getKeysModified() {
+         synchronized (lock) {
             return keysModified;
          }
       }
@@ -493,11 +488,11 @@ public class CommitLog {
       @Override
       public String toString() {
          return "VersionEntry{" +
-               "version=" + version +
-               ", subVersion=" + subVersion +
-               ", concurrentClockNumber=" + concurrentClockNumber +
-               ", keysModified=" + (keysModified == null ? "ALL" : Arrays.asList(keysModified)) +
-               '}';
+                 "version=" + version +
+                 ", subVersion=" + subVersion +
+                 ", concurrentClockNumber=" + concurrentClockNumber +
+                 ", keysModified=" + (keysModified == null ? "ALL" : Arrays.asList(keysModified)) +
+                 '}';
       }
 
       public final void dumpTo(BufferedWriter writer) throws IOException {
