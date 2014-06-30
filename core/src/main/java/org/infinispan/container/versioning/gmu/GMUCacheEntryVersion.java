@@ -49,12 +49,14 @@ import static org.infinispan.container.versioning.InequalVersionComparisonResult
 public class GMUCacheEntryVersion extends GMUVersion {
 
    private transient CommitLog.VersionEntry versionEntry;
+   private transient long versionNumber;
    private final int subVersion;
 
    public GMUCacheEntryVersion(String cacheName, int viewId, GMUVersionGenerator versionGenerator, CommitLog.VersionEntry versionEntry, int subVersion) {
       super(cacheName, viewId, versionGenerator);
       this.versionEntry = versionEntry;
       this.subVersion = subVersion;
+      this.versionNumber = versionEntry.getVersion().getThisNodeVersionValue();
    }
 
    private GMUCacheEntryVersion(String cacheName, int viewId, ClusterSnapshot clusterSnapshot,
@@ -99,8 +101,9 @@ public class GMUCacheEntryVersion extends GMUVersion {
          GMUCacheEntryVersion cacheEntryVersion = (GMUCacheEntryVersion) other;
          if(versionEntry == null || cacheEntryVersion.versionEntry == null) return BEFORE;
 
-         InequalVersionComparisonResult result = versionEntry.getVersion().compareToWithCheckUnsafeBeforeOrEqual(cacheEntryVersion.versionEntry.getVersion());
-         if (result == EQUAL) {
+         //InequalVersionComparisonResult result = versionEntry.getVersion().compareToWithCheckUnsafeBeforeOrEqual(cacheEntryVersion.versionEntry.getVersion());
+          InequalVersionComparisonResult result = compare(versionNumber, cacheEntryVersion.versionNumber);
+          if (result == EQUAL) {
             return compare(subVersion, cacheEntryVersion.subVersion);
          }
          return result;
